@@ -1,5 +1,5 @@
 {
-  "note": "Derived from undercity-spec.md \u00a78 (Round Configuration). Round lengths, inject counts and mechanics are transcribed from that table. Per-beat runbook rows are intentionally EMPTY \u2014 inject timings and artifact instructions ('hand F-201 card to POW') exist in no build input, and are authored from the facilitation design. The control panel renders whatever beats this file contains; the off-script inject library works regardless.",
+  "note": "Derived from undercity-spec.md §8 (Round Configuration). Round lengths, inject counts and mechanics are transcribed from that table. Per-beat runbook rows are intentionally EMPTY — inject timings and artifact instructions ('hand F-201 card to POW') exist in no build input, and are authored from the facilitation design. The control panel renders whatever beats this file contains; the off-script inject library works regardless. Phases (spec: SETUP→FINISHED) map onto these rounds and a mode; see phases[]. Balance numbers live in config/scenarios/*.json, which override these defaults.",
   "defaults": {
     "upkeep_interval_s": 600,
     "resolve_recovery": 5,
@@ -30,7 +30,7 @@
       "length_s": 1200,
       "injects": "1-2 minor per sector, staggered",
       "mechanics": "Intra-sector only",
-      "purpose": "Baseline capture \u2014 must feel comfortably manageable",
+      "purpose": "Baseline capture — must feel comfortably manageable",
       "breather_after_s": 300,
       "beats": []
     },
@@ -60,9 +60,74 @@
       "length_s": 1500,
       "injects": "4 novel-combination faults + 1 mini-triage",
       "mechanics": "Same systems, fresh crisis",
-      "purpose": "Post-measurement \u2014 the delta is the product",
+      "purpose": "Post-measurement — the delta is the product",
       "breather_after_s": 0,
       "beats": []
+    }
+  ],
+  "phases": [
+    {
+      "id": "SETUP",
+      "name": "Setup",
+      "round": "R0",
+      "mode": "BRIEFING",
+      "hint": "Laptops connected, binders on tables, klaxon not yet fired."
+    },
+    {
+      "id": "ORIENTATION",
+      "name": "Orientation",
+      "round": "R0",
+      "mode": "PLAY",
+      "hint": "Tutorial fault per sector. Zero stakes."
+    },
+    {
+      "id": "ROUND_1",
+      "name": "Round 1 — Stable Ops",
+      "round": "R1",
+      "mode": "PLAY",
+      "hint": "Baseline capture. Must feel manageable."
+    },
+    {
+      "id": "ROUND_2",
+      "name": "Round 2 — Interdependence",
+      "round": "R2",
+      "mode": "PLAY",
+      "hint": "Cross-sector faults, transfers, Council #1."
+    },
+    {
+      "id": "ROUND_3",
+      "name": "Round 3 — Core Failure",
+      "round": "R3",
+      "mode": "PLAY",
+      "hint": "Core to 60%, Continuity Order, brownouts."
+    },
+    {
+      "id": "DEBRIEF_1",
+      "name": "Debrief 1",
+      "round": "R3",
+      "mode": "DEBRIEF",
+      "hint": "Headline metrics; one written commitment each."
+    },
+    {
+      "id": "AFTERSHOCK",
+      "name": "Aftershock",
+      "round": "R4",
+      "mode": "PLAY",
+      "hint": "Same systems, fresh crisis. The delta is the product."
+    },
+    {
+      "id": "DEBRIEF_2",
+      "name": "Debrief 2",
+      "round": "R4",
+      "mode": "DEBRIEF",
+      "hint": "Round 3 vs Aftershock on the wall."
+    },
+    {
+      "id": "FINISHED",
+      "name": "Finished",
+      "round": "R4",
+      "mode": "DEBRIEF",
+      "hint": "Export the log. Reset before the next cohort."
     }
   ]
 }

@@ -1,193 +1,296 @@
 # UNDERCITY — HAVEN-9
 
-Server and three screens for the UNDERCITY crisis-leadership simulation.
+The game control system for the UNDERCITY crisis-leadership simulation: one
+server, three synchronised screens, one live game state.
 
-Six sector tables run a four-round shift keeping an underground city alive
-while a facilitator turns the pressure dials by hand. **The software is the
-stimulus and the instrument, not the product** — the product is the
-measurement-and-debrief methodology, and `runlog.jsonl` is what feeds it.
+Six sector tables (18–36 participants) keep an underground city alive through
+a four-round shift while a facilitator turns the pressure dials from a game
+master console. **The software is the world engine, not the product** — it
+creates time pressure, scarcity and visible consequences, and records what
+happened. The participants still talk, negotiate, walk, consult binders, sign
+Transfer Chits and sit in Council. `runlog.jsonl` is what feeds the debrief.
 
 Design authority: `docs/undercity-spec.md`.
-Protocol authority: `docs/undercity-message-contract.md`.
-Where the two differ, **the contract wins** (spec §5.2).
+Protocol authority: `docs/undercity-message-contract.md` (§8 is the game
+control extension). Where the two differ, **the contract wins**.
 
 ---
 
-## Two ways to run it
+## The three screens
 
-UNDERCITY runs in two modes from one codebase.
+```text
+                 /admin  (facilitator's game master console)
+                     │
+                 GAME STATE   ← one authoritative process, server-side timers
+              ╱       │        ╲
+          /wall   /sector/POW   … /sector/COM
+       projector   one laptop per sector (POW WTR MED TRN AGR COM)
+```
 
-### Hosted — the platform
+| Screen | Who | LAN URL | What it does |
+|---|---|---|---|
+| **Wall** | projector, whole room | `/wall` | CITY STABILITY · CORE OUTPUT · NEXT CORE CYCLE · six sector cards (integrity, stock, workers, worst fault + countdown, status word) · event feed · emergency overlay · Council takeover · paused · Round 3 vs Aftershock |
+| **Sector** | the Systems Lead | `/sector/POW` … `/sector/COM` | What's wrong · how long · what we have · what to enter. Fault list → open card → resolution console with 3-strike 20 s lockout. Transfers panel. TRN gets the transfer queue + STAMP; COM gets City Intelligence |
+| **Admin** | the facilitator | `/admin?token=haven9` | Phase/master timer, seven always-visible quick actions, 2×3 sector control grid, pressure panel (faults · timeline · events · council · core · transfers · settings · debrief), live log, observation pad |
 
-Many concurrent sessions, facilitator accounts, an admin panel that creates a
-session, names the six tables and hands each one a join link.
+Every screen updates in real time over one websocket; no refresh, ever. A
+laptop that drops and rejoins gets the current state and its timers continue
+from where the server has them. `/bigscreen` is still there: the original
+HAVEN-9 cross-section map, fed from the same frame.
+
+---
+
+## Run it
+
+### LAN — the travel router (use this in a hotel)
+
+No internet is needed during play. The facilitator's laptop runs the server;
+the projector and six sector laptops join over the same Wi-Fi/LAN.
 
 ```bash
 npm install
+npm run start:lan            # or: MODE=lan node server.js
+```
+
+The boot log prints the addresses to read out to the room, e.g.
+
+```text
+  WALL (projector)      http://192.168.1.20:3000/wall
+  SECTOR laptops        http://192.168.1.20:3000/sector/POW  …/WTR  …/MED  …/TRN  …/AGR  …/COM
+  ADMIN (facilitator)   http://192.168.1.20:3000/admin?token=haven9
+```
+
+Admin → **URLS** shows the same list on screen. Change the facilitator token
+with `FACILITATOR_TOKEN=…`. A second Admin connection is allowed (a dead
+laptop must not end the run). The Admin page asks for the token if the URL
+does not carry one.
+
+```bash
+PORT=3000 FACILITATOR_TOKEN=haven9 MODE=lan node server.js
+RUNLOG_PATH=/media/usb/run.jsonl SNAPSHOT_PATH=/media/usb/snap.json MODE=lan node server.js   # log to a stick
+npm test                                                                            # ~160 tests
+```
+
+### Demo scenario
+
+With a LAN server running, open `/wall`, `/sector/POW`, `/sector/TRN` and
+`/admin?token=haven9`, then:
+
+```bash
+npm run demo                 # DEMO_FAST=1 for a quicker run; DEMO_URL / DEMO_TOKEN to point elsewhere
+```
+
+It walks the thirteen beats of spec §50 — normal state, fault, countdown,
+wrong code, lockout, correct code (stock deducted, +5 integrity), transfer
+stamped by TRN, integrity loss, CRITICAL, Council, Continuity Order, brownout,
+sector DARK, and the Round 3 vs Aftershock comparison on the wall. Demo values
+are demo values, not balance.
+
+### Hosted — the platform
+
+Many concurrent sessions, facilitator accounts, a sessions panel that creates
+a session, picks its scenario, names the six tables and hands each one a join
+link.
+
+```bash
 npm run create-user -- you@example.com "Your Name"   # prints a password once
 npm start                                            # http://localhost:3000/admin
 ```
 
 | Screen | URL |
 |---|---|
-| Admin | `/admin` |
-| Big screen | `/s/<CODE>/bigscreen` |
-| Control panel | `/s/<CODE>/control?token=…` |
+| Sessions panel (accounts) | `/admin` |
+| Wall | `/s/<CODE>/wall` |
+| Admin console | `/s/<CODE>/control?token=…` |
 | A team's dashboard | `/j/<JOIN CODE>` → their own sector |
-
-Each team's join link resolves straight to their sector — nothing to pick and
-nothing to type on six laptops while a room fills up.
-
-### LAN — the travel router
-
-The original single-run behaviour, no accounts, bare URLs. **Keep using this
-whenever the venue's network is not yours.** The spec calls hotel WiFi *"the #1
-failure mode for this class of product"* (§5.1), and a hosted session dies with
-the venue's uplink.
-
-```bash
-MODE=lan npm start
-```
-
-| Screen | URL | Count |
-|---|---|---|
-| Sector dashboard | `/sector/POW` … `/sector/COM` | 6 |
-| Big screen | `/bigscreen` | 1 |
-| Control panel | `/control?token=haven9` | 1 (a second is allowed) |
-
-```bash
-PORT=3000 FACILITATOR_TOKEN=haven9 MODE=lan npm start
-RUNLOG_PATH=/media/usb/run.jsonl MODE=lan npm start   # log straight to a stick
-npm test                                              # 78 tests, ~25s
-```
 
 ### Environment
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `MODE` | `lan` unless `DATA_DIR` is set | `hosted` or `lan` |
-| `DATA_DIR` | `./data` | SQLite file and one runlog per session |
+| `DATA_DIR` | `./data` | SQLite file, saved scenarios, one runlog per session |
 | `PORT` | `3000` | |
-| `FACILITATOR_TOKEN` | `haven9` | LAN mode control-panel token |
-| `SECURE_COOKIES` | on when `NODE_ENV=production` | `Secure` flag on the admin cookie |
-| `ADMIN_EMAIL` | — | hosted mode: seed this master admin on first boot |
-| `ADMIN_NAME` | local part of the email | display name for the seeded admin |
-| `ADMIN_PASSWORD` | generated and logged once | password for the seeded admin only |
+| `FACILITATOR_TOKEN` | `haven9` | LAN mode admin token |
+| `SECURE_COOKIES` | on when `NODE_ENV=production` | `Secure` flag on the sessions-panel cookie |
+| `ADMIN_EMAIL` / `ADMIN_NAME` / `ADMIN_PASSWORD` | — | hosted mode: seed the master admin on first boot |
 | `KIT_DIR` | `./kit` | where the printable documents live |
 | `RUNLOG_PATH` / `SNAPSHOT_PATH` | under `DATA_DIR` | LAN mode only |
 
 ---
 
-## Deploying (Render)
+## How a round works
 
-`render.yaml` and the `Dockerfile` deploy the hosted mode as a single always-on
-service with a persistent disk.
+1. **Phases.** `SETUP → ORIENTATION → ROUND_1 → ROUND_2 → ROUND_3 → DEBRIEF_1 →
+   AFTERSHOCK → DEBRIEF_2 → FINISHED` (`lib/rounds.json`). Each phase maps to a
+   round and a mode; every change is timestamped. Admin: START / PAUSE /
+   RESUME / END PHASE / NEXT PHASE. PAUSE freezes every timer (master clock,
+   fault countdowns, council, core cycle, temporary effects) and the wall and
+   sectors say SIMULATION PAUSED. RESUME continues from the exact remaining
+   times. RESET requires confirmation.
+2. **Faults.** Admin fires one from the picker (one click), a preset ("ROUND 2
+   WAVE A", several faults with delays) or the round's **timeline**. The fault
+   appears on that sector's screen with its countdown, and as the wall's
+   headline fault for that sector. The team looks the code up in the physical
+   binder, gathers resources and cross-sector spec values, and enters the
+   resolution code. Wrong code → attempt recorded; three consecutive wrong
+   codes → console locked 20 s (server-controlled). Right code → +5 integrity,
+   the procedure's resources leave the digital stock, the wall credits the
+   sector. Deadline reached → `EXPIRED`, an integrity penalty by severity, and
+   the fault stays solvable (all configurable).
+3. **Core cycle.** A city-wide countdown (default 7:00). At zero the server
+   processes the cycle: production → upkeep → shortage penalties → worker
+   recovery (MED spends med supplies) → brownout effects → city stability →
+   next cycle. Admin sees a per-sector summary; Transport's per-cycle stamp
+   capacity resets.
+4. **Transfers.** The Transfer Chit stays physical. The digital record follows
+   `REQUESTED → AGREED → WAITING_TRN → STAMPED → DELIVERED`; only TRN's STAMP
+   (or Admin) moves stock, and only within Transport's capacity, which
+   brownout, gridlock and tunnel collapse reduce.
+5. **Council.** CALL COUNCIL puts the 5:00 summons on every screen. Admin
+   records the **Continuity Order** by clicking sectors in rank order; it
+   confirms ("This decision cannot be recalled."), ranks 5 and 6 enter
+   BROWNOUT, the wall announces CONTINUITY ORDER ACCEPTED. No order at 00:00
+   → NO CONTINUITY ORDER RECEIVED and a one-click **rolling blackout**, which
+   rotates brownout through the city until Admin ends it.
+6. **Pressure.** Quick actions (TRIGGER FAULT · CORE −10% · INJURE WORKER ·
+   CALL COUNCIL · BROWNOUT · ANNOUNCEMENT · ALERT · PAUSE) are always on
+   screen. The pressure dial and configurable **events** (supply delay,
+   transport gridlock, false sensor reading, power surge, tunnel collapse,
+   communication blackout, biological breach…) each have a visibility:
+   `ADMIN_ONLY`, `CITY_WIDE`, `TARGET_SECTOR` or `COMMS_ONLY`.
+7. **Debrief.** Admin → DEBRIEF folds the log into per-round numbers (faults
+   resolved, time to first action, average response, failed console entries,
+   lockouts, transfers and their timing, critical entries, council decision
+   time) and a neutral Round 3 vs Aftershock table that can be put on the
+   wall. No winner is declared.
 
-1. Push the repo and point Render at the blueprint.
-2. Render provisions a 5 GB disk at `/var/data` — SQLite and the run logs.
-3. **Open `/admin` and claim the instance.** While no account exists, that page
-   offers a "create the first admin" form instead of a login. It closes
-   permanently the moment any account exists.
+The facilitator's eyes belong on the room: nothing on the Admin console is
+more than two clicks away and only destructive actions confirm.
 
-That is the whole first-run path — no shell, no environment variable, no
-redeploy. The other two routes are fallbacks:
+---
 
-- **Seed from the environment.** Set `ADMIN_EMAIL`, `ADMIN_NAME` and
-  `ADMIN_PASSWORD`, and the account is created on boot if it does not exist.
-  ⚠️ `render.yaml` env vars only reach a service **created from the Blueprint**.
-  A service created by hand in the dashboard never sees them — set them there
-  instead. If `ADMIN_EMAIL` is unset the boot log now says so explicitly.
-- **Shell.** `npm run create-user -- you@example.com "Your Name"`.
+## Configuration, not code
 
-### ⚠️ Attach a persistent disk, or you will lose everything
+Anything involving balance lives in a **scenario**
+(`config/scenarios/haven9-standard.json`) and is editable live from Admin →
+SETTINGS: thresholds, lockout, council clock, cycle length, production and
+upkeep per sector, deadline defaults and penalties by severity, brownout
+effects (with per-sector specials: COM loses telemetry, TRN capacity drops,
+POW production collapses), transport capacity, the city stability formula
+and its weights, resource minimums, wall detail switches, event presets,
+fault presets, the round timelines and COM's intelligence items.
 
-Accounts, sessions and run logs all live in `DATA_DIR`. On a container host
-that directory only survives a restart if a **disk is mounted over it**.
-Without one the app runs perfectly, writes happily, and loses the lot the next
-time the container is replaced.
+**SAVE AS SCENARIO** stores the running configuration in SQLite under a name
+(`HAVEN-9 HARD`, `HAVEN-9 CLIENT TEST`…); a saved copy with a built-in's id
+shadows it, deleting the copy reveals the built-in again. A session chooses
+its scenario when created (hosted) or on RESET RUN WITH SCENARIO (Admin).
 
-`render.yaml` declares the disk — but like the env vars, it applies **only to a
-service created from the Blueprint**. A service created by hand in the
-dashboard has no disk until you add one there:
+Three switches decide how much the computer does, because the earlier design
+deliberately kept it out of the economy (contract §3.5):
 
-> Render → your service → **Disks** → Add Disk → mount path `/var/data`
+| Switch | Default | Off means |
+|---|---|---|
+| `auto_economy` | on | production, upkeep and transfers are recorded but move no stock |
+| `deduct_resources_on_resolve` | on | a resolve is a declaration; chits are the only ledger |
+| `resolve_requires_resources` | off | (on) a team short of stock is refused, not just logged |
 
-A disk requires a **paid** instance. Free instances cannot have one, and they
-also spin down when idle — which is what a restart that loses data looks like.
-
-The server checks this itself. If `DATA_DIR` is not on a mounted disk the boot
-log carries a loud banner, `/healthz` reports
-`storage.verdict: "ephemeral"`, and the admin panel shows a red banner on every
-page. Once data has survived one restart the check reports `persistent` and
-says so — that is proof, not inference, because the ledger it writes came back.
-
-### Accounts survive deploys
-
-A deploy replaces the **image** — code and the printable kit. Accounts, sessions
-and run logs live in `/var/data` on the persistent disk, which is mounted over
-the image and left alone. Redeploy as often as you like.
-
-`ADMIN_EMAIL` / `ADMIN_NAME` / `ADMIN_PASSWORD` only seed the master admin **if
-that account does not exist yet**. An existing account is never modified, so a
-password changed in the app is not silently reverted by the next deploy. The
-"No facilitator accounts yet" line appears only on a first boot against an
-empty disk.
-
-After that, add people in the app: **FACILITATORS** (admin only) creates
-accounts, resets passwords, and grants or revokes admin. Generated passwords
-are shown exactly once. Two guards stop a lockout: the last admin cannot be
-demoted or removed, and nobody can delete their own account. A facilitator who
-still owns sessions cannot be removed either, so run history keeps its author.
-
-`npm run create-user` still works from a Render shell if you ever need it.
-
-**Do not raise `numInstances` above 1.** Game state is authoritative in memory
-and broadcast to every client of a session (contract §0.1–0.2). A second
-instance would hold its own copy of every game, and clients would see whichever
-one the load balancer happened to pick. Scaling this safely means moving state
-to Redis, which the contract deliberately rules out for the MVP.
-
-**A paid instance is required.** Free instances sleep when idle, and a server
-that sleeps mid-session ends the run.
-
-### Why not Vercel
-
-Vercel's WebSocket support (public beta, June 2026) pins a connection to a
-single function instance for at most 30 minutes, with no built-in way to
-broadcast between instances, and recommends Redis for any shared state. R2 and
-R3 are 30 minutes each, and the whole design is one authoritative process
-broadcasting full state to eight clients — so the platform's two hard limits
-are exactly the two things this app does.
+Nothing in this file has been playtested. Treat every number as a starting
+point.
 
 ---
 
 ## Layout
 
-```
-server.js              Express + ws; boots content, routes intents, 10s tick
-content/*.json         faults · specs · sectors — generated, never hand-edited
+```text
+server.js                Express + ws; routes, intents, the 1 s engine tick, change-based broadcast
+config/scenarios/        game configuration — every balance number (HAVEN-9 STANDARD ships)
+content/*.json           faults · specs · sectors — generated from the matrix, never hand-edited
 lib/
-  validate.js          boot-time content reconciliation (aborts on error)
-  state.js             authoritative state and every reducer
-  resolve.js           submit_code, in the contract's exact order
-  visibility.js        per-role filtering — THE SECURITY BOUNDARY
-  log.js               runlog.jsonl appender + snapshot writer
-  rounds.json          round config from spec §8; runbook beats live here
-  db.js                SQLite: facilitators, sessions, teams
-  auth.js              scrypt passwords, server-side cookie sessions
-  sessions.js          registry of concurrent games, one per session
-public/sector          dashboard   (spec §6.1)
-public/bigscreen       projection  (spec §6.2)
-public/control         facilitator (spec §6.3)
-public/admin           session management (hosted mode)
-scripts/create-user.js facilitator accounts
-tools/                 workbook generator, the matrix itself, and the exporter
-tools/kit/             paper-kit generators (binders, cards, charter, guides)
-kit/                   the generated documents + MANIFEST.json, ready to print
-lib/kit.js             manifest reading, audience split, paper/server sync check
-lib/zip.js             minimal STORE-method zip writer for download-all
-test/                  unit, visibility, integration and resilience suites
+  config.js              ScenarioLibrary: built-ins + saved copies, deep merge, resolve for play
+  state.js               authoritative state and every reducer; economy + crisis mixed in
+  economy.js             pure functions: city stability formula, production/upkeep, PROCESS CYCLE
+  crisis.js              council, Continuity Order, rolling blackout, events, scheduled queue, timeline
+  resolve.js             submit_code, in the contract's exact order (deduction is a switch)
+  visibility.js          per-role filtering — THE SECURITY BOUNDARY
+  analytics.js           runlog.jsonl → per-round stats, Round 3 vs Aftershock comparison, timeline
+  log.js                 runlog.jsonl appender (+ round/phase context) and snapshot writer
+  rounds.json            rounds and phases from spec §8
+  db.js                  SQLite: facilitators, sessions, teams, scenarios
+  auth.js                scrypt passwords, server-side cookie sessions (sessions panel only)
+  sessions.js            registry of concurrent games, one per session, reset with scenario
+  kit.js · zip.js        the printable kit and its download
+public/
+  wall/                  projector   (spec §6–§11)
+  sector/                sector laptop (spec §12–§23)
+  control/               admin console (spec §24–§34, §44, §46)  — served at /admin and /control
+  bigscreen/             the original HAVEN-9 cross-section map view
+  admin/                 hosted sessions panel (accounts, join links, print kit)
+  shared/ws.js           connect · countdown interpolation · audio with synthesised fallbacks
+  audio/                 drop <sting>.mp3 here to replace a placeholder tone
+scripts/demo.js          the demo scenario (spec §50)
+scripts/create-user.js   facilitator accounts
+tools/ · kit/            content pipeline and the printable documents (unchanged)
+test/                    unit, engine, visibility, integration, resilience, hosted, accounts suites
 ```
+
+### Architecture in five sentences
+
+The server holds one `GameState` per session in memory, ticks it every
+second, and after any change broadcasts a **full state frame** to every
+client of that session — each client gets its own projection from
+`lib/visibility.js`, so a sector laptop never receives another sector's stock,
+any answer key, or the dependency half of a fault's flavour line. Clients
+render what they are told and send intents; timers are server-authoritative
+and clients only interpolate countdowns between frames. Every state change is
+appended to `runlog.jsonl` with its round and phase, and the game is
+snapshotted every 10 s so a crash or redeploy resumes mid-run. Balance lives
+in a scenario document, the engine has no numbers of its own, and the content
+(faults, specs, sectors) is generated from the spreadsheet that also prints
+the binders. A cloud deployment is the same process with accounts and many
+sessions in front of it; nothing about the game changes.
+
+### Database schema (SQLite, `DATA_DIR/undercity.db`)
+
+| Table | Holds |
+|---|---|
+| `facilitators` | accounts: email, name, scrypt hash, is_admin |
+| `auth_sessions` | server-side login tokens |
+| `sessions` | one row per run: code, run_id, name, client, owner, control_token, status, **scenario_id** |
+| `teams` | six per session: sector, table name, join code |
+| `scenarios` | saved scenario documents (id, name, notes, json) |
+
+Game state itself is **not** in the database. It lives in memory and in
+`DATA_DIR/runs/<CODE>/snapshot.json`; the log is `runlog.jsonl` beside it.
+Migrations are additive and run at boot (`lib/db.js` → `migrate`).
+
+---
+
+## Adding faults, events, presets and timelines
+
+- **A new fault** starts in `tools/undercity-crossref-matrix.xlsx` (see *Content
+  pipeline* below), never in `content/faults.json`. Deadlines and injuries can
+  be set per fault there; a fault with no deadline gets the scenario's default
+  for its severity (`deadline_default_s`).
+- **A new event**: add an object to `events[]` in a scenario. Fields:
+  `id name description targets` (`"ALL"`, `"PICK"`, `"RANDOM2"` or a list),
+  `visibility`, and any of `integrity_changes {SECTOR|TARGET: delta}`,
+  `resource_changes {…}` (per target), `resource_changes_all {…}`,
+  `worker_changes { injure, sectors? }`, `core_delta`, `intel_changes {key: value}`,
+  `effects [{ kind: trn_capacity|com_blind|no_production, value|delta, duration_s|cycles }]`,
+  `alert { title subtitle big }`, `announce` (`{target}` is substituted),
+  `followups [{ event_id, delay_s }]`. It appears on the PRESSURE tab at once.
+- **A fault preset**: `fault_presets[]` → `{ id, name, items: [{ fault_code, sector, delay_s }] }`.
+- **A round timeline**: `timelines.R2[]` → `{ offset_s, kind, mode }` where kind
+  is `fault` (`fault_code`, `sector`), `event` (`event_id`), `council`,
+  `core` (`value`), `announce` (`text`), `alert` (`text`) or `cycle`, and mode
+  is `AUTO` (fires itself) or `MANUAL` (turns into READY TO FIRE — the
+  facilitator hands the card and presses it). Skip or delay anything; the
+  script never forces the room.
+- **COM intelligence**: `intel[]` → `{ key, label, value, hidden_in_brownout }`;
+  editable live from Admin → CORE.
+
+Edit a built-in in `config/scenarios/`, or save a copy from Admin.
 
 ---
 
@@ -203,93 +306,32 @@ tools/build_crossref.py              generates the workbook (deterministic, seed
 ```
 
 Both branches read the **same cells**, so paper and server cannot disagree.
-That is the property the whole design rests on: a hand-fix to either side
-desynchronises them and makes a fault unsolvable mid-session.
-
-Ordinary content edits start at the workbook, not the generator: edit
-`tools/undercity-crossref-matrix.xlsx`, recalculate, re-export. The generator is
-there so the workbook itself is reproducible — `random.seed(9)` fixes every spec
-value, so re-running it does not invalidate printed binders.
-
 **Never hand-edit `content/*.json`.** A hand-fix desynchronises paper from
 server and makes a fault unsolvable mid-session — the one failure a
-facilitator cannot recover from live (spec §1).
-
-`lib/validate.js` re-checks the fixtures at every boot: it re-derives every
-resolution code from `specs.json`, enforces spec-value uniqueness, rejects
-ambiguous codes, and flags flavour text that contradicts the answer key.
-**Errors abort startup.** Warnings print loudly and allow the run.
-
-`content/` currently validates clean — 0 errors, 0 warnings. Findings to date,
-including the F-208 card/answer-key mismatch and the exporter bug that silently
-accepted an uncalculated workbook, are recorded in **`CONTENT-ISSUES.md`**.
-
----
+facilitator cannot recover from live. `lib/validate.js` re-checks the
+fixtures at every boot; errors abort startup. Findings to date are in
+`CONTENT-ISSUES.md`.
 
 ## The paper kit
 
-### Getting the documents
-
-Sign in to `/admin` → **PRINT KIT**. Every document is downloadable
-individually, as a participant-facing set, as a facilitator-only set, or all
-thirteen as one zip.
-
-The page splits them deliberately:
-
-| Group | Documents | Rule |
-|---|---|---|
-| **Participant-facing** | fault cards, City Charter, role cards, transfer chits, consent pack + table tents | safe to hand out and leave on a table |
-| **Facilitator only** | answer key, six sector binders, the Guidebook | never leave on a participant table |
-
-A badge at the top says whether the kit matches the content the server is
-actually running. It is not a guess: the manifest records the SHA-256 of every
-content file at the moment the documents were built, and the server re-hashes
-its own content and compares. Green means printing is safe; red means the kit
-predates a content change and printing it risks handing teams values the
-server will reject.
-
-That guarantee comes from **where** generation happens. The kit is built during
-the Docker build, in a stage that runs the generators against the same matrix
-and the same `content/*.json` that ship in the image. Paper and server come out
-of one build, together. There is deliberately no "regenerate" button and no
-Python in the runtime image — nothing on the server can produce a document that
-disagrees with the game it is serving. To change the kit, change the matrix and
-redeploy.
-
-### Rebuilding locally
-
-`npm run kit` regenerates all thirteen documents: six sector binders, the fault
-card deck, the facilitator answer key, the City Charter and Continuity Order,
-transfer chits, role cards, the consent pack and table tents, and the
-Facilitator & Administrator Guidebook. Requires `openpyxl` (Python) and the
-`docx` devDependency.
-
-Three content rules are enforced by the generators, not by discipline:
-
-- **A card prints the symptom only.** Flavour lines read `"SYMPTOM; needs X
-  from Y"`; the half after the semicolon is the lookup the team must earn by
-  talking to another sector. `lib/visibility.js` applies the same cut before
-  sending state to a dashboard, so the screen cannot hand over what the paper
-  withholds.
-- **A binder never prints another sector's spec values**, and never a complete
-  resolution code — only the procedure, the cost, and *where* to fetch each
-  value. `assemble_binders.py` fails the build if a binder would leak.
-- **Appendix C gets no index entry.** It is findable only by reading the
-  binder, and nothing on screen names it.
+Sign in to the hosted `/admin` → **PRINT KIT**: fault cards, City Charter,
+role cards, transfer chits, consent pack (participant-facing) and the answer
+key, six sector binders and the Guidebook (facilitator only). A badge says
+whether the kit matches the content the server is running (SHA-256 of every
+content file, recorded at build time). `npm run kit` rebuilds locally
+(needs `openpyxl` and the `docx` devDependency). Three content rules are
+enforced by the generators: a card prints the symptom only; a binder never
+prints another sector's spec values or a complete code; Appendix C gets no
+index entry.
 
 ## Two structural edge cases
 
-Both live in the content, and any code path that assumes exactly one
-resolution code is wrong:
-
 - **`F-201` has two valid codes.** The WTR binder prints reservoir pressure
-  **340**; the big screen shows **290**. The server accepts either. These two
-  numbers are never reconciled anywhere in the code or the UI — the mismatch
-  *is* the psychological-safety probe (spec §3.7).
-- **`F-210` has zero.** It is a sensor ghost with no procedure. Every
-  submission returns `no_procedure`; only the facilitator can clear it. This
-  is driven off `valid_codes.length === 0`, never off the fault code, so a
-  future false alarm needs no code change.
+  **340**; the wall shows **290**. The server accepts either. Never reconciled —
+  the mismatch *is* the psychological-safety probe (spec §3.7).
+- **`F-210` has zero.** A sensor ghost with no procedure. Every submission
+  returns `no_procedure`; only the facilitator can clear it. Driven off
+  `valid_codes.length === 0`, never off the code.
 
 ## Visibility
 
@@ -298,60 +340,55 @@ a sector must not know is never put in its frame.
 
 | Role | Own sector | Other sectors | Extra |
 |---|---|---|---|
-| `sector` | full | integrity + status only, **60 s stale** | — |
-| `sector` = COM | full | as above **+ foreign fault codes and names, live** | — |
-| `bigscreen` | — | integrity/status/ticker/telemetry; no faults, no inventory | — |
-| `control` | everything, live | everything, live | `valid_codes` |
+| `sector` | full | integrity + status only, **60 s stale** | own transfers, own announcements, own effects |
+| `sector` = COM | full | as above **+ foreign fault codes and names, live** | CITY INTELLIGENCE (UNKNOWN under brownout/blackout) |
+| `sector` = TRN | full | as above | TRANSFER QUEUE + capacity + STAMP |
+| `wall` | — | integrity, status, workers, stock summary, worst fault + countdown, public feed | none of it while COM is DARK; **never** an answer key, procedure or flavour line |
+| `control` | everything, live | everything, live | `valid_codes`, config, timeline, transfers, debrief |
 
-COM's exception is scoped to *what is broken*, not *how to fix it* and not
-*how much they hold* — and COM's view of the bars stays on the same 60 s
-delay as everyone else's.
+The wall's stock summary and headline fault are switches
+(`wall_shows_inventory`, `wall_shows_faults`) so the original "bars only"
+projector is one setting away. A sector's screen says only *consult your
+binder*; the dependency half of every flavour line is cut server-side, exactly
+as the printed card cuts it.
 
 ## Deliberate non-features
 
 Do not let a future change add these:
 
-- **No chat.** All inter-sector communication is voice or feet. A chat box
-  routes the diagnostic data into silent text and destroys the product.
-- **No auto-deducted resources.** `set_inventory` is a declaration; physical
-  chits are the source of truth. Enforcement pushes arguments onto the screen
-  and off the transcript.
-- **No cascade engine.** The facilitator fires everything. `triggered_by`
-  exists on every fault and stays `null`.
-- **No participant accounts.** Facilitators sign in; teams never do. A table
-  joins by code and stays anonymous, and nothing about a participant persists
-  between runs. The hosted mode adds session management, not participant
-  identity.
-- **No responsive layout.** Fixed 1366×768 on provided hardware.
-
----
+- **No chat.** All inter-sector communication is voice or feet.
+- **No digital Transfer Chit.** The chit is signed by both Liaisons and
+  stamped by TRN on paper; the screen only records the status.
+- **No automatic triage.** The sector screen lists faults in the order they
+  arrived and never says which to solve first.
+- **No cascade AI.** Every fault is fired by the facilitator, a preset they
+  chose, or a timeline they armed — and MANUAL beats wait for them.
+- **No participant accounts.** Teams join by URL or code and stay anonymous.
+- **No behavioural analysis in the app.** The debrief shows counts and
+  durations; interpretation is the facilitator's.
 
 ## runlog.jsonl
 
 One JSON object per line, appended on every state change, rotated on
-`reset_run`. This file is joined to the table audio in debrief.
-
-At R0 the facilitator fires the klaxon; the audio spike aligns every recording
-to this log, and the sting is logged with its timestamp. **That entry is the
-join key for the entire analytics pipeline.**
-
-Logged: faults fired/resolved/cleared, every submission — accepted *and*
-rejected, since failed attempts are diagnostic — inventory declarations,
-mode/round/clock changes, announcements, facilitator overrides, observation
-tags, and connect/disconnect.
-
-The observation pad writes straight into it. That is how the debrief timeline
-builds itself, and it is the highest-value surface in the control panel.
+`reset_run`, each line stamped with its `round` and `phase`. At R0 the
+facilitator fires the klaxon; the audio spike aligns every recording to this
+log. Logged: phases and clocks, faults fired/opened/resolved/expired/cleared,
+every console submission accepted *and* rejected, lockouts, inventory
+declarations, cycles and missed upkeep, injuries and recoveries, every
+transfer step, council calls/orders/no-order, blackouts, events and effects,
+alerts, announcements, configuration changes, observation tags, connects and
+disconnects. `lib/analytics.js` reads nothing else.
 
 ---
 
-## Not included
+## Deploying (Render)
 
-Physical artifacts (spec §4) — binders, fault cards, transfer chits, the city
-charter, role cards, the consent pack — are out of scope for this repo.
-
-`lib/rounds.json` carries round lengths and mechanics from spec §8, but its
-per-beat runbook rows are **empty**: inject timings and artifact instructions
-("hand F-201 card to POW") come from the facilitation design and are authored
-there. The control panel's off-script inject library is fully functional
-meanwhile.
+`render.yaml` and the `Dockerfile` deploy the hosted mode as a single
+always-on service with a persistent disk (`/var/data`). Open `/admin` to
+claim the instance on first run. **Attach a persistent disk** or accounts,
+sessions, saved scenarios and run logs are lost on restart — the boot log,
+`/healthz` and the sessions panel all warn when `DATA_DIR` is ephemeral.
+**Do not raise `numInstances` above 1**: game state is authoritative in one
+process. A paid instance is required (free instances sleep mid-session).
+Accounts and saved scenarios survive redeploys; a deploy replaces the image,
+not the disk.

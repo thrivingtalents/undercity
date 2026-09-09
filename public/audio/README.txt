@@ -1,0 +1,1 @@
+Drop replaceable stings here as <name>.mp3: fault_alert critical resolved council warning_30 brownout dark core_warning alert cycle chime klaxon. Missing files fall back to synthesised tones (public/shared/ws.js).

@@ -1,0 +1,255 @@
+{
+  "id": "haven9-standard",
+  "name": "HAVEN-9 STANDARD",
+  "notes": "DEMO BALANCE — not playtested. Every number in this file is game configuration, not engine logic, and is editable from Admin → SETTINGS. Save a copy with SAVE AS SCENARIO before changing anything for a client.",
+
+  "defaults": {
+    "tick_ms": 1000,
+    "broadcast_ms": 10000,
+    "snapshot_ms": 10000,
+    "delay_window_s": 60,
+    "card_shows_dependency": false,
+
+    "critical_below": 30,
+    "dark_at": 0,
+    "resolve_recovery": 5,
+    "lockout_s": 20,
+    "lockout_after_consecutive_invalid": 3,
+    "council_clock_s": 300,
+
+    "auto_economy": true,
+    "deduct_resources_on_resolve": true,
+    "resolve_requires_resources": false,
+    "cycle_length_s": 420,
+    "cycle_autostart": true,
+    "upkeep_shortfall_penalty": 4,
+    "upkeep_shortfall_penalty_cap": 12,
+    "core_scales_power_production": true,
+    "injured_recovery_per_cycle": 1,
+    "injured_recovery_costs_med": 1,
+
+    "deadline_default_s": { "1": null, "2": 480, "3": 360 },
+    "deadline_penalty": { "1": 5, "2": 10, "3": 15 },
+    "expired_faults_remain_solvable": true,
+
+    "resource_min_thresholds": { "power": 1, "water": 1, "parts": 1, "med": 0 },
+
+    "trn_capacity_per_cycle": 3,
+    "deliver_on_stamp": true,
+
+    "brownout_effects": {
+      "production_multiplier": 0.5,
+      "upkeep_delivery_multiplier": 0.5,
+      "fault_timer_multiplier": 0.75,
+      "worker_penalty": 2,
+      "decay_per_min": 0.5,
+      "per_sector": {
+        "COM": { "lose_telemetry": true },
+        "TRN": { "transfer_capacity": 1 },
+        "POW": { "production_multiplier": 0.25 }
+      }
+    },
+    "com_dark_hides_wall_detail": true,
+
+    "wall_shows_inventory": true,
+    "wall_shows_faults": true,
+    "wall_feed_max": 7,
+
+    "stability": {
+      "mode": "auto",
+      "manual_value": 100,
+      "weights": {
+        "integrity": 0.6,
+        "core_output": 0.4,
+        "critical_fault": 4,
+        "dark_sector": 12,
+        "brownout_sector": 6,
+        "missed_upkeep": 3
+      }
+    },
+    "core_output_presets": [100, 90, 80, 70, 60, 50, 40],
+    "rolling_blackout": { "interval_s": 60, "sectors_at_a_time": 2 },
+    "auto_blackout_on_no_order": false,
+    "alert_full_screen_s": 8,
+    "sound_enabled": true
+  },
+
+  "sectors": {
+    "POW": { "start_integrity": 100, "start_workforce": 8,
+             "start_inventory": { "power": 3, "water": 3, "parts": 3, "med": 1 },
+             "production": { "power": 3 }, "upkeep": { "power": 2, "water": 1 } },
+    "WTR": { "start_integrity": 100, "start_workforce": 8,
+             "start_inventory": { "power": 3, "water": 3, "parts": 3, "med": 1 },
+             "production": { "water": 3 }, "upkeep": { "power": 2, "water": 1 } },
+    "MED": { "start_integrity": 100, "start_workforce": 8,
+             "start_inventory": { "power": 3, "water": 3, "parts": 3, "med": 1 },
+             "production": { "med": 1 }, "upkeep": { "power": 2, "water": 1 } },
+    "TRN": { "start_integrity": 100, "start_workforce": 8,
+             "start_inventory": { "power": 3, "water": 3, "parts": 3, "med": 1 },
+             "production": {}, "upkeep": { "power": 2, "water": 1 } },
+    "AGR": { "start_integrity": 100, "start_workforce": 8,
+             "start_inventory": { "power": 3, "water": 3, "parts": 3, "med": 1 },
+             "production": {}, "upkeep": { "power": 2, "water": 1 },
+             "note": "AGR's economy (food) is not specified yet — set production here once playtested." },
+    "COM": { "start_integrity": 100, "start_workforce": 8,
+             "start_inventory": { "power": 3, "water": 3, "parts": 3, "med": 1 },
+             "production": {}, "upkeep": { "power": 2, "water": 1 } }
+  },
+
+  "intel": [
+    { "key": "water_pressure", "label": "WATER PRESSURE", "value": "NOMINAL", "hidden_in_brownout": true },
+    { "key": "tunnel_4_sensor", "label": "TUNNEL 4 SENSOR", "value": "RELIABLE", "hidden_in_brownout": true },
+    { "key": "medical_load", "label": "MEDICAL LOAD", "value": "NORMAL", "hidden_in_brownout": false },
+    { "key": "core_trend", "label": "CORE TREND", "value": "STABLE", "hidden_in_brownout": true }
+  ],
+
+  "events": [
+    { "id": "supply_delay", "name": "SUPPLY DELAY",
+      "description": "The target sector receives no production next cycle.",
+      "targets": "PICK", "visibility": "TARGET_SECTOR",
+      "effects": [{ "kind": "no_production", "cycles": 1 }],
+      "announce": "Supply run to {target} delayed — no production this cycle." },
+
+    { "id": "worker_injury", "name": "WORKER INJURY",
+      "description": "One worker in the target sector is injured and moves to MED.",
+      "targets": "PICK", "visibility": "TARGET_SECTOR",
+      "worker_changes": { "injure": 1 } },
+
+    { "id": "transport_gridlock", "name": "TRANSPORT GRIDLOCK",
+      "description": "Transport capacity drops to zero for three minutes.",
+      "targets": ["TRN"], "visibility": "CITY_WIDE",
+      "effects": [{ "kind": "trn_capacity", "value": 0, "duration_s": 180 }],
+      "announce": "Tunnel gridlock — Transport cannot move anything for 3 minutes." },
+
+    { "id": "false_sensor_reading", "name": "FALSE SENSOR READING",
+      "description": "COM's intelligence feed shows a misleading value. Nobody else sees it.",
+      "targets": ["COM"], "visibility": "COMMS_ONLY",
+      "intel_changes": { "tunnel_4_sensor": "UNRELIABLE", "water_pressure": "DEGRADING" } },
+
+    { "id": "power_surge", "name": "POWER SURGE",
+      "description": "Grid surge damages POW and burns one part in every sector.",
+      "targets": ["POW"], "visibility": "CITY_WIDE",
+      "integrity_changes": { "POW": -8 },
+      "resource_changes_all": { "parts": -1 },
+      "announce": "Power surge on the ring main. Check your spare parts." },
+
+    { "id": "core_output_drop", "name": "CORE OUTPUT DROP",
+      "description": "Core output falls by 10 points.",
+      "targets": "ALL", "visibility": "CITY_WIDE",
+      "core_delta": -10,
+      "alert": { "title": "⚠ CORE INSTABILITY DETECTED", "subtitle": "CORE OUTPUT FALLING" } },
+
+    { "id": "medical_emergency", "name": "MEDICAL EMERGENCY",
+      "description": "Two workers injured in two random sectors; MED under load.",
+      "targets": "RANDOM2", "visibility": "CITY_WIDE",
+      "worker_changes": { "injure": 1 },
+      "intel_changes": { "medical_load": "HIGH" },
+      "announce": "Medical emergency — casualties inbound to MED." },
+
+    { "id": "tunnel_collapse", "name": "TUNNEL COLLAPSE",
+      "description": "Tunnel 4 collapses. TRN loses integrity and one unit of transfer capacity for five minutes.",
+      "targets": ["TRN"], "visibility": "CITY_WIDE",
+      "integrity_changes": { "TRN": -15 },
+      "effects": [{ "kind": "trn_capacity", "delta": -1, "duration_s": 300 }],
+      "alert": { "title": "TUNNEL COLLAPSE", "subtitle": "TUNNEL 4 — TRANSPORT CAPACITY REDUCED" } },
+
+    { "id": "communication_blackout", "name": "COMMUNICATION BLACKOUT",
+      "description": "COM loses telemetry for four minutes; the wall hides sector detail.",
+      "targets": ["COM"], "visibility": "CITY_WIDE",
+      "effects": [{ "kind": "com_blind", "duration_s": 240 }],
+      "announce": "Sensor network offline. Telemetry unavailable." },
+
+    { "id": "biological_breach", "name": "BIOLOGICAL BREACH",
+      "description": "Containment crisis in Tunnel 7: MED and TRN are hit, one TRN worker is injured, and a medical emergency follows two minutes later. This is a containment problem, not combat.",
+      "targets": ["MED", "TRN"], "visibility": "CITY_WIDE",
+      "integrity_changes": { "MED": -10, "TRN": -5 },
+      "worker_changes": { "injure": 1, "sectors": ["TRN"] },
+      "effects": [{ "kind": "trn_capacity", "delta": -1, "duration_s": 300 }],
+      "alert": { "title": "BIOLOGICAL BREACH DETECTED", "subtitle": "TUNNEL 7 — CONTAINMENT PROTOCOL" },
+      "followups": [{ "event_id": "medical_emergency", "delay_s": 120 }] },
+
+    { "id": "cancel_supply", "name": "CANCEL SUPPLY",
+      "description": "The target sector loses one power and one water immediately.",
+      "targets": "PICK", "visibility": "TARGET_SECTOR",
+      "resource_changes": { "power": -1, "water": -1 } }
+  ],
+
+  "fault_presets": [
+    { "id": "r1_wave", "name": "ROUND 1 WAVE",
+      "items": [
+        { "fault_code": "F-101", "sector": "POW", "delay_s": 0 },
+        { "fault_code": "F-103", "sector": "WTR", "delay_s": 60 },
+        { "fault_code": "F-105", "sector": "MED", "delay_s": 120 },
+        { "fault_code": "F-106", "sector": "TRN", "delay_s": 180 },
+        { "fault_code": "F-107", "sector": "AGR", "delay_s": 240 },
+        { "fault_code": "F-108", "sector": "COM", "delay_s": 300 } ] },
+    { "id": "r2_wave_a", "name": "ROUND 2 WAVE A",
+      "items": [
+        { "fault_code": "F-201", "sector": "POW", "delay_s": 0 },
+        { "fault_code": "F-203", "sector": "WTR", "delay_s": 90 },
+        { "fault_code": "F-205", "sector": "MED", "delay_s": 180 } ] },
+    { "id": "r2_wave_b", "name": "ROUND 2 WAVE B",
+      "items": [
+        { "fault_code": "F-207", "sector": "TRN", "delay_s": 0 },
+        { "fault_code": "F-209", "sector": "AGR", "delay_s": 60 },
+        { "fault_code": "F-211", "sector": "COM", "delay_s": 120 },
+        { "fault_code": "F-210", "sector": "AGR", "delay_s": 200 } ] },
+    { "id": "r3_stack", "name": "ROUND 3 CRITICAL STACK",
+      "items": [
+        { "fault_code": "F-301", "sector": "POW", "delay_s": 0 },
+        { "fault_code": "F-302", "sector": "WTR", "delay_s": 45 },
+        { "fault_code": "F-303", "sector": "MED", "delay_s": 90 } ] }
+  ],
+
+  "timelines": {
+    "R0": [
+      { "offset_s": 0,   "kind": "fault", "fault_code": "F-001", "sector": "POW", "mode": "MANUAL" },
+      { "offset_s": 0,   "kind": "fault", "fault_code": "F-002", "sector": "WTR", "mode": "MANUAL" },
+      { "offset_s": 0,   "kind": "fault", "fault_code": "F-003", "sector": "MED", "mode": "MANUAL" },
+      { "offset_s": 0,   "kind": "fault", "fault_code": "F-004", "sector": "TRN", "mode": "MANUAL" },
+      { "offset_s": 0,   "kind": "fault", "fault_code": "F-005", "sector": "AGR", "mode": "MANUAL" },
+      { "offset_s": 0,   "kind": "fault", "fault_code": "F-006", "sector": "COM", "mode": "MANUAL" }
+    ],
+    "R1": [
+      { "offset_s": 60,  "kind": "fault", "fault_code": "F-101", "sector": "POW", "mode": "MANUAL" },
+      { "offset_s": 150, "kind": "fault", "fault_code": "F-103", "sector": "WTR", "mode": "MANUAL" },
+      { "offset_s": 240, "kind": "fault", "fault_code": "F-105", "sector": "MED", "mode": "MANUAL" },
+      { "offset_s": 330, "kind": "fault", "fault_code": "F-106", "sector": "TRN", "mode": "MANUAL" },
+      { "offset_s": 420, "kind": "fault", "fault_code": "F-107", "sector": "AGR", "mode": "MANUAL" },
+      { "offset_s": 510, "kind": "fault", "fault_code": "F-108", "sector": "COM", "mode": "MANUAL" },
+      { "offset_s": 720, "kind": "fault", "fault_code": "F-102", "sector": "POW", "mode": "MANUAL" },
+      { "offset_s": 840, "kind": "fault", "fault_code": "F-104", "sector": "WTR", "mode": "MANUAL" }
+    ],
+    "R2": [
+      { "offset_s": 0,    "kind": "fault", "fault_code": "F-201", "sector": "POW", "mode": "MANUAL" },
+      { "offset_s": 120,  "kind": "fault", "fault_code": "F-203", "sector": "WTR", "mode": "MANUAL" },
+      { "offset_s": 270,  "kind": "fault", "fault_code": "F-205", "sector": "MED", "mode": "MANUAL" },
+      { "offset_s": 420,  "kind": "announce", "text": "Core output dropping. Council convenes in 10 minutes.", "mode": "AUTO" },
+      { "offset_s": 540,  "kind": "fault", "fault_code": "F-207", "sector": "TRN", "mode": "MANUAL" },
+      { "offset_s": 660,  "kind": "fault", "fault_code": "F-209", "sector": "AGR", "mode": "MANUAL" },
+      { "offset_s": 780,  "kind": "fault", "fault_code": "F-211", "sector": "COM", "mode": "MANUAL" },
+      { "offset_s": 900,  "kind": "fault", "fault_code": "F-210", "sector": "AGR", "mode": "MANUAL", "note": "FALSE ALARM — clear by hand once COM confirms" },
+      { "offset_s": 1080, "kind": "council", "mode": "MANUAL", "note": "Council #1 — information pooling" },
+      { "offset_s": 1440, "kind": "fault", "fault_code": "F-202", "sector": "POW", "mode": "MANUAL" }
+    ],
+    "R3": [
+      { "offset_s": 0,    "kind": "fault", "fault_code": "F-301", "sector": "POW", "mode": "MANUAL" },
+      { "offset_s": 60,   "kind": "fault", "fault_code": "F-302", "sector": "WTR", "mode": "MANUAL" },
+      { "offset_s": 120,  "kind": "fault", "fault_code": "F-303", "sector": "MED", "mode": "MANUAL" },
+      { "offset_s": 300,  "kind": "core",  "value": 60, "mode": "AUTO", "note": "Core drops to 60% — the city can sustain 4 of 6 sectors" },
+      { "offset_s": 300,  "kind": "announce", "text": "Core output at 60 percent. Continuity Order will be required.", "mode": "AUTO" },
+      { "offset_s": 480,  "kind": "fault", "fault_code": "F-304", "sector": "TRN", "mode": "MANUAL" },
+      { "offset_s": 660,  "kind": "fault", "fault_code": "F-305", "sector": "AGR", "mode": "MANUAL" },
+      { "offset_s": 840,  "kind": "fault", "fault_code": "F-306", "sector": "COM", "mode": "MANUAL" },
+      { "offset_s": 1200, "kind": "council", "mode": "MANUAL", "note": "Council #2 — Continuity Order due at 25:00" }
+    ],
+    "R4": [
+      { "offset_s": 60,   "kind": "fault", "fault_code": "F-401", "sector": "POW", "mode": "MANUAL" },
+      { "offset_s": 240,  "kind": "fault", "fault_code": "F-402", "sector": "MED", "mode": "MANUAL" },
+      { "offset_s": 480,  "kind": "fault", "fault_code": "F-403", "sector": "WTR", "mode": "MANUAL" },
+      { "offset_s": 720,  "kind": "fault", "fault_code": "F-404", "sector": "TRN", "mode": "MANUAL" },
+      { "offset_s": 900,  "kind": "core",  "value": 70, "mode": "AUTO" },
+      { "offset_s": 960,  "kind": "council", "mode": "MANUAL", "note": "Mini-triage" }
+    ]
+  }
+}

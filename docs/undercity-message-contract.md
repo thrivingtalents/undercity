@@ -232,3 +232,181 @@ Log every: fault fired/resolved/cleared, every submit (accepted *and* rejected �
 - ❌ Accounts, logins, persistence between runs — every run is stateless; `reset_run` is the whole lifecycle.
 - ❌ Mobile-responsive layouts — fixed 1366×768 on provided hardware.
 - ❌ Reconciling telemetry 290 with binder 340 — that mismatch *is* the psychological safety probe.
+
+---
+
+## 8. Game Control System extension (v2)
+
+Everything above still holds. This section adds the phases, economy, crisis
+and measurement layers. **Balance lives in `config/scenarios/*.json`, never in
+code** — every number below is a scenario default.
+
+### 8.1 URLs
+
+| Screen | LAN mode | Hosted mode |
+|---|---|---|
+| Wall (projector) | `/wall` | `/s/<CODE>/wall` |
+| Sector laptop | `/sector/POW` … `/sector/COM` | `/j/<JOIN>` → `/s/<CODE>/sector/POW` |
+| Admin (game master) | `/admin?token=<FACILITATOR_TOKEN>` (also `/control`) | `/s/<CODE>/control?token=…` |
+| Sessions panel | — | `/admin` (accounts) |
+
+`/bigscreen` remains as the original cross-section map view of the same frame.
+The Admin page prompts for the token if the URL does not carry one.
+
+### 8.2 Envelope fields (every role)
+
+```json
+{
+  "phase": "ROUND_2", "phase_name": "Round 2 — Interdependence",
+  "round": "R2", "round_name": "Interdependence", "round_length_s": 1800,
+  "round_clock":   { "running": true,  "remaining_s": 1140 },
+  "council_clock": { "running": false, "remaining_s": 300 },
+  "cycle": { "number": 3, "length_s": 420, "remaining_s": 267, "running": true },
+  "paused": false, "breather": false, "frozen": false,
+  "core_output": 83, "core_integrity": 83,
+  "city_stability": 71, "stability_mode": "auto",
+  "council": { "active": false, "count": 1, "order_submitted": false, "no_order": false, "started_at": null },
+  "continuity_order": { "order": ["POW","MED","WTR","TRN","COM","AGR"], "brownout": ["COM","AGR"], "t": "…" },
+  "blackout": { "active": false, "current": [] },
+  "alert": { "id": "A-0003", "title": "⚠ CORE INSTABILITY DETECTED", "subtitle": "CORE OUTPUT FALLING", "big": "", "t": "…", "age_s": 3, "full_screen": true },
+  "sound_enabled": true,
+  "thresholds": { "power": 1, "water": 1, "parts": 1, "med": 0 }
+}
+```
+
+Phases: `SETUP ORIENTATION ROUND_1 ROUND_2 ROUND_3 DEBRIEF_1 AFTERSHOCK DEBRIEF_2 FINISHED`
+(`lib/rounds.json` → `phases[]`, each mapping to a round and a mode).
+
+**Clocks.** A clock's `running` is already false whenever the simulation is
+frozen (pause, breather, briefing). Clients count down locally between frames
+with `Undercity.countdown(clock, frame.frozen)` and never past zero. The
+server ticks every second and broadcasts on change or every `broadcast_ms`.
+
+**Alert.** Full-screen while `full_screen` is true (`alert_full_screen_s`,
+default 8 s), then a reduced persistent banner until `dismiss_alert`.
+
+### 8.3 Sector frame additions
+
+Own sector: `brownout`, `dark`, `workforce { active injured loaned borrowed
+available total }`, `low { power water parts med }` (below threshold or zero),
+`production_next`, `upkeep_delivery` (next cycle's cost after brownout),
+`upkeep_due_in_s` (= cycle remaining). Own faults add `id status deadline_s
+deadline_remaining_s integrity_penalty expired opened_at`. Fault `status`:
+`ACTIVE RESOLVED EXPIRED FAILED CLEARED`. The dependency half of the flavour
+line is still cut; the screen says *consult your binder*, nothing more.
+
+Plus: `transfers[]` (those involving this sector), `announcements[]` (public
+plus this sector's), `effects[]` (temporary effects targeting this sector or
+ALL), and:
+
+- **TRN only** — `transfer_queue { capacity, used, can_stamp, items[] }`.
+- **COM only** — `intel { degraded, items[{key,label,value}] }`; values read
+  `UNKNOWN` under a brownout (per item `hidden_in_brownout`) or comms blackout.
+  `full_telemetry` also drops to false while COM is blind.
+
+Transfer object:
+```json
+{ "id": "T-0007", "from": "WTR", "to": "POW", "resource": "water", "amount": 2,
+  "status": "WAITING_TRN", "requested_at": "…", "agreed_at": null, "waiting_at": "…",
+  "stamped_at": null, "delivered_at": null, "cancelled_at": null, "requested_by": "WTR" }
+```
+Status flow: `REQUESTED → AGREED → WAITING_TRN → STAMPED → DELIVERED`, or
+`CANCELLED`. **Only STAMPED moves stock** (when `auto_economy` is on). The
+signed chit and TRN's rubber stamp remain the physical truth.
+
+### 8.4 Wall frame
+
+Per sector: `integrity status brownout dark workforce{active injured available
+total} unresolved_faults`, plus `inventory` when `wall_shows_inventory` and
+`top_fault { code name severity deadline_remaining_s expired }` when
+`wall_shows_faults`. Both vanish while COM is DARK and
+`com_dark_hides_wall_detail` is on (`telemetry_degraded: true`). `feed[]` is
+the ticker filtered to public kinds, newest first, capped at `wall_feed_max`.
+`debrief` carries the Round 3 vs Aftershock comparison once the facilitator
+turns `wall_debrief` on. Never: an answer key, a procedure, a flavour line.
+
+### 8.5 Control frame
+
+Everything, plus `transfers[]`, `transfer_capacity`, `timeline[]`
+(`{id offset_s kind fault_code sector event_id text value mode:AUTO|MANUAL
+status:PENDING|READY|FIRED|SKIPPED}`), `round_elapsed_s`, `scheduled[]`,
+`effects[]`, `intel[]`, `cycle_summary`, `council_detail`,
+`continuity_order_detail`, `blackout_detail`, `phases[]`, `config` (the live
+scenario defaults) and `scenario { id name sectors events fault_presets }`.
+
+### 8.6 Sector → server (new)
+
+```json
+{ "type": "fault_open", "fault_code": "F-201" }
+{ "type": "transfer_request", "from": "WTR", "to": "POW", "resource": "water", "amount": 2, "note": "" }
+{ "type": "transfer_update", "id": "T-0007", "status": "AGREED" }        // AGREED | WAITING_TRN | CANCELLED
+{ "type": "transfer_stamp", "id": "T-0007" }                              // TRN only
+```
+Replies: `transfer_result { ok, reason?, transfer? }`. `submit_result` now
+also carries `recovery` and `consumed` on success, `max_consecutive` on an
+invalid code, and `insufficient_resources { short }` when the scenario
+requires stock.
+
+### 8.7 Control → server (new)
+
+```json
+{ "type": "set_phase", "phase": "ROUND_2" }   { "type": "next_phase" }
+{ "type": "clock", "which": "round", "action": "start|pause|resume|end|add|set", "seconds": 120 }
+{ "type": "cycle", "action": "start|pause|process|set|add", "seconds": 60 }
+{ "type": "pause" }  { "type": "resume" }
+{ "type": "fire_preset", "preset_id": "r2_wave_a" }
+{ "type": "fault_add_time", "sector": "POW", "fault_code": "F-201", "seconds": 60 }
+{ "type": "adjust_integrity", "sector": "POW", "delta": -10 }
+{ "type": "injure_worker", "sector": "POW", "count": 1 }   { "type": "recover_worker", "sector": "POW", "count": 1 }
+{ "type": "set_core_output", "value": 60 }   { "type": "adjust_core", "delta": -10 }
+{ "type": "set_stability", "mode": "manual", "value": 55 }
+{ "type": "set_intel", "key": "water_pressure", "value": "DEGRADING" }
+{ "type": "set_config", "patch": { "cycle_length_s": 300, "brownout_effects": { "production_multiplier": 0.4 } } }
+{ "type": "set_sector_config", "sector": "AGR", "patch": { "production": { "water": 1 } } }
+{ "type": "set_sound", "on": false }
+{ "type": "alert", "title": "COUNCIL SUMMONED", "subtitle": "CHIEFS + LIAISONS REPORT IMMEDIATELY" }
+{ "type": "dismiss_alert" }
+{ "type": "call_council" }   { "type": "end_council" }
+{ "type": "continuity_order", "order": ["POW","MED","WTR","TRN","COM","AGR"], "confirm": true }
+{ "type": "rolling_blackout", "confirm": true }   { "type": "end_blackout" }
+{ "type": "fire_event", "event_id": "tunnel_collapse", "target": "TRN" }
+{ "type": "cancel_scheduled", "id": "S-0004" }
+{ "type": "timeline_fire", "id": "R2-01" }  { "type": "timeline_skip", "id": "R2-01" }  { "type": "timeline_delay", "id": "R2-01", "seconds": 120 }
+{ "type": "transfer_request", "from": "WTR", "to": "POW", "resource": "water", "amount": 2 }
+{ "type": "transfer_update", "id": "T-0007", "status": "DELIVERED" }
+{ "type": "transfer_stamp", "id": "T-0007", "force": true }
+{ "type": "wall_debrief", "on": true }
+{ "type": "reset_run", "run_id": "…", "scenario_id": "haven9-hard", "confirm": true }
+```
+
+`set_mode: "COUNCIL"` still works and is equivalent to `call_council`.
+Replies: `fire_result`, `event_result`, `order_result`, `timeline_result`,
+`transfer_result`, `cycle_summary`.
+
+### 8.8 HTTP (control token)
+
+| Route | Purpose |
+|---|---|
+| `GET /api/content?session&token` | faults, specs, sectors, rounds, scenarios, public URLs |
+| `GET /api/debrief?session&token` | `lib/analytics` output: per-round stats, `comparison` (R3 vs R4), timeline |
+| `GET /api/scenarios?…` · `GET /api/scenarios/:id` | list / raw document |
+| `POST /api/scenarios` `{ name, id?, from_live: true }` | SAVE AS SCENARIO from the running configuration |
+| `DELETE /api/scenarios/:id` | remove a saved copy (built-ins cannot be deleted) |
+
+### 8.9 Sounds
+
+The server queues stings on game events (`fault_alert critical resolved
+council warning_30 brownout dark core_warning alert cycle chime`) and sends
+`{ "type": "sting", "sound": "…" }` to the wall and sector screens when
+`sound_enabled` is on. The client plays `/audio/<sound>.mp3` if that file
+exists, else a synthesised placeholder.
+
+### 8.10 Log additions
+
+`phase`, `pause`, `fault_opened`, `deadline_expired {penalty}`, `fault_failed`,
+`cycle_processed {summary}`, `upkeep_missed`, `worker_recovered`,
+`transfer_requested/agreed/waiting_trn/stamped/delivered/cancelled/refused`,
+`council_called/ended/no_order`, `continuity_order`, `blackout_started/rotated/ended`,
+`event_fired`, `effect_started/ended`, `scheduled`, `preset_fired`,
+`timeline_fired/skipped/delayed`, `alert`, `config_patched`, `set_stability`,
+`intel`, `sound`. Every line also carries `round` and `phase`.

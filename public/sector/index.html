@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>UNDERCITY — Sector</title>
+<title>UNDERCITY — Sector Console</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 fill=%27%230a0c0e%27/%3E%3Crect x=%272%27 y=%272%27 width=%2712%27 height=%2712%27 fill=%27%23E8B33A%27/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/shared/base.css">
 <link rel="stylesheet" href="/assets/sector/sector.css">
@@ -10,95 +10,224 @@
 <body>
 <div id="app" class="shell">
 
+  <!-- ===== HEADER: what's wrong / how long / how strong ===================== -->
   <header class="topbar">
     <div class="ident">
-      <span class="crest" id="crest"></span>
-      <h1 id="sector-name">—</h1>
-      <span class="code" id="sector-code">—</span>
-      <span class="team hidden" id="team-name"></span>
+      <span class="crest"></span>
+      <span class="glyph" id="hdr-glyph"></span>
+      <div class="ident-text">
+        <h1 id="hdr-name">—</h1>
+        <div class="ident-sub"><span class="code" id="hdr-code">—</span><span class="team" id="hdr-team" hidden></span></div>
+      </div>
     </div>
-    <div class="tempo">
-      <span class="label">Round</span><b id="round">—</b>
-      <span class="label">Clock</span><b id="round-clock">--:--</b>
-      <span class="label">Mode</span><b id="mode">—</b>
+
+    <div class="hstat status-block" id="hdr-status-block" data-status="">
+      <span class="label">System status</span>
+      <b class="hval" id="hdr-status">—</b>
     </div>
+
+    <div class="hstat integrity-block">
+      <span class="label">Integrity</span>
+      <div class="integrity-row">
+        <b class="hval big" id="hdr-integrity">—</b>
+        <div class="bar" id="hdr-integrity-bar"><i style="width:0%"></i></div>
+      </div>
+    </div>
+
+    <div class="hstat cycle-block">
+      <span class="label">Next core cycle</span>
+      <b class="hval huge clock" id="hdr-cycle">--:--</b>
+    </div>
+
+    <div class="hstat">
+      <span class="label">Core output</span>
+      <b class="hval big" id="hdr-core">—</b>
+    </div>
+
+    <div class="hstat phase-block">
+      <span class="label" id="hdr-phase">—</span>
+      <b class="hval clock" id="hdr-round-clock">--:--</b>
+    </div>
+
     <div class="conn" id="conn" data-status="down">
       <span class="dot"></span><span class="text" id="conn-text">CONNECTING</span>
     </div>
   </header>
 
+  <!-- ===== BANNERS (persistent, stacked) =================================== -->
+  <div class="banners" id="banners">
+    <div class="banner banner-alert" id="banner-alert" hidden>
+      <b id="banner-alert-title"></b><span id="banner-alert-sub"></span>
+    </div>
+    <div class="banner banner-brownout" id="banner-brownout" hidden>⚠ SECTOR BROWNOUT — PRODUCTION REDUCED · OPERATIONS DEGRADED</div>
+    <div class="banner banner-breather" id="banner-breather" hidden>BREATHER — SYSTEMS HOLDING</div>
+    <div class="banner banner-result" id="banner-result" hidden></div>
+  </div>
+
+  <!-- ===== MAIN ============================================================ -->
   <main class="columns">
 
-    <!-- LEFT — MY SECTOR (always full fidelity) -->
-    <section class="col col-mine panel">
-      <h2 class="col-title">MY SECTOR</h2>
-
-      <div class="integrity-block">
-        <div class="integrity-head">
-          <span class="label">Integrity</span>
-          <span class="integrity-value" id="integrity">—</span>
+    <!-- LEFT: resources & upkeep -->
+    <section class="col col-left">
+      <div class="panel block">
+        <h2 class="ptitle">RESOURCES</h2>
+        <div class="resources" id="resources"></div>
+        <div class="workers">
+          <span class="wglyph">👤</span>
+          <span class="wlabel">WORKERS</span>
+          <b class="wnum" id="wf-avail">—</b>
+          <span class="wsep">/</span>
+          <b class="wnum dim" id="wf-total">—</b>
+          <span class="wlabel">AVAILABLE</span>
         </div>
-        <div class="bar" id="integrity-bar"><i style="width:0%"></i></div>
-        <div class="status-line" id="status">—</div>
+        <div class="wextra" id="wf-extra" hidden></div>
+        <div class="declare-note">Declare what is on the table — physical chits are the source of truth.</div>
       </div>
 
-      <div class="block">
-        <span class="label">Workforce</span>
-        <div class="workforce">
-          <div class="wf"><span class="wf-icon">&#128100;</span><b id="wf-active">—</b><span class="label">active</span></div>
-          <div class="wf injured"><span class="wf-icon">&#9855;</span><b id="wf-injured">—</b><span class="label">injured</span></div>
-        </div>
-      </div>
-
-      <div class="block">
-        <span class="label">Inventory <em>— declare what is on the table</em></span>
-        <div class="inventory" id="inventory"></div>
-        <div class="inv-note">Physical chits are the source of truth.</div>
-      </div>
-
-      <div class="block upkeep">
-        <span class="label">Next upkeep</span>
+      <div class="panel block">
+        <h2 class="ptitle">NEXT CYCLE UPKEEP</h2>
         <div class="upkeep-line">
-          <span id="upkeep-cost">—</span>
-          <b id="upkeep-clock">--:--</b>
+          <span class="upkeep-items" id="upkeep-delivery">—</span>
+          <span class="upkeep-full" id="upkeep-full" hidden></span>
+        </div>
+        <div class="upkeep-row"><span class="label">Production next cycle</span><b id="production-next">—</b></div>
+        <div class="upkeep-row"><span class="label">Due in</span><b class="clock due-clock" id="upkeep-due">--:--</b></div>
+      </div>
+
+      <div class="panel block transfers-block">
+        <h2 class="ptitle">RESOURCE TRANSFERS</h2>
+        <div class="transfers" id="transfers"><div class="empty" id="transfers-empty">No transfers recorded.</div></div>
+        <div class="msg" id="transfer-msg" hidden></div>
+        <form class="transfer-form" id="transfer-form" autocomplete="off">
+          <div class="tf-row">
+            <select id="tf-dir" aria-label="Direction">
+              <option value="out">FROM US →</option>
+              <option value="in">→ TO US FROM</option>
+            </select>
+            <select id="tf-sector" aria-label="Other sector"></select>
+          </div>
+          <div class="tf-row">
+            <select id="tf-res" aria-label="Resource">
+              <option value="power">⚡ POWER</option>
+              <option value="water">💧 WATER</option>
+              <option value="parts">🔧 PARTS</option>
+              <option value="med">⚕ MEDICAL</option>
+              <option value="workers">👤 WORKERS</option>
+            </select>
+            <select id="tf-amt" aria-label="Amount"></select>
+            <button type="submit" id="tf-submit">RECORD TRANSFER</button>
+          </div>
+        </form>
+        <div class="declare-note">The signed Transfer Chit and TRN&#39;s stamp remain the real record.</div>
+      </div>
+    </section>
+
+    <!-- CENTRE: active faults -->
+    <section class="col col-centre">
+      <div class="panel faults-panel">
+        <h2 class="ptitle">ACTIVE FAULTS <span class="count" id="fault-count">0</span></h2>
+        <div class="fault-list" id="fault-list"></div>
+        <div class="empty nominal" id="fault-empty">NO ACTIVE FAULTS — systems nominal</div>
+        <div class="empty" id="fault-pick" hidden>SELECT A FAULT TO OPEN ITS CARD</div>
+      </div>
+
+      <div class="panel card" id="card" hidden>
+        <div class="card-head">
+          <div class="card-sev" id="card-sev">▲▲ EMERGENCY</div>
+          <div class="card-code" id="card-code">F-000</div>
+          <div class="card-name" id="card-name">—</div>
+          <div class="card-flavour" id="card-flavour"></div>
+        </div>
+
+        <div class="card-time">
+          <span class="label" id="card-time-label">Time remaining</span>
+          <b class="card-clock clock" id="card-deadline">--:--</b>
+          <span class="card-penalty" id="card-penalty" hidden></span>
+        </div>
+
+        <div class="card-meta" id="card-meta"></div>
+        <div class="card-hints">
+          <div>LOOK UP THIS CODE IN YOUR FAULT INDEX</div>
+          <div>CONSULT TECHNICAL OPERATIONS BINDER</div>
+        </div>
+
+        <div class="console" id="console">
+          <div class="console-row">
+            <label class="cfield">
+              <span class="label">Resolution code</span>
+              <input type="text" id="code-input" placeholder="P-00-000" maxlength="16" autocomplete="off" autocapitalize="characters" spellcheck="false">
+            </label>
+            <label class="cfield cfield-workers">
+              <span class="label">Workers assigned</span>
+              <select id="workers-select"></select>
+            </label>
+            <button class="primary" id="submit-btn" type="button">SUBMIT</button>
+          </div>
+          <div class="console-msg" id="console-msg"></div>
         </div>
       </div>
     </section>
 
-    <!-- CENTRE — ACTIVE FAULTS -->
-    <section class="col col-faults panel">
-      <h2 class="col-title">ACTIVE FAULTS <span id="fault-count" class="count">0</span></h2>
-      <div class="faults" id="faults">
-        <div class="empty">No active faults.</div>
+    <!-- RIGHT: city feed (deliberately degraded), announcements, specials -->
+    <section class="col col-right">
+      <div class="panel council" id="council" hidden>
+        <div class="council-label">COUNCIL SUMMONED</div>
+        <div class="council-clock clock" id="council-clock">05:00</div>
+        <div class="council-call">CHIEF + LIAISON<br>REPORT TO CENTRAL COUNCIL</div>
       </div>
-    </section>
 
-    <!-- RIGHT — CITY FEED (deliberately degraded) -->
-    <section class="col col-city panel">
-      <div id="city-normal">
-        <h2 class="col-title">CITY FEED <span class="delay-note" id="delay-note">60s delay</span></h2>
+      <div class="panel block" id="effects-panel" hidden>
+        <h2 class="ptitle">ACTIVE EFFECTS</h2>
+        <div class="effects" id="effects"></div>
+      </div>
+
+      <div class="panel block" id="queue-panel" hidden>
+        <h2 class="ptitle">TRANSFER QUEUE <span class="cap" id="queue-cap"></span></h2>
+        <div class="queue" id="queue"></div>
+        <div class="msg" id="queue-msg" hidden></div>
+      </div>
+
+      <div class="panel block" id="intel-panel" hidden>
+        <h2 class="ptitle">CITY INTELLIGENCE <span class="tag warn" id="intel-degraded" hidden>TELEMETRY DEGRADED</span></h2>
+        <div class="intel" id="intel"></div>
+      </div>
+
+      <div class="panel block city-block" id="city-block">
+        <h2 class="ptitle">CITY FEED <span class="tag" id="delay-note">60s DELAY</span></h2>
         <div class="city" id="city"></div>
-        <h2 class="col-title announce-title">ANNOUNCEMENTS</h2>
-        <div class="announcements" id="announcements">
-          <div class="empty">Nothing yet.</div>
-        </div>
       </div>
 
-      <!-- COUNCIL takeover -->
-      <div id="city-council" class="council hidden">
-        <div class="council-label">COUNCIL</div>
-        <div class="council-clock" id="council-clock">5:00</div>
-        <div class="council-call">SEND LIAISON + CHIEF<br>TO COUNCIL TABLE</div>
+      <div class="panel block announce-block" id="announce-block">
+        <h2 class="ptitle">ANNOUNCEMENTS</h2>
+        <div class="announcements" id="announcements"><div class="empty">Nothing yet.</div></div>
+      </div>
+
+      <div class="panel block resolved-block" id="resolved-block" hidden>
+        <h2 class="ptitle">RECENTLY RESOLVED</h2>
+        <div class="resolved" id="resolved"></div>
       </div>
     </section>
 
   </main>
 
-  <!-- DARK takeover -->
-  <div id="dark-overlay" class="dark-overlay hidden">
-    <div class="stencil">SECTOR DARK</div>
-    <div class="dark-sub">Systems offline. Comms only.</div>
+  <!-- ===== OVERLAYS ======================================================== -->
+  <div class="overlay alert-full" id="alert-full" hidden>
+    <div class="alert-title" id="alert-title"></div>
+    <div class="alert-sub" id="alert-sub"></div>
+    <div class="alert-big" id="alert-big"></div>
   </div>
+
+  <div class="overlay dark-overlay" id="dark-overlay" hidden>
+    <div class="stencil">SECTOR OFFLINE</div>
+    <div class="overlay-sub">Await instructions from Continuity Authority.</div>
+  </div>
+
+  <div class="overlay pause-overlay" id="pause-overlay" hidden>
+    <div class="stencil pause">SIMULATION PAUSED</div>
+    <div class="overlay-sub">Countdowns are frozen.</div>
+  </div>
+
+  <div class="sound-hint" id="sound-hint">🔈 CLICK ANYWHERE TO ENABLE SOUND</div>
 
 </div>
 <script src="/shared/ws.js"></script>

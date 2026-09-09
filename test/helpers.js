@@ -20,6 +20,7 @@ function newGame() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'undercity-test-'));
   const log = new RunLog(path.join(dir, 'runlog.jsonl'), path.join(dir, 'snapshot.json'));
   const game = new GameState({ content: loadContent(), rounds, runId: 'test-run', log });
+  log.setContext({ round: game.state.round, phase: game.state.phase });
   game.state.mode = 'PLAY';
   game.dir = dir;
   return game;

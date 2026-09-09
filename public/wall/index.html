@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HAVEN-9 — CITY WALL</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 fill=%27%230a0c0e%27/%3E%3Ccircle cx=%278%27 cy=%278%27 r=%274%27 fill=%27%23E8B33A%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/shared/base.css">
+<link rel="stylesheet" href="/assets/wall/wall.css">
+</head>
+<body>
+<div class="wall" id="wall">
+
+  <!-- persistent top strips: one shared row, above the header -->
+  <div class="strips" id="strips">
+  <div class="strip strip-blackout" id="strip-blackout" hidden>
+    <span class="strip-light"></span>
+    <span class="strip-text" id="strip-blackout-text">ROLLING BLACKOUT IN PROGRESS</span>
+  </div>
+  <div class="strip strip-alert" id="strip-alert" hidden>
+    <span class="strip-light"></span>
+    <span class="strip-text">
+      <b id="strip-alert-title"></b>
+      <span id="strip-alert-sub"></span>
+      <em id="strip-alert-big"></em>
+    </span>
+  </div>
+  <div class="strip strip-breather" id="strip-breather" hidden>
+    <span class="strip-light"></span>
+    <span class="strip-text">BREATHER — SYSTEMS HOLDING</span>
+  </div>
+  </div>
+
+  <!-- TOP AREA -->
+  <header class="top">
+    <div class="brand">
+      <h1>HAVEN-9</h1>
+      <div class="brand-sub">UNDERCITY EMERGENCY COMMAND</div>
+      <div class="phase-row">
+        <span class="phase" id="phase-name">—</span>
+        <span class="round-clock" id="round-clock">--:--</span>
+      </div>
+    </div>
+
+    <div class="fig" id="fig-stability">
+      <div class="fig-label">CITY STABILITY</div>
+      <div class="fig-value"><span id="stability">--</span><small>%</small></div>
+    </div>
+
+    <div class="fig" id="fig-core">
+      <div class="fig-label">CORE OUTPUT</div>
+      <div class="fig-value"><span id="core-output">--</span><small>%</small></div>
+    </div>
+
+    <div class="fig fig-cycle" id="fig-cycle">
+      <div class="fig-label">NEXT CORE CYCLE <span class="cycle-no" id="cycle-no"></span></div>
+      <div class="fig-value cycle-value" id="cycle-clock">--:--</div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="main" id="main">
+    <section class="grid" id="grid"></section>
+
+    <!-- council takeover -->
+    <section class="council" id="council" hidden>
+      <div class="council-label">CENTRAL COUNCIL</div>
+      <div class="council-title">COUNCIL IN SESSION</div>
+      <div class="council-clock" id="council-clock">--:--</div>
+      <div class="council-call">CHIEFS + LIAISONS REPORT TO CENTRAL COUNCIL</div>
+      <div class="council-note" id="council-note" hidden>NO CONTINUITY ORDER RECEIVED</div>
+      <div class="council-order" id="council-order" hidden></div>
+    </section>
+
+    <!-- debrief comparison -->
+    <section class="debrief" id="debrief" hidden>
+      <div class="debrief-title">ROUND 3 <span>vs</span> AFTERSHOCK</div>
+      <table class="debrief-table">
+        <thead>
+          <tr><th class="metric"></th><th>ROUND 3</th><th>AFTERSHOCK</th></tr>
+        </thead>
+        <tbody id="debrief-rows"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <!-- CITY EVENT FEED -->
+  <footer class="bottom">
+    <div class="feed-panel">
+      <div class="feed-head">
+        <span class="feed-title">CITY EVENT FEED</span>
+        <span class="order-line" id="order-line" hidden></span>
+      </div>
+      <ol class="feed" id="feed"></ol>
+    </div>
+    <div class="telemetry" id="telemetry">
+      <div class="tel-title">SENSOR FEED</div>
+      <div class="tel-rows" id="tel-rows"></div>
+    </div>
+  </footer>
+
+  <!-- MAJOR EMERGENCY OVERLAY (full-screen phase) -->
+  <div class="alert-full" id="alert-full" hidden>
+    <div class="alert-inner">
+      <div class="alert-tag">MAJOR EMERGENCY</div>
+      <div class="alert-title" id="alert-title"></div>
+      <div class="alert-sub" id="alert-sub"></div>
+      <div class="alert-big" id="alert-big"></div>
+    </div>
+  </div>
+
+  <!-- PAUSED -->
+  <div class="paused" id="paused" hidden>
+    <div class="paused-inner">
+      <div class="paused-title">SIMULATION PAUSED</div>
+      <div class="paused-sub">ALL CLOCKS HELD — AWAIT FACILITATOR</div>
+    </div>
+  </div>
+
+  <!-- corner chrome -->
+  <div class="sound-hint" id="sound-hint">CLICK ANYWHERE TO ENABLE SOUND</div>
+  <div class="conn" id="conn" data-status="down">
+    <span class="dot"></span><span class="text" id="conn-text">CONNECTING</span>
+  </div>
+
+</div>
+<script src="/shared/ws.js"></script>
+<script src="/assets/wall/wall.js"></script>
+</body>
+</html>

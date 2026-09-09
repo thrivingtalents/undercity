@@ -105,15 +105,37 @@ test('valid_codes NEVER appear in a sector payload', () => {
   }
 });
 
-test('the big screen carries no fault detail and no inventory', () => {
+test('the wall names the worst fault and the stock, never the fix', () => {
   const payload = forBigscreen(loaded());
-  for (const view of Object.values(payload.sectors)) {
-    assert.equal(view.faults, undefined);
-    assert.equal(view.inventory, undefined);
-    assert.equal(typeof view.unresolved_faults, 'number', 'counts only');
-  }
-  assert.ok(!JSON.stringify(payload).includes('valid_codes'));
-  assert.ok(payload.ticker && payload.telemetry, 'ticker and telemetry are public');
+  const pow = payload.sectors.POW;
+  assert.equal(pow.faults, undefined, 'no fault array — one headline fault only');
+  assert.equal(pow.top_fault.code, 'F-201');
+  assert.equal(pow.top_fault.name, 'Coolant loop failure');
+  assert.equal(pow.top_fault.flavour, undefined, 'no flavour, no dependency clause');
+  assert.equal(pow.top_fault.crew_required, undefined);
+  assert.ok(pow.inventory, 'resource summary is on by default (spec §7)');
+  assert.equal(typeof pow.unresolved_faults, 'number');
+  const json = JSON.stringify(payload);
+  assert.ok(!json.includes('valid_codes'));
+  assert.ok(!json.includes('P-04-340'));
+  assert.ok(!/Appendix C/i.test(json));
+  assert.ok(payload.feed && payload.telemetry, 'feed and telemetry are public');
+});
+
+test('wall fault detail and inventory are switches, and COM going dark hides both', () => {
+  const game = loaded();
+  game.patchConfig({ wall_shows_inventory: false, wall_shows_faults: false });
+  let payload = forBigscreen(game);
+  assert.equal(payload.sectors.POW.top_fault, undefined);
+  assert.equal(payload.sectors.POW.inventory, undefined);
+  assert.equal(typeof payload.sectors.POW.unresolved_faults, 'number', 'counts always');
+
+  game.patchConfig({ wall_shows_inventory: true, wall_shows_faults: true });
+  game.setStatus('COM', 'DARK');
+  payload = forBigscreen(game);
+  assert.equal(payload.telemetry_degraded, true);
+  assert.equal(payload.sectors.POW.top_fault, undefined, 'no sensors, no detail');
+  assert.equal(payload.sectors.POW.inventory, undefined);
 });
 
 test('control receives the live answer key, undelayed', () => {

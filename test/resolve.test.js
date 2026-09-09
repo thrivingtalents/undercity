@@ -156,13 +156,43 @@ test('unknown fault, wrong sector and dark sector are all refused', () => {
   assert.equal(submit(game).reason, 'sector_dark');
 });
 
-test('resources are never deducted — declaration only', () => {
+test('resource deduction on resolve is configuration: on by default', () => {
   const game = newGame();
   game.fireFault('F-201', 'POW');                    // requires 2 parts, 1 water
   const before = { ...game.state.sectors.POW.inventory };
-  submit(game);
+  const res = submit(game);
+  assert.deepEqual(res.consumed, { parts: 2, water: 1 });
+  assert.equal(game.state.sectors.POW.inventory.parts, before.parts - 2);
+  assert.equal(game.state.sectors.POW.inventory.water, before.water - 1);
+});
+
+test('with deduct_resources_on_resolve off, resolve is a declaration only (contract §3.5)', () => {
+  const game = newGame();
+  game.patchConfig({ deduct_resources_on_resolve: false });
+  game.fireFault('F-201', 'POW');
+  const before = { ...game.state.sectors.POW.inventory };
+  const res = submit(game);
+  assert.equal(res.accepted, true);
+  assert.equal(res.consumed, null);
   assert.deepEqual(game.state.sectors.POW.inventory, before,
-    'the server must not touch inventory on resolve');
+    'the server must not touch inventory on resolve when the switch is off');
+});
+
+test('a short team is only refused when resolve_requires_resources is on', () => {
+  const game = newGame();
+  game.fireFault('F-201', 'POW');
+  game.setInventory('POW', { power: 0, water: 0, parts: 0, med: 0 });
+  assert.equal(submit(game).accepted, true, 'default: the argument stays in the room');
+
+  const strict = newGame();
+  strict.patchConfig({ resolve_requires_resources: true });
+  strict.fireFault('F-201', 'POW');
+  strict.setInventory('POW', { power: 0, water: 0, parts: 0, med: 0 });
+  const res = submit(strict);
+  assert.equal(res.reason, 'insufficient_resources');
+  assert.deepEqual(res.short, { parts: 2, water: 1 });
+  const fault = strict.state.sectors.POW.faults[0];
+  assert.equal(fault.attempts, 0, 'a resource refusal is not a code guess');
 });
 
 test('a fault can be resolved even with inventory the team does not have', () => {

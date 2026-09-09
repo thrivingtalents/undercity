@@ -169,7 +169,7 @@
 
     host.innerHTML = data.sessions.map((s) => {
       const live = s.live_state
-        ? `<span><span class="dot-live"></span>${esc(s.live_state.mode)} · ${esc(s.live_state.round)} · core ${s.live_state.core_integrity}</span>`
+        ? `<span><span class="dot-live"></span>${esc(s.live_state.phase || s.live_state.mode)} · ${esc(s.live_state.round)} · core ${s.live_state.core_integrity}</span>`
         : '';
       const connected = s.connected ? `<span>${s.connected} connected</span>` : '';
       return `<div class="card" data-code="${esc(s.code)}">
@@ -204,7 +204,12 @@
       <div class="tf">
         <div class="sec"><span class="swatch" style="background:${esc(s.colour)}"></span>${esc(s.code)}</div>
         <input type="text" data-sector="${esc(s.code)}" placeholder="${esc(s.name)}">
-      </div>`).join('');
+      </div>`).join('') + `
+      <div class="tf" style="grid-column:1/-1">
+        <div class="sec">SCENARIO</div>
+        <select id="new-scenario">${(meta.scenarios || []).map((sc) =>
+          `<option value="${esc(sc.id)}">${esc(sc.name)}${sc.builtin ? '' : ' (saved)'}</option>`).join('')}</select>
+      </div>`;
     showSection('create-view');
   });
 
@@ -225,6 +230,7 @@
           name: $('new-name').value,
           client_name: $('new-client').value,
           teams,
+          scenario_id: $('new-scenario') ? $('new-scenario').value : null,
         },
       });
       await openSession(session.code);
@@ -289,21 +295,22 @@
           <span class="status ${esc(s.status)}">${esc(s.status)}</span>
           ${s.client_name ? `<span>${esc(s.client_name)}</span>` : ''}
           <span>run ${esc(s.run_id)}</span>
-          ${s.live_state ? `<span><span class="dot-live"></span>${esc(s.live_state.mode)} · ${esc(s.live_state.round)}</span>` : ''}
+          ${s.live_state ? `<span><span class="dot-live"></span>${esc(s.live_state.phase || s.live_state.mode)} · ${esc(s.live_state.round)}</span>` : ''}
         </div>
       </div>
 
       <div class="links">
         <div class="link-card">
-          <div class="lbl">Big screen — projector</div>
+          <div class="lbl">Wall — projector</div>
           <div class="link-row">
-            <input readonly value="${esc(absolute(`${base}/bigscreen`))}">
-            <button data-copy="${esc(absolute(`${base}/bigscreen`))}">COPY</button>
-            <button data-open="${esc(`${base}/bigscreen`)}">OPEN</button>
+            <input readonly value="${esc(absolute(`${base}/wall`))}">
+            <button data-copy="${esc(absolute(`${base}/wall`))}">COPY</button>
+            <button data-open="${esc(`${base}/wall`)}">OPEN</button>
           </div>
+          <div class="warn-note">${esc(`${base}/bigscreen`)} is the older cross-section map view of the same feed.</div>
         </div>
         <div class="link-card">
-          <div class="lbl">Control panel — facilitator only</div>
+          <div class="lbl">Admin console — facilitator only</div>
           <div class="link-row">
             <input readonly value="${esc(absolute(controlUrl))}">
             <button data-copy="${esc(absolute(controlUrl))}">COPY</button>

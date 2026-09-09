@@ -2,137 +2,379 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>UNDERCITY — Control</title>
+<title>UNDERCITY — Admin</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 fill=%27%230a0c0e%27/%3E%3Ccircle cx=%278%27 cy=%278%27 r=%275%27 fill=%27%23E85A5A%27/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/shared/base.css">
 <link rel="stylesheet" href="/assets/control/control.css">
 </head>
 <body>
-<div class="shell">
 
+<!-- TOKEN PROMPT (shown when the URL carries no facilitator token) -->
+<div class="token-gate hidden" id="token-gate">
+  <form class="token-card panel" id="token-form">
+    <h1>UNDERCITY <span class="sub">ADMIN</span></h1>
+    <p>Facilitator token required. In LAN mode this is <code>FACILITATOR_TOKEN</code> (default <code>haven9</code>).</p>
+    <input type="password" id="token-input" placeholder="facilitator token" autocomplete="off" autofocus>
+    <button type="submit" class="primary wide">OPEN CONSOLE</button>
+    <div class="error hidden" id="token-error">Rejected — wrong token.</div>
+  </form>
+</div>
+
+<div class="shell" id="shell">
+
+  <!-- MASTER CONTROL -->
   <header class="topbar">
-    <div class="left">
-      <h1>UNDERCITY <span class="sub">CONTROL</span></h1>
+    <div class="tb-ident">
+      <h1>UNDERCITY <span class="sub">ADMIN</span></h1>
       <span class="runid" id="run-id">—</span>
+      <span class="scenario" id="scenario-name">—</span>
+    </div>
+
+    <div class="tb-phase">
+      <span class="label">PHASE</span>
+      <b id="phase-name">—</b>
       <span class="pill" id="mode-pill">—</span>
       <span class="pill breather hidden" id="breather-pill">BREATHER</span>
+      <span class="pill paused hidden" id="paused-pill">PAUSED</span>
     </div>
-    <div class="right">
-      <span class="core">CORE <b id="core-value">—</b></span>
+
+    <div class="tb-clock">
+      <span class="label">MASTER TIME</span>
+      <b id="master-clock">--:--</b>
+    </div>
+
+    <div class="tb-buttons">
+      <button id="btn-start" class="primary">START</button>
+      <button id="btn-pause">PAUSE</button>
+      <button id="btn-end-phase">END PHASE</button>
+      <button id="btn-next-phase">NEXT PHASE ›</button>
+      <select id="phase-select" title="Jump to a phase"></select>
+    </div>
+
+    <div class="tb-figures">
+      <div class="fig"><span class="label">CORE</span><b id="core-value">—</b></div>
+      <div class="fig"><span class="label">CITY</span><b id="city-value">—</b></div>
+      <div class="fig"><span class="label">CYCLE</span><b id="cycle-clock">--:--</b></div>
+      <div class="fig"><span class="label">COUNCIL</span><b id="council-clock">--:--</b></div>
+    </div>
+
+    <div class="tb-right">
+      <button id="btn-sound" title="Wall + sector sound">🔊</button>
+      <button id="btn-urls" title="Addresses for the room">URLS</button>
       <button id="btn-snapshot">SNAPSHOT</button>
       <button id="btn-export">EXPORT LOG</button>
-      <button id="btn-reset" class="danger">RESET RUN</button>
+      <button id="btn-reset" class="danger">RESET</button>
       <div class="conn" id="conn" data-status="down">
         <span class="dot"></span><span class="text" id="conn-text">CONNECTING</span>
       </div>
     </div>
   </header>
 
-  <main class="cols">
+  <!-- QUICK ACTIONS — always visible (spec §46) -->
+  <nav class="quick" id="quick">
+    <button data-quick="fault" class="q-fault">TRIGGER FAULT</button>
+    <button data-quick="core">CORE −10%</button>
+    <button data-quick="injure">INJURE WORKER</button>
+    <button data-quick="council" class="q-council">CALL COUNCIL</button>
+    <button data-quick="brownout">BROWNOUT</button>
+    <button data-quick="announce">ANNOUNCEMENT</button>
+    <button data-quick="alert">ALERT</button>
+    <button data-quick="pause" id="quick-pause">PAUSE</button>
+  </nav>
 
-    <!-- COL 1 — RUNBOOK + INJECT LIBRARY -->
-    <section class="col panel">
-      <h2 class="col-title">1 · RUNBOOK</h2>
-      <div class="runbook" id="runbook"></div>
+  <!-- QUICK PICKER (one popover for every quick action) -->
+  <div class="picker hidden" id="picker">
+    <div class="picker-head">
+      <b id="picker-title">—</b>
+      <button id="picker-close">✕</button>
+    </div>
+    <div class="picker-body" id="picker-body"></div>
+  </div>
 
-      <h2 class="col-title">OFF-SCRIPT — INJECT LIBRARY</h2>
-      <div class="filters">
-        <select id="f-round"><option value="">all rounds</option></select>
-        <select id="f-sector"><option value="">all sectors</option></select>
-        <select id="f-sev">
-          <option value="">all sev</option><option value="1">▲</option>
-          <option value="2">▲▲</option><option value="3">▲▲▲</option>
-        </select>
-      </div>
-      <input type="text" id="f-text" placeholder="filter by code or name…" autocomplete="off">
-      <div class="injects" id="injects"></div>
+  <main class="main">
+
+    <!-- SECTOR CONTROL GRID -->
+    <section class="grid-wrap panel">
+      <h2 class="col-title">SECTOR CONTROL</h2>
+      <div class="sector-grid" id="sectors"></div>
     </section>
 
-    <!-- COL 2 — CITY STATE -->
-    <section class="col panel">
-      <h2 class="col-title">2 · CITY STATE</h2>
-      <div class="core-block">
-        <span class="label">Core integrity</span>
-        <div class="core-row">
-          <input type="range" id="core-slider" min="0" max="100" value="100">
-          <b id="core-readout">100</b>
+    <!-- PRESSURE PANEL -->
+    <section class="pressure panel">
+      <nav class="tabs" id="tabs">
+        <button data-tab="faults" class="on">FAULTS</button>
+        <button data-tab="timeline">TIMELINE</button>
+        <button data-tab="pressure">PRESSURE</button>
+        <button data-tab="council">COUNCIL</button>
+        <button data-tab="core">CORE</button>
+        <button data-tab="transfers">TRANSFERS</button>
+        <button data-tab="settings">SETTINGS</button>
+        <button data-tab="debrief">DEBRIEF</button>
+      </nav>
+
+      <!-- FAULTS -->
+      <div class="tab on" id="tab-faults">
+        <div class="block">
+          <span class="label">Presets <em>— several faults with delays</em></span>
+          <div class="presets" id="fault-presets"></div>
+        </div>
+        <div class="block">
+          <span class="label">Scheduled</span>
+          <div class="scheduled" id="scheduled"><div class="hint">Nothing queued.</div></div>
+        </div>
+        <div class="block grow">
+          <span class="label">Fault library <em>— one click fires</em></span>
+          <div class="filters">
+            <select id="f-round"><option value="">all rounds</option></select>
+            <select id="f-sector"><option value="">all sectors</option></select>
+            <select id="f-sev">
+              <option value="">all sev</option><option value="1">▲</option>
+              <option value="2">▲▲</option><option value="3">▲▲▲</option>
+            </select>
+            <input type="text" id="f-text" placeholder="code or name…" autocomplete="off">
+          </div>
+          <div class="injects" id="injects"></div>
         </div>
       </div>
-      <div class="sectors" id="sectors"></div>
-    </section>
 
-    <!-- COL 3 — TEMPO -->
-    <section class="col panel">
-      <h2 class="col-title">3 · TEMPO</h2>
-
-      <div class="block">
-        <span class="label">Round</span>
-        <div class="rounds" id="rounds"></div>
+      <!-- TIMELINE -->
+      <div class="tab" id="tab-timeline">
+        <div class="tl-head">
+          <span class="label">Round script</span>
+          <b id="tl-round">—</b>
+          <span class="tl-elapsed" id="tl-elapsed">00:00 elapsed</span>
+        </div>
+        <div class="hint">AUTO fires itself. MANUAL turns into READY TO FIRE — you hand the card and press it. Skip or delay anything. The script never forces you.</div>
+        <div class="timeline" id="timeline"></div>
       </div>
 
-      <div class="block">
-        <span class="label">Round clock</span>
-        <div class="clock-row">
-          <b id="round-clock">--:--</b>
-          <button data-clock="start">START</button>
-          <button data-clock="pause">PAUSE</button>
-          <button data-clock="add" data-sec="120">+2:00</button>
+      <!-- PRESSURE -->
+      <div class="tab" id="tab-pressure">
+        <div class="block">
+          <span class="label">Pressure dial</span>
+          <div class="dial" id="dial">
+            <button data-dial="fault">+ FAULT</button>
+            <button data-dial="second">+ SECOND FAULT</button>
+            <button data-dial="injure">INJURE WORKER</button>
+            <button data-dial="cancel_supply">CANCEL SUPPLY</button>
+            <button data-dial="transport_gridlock">TRANSPORT DELAY</button>
+            <button data-dial="communication_blackout">COMMS FAILURE</button>
+            <button data-dial="core">CORE −10%</button>
+            <button data-dial="council">CALL COUNCIL</button>
+            <button data-dial="blackout" class="danger-ish">ROLLING BLACKOUT</button>
+            <button data-dial="biological_breach" class="danger-ish">BIOLOGICAL BREACH</button>
+          </div>
+        </div>
+        <div class="block">
+          <span class="label">Event presets <em>— configurable in the scenario</em></span>
+          <div class="events" id="events"></div>
+        </div>
+        <div class="block">
+          <span class="label">Active effects</span>
+          <div class="effects" id="effects"><div class="hint">None.</div></div>
+        </div>
+        <div class="block">
+          <span class="label">Emergency overlay</span>
+          <div class="alert-presets" id="alert-presets"></div>
+          <div class="row">
+            <input type="text" id="alert-title" placeholder="TITLE" autocomplete="off">
+            <input type="text" id="alert-sub" placeholder="subtitle" autocomplete="off">
+            <input type="text" id="alert-big" placeholder="big figure (optional)" autocomplete="off" class="short">
+            <button id="btn-alert">SHOW</button>
+            <button id="btn-dismiss-alert">DISMISS</button>
+          </div>
+        </div>
+        <div class="block">
+          <span class="label">Announce</span>
+          <div class="presets" id="presets"></div>
+          <div class="row">
+            <select id="announce-target"><option value="">CITY-WIDE</option></select>
+            <input type="text" id="announce-text" placeholder="custom announcement…" autocomplete="off">
+            <button id="btn-announce">SEND</button>
+          </div>
+          <div class="stings">
+            <button data-sting="klaxon">KLAXON</button>
+            <button data-sting="chime">CHIME</button>
+            <button data-sting="silence">SILENCE</button>
+            <button id="btn-breather">BREATHER OFF</button>
+          </div>
+          <div class="hint">R0 klaxon is the audio join key — fire it once, on the record.</div>
         </div>
       </div>
 
-      <div class="block">
-        <span class="label">Mode</span>
-        <div class="modes" id="modes"></div>
-        <div class="clock-row council-row">
-          <b id="council-clock">5:00</b>
-          <button data-council="start">START</button>
-          <button data-council="pause">PAUSE</button>
+      <!-- COUNCIL -->
+      <div class="tab" id="tab-council">
+        <div class="council-status" id="council-status"></div>
+        <div class="row">
+          <button id="btn-call-council" class="primary">CALL COUNCIL</button>
+          <button id="btn-end-council">COUNCIL ENDED</button>
+          <button data-council="add" data-sec="60">+1:00</button>
           <button data-council="set" data-sec="300">RESET 5:00</button>
+          <button data-council="pause">HOLD</button>
+          <button data-council="start">RUN</button>
+        </div>
+        <div class="block">
+          <span class="label">Continuity Order <em>— click sectors in rank order 1 → 6</em></span>
+          <div class="order-pick" id="order-pick"></div>
+          <div class="order-slots" id="order-slots"></div>
+          <div class="row">
+            <button id="btn-order-clear">CLEAR</button>
+            <button id="btn-order-submit" class="primary" disabled>SUBMIT CONTINUITY ORDER</button>
+          </div>
+          <div class="hint">Ranks 5 and 6 enter BROWNOUT. Confirmation required; the decision cannot be recalled.</div>
+        </div>
+        <div class="no-order hidden" id="no-order">
+          <b>NO CONTINUITY ORDER RECEIVED</b>
+          <button id="btn-blackout" class="danger">INITIATE ROLLING BLACKOUT</button>
+        </div>
+        <div class="block">
+          <span class="label">Blackout</span>
+          <div class="row">
+            <span id="blackout-status">Not active.</span>
+            <button id="btn-blackout-2">START ROLLING BLACKOUT</button>
+            <button id="btn-end-blackout">END BLACKOUT</button>
+          </div>
+        </div>
+        <div class="block">
+          <span class="label">Last order</span>
+          <div id="last-order" class="hint">None yet.</div>
         </div>
       </div>
 
-      <div class="block">
-        <span class="label">Breather <em>pauses all decay + clocks</em></span>
-        <button id="btn-breather" class="wide">BREATHER OFF</button>
+      <!-- CORE -->
+      <div class="tab" id="tab-core">
+        <div class="block">
+          <span class="label">Core output</span>
+          <div class="core-presets" id="core-presets"></div>
+          <div class="row">
+            <button data-core-delta="-5">−5</button>
+            <button data-core-delta="5">+5</button>
+            <input type="number" id="core-input" min="0" max="100" class="short">
+            <button id="btn-core-set">SET</button>
+          </div>
+        </div>
+        <div class="block">
+          <span class="label">City stability</span>
+          <div class="row">
+            <select id="stab-mode"><option value="auto">AUTOMATIC</option><option value="manual">MANUAL</option></select>
+            <input type="number" id="stab-value" min="0" max="100" class="short">
+            <button id="btn-stab-set">SET</button>
+            <span class="hint" id="stab-hint"></span>
+          </div>
+        </div>
+        <div class="block">
+          <span class="label">Core cycle</span>
+          <div class="row">
+            <b id="cycle-clock-2">--:--</b>
+            <span id="cycle-number" class="hint"></span>
+            <button data-cycle="start">RUN</button>
+            <button data-cycle="pause">HOLD</button>
+            <button data-cycle="add" data-sec="60">+1:00</button>
+            <button data-cycle="process" class="primary">PROCESS CYCLE NOW</button>
+          </div>
+          <div class="cycle-summary" id="cycle-summary"><div class="hint">No cycle processed yet.</div></div>
+        </div>
+        <div class="block">
+          <span class="label">Telemetry</span>
+          <div class="row">
+            <span>WTR RESERVOIR</span>
+            <input type="number" id="tel-wtr" class="short">
+            <button id="btn-tel-set">SET</button>
+            <span class="hint">290 is the public half of the seeded discrepancy. Do not reconcile it with 340.</span>
+          </div>
+        </div>
+        <div class="block">
+          <span class="label">COM intelligence <em>— what Comms can see</em></span>
+          <div class="intel" id="intel"></div>
+        </div>
       </div>
 
-      <div class="block">
-        <span class="label">Stings</span>
-        <div class="stings">
-          <button data-sting="klaxon">KLAXON</button>
-          <button data-sting="chime">CHIME</button>
-          <button data-sting="silence">SILENCE</button>
+      <!-- TRANSFERS -->
+      <div class="tab" id="tab-transfers">
+        <div class="row">
+          <span class="label">Transport capacity</span>
+          <b id="trn-cap">—</b>
+          <span class="hint">stamped this cycle / capacity</span>
         </div>
-        <div class="hint">R0 klaxon is the audio join key — fire it once, on the record.</div>
+        <div class="block">
+          <span class="label">Record a transfer</span>
+          <div class="row">
+            <select id="tr-from"></select>
+            <span>→</span>
+            <select id="tr-to"></select>
+            <select id="tr-res">
+              <option value="power">power</option><option value="water">water</option>
+              <option value="parts">parts</option><option value="med">med</option>
+              <option value="workers">workers</option>
+            </select>
+            <input type="number" id="tr-amt" value="1" min="1" max="9" class="short">
+            <button id="btn-tr-add">RECORD</button>
+          </div>
+          <div class="hint">The signed chit and TRN's stamp are the real record. STAMP here moves the digital stock.</div>
+        </div>
+        <div class="transfers" id="transfers"></div>
       </div>
 
-      <div class="block">
-        <span class="label">Announce</span>
-        <div class="presets" id="presets"></div>
-        <div class="announce-row">
-          <input type="text" id="announce-text" placeholder="custom announcement…" autocomplete="off">
-          <button id="btn-announce">SEND</button>
+      <!-- SETTINGS -->
+      <div class="tab" id="tab-settings">
+        <div class="block">
+          <span class="label">Scenario</span>
+          <div class="row">
+            <b id="settings-scenario">—</b>
+            <select id="scenario-select"></select>
+            <button id="btn-load-scenario" class="danger">RESET RUN WITH SCENARIO</button>
+          </div>
+          <div class="row">
+            <input type="text" id="save-name" placeholder="save current configuration as…" autocomplete="off">
+            <button id="btn-save-scenario" class="primary">SAVE AS SCENARIO</button>
+            <span class="hint" id="save-hint"></span>
+          </div>
         </div>
+        <div class="hint">Nothing here is playtested. Every field applies live to this run; SAVE to keep it.</div>
+        <div class="settings" id="settings"></div>
+        <div class="block">
+          <span class="label">Sector economy <em>— per cycle</em></span>
+          <div class="sector-config" id="sector-config"></div>
+        </div>
+      </div>
+
+      <!-- DEBRIEF -->
+      <div class="tab" id="tab-debrief">
+        <div class="row">
+          <button id="btn-debrief-refresh" class="primary">REFRESH</button>
+          <button id="btn-wall-debrief">SHOW ON WALL</button>
+          <button id="btn-export-2">EXPORT LOG</button>
+          <span class="hint" id="debrief-hint"></span>
+        </div>
+        <div class="debrief" id="debrief"><div class="hint">Press REFRESH to fold the run log into numbers.</div></div>
       </div>
     </section>
+  </main>
 
-    <!-- COL 4 — OBSERVATION PAD -->
-    <section class="col panel col-obs">
-      <h2 class="col-title">4 · OBSERVATION PAD</h2>
-      <div class="hint pad-hint">Eyes on the room. Tag first, type later.</div>
-
-      <div class="obs-sectors" id="obs-sectors"></div>
-      <div class="obs-tags" id="obs-tags"></div>
-
-      <textarea id="obs-note" rows="3" placeholder="note… (Enter to log, Shift+Enter for newline)"></textarea>
-      <button id="btn-observe" class="primary wide">LOG OBSERVATION</button>
-
-      <h2 class="col-title feed-title">LIVE FEED</h2>
+  <!-- LIVE LOG + OBSERVATION PAD -->
+  <footer class="bottom">
+    <section class="feed-wrap panel">
+      <h2 class="col-title">LIVE EVENT LOG</h2>
       <div class="feed" id="feed"></div>
     </section>
+    <section class="obs panel">
+      <h2 class="col-title">OBSERVATION PAD <span class="hint">eyes on the room — tag first, type later</span></h2>
+      <div class="obs-sectors" id="obs-sectors"></div>
+      <div class="obs-tags" id="obs-tags"></div>
+      <div class="row">
+        <input type="text" id="obs-note" placeholder="note… (Enter to log)" autocomplete="off">
+        <button id="btn-observe" class="primary">LOG</button>
+      </div>
+    </section>
+  </footer>
 
-  </main>
+  <!-- URLS popover -->
+  <div class="picker hidden" id="urls">
+    <div class="picker-head"><b>ADDRESSES FOR THE ROOM</b><button id="urls-close">✕</button></div>
+    <div class="picker-body" id="urls-body"></div>
+  </div>
 </div>
+
 <script src="/shared/ws.js"></script>
 <script src="/assets/control/control.js"></script>
 </body>

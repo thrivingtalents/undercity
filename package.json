@@ -2,7 +2,7 @@
   "name": "undercity",
   "version": "0.1.0",
   "private": true,
-  "description": "UNDERCITY \u2014 crisis leadership simulation server (HAVEN-9)",
+  "description": "UNDERCITY — crisis leadership simulation server (HAVEN-9)",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
@@ -10,12 +10,13 @@
     "test": "node --test test/*.test.js",
     "export-content": "python3 tools/export_faults.py tools/undercity-crossref-matrix.xlsx content",
     "create-user": "node scripts/create-user.js",
-    "start:lan": "MODE=lan node server.js",
     "kit": "npm run kit:binders && npm run kit:cards && npm run kit:extras && npm run kit:manifest",
     "kit:binders": "mkdir -p build && python3 tools/kit/assemble_binders.py tools/undercity-crossref-matrix.xlsx build/binder_content.json && node tools/kit/build_binders.js build/binder_content.json kit",
     "kit:cards": "node tools/kit/build_cards.js content/faults.json kit",
     "kit:extras": "node tools/kit/build_kit.js kit && node tools/kit/build_guidebook.js kit",
-    "kit:manifest": "node tools/kit/manifest.js kit tools/undercity-crossref-matrix.xlsx content"
+    "kit:manifest": "node tools/kit/manifest.js kit tools/undercity-crossref-matrix.xlsx content",
+    "demo": "node scripts/demo.js",
+    "start:lan": "node -e \"process.env.MODE='lan';require('./server.js')\""
   },
   "engines": {
     "node": ">=18"

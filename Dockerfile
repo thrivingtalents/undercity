@@ -39,6 +39,7 @@ COPY package.json ./
 COPY server.js ./
 COPY lib ./lib
 COPY content ./content
+COPY config ./config
 COPY public ./public
 COPY scripts ./scripts
 

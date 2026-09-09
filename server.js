@@ -4,34 +4,39 @@
  *
  * Runs in two modes from one codebase:
  *
- *   hosted  many concurrent sessions, facilitator accounts, an admin panel.
+ *   hosted  many concurrent sessions, facilitator accounts, a sessions panel.
  *           Sessions and teams live in SQLite; each run keeps its own
  *           in-memory game, runlog.jsonl and snapshot.
  *
- *   lan     the original single-run behaviour for the offline travel router.
- *           One implicit session, no accounts, bare /sector/:code URLs. The
- *           spec calls venue WiFi the #1 failure mode for this class of
- *           product (§5.1), so this path stays first-class.
+ *   lan     the single-run behaviour for the offline travel router.
+ *           One implicit session, no accounts, bare URLs. The spec calls
+ *           venue WiFi the #1 failure mode for this class of product (§5.1),
+ *           so this path stays first-class.
+ *
+ * The three screens (LAN mode):
+ *   /wall           projector — the city
+ *   /sector/POW …   one laptop per sector
+ *   /admin          the facilitator's game master console (also /control)
  *
  * Set MODE=lan (or omit DATA_DIR) for the router. Everything else is shared.
  */
 
-///
-
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const os = require('os');
 const express = require('express');
 const { WebSocketServer } = require('ws');
 
 const { validateContent } = require('./lib/validate');
-const { GameState } = require('./lib/state');
 const { RunLog } = require('./lib/log');
 const { submitCode } = require('./lib/resolve');
 const { filterState } = require('./lib/visibility');
 const { Store } = require('./lib/db');
 const { makeAuth, hashPassword, verifyPassword } = require('./lib/auth');
 const { SessionRegistry } = require('./lib/sessions');
+const { ScenarioLibrary } = require('./lib/config');
+const { analyse } = require('./lib/analytics');
 const { Kit } = require('./lib/kit');
 const { inspectStorage, reportStorage } = require('./lib/storage');
 const { zip } = require('./lib/zip');
@@ -87,7 +92,9 @@ const storage = inspectStorage(DATA_DIR);
 
 const store = new Store(path.join(DATA_DIR, 'undercity.db'));
 const auth = makeAuth(store, { secure: SECURE_COOKIES });
-const registry = new SessionRegistry({ store, content, rounds, dataDir: DATA_DIR });
+const scenarios = new ScenarioLibrary({ store, rounds, content });
+const registry = new SessionRegistry({ store, content, rounds, dataDir: DATA_DIR, scenarios });
+console.log(`✓ scenarios — ${scenarios.list().map((s) => s.id).join(', ')}`);
 
 // The printable kit is generated at image-build time from the same commit that
 // produced content/*.json, so it is read-only here and always matches.
@@ -102,16 +109,10 @@ const kit = new Kit({
  * Accounts live in SQLite on the persistent disk and survive redeploys — a
  * deploy replaces the image, not the disk. This exists so the FIRST deploy
  * needs no shell access: if ADMIN_EMAIL names an account that does not exist
- * yet, it is created.
- *
- * An existing account is never touched. Silently resetting a password on every
- * redeploy would undo any change made since, and would mean the env var, not
- * the person, owns the account.
+ * yet, it is created. An existing account is never touched.
  */
 function seedAdmin() {
   const email = (process.env.ADMIN_EMAIL || '').trim();
-  // Say so rather than returning silently: a boot log that shows neither an
-  // account nor a reason is impossible to diagnose from the outside.
   if (!email) {
     if (store.countFacilitators() === 0) {
       console.log('  ADMIN_EMAIL is not set — no account will be seeded.');
@@ -121,8 +122,6 @@ function seedAdmin() {
 
   const existing = store.facilitatorByEmail(email);
   if (existing) {
-    // Make sure the named master admin is actually an admin, but leave the
-    // password alone.
     if (!existing.is_admin) {
       store.setAdmin(existing.id, true);
       console.log(`✓ ${existing.email} promoted to admin`);
@@ -132,8 +131,6 @@ function seedAdmin() {
 
   const name = (process.env.ADMIN_NAME || '').trim() || email.split('@')[0];
   const supplied = process.env.ADMIN_PASSWORD;
-  // Never block a first deploy for want of a password: generate one and print
-  // it once. It is shown only on the boot that created the account.
   const password = supplied || require('crypto').randomBytes(12).toString('base64url');
 
   const user = store.createFacilitator({
@@ -183,15 +180,16 @@ if (MODE === 'lan') {
 // -- http ---------------------------------------------------------------------
 
 const app = express();
-app.use(express.json({ limit: '256kb' }));
+app.use(express.json({ limit: '512kb' }));
 app.use(express.urlencoded({ extended: false }));
 
 const staticOpts = { redirect: false };
 app.use('/shared', express.static(path.join(__dirname, 'public', 'shared'), staticOpts));
-app.use('/assets/sector', express.static(path.join(__dirname, 'public', 'sector'), staticOpts));
-app.use('/assets/bigscreen', express.static(path.join(__dirname, 'public', 'bigscreen'), staticOpts));
-app.use('/assets/control', express.static(path.join(__dirname, 'public', 'control'), staticOpts));
-app.use('/assets/admin', express.static(path.join(__dirname, 'public', 'admin'), staticOpts));
+// Optional replaceable audio: drop fault_alert.mp3 etc. into public/audio.
+app.use('/audio', express.static(path.join(__dirname, 'public', 'audio'), staticOpts));
+for (const view of ['sector', 'bigscreen', 'wall', 'control', 'admin']) {
+  app.use(`/assets/${view}`, express.static(path.join(__dirname, 'public', view), staticOpts));
+}
 
 const view = (name) => path.join(__dirname, 'public', name, 'index.html');
 
@@ -205,6 +203,7 @@ function requireSession(req, res, next) {
   next();
 }
 
+app.get('/s/:code/wall', requireSession, (_req, res) => res.sendFile(view('wall')));
 app.get('/s/:code/bigscreen', requireSession, (_req, res) => res.sendFile(view('bigscreen')));
 app.get('/s/:code/control', requireSession, (_req, res) => res.sendFile(view('control')));
 app.get('/s/:code/sector/:sector', requireSession, (req, res) => {
@@ -232,31 +231,25 @@ if (MODE === 'lan') {
     }
     res.sendFile(view('sector'));
   });
+  app.get('/wall', (_req, res) => res.sendFile(view('wall')));
   app.get('/bigscreen', (_req, res) => res.sendFile(view('bigscreen')));
   app.get('/control', (_req, res) => res.sendFile(view('control')));
+  // In LAN mode /admin IS the game master console. The page asks for the
+  // facilitator token if the URL does not carry one.
+  app.get('/admin', (_req, res) => res.sendFile(view('control')));
 }
 
-// -- admin --------------------------------------------------------------------
+// -- admin (hosted sessions panel) -------------------------------------------
 
 app.get('/admin/login', (_req, res) => res.sendFile(view('admin')));
 app.get('/admin', auth.requireAuth, (_req, res) => res.sendFile(view('admin')));
 app.get('/admin/*', auth.requireAuth, (_req, res) => res.sendFile(view('admin')));
 
-/**
- * First-run setup.
- *
- * A fresh instance has no accounts, and the ways in all assume something the
- * operator may not have: shell access, or environment variables that only
- * reach the service if it was created from the Blueprint. So while — and only
- * while — the facilitator table is empty, /admin offers to create the first
- * admin. The moment any account exists this closes permanently.
- */
 const setupOpen = () => store.countFacilitators() === 0;
 
 app.get('/api/auth/needs-setup', (_req, res) => {
   res.json({
     needs_setup: setupOpen(),
-    // Prefilled when the operator did set ADMIN_EMAIL but the seed never ran.
     suggested_email: setupOpen() ? (process.env.ADMIN_EMAIL || '').trim() || null : null,
     suggested_name: setupOpen() ? (process.env.ADMIN_NAME || '').trim() || null : null,
   });
@@ -296,7 +289,6 @@ app.post('/api/auth/setup', (req, res) => {
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body || {};
   const user = store.facilitatorByEmail(email);
-  // Same response either way: never reveal which half was wrong.
   if (!user || !verifyPassword(password, user.password_hash)) {
     return res.status(401).json({ error: 'Incorrect email or password.' });
   }
@@ -328,6 +320,7 @@ api.get('/meta', (_req, res) => {
       code, name: content.sectors.sectors[code].name, colour: content.sectors.sectors[code].colour,
     })),
     rounds: rounds.rounds.map((r) => ({ id: r.id, name: r.name })),
+    scenarios: scenarios.list(),
     mode: MODE,
   });
 });
@@ -345,8 +338,10 @@ function decorate(row) {
     connected: entry ? entry.clients.size : 0,
     live_state: entry ? {
       mode: entry.game.state.mode,
+      phase: entry.game.state.phase,
       round: entry.game.state.round,
       core_integrity: Math.round(entry.game.state.core_integrity),
+      city_stability: Math.round(entry.game.state.city_stability),
     } : null,
   };
 }
@@ -357,13 +352,12 @@ api.get('/sessions', (req, res) => {
 });
 
 api.post('/sessions', (req, res) => {
-  const { name, client_name: clientName, teams } = req.body || {};
+  const { name, client_name: clientName, teams, scenario_id: scenarioId } = req.body || {};
   if (!name || !String(name).trim()) return res.status(400).json({ error: 'A session name is required.' });
 
   const sectors = {};
   for (const code of SECTOR_CODES) {
     const teamName = teams && teams[code];
-    // Unnamed tables still get a team, so a session is always runnable.
     sectors[code] = (teamName && String(teamName).trim()) || content.sectors.sectors[code].name;
   }
   const row = store.createSession({
@@ -372,7 +366,8 @@ api.post('/sessions', (req, res) => {
     facilitatorId: req.user.id,
     sectors,
   });
-  res.status(201).json({ session: decorate(row) });
+  if (scenarioId && scenarios.raw(scenarioId)) store.setSessionScenario(row.id, scenarioId);
+  res.status(201).json({ session: decorate(store.sessionById(row.id)) });
 });
 
 api.get('/sessions/:code', (req, res) => {
@@ -433,10 +428,6 @@ api.get('/sessions/:code/log', (req, res) => {
 
 // -- facilitators (admin only) ------------------------------------------------
 
-/**
- * Only an admin manages accounts. Without this, is_admin would be decoration
- * and every new facilitator would need shell access to the server.
- */
 function requireAdmin(req, res, next) {
   if (!req.user.is_admin) return res.status(403).json({ error: 'Admins only.' });
   next();
@@ -471,7 +462,6 @@ api.post('/facilitators', requireAdmin, (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 8 characters.' });
   }
 
-  // A generated password is returned ONCE, for the admin to pass on.
   const generated = password ? null : require('crypto').randomBytes(9).toString('base64url');
   const user = store.createFacilitator({
     email: clean,
@@ -500,7 +490,6 @@ api.post('/facilitators/:id/admin', requireAdmin, (req, res) => {
   if (!user) return res.status(404).json({ error: 'not_found' });
   const makeAdmin = !!(req.body || {}).is_admin;
 
-  // Never leave the platform with nobody who can manage it.
   if (!makeAdmin && user.is_admin && store.countAdmins() <= 1) {
     return res.status(409).json({ error: 'This is the last admin — promote someone else first.' });
   }
@@ -556,24 +545,113 @@ api.get('/kit/download-all', (req, res) => {
 
 app.use('/api/admin', api);
 
+// -- control-token gated API (the game master console) -----------------------
+
+/** The session named by ?session (LAN: LOCAL), only with its control token. */
+function controlSession(req, res) {
+  const code = String(req.query.session || (MODE === 'lan' ? LAN_CODE : '')).toUpperCase();
+  const row = store.sessionByCode(code);
+  const token = req.query.token || (req.body || {}).token;
+  if (!row || token !== row.control_token) {
+    res.status(403).json({ error: 'forbidden' });
+    return null;
+  }
+  return row;
+}
+
 // The facilitator panel needs the answer key; it is gated on the session's own
 // control token, exactly as the control socket is.
 app.get('/api/content', (req, res) => {
-  const code = String(req.query.session || (MODE === 'lan' ? LAN_CODE : '')).toUpperCase();
-  const row = store.sessionByCode(code);
-  if (!row || req.query.token !== row.control_token) return res.status(403).json({ error: 'forbidden' });
-  res.json({ faults: content.faults, specs: content.specs, sectors: content.sectors, rounds });
+  const row = controlSession(req, res);
+  if (!row) return;
+  res.json({
+    faults: content.faults, specs: content.specs, sectors: content.sectors, rounds,
+    scenarios: scenarios.list(),
+    urls: publicUrls(row),
+  });
 });
 
 app.get('/api/log', (req, res) => {
-  const code = String(req.query.session || (MODE === 'lan' ? LAN_CODE : '')).toUpperCase();
-  const row = store.sessionByCode(code);
-  if (!row || req.query.token !== row.control_token) return res.status(403).send('forbidden');
+  const row = controlSession(req, res);
+  if (!row) return;
   const { runlog } = registry.paths(row.code);
   res.type('application/x-ndjson')
      .set('Content-Disposition', `attachment; filename="runlog-${row.run_id}.jsonl"`)
      .send(fs.existsSync(runlog) ? fs.readFileSync(runlog, 'utf8') : '');
 });
+
+/** Debrief numbers, folded from the run log on request. */
+app.get('/api/debrief', (req, res) => {
+  const row = controlSession(req, res);
+  if (!row) return;
+  const { runlog } = registry.paths(row.code);
+  const text = fs.existsSync(runlog) ? fs.readFileSync(runlog, 'utf8') : '';
+  const entry = registry.live.get(row.code);
+  res.json(analyse(text, { runId: entry ? entry.game.state.run_id : null }));
+});
+
+app.get('/api/scenarios', (req, res) => {
+  if (!controlSession(req, res)) return;
+  res.json({ scenarios: scenarios.list() });
+});
+
+app.get('/api/scenarios/:id', (req, res) => {
+  if (!controlSession(req, res)) return;
+  const doc = scenarios.raw(req.params.id);
+  if (!doc) return res.status(404).json({ error: 'not_found' });
+  res.json({ scenario: doc });
+});
+
+/** SAVE AS SCENARIO: the running game's configuration, under a new name. */
+app.post('/api/scenarios', (req, res) => {
+  const row = controlSession(req, res);
+  if (!row) return;
+  const { id, name, doc, from_live: fromLive } = req.body || {};
+  let document = doc;
+  if (fromLive || !document) {
+    const entry = registry.get(row.code);
+    const sc = entry.game.scenario;
+    document = {
+      notes: (req.body || {}).notes ?? sc.notes,
+      defaults: sc.defaults, sectors: sc.sectors, intel: sc.intel,
+      events: sc.events, fault_presets: sc.fault_presets, timelines: sc.timelines,
+    };
+  }
+  if (!name || !String(name).trim()) return res.status(400).json({ error: 'A scenario name is required.' });
+  try {
+    const key = scenarios.save({ id, name, doc: document });
+    res.status(201).json({ ok: true, id: key, scenarios: scenarios.list() });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/scenarios/:id', (req, res) => {
+  if (!controlSession(req, res)) return;
+  res.json({ ok: scenarios.remove(req.params.id), scenarios: scenarios.list() });
+});
+
+/** The LAN addresses to put on the projector and read out to the room. */
+function lanAddresses() {
+  const out = [];
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const iface of list || []) {
+      if (iface.family === 'IPv4' && !iface.internal) out.push(iface.address);
+    }
+  }
+  return out;
+}
+
+function publicUrls(row) {
+  const base = MODE === 'lan' ? '' : `/s/${row.code}`;
+  const hosts = MODE === 'lan' ? lanAddresses().map((ip) => `http://${ip}:${PORT}`) : [];
+  return {
+    hosts,
+    wall: `${base}/wall`,
+    sectors: Object.fromEntries(SECTOR_CODES.map((c) => [c, `${base}/sector/${c}`])),
+    admin: MODE === 'lan' ? '/admin' : `${base}/control`,
+  };
+}
 
 app.get('/healthz', (_req, res) => res.json({
   ok: true,
@@ -586,7 +664,7 @@ app.get('/healthz', (_req, res) => res.json({
   },
 }));
 
-app.get('/', (_req, res) => res.redirect(MODE === 'lan' ? '/bigscreen' : '/admin'));
+app.get('/', (_req, res) => res.redirect(MODE === 'lan' ? '/wall' : '/admin'));
 
 // -- websockets ---------------------------------------------------------------
 
@@ -599,9 +677,26 @@ function send(ws, payload) {
 
 /** Full state to every client of ONE session, each through its own filter. */
 function broadcast(entry) {
+  entry.lastBroadcast = Date.now();
+  entry.lastChanged = entry.game.changed;
   for (const client of entry.clients) {
     if (!client.ready) continue;
     send(client.ws, filterState(entry.game, client));
+  }
+  flushStings(entry);
+}
+
+/** Sounds queued by the engine go to the room (wall + sectors), never control. */
+function flushStings(entry) {
+  const stings = entry.game.drainStings();
+  if (!stings.length) return;
+  for (const name of new Set(stings)) {
+    entry.log.write('sting', { sound: name, auto: true });
+    for (const c of entry.clients) {
+      if (c.ready && (c.role === 'bigscreen' || c.role === 'sector')) {
+        send(c.ws, { type: 'sting', sound: name });
+      }
+    }
   }
 }
 
@@ -617,7 +712,13 @@ wss.on('connection', (ws) => {
     } catch {
       return send(ws, { type: 'error', reason: 'bad_json' });
     }
-    handleMessage(client, msg);
+    try {
+      handleMessage(client, msg);
+    } catch (err) {
+      // A bad frame must never take the run down mid-session.
+      console.error('[ws] handler failed:', err);
+      send(ws, { type: 'error', reason: 'server_error', got: msg && msg.type });
+    }
   });
 
   ws.on('close', () => {
@@ -648,26 +749,9 @@ function handleMessage(client, msg) {
   if (!entry) return send(client.ws, { type: 'error', reason: 'session_gone' });
   entry.lastTouch = Date.now();
 
-  switch (msg.type) {
-    case 'submit_code': {
-      if (client.role !== 'sector' || client.sector !== msg.sector) {
-        return send(client.ws, { type: 'error', reason: 'wrong_sector' });
-      }
-      send(client.ws, submitCode(entry.game, msg));
-      return broadcast(entry);
-    }
-    case 'set_inventory': {
-      if (client.role !== 'sector' || client.sector !== msg.sector) {
-        return send(client.ws, { type: 'error', reason: 'wrong_sector' });
-      }
-      entry.game.setInventory(msg.sector, msg.inventory || {});
-      return broadcast(entry);
-    }
-    default: {
-      if (client.role !== 'control') return send(client.ws, { type: 'error', reason: 'forbidden' });
-      return handleControl(client, entry, msg);
-    }
-  }
+  if (client.role === 'sector') return handleSector(client, entry, msg);
+  if (client.role !== 'control') return send(client.ws, { type: 'error', reason: 'forbidden' });
+  return handleControl(client, entry, msg);
 }
 
 function handleHello(client, msg) {
@@ -690,7 +774,7 @@ function handleHello(client, msg) {
       return client.ws.close();
     }
     client.role = 'control';
-  } else if (msg.role === 'bigscreen') {
+  } else if (msg.role === 'bigscreen' || msg.role === 'wall') {
     client.role = 'bigscreen';
   } else if (msg.role === 'sector') {
     const sector = String(msg.sector || '').toUpperCase();
@@ -720,39 +804,138 @@ function handleHello(client, msg) {
     teams: Object.fromEntries(
       store.teamsForSession(row.id).map((t) => [t.sector, t.team_name])
     ),
+    urls: publicUrls(row),
     server_time: new Date().toISOString(),
   });
   send(client.ws, filterState(entry.game, client));
   entry.log.write('connect', { role: client.role, sector: client.sector });
 }
 
+// -- participant intents ------------------------------------------------------
+
+function handleSector(client, entry, msg) {
+  const game = entry.game;
+  const mine = client.sector;
+  if (msg.sector && String(msg.sector).toUpperCase() !== mine) {
+    return send(client.ws, { type: 'error', reason: 'wrong_sector' });
+  }
+
+  switch (msg.type) {
+    case 'submit_code':
+      send(client.ws, submitCode(game, { ...msg, sector: mine }));
+      return broadcast(entry);
+
+    case 'set_inventory':
+      game.setInventory(mine, msg.inventory || {});
+      return broadcast(entry);
+
+    case 'fault_open':
+      game.openFault(mine, msg.fault_code);
+      return broadcast(entry);
+
+    /** The digital record of a physical chit — either party may raise it. */
+    case 'transfer_request': {
+      const from = String(msg.from || mine).toUpperCase();
+      const to = String(msg.to || '').toUpperCase();
+      if (from !== mine && to !== mine) return send(client.ws, { type: 'error', reason: 'not_party' });
+      const result = game.requestTransfer({
+        from, to, resource: msg.resource, amount: msg.amount, note: msg.note, by: mine,
+      });
+      send(client.ws, { type: 'transfer_result', ...result });
+      return broadcast(entry);
+    }
+
+    case 'transfer_update': {
+      const t = game.findTransfer(msg.id);
+      if (!t || (t.from !== mine && t.to !== mine)) return send(client.ws, { type: 'error', reason: 'not_party' });
+      const status = String(msg.status || '').toUpperCase();
+      if (!['AGREED', 'WAITING_TRN', 'CANCELLED'].includes(status)) {
+        return send(client.ws, { type: 'error', reason: 'bad_status' });
+      }
+      send(client.ws, { type: 'transfer_result', ...game.updateTransfer(msg.id, status, { by: mine }) });
+      return broadcast(entry);
+    }
+
+    /** TRN's stamp. The rubber stamp on the chit is still the real one. */
+    case 'transfer_stamp': {
+      if (mine !== 'TRN') return send(client.ws, { type: 'error', reason: 'forbidden' });
+      if (game.state.sectors.TRN.status === 'DARK') {
+        return send(client.ws, { type: 'transfer_result', ok: false, reason: 'sector_dark' });
+      }
+      send(client.ws, { type: 'transfer_result', ...game.stampTransfer(msg.id, { by: 'TRN' }) });
+      return broadcast(entry);
+    }
+
+    default:
+      return send(client.ws, { type: 'error', reason: 'forbidden' });
+  }
+}
+
+// -- facilitator authority ----------------------------------------------------
+
 function handleControl(client, entry, msg) {
   const game = entry.game;
   const ok = () => broadcast(entry);
+  const reply = (payload) => send(client.ws, payload);
 
   switch (msg.type) {
+    // -- faults
     case 'fire_fault':
-      send(client.ws, { type: 'fire_result', ...game.fireFault(msg.fault_code, msg.sector) });
+      reply({ type: 'fire_result', ...game.fireFault(msg.fault_code, msg.sector) });
       return ok();
-    case 'clear_fault':  game.clearFault(msg.sector, msg.fault_code, msg.reason); return ok();
+    case 'fire_preset':
+      reply({ type: 'fire_result', ...game.firePreset(msg.preset_id) });
+      return ok();
+    case 'clear_fault':      game.clearFault(msg.sector, msg.fault_code, msg.reason); return ok();
+    case 'accelerate_fault': game.accelerateFault(msg.sector, msg.fault_code, msg.decay_per_min); return ok();
+    case 'pause_fault':      game.pauseFault(msg.sector, msg.fault_code, msg.paused); return ok();
+    case 'fault_add_time':   game.addFaultTime(msg.sector, msg.fault_code, msg.seconds); return ok();
     case 'runbook_mark': {
       if (msg.done) game.runbookDone.add(msg.beat_id);
       else game.runbookDone.delete(msg.beat_id);
       entry.log.write('runbook_mark', { beat_id: msg.beat_id, done: !!msg.done });
       return ok();
     }
+
+    // -- sectors
     case 'set_integrity':      game.setIntegrity(msg.sector, msg.value); return ok();
+    case 'adjust_integrity':   game.adjustIntegrity(msg.sector, msg.delta); return ok();
     case 'set_status':         game.setStatus(msg.sector, msg.value); return ok();
     case 'adjust_workforce':   game.adjustWorkforce(msg.sector, msg.active, msg.injured); return ok();
+    case 'injure_worker':      game.injure(msg.sector, msg.count || 1); return ok();
+    case 'recover_worker':     game.recover(msg.sector, msg.count || 1); return ok();
     case 'adjust_inventory':   game.adjustInventory(msg.sector, msg.delta); return ok();
-    case 'set_core_integrity': game.setCoreIntegrity(msg.value); return ok();
-    case 'accelerate_fault':   game.accelerateFault(msg.sector, msg.fault_code, msg.decay_per_min); return ok();
-    case 'pause_fault':        game.pauseFault(msg.sector, msg.fault_code, msg.paused); return ok();
+    case 'set_sector_config':  game.patchSectorConfig(msg.sector, msg.patch || {}); return ok();
 
-    case 'set_round': game.setRound(msg.round); return ok();
-    case 'clock':     game.clock(msg.action, msg.seconds, msg.which); return ok();
-    case 'set_mode':  game.setMode(msg.mode); return ok();
-    case 'announce':  game.announce(msg.text); return ok();
+    // -- city
+    case 'set_core_integrity':
+    case 'set_core_output':    game.setCoreOutput(msg.value); return ok();
+    case 'adjust_core':        game.setCoreOutput(game.state.core_integrity + Number(msg.delta || 0)); return ok();
+    case 'set_stability':      game.setStability({ mode: msg.mode, value: msg.value }); return ok();
+    case 'set_telemetry':      game.setTelemetry(msg.telemetry || {}); return ok();
+    case 'set_intel':          game.setIntel(msg.key, msg.value !== undefined ? msg.value : msg.patch); return ok();
+    case 'set_config':         game.patchConfig(msg.patch || {}); return ok();
+    case 'set_sound':          game.setSound(msg.on); return ok();
+
+    // -- tempo
+    case 'set_phase':   game.setPhase(msg.phase); return ok();
+    case 'next_phase':  game.nextPhase(); return ok();
+    case 'set_round':   game.setRound(msg.round); return ok();
+    case 'set_mode':    game.setMode(msg.mode); return ok();
+    case 'clock':       game.clock(msg.action, msg.seconds, msg.which); return ok();
+    case 'cycle': {
+      const summary = game.cycleControl(msg.action, msg.seconds);
+      if (summary) reply({ type: 'cycle_summary', summary });
+      return ok();
+    }
+    case 'pause':       game.pause(); return ok();
+    case 'resume':      game.resume(); return ok();
+    case 'breather':    game.setBreather(msg.on); return ok();
+
+    // -- the room
+    case 'announce':    game.announce(msg.text, { sector: msg.sector || null }); return ok();
+    case 'alert':       game.setAlert({ title: msg.title, subtitle: msg.subtitle, big: msg.big }); return ok();
+    case 'dismiss_alert': game.dismissAlert(); return ok();
     case 'sting': {
       entry.log.write('sting', { sound: msg.sound });
       for (const c of entry.clients) {
@@ -762,10 +945,52 @@ function handleControl(client, entry, msg) {
       }
       return ok();
     }
-    case 'breather': game.setBreather(msg.on); return ok();
-    case 'set_telemetry': {
-      Object.assign(game.state.telemetry, msg.telemetry || {});
-      entry.log.write('set_telemetry', { telemetry: msg.telemetry });
+
+    // -- crisis
+    case 'call_council':   game.callCouncil(); return ok();
+    case 'end_council':    game.endCouncil(msg.reason || 'facilitator'); return ok();
+    case 'continuity_order': {
+      if (!msg.confirm) return reply({ type: 'error', reason: 'confirm_required' });
+      reply({ type: 'order_result', ...game.submitContinuityOrder(msg.order) });
+      return ok();
+    }
+    case 'rolling_blackout': {
+      if (!msg.confirm) return reply({ type: 'error', reason: 'confirm_required' });
+      game.startRollingBlackout();
+      return ok();
+    }
+    case 'end_blackout':   game.endRollingBlackout(); return ok();
+    case 'fire_event':
+      reply({ type: 'event_result', ...game.fireEvent(msg.event_id, { target: msg.target }) });
+      return ok();
+    case 'cancel_scheduled': game.cancelScheduled(msg.id); return ok();
+    case 'timeline_fire':  reply({ type: 'timeline_result', ...game.fireTimelineItem(msg.id) }); return ok();
+    case 'timeline_skip':  game.skipTimelineItem(msg.id); return ok();
+    case 'timeline_delay': game.delayTimelineItem(msg.id, msg.seconds); return ok();
+
+    // -- transfers
+    case 'transfer_request': {
+      reply({ type: 'transfer_result', ...game.requestTransfer({ ...msg, by: 'facilitator' }) });
+      return ok();
+    }
+    case 'transfer_update':
+      reply({ type: 'transfer_result', ...game.updateTransfer(msg.id, String(msg.status || '').toUpperCase(), { by: 'facilitator' }) });
+      return ok();
+    case 'transfer_stamp':
+      reply({ type: 'transfer_result', ...game.stampTransfer(msg.id, { by: 'facilitator', force: !!msg.force }) });
+      return ok();
+
+    // -- debrief on the wall
+    case 'wall_debrief': {
+      if (msg.on) {
+        const { runlog } = registry.paths(entry.code);
+        const text = fs.existsSync(runlog) ? fs.readFileSync(runlog, 'utf8') : '';
+        game.state.wall_debrief = analyse(text, { runId: game.state.run_id }).comparison;
+      } else {
+        game.state.wall_debrief = null;
+      }
+      entry.log.write('wall_debrief', { on: !!msg.on });
+      game.touch();
       return ok();
     }
 
@@ -773,25 +998,23 @@ function handleControl(client, entry, msg) {
       entry.log.write('observe', {
         sector: msg.sector || null, tag: msg.tag || null, note: msg.note || '',
       });
-      send(client.ws, { type: 'observe_ack', t: new Date().toISOString() });
-      return;
+      game.ticker('obs', `${msg.tag || 'NOTE'}${msg.sector ? ' ' + msg.sector : ''}: ${msg.note || ''}`, { scope: 'admin' });
+      reply({ type: 'observe_ack', t: new Date().toISOString() });
+      return ok();
 
+    // -- run control
     case 'reset_run': {
-      if (!msg.confirm) return send(client.ws, { type: 'error', reason: 'confirm_required' });
-      const runId = msg.run_id || entry.row.run_id;
-      entry.log.write('run_end', { run_id: game.state.run_id });
-      entry.log.rotate(game.state.run_id);
-      game.reset(runId);
-      entry.log.writeSnapshot(game.serialise());
+      if (!msg.confirm) return reply({ type: 'error', reason: 'confirm_required' });
+      registry.resetRun(entry.code, { runId: msg.run_id, scenarioId: msg.scenario_id || null });
       return ok();
     }
     case 'snapshot':
       entry.log.writeSnapshot(game.serialise());
-      send(client.ws, { type: 'snapshot_ack', t: new Date().toISOString() });
+      reply({ type: 'snapshot_ack', t: new Date().toISOString() });
       return;
     case 'export_log': {
       const row = store.sessionByCode(client.session);
-      send(client.ws, {
+      reply({
         type: 'export_ready',
         url: `/api/log?session=${row.code}&token=${encodeURIComponent(row.control_token)}`,
       });
@@ -799,21 +1022,32 @@ function handleControl(client, entry, msg) {
     }
 
     default:
-      return send(client.ws, { type: 'error', reason: 'unknown_message', got: msg.type });
+      return reply({ type: 'error', reason: 'unknown_message', got: msg.type });
   }
 }
 
 // -- loops --------------------------------------------------------------------
 
-const tickMs = rounds.defaults.tick_ms;
+/**
+ * The engine ticks every second (deadlines, lockouts and the cycle need
+ * that precision) but only broadcasts when something changed, or every
+ * broadcast_ms as a heartbeat. Clients interpolate countdowns in between.
+ */
+const tickMs = Number(rounds.defaults.tick_ms || 1000);
 let lastTick = Date.now();
 setInterval(() => {
   const now = Date.now();
   const elapsed = now - lastTick;
   lastTick = now;
   for (const entry of registry.entries()) {
-    entry.game.tick(elapsed);
-    broadcast(entry);
+    const game = entry.game;
+    try { game.tick(elapsed); } catch (err) { console.error('[tick] failed:', err); }
+    const heartbeat = Number(game.cfg.broadcast_ms || 10000);
+    if (game.changed !== entry.lastChanged || now - (entry.lastBroadcast || 0) >= heartbeat) {
+      broadcast(entry);
+    } else {
+      flushStings(entry);
+    }
   }
 }, tickMs);
 
@@ -840,15 +1074,17 @@ if (require.main === module) {
     reportStorage(storage);
     console.log(`\nUNDERCITY — HAVEN-9  [${MODE} mode]`);
     if (MODE === 'lan') {
-      console.log(`  sector      http://localhost:${PORT}/sector/POW`);
-      console.log(`  big screen  http://localhost:${PORT}/bigscreen`);
-      console.log(`  control     http://localhost:${PORT}/control?token=${LAN_TOKEN}\n`);
+      const ips = lanAddresses();
+      const host = ips[0] ? `http://${ips[0]}:${PORT}` : `http://localhost:${PORT}`;
+      console.log(`  WALL (projector)      ${host}/wall`);
+      console.log(`  SECTOR laptops        ${host}/sector/POW  …/WTR  …/MED  …/TRN  …/AGR  …/COM`);
+      console.log(`  ADMIN (facilitator)   ${host}/admin?token=${LAN_TOKEN}`);
+      if (ips.length > 1) console.log(`  other addresses       ${ips.slice(1).join(', ')}`);
+      console.log('');
     } else {
       console.log(`  admin       http://localhost:${PORT}/admin`);
       console.log(`  data dir    ${DATA_DIR}`);
       if (store.countFacilitators() === 0) {
-        // Deliberately the first thing suggested: it needs no shell, no env
-        // var, and no redeploy. The other routes are fallbacks.
         console.log('\n  ⚠ No facilitator accounts yet — this instance is unclaimed.');
         console.log('      Open /admin and create the first admin account now.');
         console.log('      That form is available ONLY while zero accounts exist.\n');
@@ -861,4 +1097,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, server, store, registry, auth, MODE };
+module.exports = { app, server, store, registry, scenarios, auth, MODE };
