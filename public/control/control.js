@@ -103,6 +103,7 @@
       if (msg.type === 'transfer_result' && msg.ok === false) toast(`Transfer: ${msg.reason}`);
       if (msg.type === 'fire_result' && msg.ok === false) toast(`Not fired: ${msg.reason}`);
       if (msg.type === 'event_result' && msg.ok === false) toast(`Event: ${msg.reason}`);
+      if (msg.type === 'override_result' && msg.ok === false) toast(`Override: ${msg.reason}`);
     },
   });
   const send = (payload) => socket.send(payload);
@@ -146,6 +147,9 @@
     }
     for (const s of content.scenarios || []) {
       $('scenario-select').insertAdjacentHTML('beforeend', `<option value="${esc(s.id)}">${esc(s.name)}${s.builtin ? '' : ' (saved)'}</option>`);
+    }
+    for (const f of content.faults.faults) {
+      $('fo-fault').insertAdjacentHTML('beforeend', `<option value="${f.code}">${f.code} · ${f.sector} · ${esc(f.name)}</option>`);
     }
   }
 
@@ -302,7 +306,7 @@
         <div class="sec-head">
           <span class="sec-code" style="color:${s.colour}">${U.SECTOR_GLYPH[code] || ''} ${code}</span>
           <span class="sec-name">${esc(s.name.toUpperCase())}</span>
-          <span class="sec-status ${s.status}">${s.status}</span>
+          <span class="sec-status ${s.status}">${s.status_word || s.status}</span>
         </div>
         <div class="sec-int"><b>${Math.round(s.integrity)}</b>
           <div class="bar ${U.integrityClass(s.integrity)}"><i style="width:${Math.max(0, s.integrity)}%"></i></div></div>
@@ -611,9 +615,15 @@
 
   const SETTINGS = [
     ['THRESHOLDS'],
-    ['critical_below', 'Critical below integrity', 'n'], ['dark_at', 'Dark at integrity', 'n'],
+    ['critical_below', 'Critical below integrity', 'n'], ['degraded_below', 'Degraded below integrity', 'n'],
+    ['dark_at', 'Dark at integrity', 'n'],
     ['resolve_recovery', 'Integrity on resolve', 'n'], ['lockout_s', 'Console lockout (s)', 'n'],
     ['lockout_after_consecutive_invalid', 'Lockout after N wrong', 'n'], ['council_clock_s', 'Council clock (s)', 'n'],
+    ['CORE & ROUND LENGTHS'],
+    ['core_start_output', 'Core output at start (%) — applies on reset', 'n'],
+    ['round_length_s.R0', 'R0 Onboarding (s)', 'n'], ['round_length_s.R1', 'R1 Stable Ops (s)', 'n'],
+    ['round_length_s.R2', 'R2 Interdependence (s)', 'n'], ['round_length_s.R3', 'R3 Core Failure (s)', 'n'],
+    ['round_length_s.R4', 'R4 Aftershock (s)', 'n'],
     ['ECONOMY'],
     ['auto_economy', 'Digital economy on (production, upkeep, stock moves)', 'b'],
     ['deduct_resources_on_resolve', 'Deduct resources on resolve', 'b'],
@@ -695,7 +705,29 @@
         send({ type: 'set_sector_config', sector: b.dataset.apply, patch: { production, upkeep, start_integrity: Number(row.querySelector('[data-si]').value), start_workforce: Number(row.querySelector('[data-sw]').value) } });
       });
     }
+
+    // Per-fault overrides in force (spec §44): deadline, expiry penalty, extra accepted codes.
+    const overrides = Object.entries(cfg.fault_overrides || {});
+    $('fault-overrides').innerHTML = overrides.map(([code, o]) => `<div class="fo">
+        <b>${esc(code)}</b>
+        <span>${o.deadline_s != null ? `deadline ${U.mmss(o.deadline_s)}` : ''}${o.integrity_penalty != null ? ` · penalty −${esc(o.integrity_penalty)}` : ''}${(o.extra_valid_codes || []).length ? ` · also accepts ${esc(o.extra_valid_codes.join(', '))}` : ''}</span>
+        <button data-fo-remove="${esc(code)}">REMOVE</button>
+      </div>`).join('') || '<div class="hint">None. Faults use the content deadline, the severity defaults and the content answer.</div>';
+    for (const b of $('fault-overrides').querySelectorAll('[data-fo-remove]')) {
+      b.addEventListener('click', () => send({ type: 'set_fault_override', fault_code: b.dataset.foRemove, patch: null }));
+    }
   }
+
+  $('btn-fo-apply').addEventListener('click', () => {
+    const code = $('fo-fault').value;
+    if (!code) return;
+    const patch = {};
+    if ($('fo-deadline').value !== '') patch.deadline_s = Number($('fo-deadline').value);
+    if ($('fo-penalty').value !== '') patch.integrity_penalty = Number($('fo-penalty').value);
+    patch.extra_valid_codes = $('fo-extra').value.split(',').map((c) => c.trim()).filter(Boolean);
+    send({ type: 'set_fault_override', fault_code: code, patch });
+    $('fo-deadline').value = ''; $('fo-penalty').value = ''; $('fo-extra').value = '';
+  });
 
   $('btn-save-scenario').addEventListener('click', async () => {
     const name = $('save-name').value.trim();

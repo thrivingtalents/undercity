@@ -915,6 +915,9 @@ function handleControl(client, entry, msg) {
     case 'set_telemetry':      game.setTelemetry(msg.telemetry || {}); return ok();
     case 'set_intel':          game.setIntel(msg.key, msg.value !== undefined ? msg.value : msg.patch); return ok();
     case 'set_config':         game.patchConfig(msg.patch || {}); return ok();
+    case 'set_fault_override':
+      reply({ type: 'override_result', ...game.setFaultOverride(msg.fault_code, msg.patch === undefined ? null : msg.patch) });
+      return ok();
     case 'set_sound':          game.setSound(msg.on); return ok();
 
     // -- tempo

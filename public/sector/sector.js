@@ -132,8 +132,11 @@
 
   // -- status words -----------------------------------------------------------
 
-  /** The word we print. Never colour alone. */
+  /** The word we print. Never colour alone. The server computes it from the
+   *  scenario thresholds (degraded_below / critical_below); the fallback only
+   *  covers a frame from an older server. */
   function statusWord(s) {
+    if (s.status_word) return s.status_word;
     if (s.status === 'DARK' || s.status === 'BROWNOUT' || s.status === 'CRITICAL') return s.status;
     return Number(s.integrity) >= 60 ? 'STABLE' : 'DEGRADED';
   }
@@ -405,16 +408,18 @@
     show($('dark-overlay'), word === 'DARK');
     show($('pause-overlay'), !!state.paused);
 
-    // Council takeover in the right column; the rest of the screen keeps working.
+    // Council: a full-width summons banner plus the takeover panel in the
+    // right column; the rest of the screen keeps working.
     const council = !!(state.council && state.council.active) || state.mode === 'COUNCIL';
     show($('council'), council);
+    show($('banner-council'), council);
     show($('city-block'), !council);
     show($('announce-block'), !council);
 
     // Alert: remember the frame's age so the tick can promote full → reduced locally.
     const a = state.alert;
     if (a) {
-      alertSeen = { id: a.id, age: Number(a.age_s) || 0, at: performance.now(), full: !!a.full_screen };
+      alertSeen = { id: a.id, age: Number(a.age_s) || 0, at: performance.now(), full: !!a.full_screen, fullS: Number(a.full_s) || ALERT_FULL_S };
       setText($('alert-title'), a.title || '');
       setText($('alert-sub'), a.subtitle || '');
       setText($('alert-big'), a.big || '');
@@ -837,7 +842,8 @@
   function renderResolved() {
     const list = (mine.recently_resolved || []).slice().reverse();
     show($('resolved-block'), list.length > 0);
-    const html = list.map((f) => `<div class="resolved-row"><span>${esc(f.code)}</span><span class="r-name">${esc(f.name)}</span><span class="r-st">RESOLVED</span></div>`).join('');
+    // RESOLVED by the team; CLEARED by the facilitator; FAILED at a deadline.
+    const html = list.map((f) => `<div class="resolved-row"><span>${esc(f.code)}</span><span class="r-name">${esc(f.name)}</span><span class="r-st">${esc(f.status === 'RESOLVED' || !f.status ? 'RESOLVED' : f.status)}</span></div>`).join('');
     const host = $('resolved');
     if (host.innerHTML !== html) host.innerHTML = html;
   }
@@ -860,6 +866,7 @@
     const council = U.countdown(state.council_clock, frozen);
     setText($('council-clock'), U.mmss(council));
     setUrgency($('council-clock'), council, true);
+    setText($('banner-council-clock'), U.mmss(council));
 
     // Fault list deadlines.
     for (const f of mine.faults || []) {
@@ -897,7 +904,7 @@
     // Alert: full-screen for its first seconds, then a persistent banner.
     if (alertSeen) {
       const age = alertSeen.age + (performance.now() - alertSeen.at) / 1000;
-      const full = alertSeen.full && age < ALERT_FULL_S;
+      const full = alertSeen.full && age < (alertSeen.fullS || ALERT_FULL_S);
       show($('alert-full'), full);
       show($('banner-alert'), !full);
     }

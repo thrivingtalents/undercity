@@ -54,8 +54,10 @@
 
   // -- helpers ---------------------------------------------------------------------
 
-  /** Status word: never colour alone. */
+  /** Status word: never colour alone. The server computes it from the
+   *  scenario thresholds; the fallback below only covers an older frame. */
   function statusWord(s) {
+    if (s.status_word) return s.status_word;
     if (s.status === 'DARK') return 'DARK';
     if (s.status === 'BROWNOUT') return 'BROWNOUT';
     if (s.status === 'CRITICAL') return 'CRITICAL';
@@ -89,7 +91,9 @@
     return (Number(frame.alert.age_s) || 0) + (performance.now() - frameAt) / 1000;
   }
   function alertIsFull() {
-    return !!(frame && frame.alert && frame.alert.full_screen && alertAge() < ALERT_FULL_S);
+    if (!frame || !frame.alert) return false;
+    const fullS = Number(frame.alert.full_s) || ALERT_FULL_S;
+    return !!(frame.alert.full_screen && alertAge() < fullS);
   }
 
   // -- full render -----------------------------------------------------------------

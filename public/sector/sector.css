@@ -76,6 +76,8 @@
   text-align: center; border-bottom: 1px solid var(--line);
 }
 .banner-brownout { background: #3a2a0c; color: var(--amber); }
+.banner-council { background: #2a1a3a; color: #e8d6ff; }
+.banner-council b { margin-left: 14px; font-size: 1.15em; color: #fff; }
 .banner-breather { background: #0f2a17; color: var(--green); }
 .banner-alert { background: #3a1212; color: #ffd4d4; }
 .banner-alert span { font-weight: 400; color: #e8a8a8; }

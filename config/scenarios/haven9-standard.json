@@ -11,7 +11,11 @@
     "card_shows_dependency": false,
 
     "critical_below": 30,
+    "degraded_below": 60,
     "dark_at": 0,
+    "core_start_output": 100,
+    "round_length_s": { "R0": 900, "R1": 1200, "R2": 1800, "R3": 1800, "R4": 1500 },
+    "fault_overrides": {},
     "resolve_recovery": 5,
     "lockout_s": 20,
     "lockout_after_consecutive_invalid": 3,

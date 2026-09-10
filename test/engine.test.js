@@ -676,3 +676,154 @@ test('analytics durations are computed from the log timestamps', () => {
   assert.equal(d.comparison.R4.avg_resolution_s, 10);
   assert.equal(d.comparison.R4.avg_first_action_s, 10, 'a submit is a first action too');
 });
+
+// -- configuration for spec §5 / §44: thresholds, core start, round lengths,
+//    per-fault overrides, scenario inheritance ---------------------------------
+
+test('the status word follows the scenario thresholds and every projection carries it', () => {
+  const game = running();
+  assert.equal(forSector(game, 'WTR').sectors.POW.status_word, 'STABLE', 'the delayed view names a word too');
+  game.setIntegrity('POW', 65);
+  assert.equal(forSector(game, 'POW').sectors.POW.status_word, 'STABLE');
+  game.patchConfig({ degraded_below: 70 });
+  assert.equal(forSector(game, 'POW').sectors.POW.status_word, 'DEGRADED');
+  assert.equal(forBigscreen(game).sectors.POW.status_word, 'DEGRADED');
+  assert.equal(forControl(game).sectors.POW.status_word, 'DEGRADED');
+  game.patchConfig({ critical_below: 66 });
+  assert.equal(game.state.sectors.POW.status, 'CRITICAL', 'a live threshold change re-evaluates status at once');
+  assert.equal(forBigscreen(game).sectors.POW.status_word, 'CRITICAL');
+  game.setStatus('POW', 'BROWNOUT');
+  assert.equal(forBigscreen(game).sectors.POW.status_word, 'BROWNOUT');
+  game.setStatus('POW', 'DARK');
+  assert.equal(forSector(game, 'POW').sectors.POW.status_word, 'DARK');
+});
+
+test('core output at start and round lengths come from the scenario', () => {
+  const game = newGame();
+  game.patchConfig({ core_start_output: 80, round_length_s: { R2: 900 } });
+  game.reset('run-2', { silent: true });
+  assert.equal(game.state.core_integrity, 80);
+  assert.equal(forBigscreen(game).core_output, 80);
+  assert.ok(game.state.city_stability < 100, 'stability reflects the lower core from the first frame');
+
+  game.setPhase('ROUND_2');
+  assert.equal(game.state.round_clock.remaining_s, 900);
+  const r1 = rounds.rounds.find((r) => r.id === 'R1');
+  assert.equal(game.roundConfig('R1').length_s, r1.length_s, 'rounds without an override keep rounds.json');
+
+  // The current round's new length applies at once while its clock is held…
+  game.patchConfig({ round_length_s: { R2: 600 } });
+  assert.equal(game.state.round_clock.remaining_s, 600);
+  // …and never while it is running.
+  game.clock('start');
+  game.patchConfig({ round_length_s: { R2: 300 } });
+  assert.equal(game.state.round_clock.remaining_s, 600);
+  assert.equal(game.roundConfig().length_s, 300, 'the next START of R2 would use it');
+});
+
+test('per-fault overrides: deadline, expiry penalty and extra accepted codes; the content answer stays', () => {
+  const game = running();
+  assert.equal(game.setFaultOverride('F-999', { deadline_s: 10 }).ok, false);
+
+  game.setFaultOverride('F-201', { deadline_s: 100, integrity_penalty: 3, extra_valid_codes: ['p-04-777', ''] });
+  const { fault } = game.fireFault('F-201', 'POW');
+  assert.equal(fault.deadline_s, 100);
+  assert.equal(fault.integrity_penalty, 3);
+  assert.ok(fault.valid_codes.includes('P-04-340') && fault.valid_codes.includes('P-04-777'));
+  assert.equal(forControl(game).config.fault_overrides['F-201'].deadline_s, 100);
+  assert.ok(!JSON.stringify(forSector(game, 'POW')).includes('P-04-777'), 'an extra code is still an answer key');
+
+  const r = submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-04-777', workers_assigned: 2 });
+  assert.equal(r.accepted, true, 'the extra code resolves it');
+
+  game.setFaultOverride('F-201', null);
+  assert.equal(forControl(game).config.fault_overrides['F-201'], undefined);
+  const again = game.fireFault('F-201', 'POW').fault;
+  assert.equal(again.deadline_s, 480, 'back to the severity default');
+  assert.equal(again.integrity_penalty, 10);
+  assert.deepEqual([...again.valid_codes].sort(), ['P-04-290', 'P-04-340']);
+  assert.equal(logEvents(game, 'fault_override').length, 2, 'both the override and its removal are logged');
+});
+
+test('each Council sitting gets its own 30-second warning', () => {
+  const game = running();
+  game.callCouncil();
+  game.clock('set', 25, 'council');
+  game.tick(1000);
+  assert.equal(game.state.council.warned_30, true);
+  assert.equal(game.submitContinuityOrder(['POW', 'WTR', 'MED', 'TRN', 'AGR', 'COM']).ok, true);
+  game.callCouncil();
+  assert.equal(game.state.council.warned_30, false);
+  game.clock('set', 25, 'council');
+  game.tick(1000);
+  assert.equal(game.state.council.warned_30, true, 'the second sitting warns too');
+});
+
+test('the demo scenario extends the standard one: defaults and sectors merge, scripts are taken whole', () => {
+  const lib = new ScenarioLibrary({ rounds, content: loadContent() });
+  const demo = lib.resolve('haven9-demo');
+  const std = lib.resolve('haven9-standard');
+  assert.equal(demo.defaults.cycle_length_s, 120);
+  assert.equal(demo.defaults.lockout_s, std.defaults.lockout_s, 'unset defaults inherit');
+  assert.equal(demo.sectors.MED.start_integrity, 55);
+  assert.deepEqual(demo.sectors.MED.upkeep, std.sectors.MED.upkeep, 'unset sector fields inherit');
+  assert.equal(demo.events.length, std.events.length, 'events inherit whole');
+  assert.ok(demo.timelines.R2.some((t) => t.mode === 'AUTO'), 'the demo R2 script replaces the standard one');
+  assert.deepEqual(demo.timelines.R1, std.timelines.R1, 'other rounds keep the parent script');
+
+  const game = newGame();
+  game.reset('demo', { silent: true, scenario: demo });
+  assert.equal(game.state.scenario_id, 'haven9-demo');
+  assert.equal(forBigscreen(game).sectors.MED.status_word, 'DEGRADED', 'MED starts visibly degraded');
+  assert.equal(forBigscreen(game).sectors.COM.integrity, 95);
+  assert.equal(game.state.cycle.remaining_s, 120);
+  assert.equal(game.roundConfig('R2').length_s, 600);
+});
+
+test('the alert frame carries the full-screen seconds so clients never guess', () => {
+  const game = running();
+  game.patchConfig({ alert_full_screen_s: 3 });
+  game.setAlert({ title: 'CORE INSTABILITY DETECTED' });
+  assert.equal(forBigscreen(game).alert.full_s, 3);
+  assert.equal(forSector(game, 'POW').alert.full_s, 3);
+  assert.equal(forBigscreen(game).alert.full_screen, true);
+});
+
+test('the session registry opens a session on its chosen scenario; RESET RUN WITH SCENARIO switches it; a restart fills new settings', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'undercity-reg-'));
+  const store = new Store(path.join(dir, 'db.sqlite'));
+  const content = loadContent();
+  const scenarios = new ScenarioLibrary({ store, rounds, content });
+  const { SessionRegistry } = require('../lib/sessions');
+  const registry = new SessionRegistry({ store, content, rounds, dataDir: dir, scenarios });
+  const sys = store.createFacilitator({ email: 'reg@test', name: 'Reg', passwordHash: 'x', isAdmin: true });
+  const row = store.createSession({
+    name: 'Reg run', clientName: null, facilitatorId: sys.id,
+    sectors: Object.fromEntries(SECTORS.map((s) => [s, s])),
+  });
+  store.setSessionScenario(row.id, 'haven9-demo');
+
+  const entry = registry.get(row.code);
+  assert.equal(entry.game.state.scenario_id, 'haven9-demo', 'the session opens on the scenario it was created with');
+  assert.equal(entry.game.cfg.cycle_length_s, 120);
+
+  registry.resetRun(row.code, { runId: 'reg-2', scenarioId: 'haven9-standard' });
+  assert.equal(entry.game.state.scenario_id, 'haven9-standard');
+  assert.equal(entry.game.cfg.cycle_length_s, 420);
+  assert.equal(store.sessionById(row.id).scenario_id, 'haven9-standard', 'the choice is persisted');
+
+  // A restart restores the run, keeps live edits, and fills settings the snapshot predates.
+  entry.game.patchConfig({ council_clock_s: 240 });
+  registry.evict(row.code);
+  const snapPath = registry.paths(row.code).snapshot;
+  const snap = JSON.parse(fs.readFileSync(snapPath, 'utf8'));
+  delete snap.scenario.defaults.degraded_below;
+  fs.writeFileSync(snapPath, JSON.stringify(snap));
+  const again = registry.get(row.code);
+  assert.equal(again.game.state.run_id, 'reg-2');
+  assert.equal(again.game.cfg.council_clock_s, 240, 'live edits survive the restart');
+  assert.equal(again.game.cfg.degraded_below, 60, 'fresh defaults fill the gaps');
+  registry.evict(row.code);
+  store.close();
+  fs.rmSync(dir, { recursive: true, force: true });
+});

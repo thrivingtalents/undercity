@@ -287,6 +287,11 @@ button.big { font-size: 13px; padding: 10px 14px; font-weight: 700; }
 .sector-config th { color: var(--ink-faint); font-weight: 400; font-size: 9px; letter-spacing: 0.1em; }
 .sector-config input { width: 40px; font-size: 10.5px; padding: 2px 3px; }
 .sector-config button { font-size: 9px; padding: 2px 5px; }
+.fault-overrides { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+.fault-overrides .fo { display: grid; grid-template-columns: 52px 1fr auto; gap: 6px; align-items: center; border: 1px solid var(--line); background: var(--panel-2); padding: 3px 6px; font-size: 10.5px; }
+.fault-overrides .fo b { color: var(--amber); }
+.fault-overrides .fo span { color: var(--ink-dim); }
+.fault-overrides .fo button { font-size: 9px; padding: 2px 6px; }
 
 /* debrief */
 .debrief { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }

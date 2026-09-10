@@ -336,6 +336,18 @@
           <span class="label">Sector economy <em>— per cycle</em></span>
           <div class="sector-config" id="sector-config"></div>
         </div>
+        <div class="block">
+          <span class="label">Fault overrides <em>— one fault: deadline, expiry penalty, extra accepted codes</em></span>
+          <div class="row">
+            <select id="fo-fault"></select>
+            <input type="number" id="fo-deadline" class="short" min="0" placeholder="deadline s" title="Deadline in seconds; blank keeps the content/severity default">
+            <input type="number" id="fo-penalty" class="short" min="0" placeholder="penalty" title="Integrity lost at the deadline; blank keeps the severity default">
+            <input type="text" id="fo-extra" placeholder="extra accepted codes, comma-separated (e.g. the value your binder prints)" autocomplete="off">
+            <button id="btn-fo-apply" class="primary">APPLY</button>
+          </div>
+          <div class="hint">Applies to faults fired from now on. The content answer is never removed — an extra code is added beside it, so a binder misprint can be honoured mid-session without desynchronising paper and server.</div>
+          <div class="fault-overrides" id="fault-overrides"></div>
+        </div>
       </div>
 
       <!-- DEBRIEF -->

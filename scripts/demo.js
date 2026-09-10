@@ -22,6 +22,9 @@ const WebSocket = require('ws');
 const URL = (process.env.DEMO_URL || 'http://localhost:3000').replace(/\/$/, '');
 const TOKEN = process.env.DEMO_TOKEN || 'haven9';
 const SESSION = (process.env.DEMO_SESSION || 'LOCAL').toUpperCase();
+// The demo scenario: short clocks, distinct starting values, an AUTO R2 script.
+// DEMO_SCENARIO=haven9-standard runs the same beats on the standard clocks.
+const SCENARIO = process.env.DEMO_SCENARIO || 'haven9-demo';
 const SPEED = process.env.DEMO_FAST ? 0.25 : 1;
 const WS = URL.replace(/^http/, 'ws');
 
@@ -56,16 +59,18 @@ async function main() {
   const send = (c, m) => c.ws.send(JSON.stringify(m));
   const A = (m) => send(admin, m);
 
-  say('0. Reset to a fresh run of the standard scenario');
-  A({ type: 'reset_run', run_id: `demo-${new Date().toISOString().slice(11, 16).replace(':', '')}`, confirm: true });
+  say(`0. Reset to a fresh run of the ${SCENARIO} scenario`);
+  A({ type: 'reset_run', run_id: `demo-${new Date().toISOString().slice(11, 16).replace(':', '')}`, scenario_id: SCENARIO, confirm: true });
   await wait(2);
   A({ type: 'set_phase', phase: 'ROUND_2' });
   A({ type: 'clock', which: 'round', action: 'start' });
   A({ type: 'announce', text: 'DEMO — Round 2 begins. Watch the wall, POW and TRN screens.' });
-  say('1. Normal state — every sector STABLE at 100, cycle counting down');
+  say('1. Normal state — six distinct sectors (MED starts DEGRADED), cycle counting down');
   await wait(6);
 
   say('2. Trigger F-201 on POW — it appears on the POW screen and as the wall headline fault');
+  // In the demo scenario the R2 script has already fired it (AUTO at 00:05);
+  // firing again is refused as already_active, which is exactly right.
   A({ type: 'fire_fault', fault_code: 'F-201', sector: 'POW' });
   await wait(6);
 

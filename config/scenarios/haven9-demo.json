@@ -1,0 +1,36 @@
+{
+  "id": "haven9-demo",
+  "name": "HAVEN-9 DEMO (fast clocks)",
+  "extends": "haven9-standard",
+  "notes": "DEMO SCENARIO (spec §50) — every value in this file is a DEMO value, not game balance. Clocks are short so the whole arc (fault → lockout → resolve → transfer → council → Continuity Order → brownout → dark → Aftershock comparison) can be rehearsed in minutes, and the six sectors start with deliberately different integrity and stock so each screen looks distinct. Anything not set here is inherited from HAVEN-9 STANDARD. Run `npm run demo` against a LAN server to drive it.",
+
+  "defaults": {
+    "cycle_length_s": 120,
+    "council_clock_s": 90,
+    "round_length_s": { "R0": 300, "R1": 480, "R2": 600, "R3": 600, "R4": 480 },
+    "deadline_default_s": { "1": null, "2": 180, "3": 120 },
+    "alert_full_screen_s": 5,
+    "core_start_output": 100
+  },
+
+  "sectors": {
+    "POW": { "start_integrity": 82, "start_inventory": { "power": 4, "water": 2, "parts": 3, "med": 1 } },
+    "WTR": { "start_integrity": 74, "start_inventory": { "power": 2, "water": 5, "parts": 2, "med": 1 } },
+    "MED": { "start_integrity": 55, "start_inventory": { "power": 2, "water": 2, "parts": 1, "med": 3 },
+             "note": "DEMO — starts DEGRADED so the status word is visible from the first frame." },
+    "TRN": { "start_integrity": 90, "start_inventory": { "power": 3, "water": 2, "parts": 4, "med": 0 } },
+    "AGR": { "start_integrity": 68, "start_inventory": { "power": 1, "water": 4, "parts": 2, "med": 1 } },
+    "COM": { "start_integrity": 95, "start_inventory": { "power": 3, "water": 1, "parts": 2, "med": 1 } }
+  },
+
+  "timelines": {
+    "R2": [
+      { "offset_s": 5,   "kind": "fault", "fault_code": "F-201", "sector": "POW", "mode": "AUTO", "note": "DEMO — the cross-sector coolant fault; POW needs WTR's reservoir value" },
+      { "offset_s": 60,  "kind": "fault", "fault_code": "F-203", "sector": "WTR", "mode": "AUTO" },
+      { "offset_s": 90,  "kind": "announce", "text": "DEMO: core output dropping. Council convenes shortly.", "mode": "AUTO" },
+      { "offset_s": 120, "kind": "fault", "fault_code": "F-205", "sector": "MED", "mode": "AUTO" },
+      { "offset_s": 180, "kind": "core",  "value": 60, "mode": "AUTO", "note": "DEMO — the city can sustain 4 of 6 sectors" },
+      { "offset_s": 240, "kind": "council", "mode": "MANUAL", "note": "DEMO — Council and the Continuity Order" }
+    ]
+  }
+}
