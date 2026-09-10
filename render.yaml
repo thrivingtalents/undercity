@@ -38,9 +38,9 @@ services:
       # saves you needing shell access for the very first sign-in. An existing
       # account is never modified, so changing the password in the app sticks.
       - key: ADMIN_EMAIL
-        value: eugene@thrivingtalents.com
+        value: thrivingtalentsgpt1@gmail.com
       - key: ADMIN_NAME
-        value: Eugene Phuah
+        value: Thriving Talents
       # Set this in the Render dashboard, not here. Leave it unset and the
       # first boot generates one and prints it to the deploy log, once.
       - key: ADMIN_PASSWORD
