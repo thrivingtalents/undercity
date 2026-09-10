@@ -80,11 +80,17 @@ With a LAN server running, open `/wall`, `/sector/POW`, `/sector/TRN` and
 npm run demo                 # DEMO_FAST=1 for a quicker run; DEMO_URL / DEMO_TOKEN to point elsewhere
 ```
 
-It walks the thirteen beats of spec §50 — normal state, fault, countdown,
-wrong code, lockout, correct code (stock deducted, +5 integrity), transfer
-stamped by TRN, integrity loss, CRITICAL, Council, Continuity Order, brownout,
-sector DARK, and the Round 3 vs Aftershock comparison on the wall. Demo values
-are demo values, not balance.
+It resets the run to the **HAVEN-9 DEMO** scenario
+(`config/scenarios/haven9-demo.json`: two-minute cycles, a 90-second council,
+short deadlines, six sectors that start at visibly different integrity and
+stock, and an R2 script that fires itself) and walks the thirteen beats of
+spec §50 — normal state, fault, countdown, wrong code, lockout, correct code
+(stock deducted, +5 integrity), transfer stamped by TRN, integrity loss,
+CRITICAL, Council, Continuity Order, brownout, sector DARK, and the Round 3 vs
+Aftershock comparison on the wall. `DEMO_SCENARIO=haven9-standard` runs the
+same beats on the standard clocks. Demo values are demo values, not balance;
+pick HAVEN-9 STANDARD again (Admin → SETTINGS → RESET RUN WITH SCENARIO)
+before a real cohort.
 
 ### Hosted — the platform
 
@@ -174,17 +180,26 @@ more than two clicks away and only destructive actions confirm.
 
 Anything involving balance lives in a **scenario**
 (`config/scenarios/haven9-standard.json`) and is editable live from Admin →
-SETTINGS: thresholds, lockout, council clock, cycle length, production and
-upkeep per sector, deadline defaults and penalties by severity, brownout
-effects (with per-sector specials: COM loses telemetry, TRN capacity drops,
-POW production collapses), transport capacity, the city stability formula
-and its weights, resource minimums, wall detail switches, event presets,
-fault presets, the round timelines and COM's intelligence items.
+SETTINGS: the status thresholds (`critical_below`, `degraded_below`,
+`dark_at`), lockout, council clock, core output at start, the length of every
+round, cycle length, production and upkeep per sector, deadline defaults and
+penalties by severity, per-fault overrides (a deadline, an expiry penalty and
+extra accepted codes for one fault), brownout effects (with per-sector
+specials: COM loses telemetry, TRN capacity drops, POW production collapses),
+transport capacity, the city stability formula and its weights, resource
+minimums, wall detail switches, event presets, fault presets, the round
+timelines and COM's intelligence items. The status word every screen prints
+(STABLE · DEGRADED · CRITICAL · BROWNOUT · DARK) is computed on the server
+from those thresholds; no client carries a number.
 
 **SAVE AS SCENARIO** stores the running configuration in SQLite under a name
 (`HAVEN-9 HARD`, `HAVEN-9 CLIENT TEST`…); a saved copy with a built-in's id
 shadows it, deleting the copy reveals the built-in again. A session chooses
 its scenario when created (hosted) or on RESET RUN WITH SCENARIO (Admin).
+A scenario file may `"extends"` another and state only what differs —
+`defaults` and `sectors` merge over the parent, while `events`,
+`fault_presets`, `intel` and each round's timeline are taken whole from
+whichever document defines them. `haven9-demo.json` is the worked example.
 
 Three switches decide how much the computer does, because the earlier design
 deliberately kept it out of the economy (contract §3.5):
@@ -204,7 +219,7 @@ point.
 
 ```text
 server.js                Express + ws; routes, intents, the 1 s engine tick, change-based broadcast
-config/scenarios/        game configuration — every balance number (HAVEN-9 STANDARD ships)
+config/scenarios/        game configuration — every balance number (HAVEN-9 STANDARD and the fast-clock DEMO ship)
 content/*.json           faults · specs · sectors — generated from the matrix, never hand-edited
 lib/
   config.js              ScenarioLibrary: built-ins + saved copies, deep merge, resolve for play
@@ -272,6 +287,14 @@ Migrations are additive and run at boot (`lib/db.js` → `migrate`).
   pipeline* below), never in `content/faults.json`. Deadlines and injuries can
   be set per fault there; a fault with no deadline gets the scenario's default
   for its severity (`deadline_default_s`).
+- **Tuning one fault for a run** (deadline, expiry penalty, extra accepted
+  codes) is a scenario override — Admin → SETTINGS → *Fault overrides*, or
+  `fault_overrides: { "F-201": { "deadline_s": 480, "integrity_penalty": 10,
+  "extra_valid_codes": ["P-04-290"] } }` in the file. It applies to faults
+  fired from then on. An extra code is added *beside* the content answer, never
+  instead of it: that lets a facilitator honour a binder misprint mid-session
+  without desynchronising paper from server, which is why the answer itself is
+  not editable here.
 - **A new event**: add an object to `events[]` in a scenario. Fields:
   `id name description targets` (`"ALL"`, `"PICK"`, `"RANDOM2"` or a list),
   `visibility`, and any of `integrity_changes {SECTOR|TARGET: delta}`,
