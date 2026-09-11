@@ -9,111 +9,97 @@
 <link rel="stylesheet" href="/assets/wall/wall.css">
 </head>
 <body>
-<div class="wall" id="wall">
+<div class="wall" id="wall" data-core="healthy">
 
-  <!-- persistent top strips: one shared row, above the header -->
-  <div class="strips" id="strips">
-  <div class="strip strip-blackout" id="strip-blackout" hidden>
-    <span class="strip-light"></span>
-    <span class="strip-text" id="strip-blackout-text">ROLLING BLACKOUT IN PROGRESS</span>
-  </div>
-  <div class="strip strip-alert" id="strip-alert" hidden>
-    <span class="strip-light"></span>
-    <span class="strip-text">
-      <b id="strip-alert-title"></b>
-      <span id="strip-alert-sub"></span>
-      <em id="strip-alert-big"></em>
-    </span>
-  </div>
-  <div class="strip strip-breather" id="strip-breather" hidden>
-    <span class="strip-light"></span>
-    <span class="strip-text">BREATHER — SYSTEMS HOLDING</span>
-  </div>
-  </div>
-
-  <!-- TOP AREA -->
-  <header class="top">
-    <div class="brand">
+  <!-- HUD: the three values that matter, and nothing else -->
+  <header class="hud">
+    <div class="hud-brand">
       <h1>HAVEN-9</h1>
-      <div class="brand-sub">UNDERCITY EMERGENCY COMMAND</div>
-      <div class="phase-row">
-        <span class="phase" id="phase-name">—</span>
-        <span class="round-clock" id="round-clock">--:--</span>
-      </div>
+      <span class="hud-phase" id="phase-name">—</span>
     </div>
-
-    <div class="fig" id="fig-stability">
-      <div class="fig-label">CITY STABILITY</div>
-      <div class="fig-value"><span id="stability">--</span><small>%</small></div>
+    <div class="hud-stats">
+      <div class="hud-stat" id="hud-city"><span class="k">CITY</span><b><span id="stability">--</span><small>%</small></b></div>
+      <div class="hud-stat" id="hud-core"><span class="k">CORE</span><b><span id="core-output">--</span><small>%</small></b></div>
+      <div class="hud-stat hud-time" id="hud-time"><span class="k" id="time-label">NEXT CYCLE</span><b class="clock" id="cycle-clock">--:--</b></div>
     </div>
-
-    <div class="fig" id="fig-core">
-      <div class="fig-label">CORE OUTPUT</div>
-      <div class="fig-value"><span id="core-output">--</span><small>%</small></div>
-    </div>
-
-    <div class="fig fig-cycle" id="fig-cycle">
-      <div class="fig-label">NEXT CORE CYCLE <span class="cycle-no" id="cycle-no"></span></div>
-      <div class="fig-value cycle-value" id="cycle-clock">--:--</div>
+    <div class="hud-tags">
+      <span class="tag tag-blackout" id="tag-blackout" hidden>ROLLING BLACKOUT</span>
+      <span class="tag tag-breather" id="tag-breather" hidden>BREATHER</span>
+      <span class="tag tag-sensors" id="tag-sensors" hidden>SENSORS OFFLINE</span>
     </div>
   </header>
 
-  <!-- MAIN -->
-  <main class="main" id="main">
-    <section class="grid" id="grid"></section>
+  <!-- the reduced form of an emergency overlay, after its full-screen seconds -->
+  <div class="strip-alert" id="strip-alert" hidden>
+    <span class="strip-light"></span>
+    <b id="strip-alert-title"></b>
+    <span id="strip-alert-sub"></span>
+    <em id="strip-alert-big"></em>
+  </div>
 
-    <!-- council takeover -->
-    <section class="council" id="council" hidden>
-      <div class="council-label">CENTRAL COUNCIL</div>
-      <div class="council-title">COUNCIL IN SESSION</div>
-      <div class="council-clock" id="council-clock">--:--</div>
-      <div class="council-call">CHIEFS + LIAISONS REPORT TO CENTRAL COUNCIL</div>
-      <div class="council-note" id="council-note" hidden>NO CONTINUITY ORDER RECEIVED</div>
-      <div class="council-order" id="council-order" hidden></div>
-    </section>
-
-    <!-- debrief comparison -->
-    <section class="debrief" id="debrief" hidden>
-      <div class="debrief-title">ROUND 3 <span>vs</span> AFTERSHOCK</div>
-      <table class="debrief-table">
-        <thead>
-          <tr><th class="metric"></th><th>ROUND 3</th><th>AFTERSHOCK</th></tr>
-        </thead>
-        <tbody id="debrief-rows"></tbody>
-      </table>
-    </section>
+  <!-- THE CITY -->
+  <main class="city" id="city">
+    <svg id="map" viewBox="0 0 1920 900" preserveAspectRatio="xMidYMid meet" role="img" aria-label="HAVEN-9 underground city"></svg>
+    <div class="final-count" id="final-count" hidden></div>
+    <div class="toast" id="toast" hidden>
+      <span class="toast-icon" id="toast-icon"></span>
+      <span class="toast-text" id="toast-text"></span>
+    </div>
   </main>
 
-  <!-- CITY EVENT FEED -->
-  <footer class="bottom">
-    <div class="feed-panel">
-      <div class="feed-head">
-        <span class="feed-title">CITY EVENT FEED</span>
-        <span class="order-line" id="order-line" hidden></span>
-      </div>
-      <ol class="feed" id="feed"></ol>
-    </div>
-    <div class="telemetry" id="telemetry">
-      <div class="tel-title">SENSOR FEED</div>
-      <div class="tel-rows" id="tel-rows"></div>
-    </div>
+  <!-- ONE most urgent fault, or nothing -->
+  <footer class="urgent" id="urgent" hidden>
+    <span class="u-icon">⚠</span>
+    <span class="u-sector" id="urgent-sector"></span>
+    <span class="u-code" id="urgent-code"></span>
+    <span class="u-name" id="urgent-name"></span>
+    <span class="u-sev" id="urgent-sev"></span>
+    <b class="u-clock clock" id="urgent-clock"></b>
   </footer>
 
-  <!-- MAJOR EMERGENCY OVERLAY (full-screen phase) -->
-  <div class="alert-full" id="alert-full" hidden>
-    <div class="alert-inner">
-      <div class="alert-tag">MAJOR EMERGENCY</div>
-      <div class="alert-title" id="alert-title"></div>
-      <div class="alert-sub" id="alert-sub"></div>
-      <div class="alert-big" id="alert-big"></div>
+  <!-- takeovers: the city stays faintly visible behind each -->
+  <div class="takeover council" id="council" hidden>
+    <div class="t-inner">
+      <div class="t-tag">CENTRAL COUNCIL</div>
+      <div class="t-title">COUNCIL SUMMONED</div>
+      <div class="t-clock clock" id="council-clock">--:--</div>
+      <div class="t-sub" id="council-sub">CHIEFS + LIAISONS REPORT TO CENTRAL COUNCIL</div>
+      <div class="t-order" id="council-order" hidden></div>
     </div>
   </div>
 
-  <!-- PAUSED -->
-  <div class="paused" id="paused" hidden>
-    <div class="paused-inner">
-      <div class="paused-title">SIMULATION PAUSED</div>
-      <div class="paused-sub">ALL CLOCKS HELD — AWAIT FACILITATOR</div>
+  <div class="takeover alert" id="alert-full" hidden>
+    <div class="t-inner">
+      <div class="t-tag">MAJOR EMERGENCY</div>
+      <div class="t-title" id="alert-title"></div>
+      <div class="t-sub" id="alert-sub"></div>
+      <div class="t-big" id="alert-big"></div>
+    </div>
+  </div>
+
+  <div class="takeover shock" id="core-shock" hidden>
+    <div class="t-inner">
+      <div class="t-tag">GEOTHERMAL CORE</div>
+      <div class="t-title">CORE OUTPUT FALLING</div>
+      <div class="t-big" id="shock-value">--%</div>
+    </div>
+  </div>
+
+  <div class="takeover debrief" id="debrief" hidden>
+    <div class="t-inner wide">
+      <div class="t-tag">DEBRIEF</div>
+      <div class="t-title">ROUND 3 <span>vs</span> AFTERSHOCK</div>
+      <table class="debrief-table">
+        <thead><tr><th class="metric"></th><th>ROUND 3</th><th>AFTERSHOCK</th></tr></thead>
+        <tbody id="debrief-rows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="takeover paused" id="paused" hidden>
+    <div class="t-inner">
+      <div class="t-title">SIMULATION PAUSED</div>
+      <div class="t-sub">ALL CLOCKS HELD — AWAIT FACILITATOR</div>
     </div>
   </div>
 
