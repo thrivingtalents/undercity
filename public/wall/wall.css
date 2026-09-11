@@ -1,7 +1,8 @@
 /* HAVEN-9 CITY WALL — the projector view.
-   A living picture of the underground city: one HUD row, the city, one
-   urgent line. Quiet when healthy, loud when something needs the room.
-   Designed for 1920×1080; the map scales with the viewport (SVG viewBox). */
+   The illustration is the city; everything alive is drawn over it. One HUD
+   row, the city, one urgent line. Quiet when healthy, loud when something
+   needs the room. Designed for 1920×1080; the map keeps the artwork's 16:9
+   inside the city area, letterboxed on rock. */
 
 .wall {
   position: relative;
@@ -17,7 +18,7 @@
 .hud {
   display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
   padding: 0 36px; border-bottom: 1px solid #161c22;
-  background: linear-gradient(180deg, #0e1216, #0a0c0e);
+  background: linear-gradient(180deg, #0e1216, #0a0c0e); z-index: 3;
 }
 .hud-brand { display: flex; align-items: baseline; gap: 18px; }
 .hud-brand h1 { font-size: 34px; letter-spacing: 0.34em; font-weight: 700; }
@@ -63,79 +64,65 @@
 
 /* -- the city --------------------------------------------------------------- */
 
-.city { position: relative; min-height: 0; }
+.city {
+  position: relative; min-height: 0;
+  background: radial-gradient(ellipse at 50% 45%, #141a20 0%, #0b0e11 55%, #06080a 100%);
+}
 #map { width: 100%; height: 100%; display: block; }
 #map text { font-family: var(--mono); fill: var(--ink); user-select: none; }
+.backdrop { image-rendering: auto; }
 
-/* rock */
-.strata { fill: none; stroke: rgba(255,255,255,0.035); stroke-width: 2; }
-.rock { fill: rgba(255,255,255,0.02); }
+/* a district: overlays traced on the artwork */
+.d-dark { display: none; filter: grayscale(1) brightness(0.42); }
+.d-tint { fill: var(--amber); opacity: 0; transition: opacity 0.8s; pointer-events: none; }
+.d-dim { fill: #04060a; opacity: 0; transition: opacity 0.8s; }
+.d-edge { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; opacity: 0; transition: opacity 0.6s; }
 
-/* links between districts: quiet infrastructure */
-.link { stroke-linecap: round; }
-.link.service { stroke: #1f262d; stroke-width: 10; }
-.link.tunnel { stroke: #1a2027; stroke-width: 26; }
-.link.tunnel-core { stroke: #2a323b; stroke-width: 6; stroke-dasharray: 2 18; }
-.link.cable { stroke: #2b2410; stroke-width: 12; }
-.link.cable-flow { stroke: #E8B33A; stroke-width: 3; stroke-dasharray: 10 22; opacity: 0.7; animation: flow 1.4s linear infinite; }
-.link.pipe { stroke: #14283d; stroke-width: 14; }
-.link.pipe-flow { stroke: #4fa3ff; stroke-width: 4; stroke-dasharray: 16 26; opacity: 0.65; animation: flow 1.8s linear infinite; }
-.link.data { stroke: #241a30; stroke-width: 8; }
-.link.data-flow { stroke: #c9a8ee; stroke-width: 3; stroke-dasharray: 4 30; opacity: 0.7; animation: flow 2.6s linear infinite; }
-.link.rail { stroke: #22282e; stroke-width: 14; }
-.link.rail-line { stroke: #6a737c; stroke-width: 2; stroke-dasharray: 3 9; }
-.t7-label { font-size: 15px; letter-spacing: 0.3em; fill: var(--red); opacity: 0; transition: opacity 0.6s; }
-/* biological breach: tunnel 7 lights up, quietly */
-#map.breach .tunnel-core { stroke: var(--red); stroke-dasharray: none; opacity: 0.9; animation: pulse 1.2s ease-in-out infinite; }
-#map.breach .t7-label { opacity: 1; }
+.district[data-state="degraded"] .d-tint { opacity: 0.16; }
+.district[data-state="degraded"] .d-edge { stroke: var(--amber); opacity: 0.55; }
 
-/* a district */
-.district { transition: opacity 0.8s; }
-.glow { opacity: 0.4; transition: opacity 0.8s; }
-.glow-alarm { opacity: 0; }
-.platform-edge { fill: none; stroke: var(--accent); stroke-width: 2; opacity: 0.35; }
-.structures, .lights { transition: filter 0.8s, opacity 0.8s; }
-.lights .warnlight { fill: var(--amber); opacity: 0; }
-.d-label { font-size: 24px; letter-spacing: 0.2em; font-weight: 700; fill: #d3dce4; }
+.district[data-state="critical"] .d-tint { fill: var(--red); animation: tintPulse 1.3s ease-in-out infinite; }
+.district[data-state="critical"] .d-edge { stroke: var(--red); opacity: 1; stroke-width: 4; animation: pulse 1.3s ease-in-out infinite; }
+
+.district[data-state="brownout"] .d-dim { opacity: 0.5; animation: dimFlicker 3.2s steps(1) infinite; }
+.district[data-state="brownout"] .d-edge { stroke: var(--amber); stroke-dasharray: 12 10; opacity: 0.8; }
+
+.district[data-state="dark"] .d-dark { display: inline; }
+.district[data-state="dark"] .d-dim { opacity: 0.35; }
+.district[data-state="dark"] .d-edge { stroke: #3a444e; opacity: 0.7; }
+
+#map.debug .d-edge { opacity: 1 !important; stroke: #00e5ff !important; stroke-dasharray: none !important; animation: none !important; }
+
+/* the label pill: icon + name, covering the painted callout */
+.l-bg { fill: #0b0e12; stroke: var(--accent); stroke-width: 2; }
+.l-text { font-size: 22px; letter-spacing: 0.18em; font-weight: 700; fill: #e6edf3; }
+.core-label .l-bg { stroke: #f0b64a; }
+.district[data-state="dark"] .l-text { fill: #7d8b97; }
+.district[data-state="dark"] .l-icon { opacity: 0.4; }
+.district[data-state="dark"] .l-bg { stroke: #3a444e; }
+.district[data-state="brownout"] .l-bg { stroke-dasharray: 8 6; }
 
 /* the compact marker: ring + number, and a word only when it is not STABLE */
-.m-bg { fill: #0c1013; stroke: #2a333c; stroke-width: 2; }
+.m-bg { fill: #0b0e12; stroke: #2a333c; stroke-width: 2; }
 .ring-bg { fill: none; stroke: #263039; stroke-width: 5; }
 .ring-fg { fill: none; stroke: var(--green); stroke-width: 5; stroke-linecap: round; transition: stroke-dasharray 0.6s ease, stroke 0.6s ease; }
 .d-int { font-size: 30px; font-weight: 700; }
 .d-word { font-size: 18px; letter-spacing: 0.16em; font-weight: 700; }
 
-.district[data-state="degraded"] .ring-fg, .district[data-state="degraded"] .d-word { stroke: var(--amber); fill: var(--amber); }
-.district[data-state="degraded"] .d-word { fill: var(--amber); }
 .district[data-state="degraded"] .ring-fg { stroke: var(--amber); }
-.district[data-state="degraded"] .warnlight { opacity: 1; animation: lamp 2.6s ease-in-out infinite; }
-.district[data-state="degraded"] .glow { opacity: 0.3; }
-
+.district[data-state="degraded"] .d-word { fill: var(--amber); }
 .district[data-state="critical"] .ring-fg { stroke: var(--red); }
 .district[data-state="critical"] .d-word, .district[data-state="critical"] .d-int { fill: var(--red); }
 .district[data-state="critical"] .m-bg { stroke: var(--red); animation: pulse 1.3s ease-in-out infinite; }
-.district[data-state="critical"] .glow-alarm { animation: alarmGlow 1.3s ease-in-out infinite; }
-.district[data-state="critical"] .platform-edge { stroke: var(--red); opacity: 0.9; animation: pulse 1.3s ease-in-out infinite; }
-.district[data-state="critical"] .warnlight { fill: var(--red); opacity: 1; animation: lamp 0.9s ease-in-out infinite; }
-
 .district[data-state="brownout"] .ring-fg { stroke: var(--amber); }
 .district[data-state="brownout"] .d-word { fill: var(--amber); }
-.district[data-state="brownout"] .glow { opacity: 0.1; }
-.district[data-state="brownout"] .structures { filter: saturate(0.5) brightness(0.72); }
-.district[data-state="brownout"] .lights { animation: flicker 3.2s steps(1) infinite; }
-.district[data-state="brownout"] .platform-edge { stroke: var(--amber); stroke-dasharray: 8 8; opacity: 0.7; }
-
-.district[data-state="dark"] .glow { opacity: 0; }
-.district[data-state="dark"] .structures, .district[data-state="dark"] .lights { filter: grayscale(1) brightness(0.4); }
 .district[data-state="dark"] .ring-fg { stroke: #3a3a3a; }
 .district[data-state="dark"] .d-int { fill: #4d5b67; }
 .district[data-state="dark"] .d-word { fill: #7d8b97; }
-.district[data-state="dark"] .d-label { fill: #4d5b67; }
-.district[data-state="dark"] .platform-edge { opacity: 0.15; }
 .district[data-state="dark"] .m-bg { stroke: #1e252c; }
 
-/* badges above the label: fault clock, low stock, injured — only when true */
-.badge rect { fill: #0c1013; stroke: #2a333c; stroke-width: 2; }
+/* badges: fault clock, low stock, injured — only when true */
+.badge rect { fill: #0b0e12; stroke: #2a333c; stroke-width: 2; }
 .badge text { font-size: 22px; font-weight: 700; letter-spacing: 0.08em; }
 .badge.b-fault rect { stroke: var(--amber); fill: #1c1608; }
 .badge.b-fault text { fill: var(--amber); }
@@ -147,59 +134,30 @@
 .badge.b-injured text { fill: #ff9d9d; }
 .badge { animation: badgeIn 0.4s ease; }
 
-/* -- environmental animation: the district tells its own story --------------- */
+/* the Geothermal Core: glow, dimming and alarm follow core output */
+.core-dim { fill: #04060a; opacity: 0; transition: opacity 1s; }
+.core-glow { fill: url(#gCoreGlow); opacity: 0.9; transform-box: fill-box; transform-origin: center; animation: corePulse 4s ease-in-out infinite; }
+.core-alarm { fill: url(#gAlarm); opacity: 0; }
+.wall[data-core="weaker"] .core-dim { opacity: 0.18; }
+.wall[data-core="weaker"] .core-glow { opacity: 0.7; animation-duration: 3.2s; }
+.wall[data-core="warning"] .core-dim { opacity: 0.36; }
+.wall[data-core="warning"] .core-glow { opacity: 0.55; animation-duration: 2.4s; }
+.wall[data-core="warning"] .core-label .l-bg { stroke: var(--amber); }
+.wall[data-core="unstable"] .core-dim { opacity: 0.5; }
+.wall[data-core="unstable"] .core-glow { opacity: 0.45; animation: coreUnstable 1.3s ease-in-out infinite; }
+.wall[data-core="unstable"] .core-alarm { animation: alarmGlow 1.3s ease-in-out infinite; }
+.wall[data-core="unstable"] .core-label .l-bg { stroke: var(--amber); }
+.wall[data-core="critical"] .core-dim { opacity: 0.62; }
+.wall[data-core="critical"] .core-glow { opacity: 0.35; animation: coreFlicker 0.5s steps(2) infinite; }
+.wall[data-core="critical"] .core-alarm { animation: alarmGlow 0.7s ease-in-out infinite; }
+.wall[data-core="critical"] .core-label .l-bg { stroke: var(--red); }
+.wall[data-core="critical"] .core-label .l-text { fill: var(--red); }
 
-.turbine { transform-box: fill-box; transform-origin: center; animation: spin 7s linear infinite; }
-.district.has-fault .turbine { animation-duration: 2.2s; }
-.spark { opacity: 0; }
-.district.has-fault .spark, .district[data-state="degraded"] .spark { animation: spark 1.6s ease-out infinite; }
-.spark:nth-child(2) { animation-delay: 0.5s; }
-.spark:nth-child(3) { animation-delay: 1.1s; }
-.pipe-local { stroke: #14283d; stroke-width: 7; stroke-linejoin: round; }
-.pipe-flow { stroke: #4fa3ff; stroke-width: 2.5; stroke-dasharray: 8 14; stroke-linejoin: round; opacity: 0.7; animation: flow 1.6s linear infinite; }
-.leak { opacity: 0; }
-.district[data-state="degraded"] .leak, .district[data-state="critical"] .leak, .district.has-fault .leak { animation: drip 1.4s ease-in infinite; }
-.leak:nth-child(2) { animation-delay: 0.45s; }
-.leak:nth-child(3) { animation-delay: 0.9s; }
-.beacon { animation: beacon 2.6s ease-in-out infinite; }
-.district.has-fault .beacon { animation-duration: 0.8s; }
-.growlight { animation: shimmer 4.5s ease-in-out infinite; }
-.growlight:nth-child(2n) { animation-delay: 1.5s; }
-.growlight:nth-child(3n) { animation-delay: 2.6s; }
-.sweep { transform-box: fill-box; transform-origin: center; animation: spin 4.2s linear infinite; }
-.district.has-fault .sweep { animation-duration: 1.6s; }
-.signal { animation: signal 3s ease-out infinite; }
-.train { fill: #d8e0e6; }
-.train-window { fill: #4a5561; }
-.district[data-state="dark"] .turbine, .district[data-state="dark"] .sweep,
-.district[data-state="dark"] .beacon, .district[data-state="dark"] .growlight,
-.district[data-state="dark"] .pipe-flow { animation: none; }
-.cable-local { stroke: #E8B33A; stroke-width: 2; opacity: 0.55; }
-.rail-local { stroke: #6a737c; stroke-width: 2; }
-.tie { stroke: #3a434c; stroke-width: 2; }
-.tunnel-mouth { fill: #05070a; stroke: #2a323b; stroke-width: 2; }
-
-/* the Geothermal Core: the heartbeat */
-.core-floor { fill: #171d23; stroke: #2a333c; stroke-width: 2; }
-.core-ring { fill: none; stroke: #3a444e; stroke-width: 3; }
-.core-ring-inner { stroke-dasharray: 6 10; }
-.core-heat { fill: url(#gHeat); opacity: 0.85; transition: opacity 1s; }
-.core-orb { fill: url(#gOrb); animation: corePulse 4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-.core-orb-inner { fill: #fff8e4; opacity: 0.9; }
-.core-label { font-size: 16px; letter-spacing: 0.34em; fill: var(--ink-dim); }
-.wall[data-core="weaker"] .core-orb { animation-duration: 3.2s; }
-.wall[data-core="weaker"] .core-heat { opacity: 0.65; }
-.wall[data-core="warning"] .core-orb { fill: url(#gOrbWarn); animation: corePulse 2.4s ease-in-out infinite; }
-.wall[data-core="warning"] .core-heat { opacity: 0.5; }
-.wall[data-core="warning"] .core-label { fill: var(--amber); }
-.wall[data-core="unstable"] .core-orb { fill: url(#gOrbWarn); animation: coreUnstable 1.3s ease-in-out infinite; }
-.wall[data-core="unstable"] .core-heat { opacity: 0.35; }
-.wall[data-core="unstable"] .core-label { fill: var(--amber); }
-.wall[data-core="critical"] .core-orb { fill: url(#gOrbCrit); animation: coreFlicker 0.5s steps(2) infinite; }
-.wall[data-core="critical"] .core-heat { opacity: 0.25; }
-.wall[data-core="critical"] .core-orb-inner { opacity: 0.4; }
-.wall[data-core="critical"] .core-label { fill: var(--red); }
-.wall[data-core="critical"] .core-ring { stroke: var(--red); }
+/* Tunnel 7: quiet until a breach names it */
+.tunnel-7 { stroke: var(--red); stroke-width: 16; stroke-linecap: round; opacity: 0; transition: opacity 0.6s; }
+.t7-label { font-size: 15px; letter-spacing: 0.3em; fill: var(--red); opacity: 0; transition: opacity 0.6s; }
+#map.breach .tunnel-7 { opacity: 0.8; animation: pulse 1.2s ease-in-out infinite; }
+#map.breach .t7-label { opacity: 1; }
 
 /* the whole city dims under a takeover or a core shock */
 .wall.dimmed #map { filter: brightness(0.55); transition: filter 0.6s; }
@@ -232,7 +190,7 @@
 
 .urgent {
   display: flex; align-items: center; gap: 24px; padding: 0 36px;
-  border-top: 1px solid #161c22; background: #0d1014;
+  border-top: 1px solid #161c22; background: #0d1014; z-index: 3;
   font-size: 30px; letter-spacing: 0.1em; --accent: var(--amber);
 }
 .urgent.sev-3 { background: #1c0e0e; border-top-color: #4a1c1c; }
@@ -299,22 +257,15 @@
 
 /* -- keyframes --------------------------------------------------------------------- */
 
-@keyframes flow { to { stroke-dashoffset: -64; } }
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes lamp { 0%, 100% { opacity: 0.15; } 50% { opacity: 1; } }
-@keyframes spark { 0% { opacity: 1; transform: translate(0, 0); } 60% { opacity: 0.6; } 100% { opacity: 0; transform: translate(6px, -14px); } }
-@keyframes drip { 0% { opacity: 0.9; transform: translateY(0); } 100% { opacity: 0; transform: translateY(16px); } }
-@keyframes beacon { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
-@keyframes shimmer { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.95; } }
-@keyframes signal { 0% { opacity: 0.9; r: 6; } 100% { opacity: 0; r: 34; } }
-@keyframes flicker { 0%, 100% { opacity: 0.35; } 8% { opacity: 0.15; } 12% { opacity: 0.4; } 45% { opacity: 0.2; } 50% { opacity: 0.45; } 78% { opacity: 0.1; } 82% { opacity: 0.35; } }
-@keyframes alarmGlow { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.7; } }
-@keyframes corePulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.06); opacity: 0.92; } }
-@keyframes coreUnstable { 0%, 100% { transform: scale(1); opacity: 1; } 30% { transform: scale(0.94); opacity: 0.75; } 60% { transform: scale(1.05); opacity: 0.95; } }
-@keyframes coreFlicker { 0% { opacity: 1; } 100% { opacity: 0.45; } }
+@keyframes tintPulse { 0%, 100% { opacity: 0.12; } 50% { opacity: 0.42; } }
+@keyframes dimFlicker { 0%, 100% { opacity: 0.5; } 8% { opacity: 0.68; } 12% { opacity: 0.45; } 45% { opacity: 0.62; } 50% { opacity: 0.42; } 78% { opacity: 0.7; } 82% { opacity: 0.5; } }
+@keyframes alarmGlow { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.65; } }
+@keyframes corePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+@keyframes coreUnstable { 0%, 100% { transform: scale(1); opacity: 0.45; } 30% { transform: scale(0.9); opacity: 0.25; } 60% { transform: scale(1.06); opacity: 0.5; } }
+@keyframes coreFlicker { 0% { opacity: 0.35; } 100% { opacity: 0.1; } }
 @keyframes toastIn { from { opacity: 0; transform: translate(-50%, -12px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes toastOut { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -8px); } }
-@keyframes badgeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes badgeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes swapIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes countIn { from { opacity: 0; transform: translate(-50%, -50%) scale(1.4); } 30% { opacity: 1; transform: translate(-50%, -50%) scale(1); } to { opacity: 0.85; } }
 @keyframes shockIn { from { transform: scale(0.94); opacity: 0; } to { transform: none; opacity: 1; } }

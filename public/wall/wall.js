@@ -2,19 +2,29 @@
 /**
  * CITY WALL — the projector view: a living picture of HAVEN-9, not a dashboard.
  *
- * It answers four questions and nothing else:
- *   1 how is the city doing        → CITY / CORE in the HUD, and the Core's glow
- *   2 which sector has a problem   → the district itself: lighting, marker, badges
- *   3 how much time do we have     → NEXT CYCLE (or the council clock)
- *   4 what just happened           → one temporary toast, then it fades
+ * The city itself is the illustration in public/wall/art/haven9-map.png
+ * (prepared from ./Asset by tools/prepare-wall-art.js). Everything alive is
+ * drawn OVER it in an SVG that uses the illustration's own pixel grid
+ * (1672×941) as its coordinate system, so every overlay is traced straight
+ * from the artwork:
  *
- * Everything on screen comes from the wall frame (lib/visibility.js →
- * forBigscreen). Nothing the server withholds is reconstructed here, and
- * nothing is shown while it is normal: a healthy district is simply lit.
- * There is no "NO ACTIVE FAULTS" anywhere — quiet is the message.
+ *   · a live label with the sector's icon sits exactly on the painted callout
+ *     and replaces it;
+ *   · a compact marker (integrity ring, number, and a word only when it is
+ *     not STABLE) and a badge stack (fault clock, low stock, injured) sit on
+ *     the rock beside it, only when something is wrong;
+ *   · each district's footprint carries the state: an amber tint when
+ *     degraded, a red pulse when critical, flickering darkness in brownout,
+ *     and a greyscale copy of the artwork when dark;
+ *   · the Geothermal Core glows, dims and finally flickers with core output.
+ *
+ * It answers four questions and nothing else: how is the city (CITY / CORE
+ * and the Core's glow), which district (the district itself), how long
+ * (NEXT CYCLE or the council clock), what just happened (one toast).
+ * Nothing says "no active faults": a healthy district is simply lit.
  *
  * Rendering split:
- *   buildMap()  once — the isometric city is drawn procedurally into the SVG
+ *   buildMap()  once — backdrop, defs, districts, core, tunnel 7
  *   render()    per state frame — keyed updates of texts, classes and badges
  *   tick()      every 250 ms — countdown texts, toast timing, the alert mode
  */
@@ -22,6 +32,7 @@
   const U = window.Undercity;
   const $ = (id) => document.getElementById(id);
   const NS = 'http://www.w3.org/2000/svg';
+  const XLINK = 'http://www.w3.org/1999/xlink';
   const CTX = U.context();
 
   const ALERT_FULL_S = 8;      // mirrors alert_full_screen_s; the frame carries the real value
@@ -30,18 +41,40 @@
   const SHOCK_MS = 4500;
   const RING_R = 13;
   const RING_LEN = 2 * Math.PI * RING_R;
+  const ART = '/assets/wall/art';
+  const MAP = { w: 1672, h: 941, src: `${ART}/haven9-map.png` };
+  const DEBUG = /[?&]debug/.test(location.search);
 
-  /** Where each district sits (platform centre, map units) and its identity. */
+  /**
+   * Where things are on the illustration, in its pixels.
+   *   footprint  the platform outline (state tints, the dark clip)
+   *   label      the painted callout's centre and width — the live label covers it
+   *   marker     integrity pill, on rock beside the label
+   *   badges     where the warning stack starts and which way it grows
+   */
   const DISTRICTS = {
-    WTR: { x: 960,  y: 200, colour: '#3A8FE8', glyph: '💧', name: 'WATER & FILTRATION' },
-    POW: { x: 380,  y: 400, colour: '#E8B33A', glyph: '⚡', name: 'POWER GRID' },
-    COM: { x: 1540, y: 400, colour: '#B07AD8', glyph: '📡', name: 'COMMS & SENSORS' },
-    MED: { x: 520,  y: 735, colour: '#E85A5A', glyph: '⚕', name: 'MEDICAL BAY' },
-    TRN: { x: 960,  y: 765, colour: '#9A9A9A', glyph: '🚇', name: 'TRANSPORT & TUNNELS' },
-    AGR: { x: 1400, y: 735, colour: '#5AB86A', glyph: '🌱', name: 'AGRICULTURE' },
+    POW: { colour: '#E8B33A', name: 'POWER GRID',
+      footprint: [[124, 290], [268, 206], [470, 208], [552, 292], [518, 396], [352, 444], [172, 412], [108, 348]],
+      label: { x: 240, y: 147, w: 262 }, marker: { x: 240, y: 100 }, badges: { x: 240, y: 62, dir: 'up' } },
+    WTR: { colour: '#3A8FE8', name: 'WATER & FILTRATION',
+      footprint: [[572, 142], [698, 74], [1002, 78], [1088, 176], [1030, 266], [760, 286], [598, 236]],
+      // markers beside a label are anchored by their inner edge, so a word never overlaps the name
+      label: { x: 837, y: 40, w: 340 }, marker: { x: 1017, y: 40, anchor: 'left' }, badges: { x: 560, y: 40, dir: 'left' } },
+    COM: { colour: '#B07AD8', name: 'COMMS & SENSORS',
+      footprint: [[1194, 292], [1300, 210], [1566, 220], [1660, 322], [1600, 426], [1330, 426], [1210, 376]],
+      label: { x: 1425, y: 152, w: 316 }, marker: { x: 1257, y: 152, anchor: 'right' }, badges: { x: 1425, y: 105, dir: 'up' } },
+    MED: { colour: '#E85A5A', name: 'MEDICAL BAY',
+      footprint: [[104, 562], [240, 470], [500, 480], [586, 588], [520, 722], [270, 746], [120, 682]],
+      label: { x: 172, y: 490, w: 252 }, marker: { x: 172, y: 445 }, badges: { x: 430, y: 500, dir: 'up' } },
+    TRN: { colour: '#9A9A9A', name: 'TRANSPORT & TUNNELS',
+      footprint: [[520, 692], [660, 596], [1000, 596], [1140, 702], [1060, 862], [720, 892], [560, 812]],
+      label: { x: 840, y: 855, w: 356 }, marker: { x: 1028, y: 855, anchor: 'left' }, badges: { x: 570, y: 855, dir: 'left' } },
+    AGR: { colour: '#5AB86A', name: 'AGRICULTURE',
+      footprint: [[1096, 592], [1210, 462], [1600, 472], [1656, 602], [1560, 766], [1260, 792], [1128, 700]],
+      label: { x: 1530, y: 493, w: 254 }, marker: { x: 1530, y: 446 }, badges: { x: 1400, y: 520, dir: 'up' } },
   };
   const ORDER = ['WTR', 'POW', 'COM', 'MED', 'TRN', 'AGR'];
-  const CORE = { x: 960, y: 470 };
+  const CORE = { x: 836, y: 398, r: 96, label: { x: 855, y: 295, w: 300 }, tunnel7: [[838, 548], [838, 612]] };
   const ROUND_LABEL = { R0: 'ORIENTATION', R1: 'ROUND 1', R2: 'ROUND 2', R3: 'ROUND 3', R4: 'AFTERSHOCK' };
   const WORD = { stable: '', degraded: '⚠ DEGRADED', critical: '⚠ CRITICAL', brownout: 'BROWNOUT', dark: 'OFFLINE' };
 
@@ -107,12 +140,9 @@
       .map(([k]) => k);
   }
 
-  // -- isometric drawing ---------------------------------------------------------------
+  // -- SVG helpers ------------------------------------------------------------------
 
-  /** Ground point (u, v) at height z → screen. 2:1-ish projection. */
-  const iso = (u, v, z = 0) => [(u - v) * 0.9, (u + v) * 0.5 - z];
-  const P = (list) => list.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
-
+  const P = (list) => list.map(([x, y]) => `${x},${y}`).join(' ');
   function el(tag, attrs = {}, children = []) {
     const node = document.createElementNS(NS, tag);
     for (const [k, v] of Object.entries(attrs)) if (v !== undefined && v !== null) node.setAttribute(k, v);
@@ -124,37 +154,12 @@
     t.textContent = str;
     return t;
   }
-  /** Darken (f < 1) or lighten (f > 1) a #rrggbb colour. */
-  function shade(hex, f) {
-    const n = parseInt(hex.slice(1), 16);
-    const c = (x) => Math.max(0, Math.min(255, Math.round(x * f)));
-    return `rgb(${c((n >> 16) & 255)},${c((n >> 8) & 255)},${c(n & 255)})`;
+  function image(href, attrs) {
+    const node = el('image', attrs);
+    node.setAttribute('href', href);
+    node.setAttributeNS(XLINK, 'xlink:href', href);
+    return node;
   }
-  /** An isometric block on the ground at (u, v), footprint w×d, height h. */
-  function box(u, v, w, d, h, fill, cls = '') {
-    return el('g', { class: `box ${cls}`.trim() }, [
-      el('polygon', { points: P([iso(u, v + d, h), iso(u + w, v + d, h), iso(u + w, v + d, 0), iso(u, v + d, 0)]), fill: shade(fill, 0.62) }),
-      el('polygon', { points: P([iso(u + w, v, h), iso(u + w, v + d, h), iso(u + w, v + d, 0), iso(u + w, v, 0)]), fill: shade(fill, 0.42) }),
-      el('polygon', { points: P([iso(u, v, h), iso(u + w, v, h), iso(u + w, v + d, h), iso(u, v + d, h)]), fill }),
-    ]);
-  }
-  /** A tank or turbine housing: an isometric cylinder. */
-  function cylinder(u, v, r, h, fill, cls = '') {
-    const [cx, cy] = iso(u, v, 0);
-    const rx = r * 0.9;
-    const ry = r * 0.5;
-    return el('g', { class: `cyl ${cls}`.trim() }, [
-      el('path', { d: `M ${cx - rx} ${cy} A ${rx} ${ry} 0 0 0 ${cx + rx} ${cy} L ${cx + rx} ${cy - h} A ${rx} ${ry} 0 0 1 ${cx - rx} ${cy - h} Z`, fill: shade(fill, 0.55) }),
-      el('ellipse', { cx, cy: cy - h, rx, ry, fill }),
-    ]);
-  }
-  function lamp(u, v, z) {
-    const [x, y] = iso(u, v, z);
-    return el('circle', { class: 'warnlight', cx: x.toFixed(1), cy: y.toFixed(1), r: 4 });
-  }
-  /** Platform corners relative to a district centre (the top face of the slab). */
-  const CORNER = { top: [-45, -111], right: [171, 9], bottom: [45, 79], left: [-171, -41] };
-  const corner = (code, which) => [DISTRICTS[code].x + CORNER[which][0], DISTRICTS[code].y + CORNER[which][1]];
 
   // -- the map ------------------------------------------------------------------------
 
@@ -162,242 +167,78 @@
     const defs = el('defs');
     const radial = (id, stops) => el('radialGradient', { id },
       stops.map(([o, c, a]) => el('stop', { offset: o, 'stop-color': c, 'stop-opacity': a })));
-    defs.appendChild(radial('gRock', [['0%', '#171d23', 1], ['100%', '#07090b', 1]]));
+    defs.appendChild(radial('gCoreGlow', [['0%', '#fff1c4', 0.75], ['40%', '#f0b64a', 0.35], ['100%', '#e8963a', 0]]));
+    defs.appendChild(radial('gAlarm', [['0%', '#ff8a8a', 0.7], ['55%', '#E85A5A', 0.2], ['100%', '#E85A5A', 0]]));
     for (const [code, d] of Object.entries(DISTRICTS)) {
-      defs.appendChild(radial(`glow-${code}`, [['0%', d.colour, 0.5], ['60%', d.colour, 0.12], ['100%', d.colour, 0]]));
+      defs.appendChild(el('clipPath', { id: `clip-${code}` }, [el('polygon', { points: P(d.footprint) })]));
     }
-    defs.appendChild(radial('gAlarm', [['0%', '#E85A5A', 0.6], ['60%', '#E85A5A', 0.15], ['100%', '#E85A5A', 0]]));
-    defs.appendChild(radial('gHeat', [['0%', '#ffd88a', 0.6], ['45%', '#e8963a', 0.18], ['100%', '#e8963a', 0]]));
-    defs.appendChild(radial('gOrb', [['0%', '#fff6d6', 1], ['55%', '#f0b64a', 1], ['100%', '#b0641c', 1]]));
-    defs.appendChild(radial('gOrbWarn', [['0%', '#ffe2b0', 1], ['55%', '#f08a2a', 1], ['100%', '#8a3a10', 1]]));
-    defs.appendChild(radial('gOrbCrit', [['0%', '#ffd0d0', 1], ['55%', '#e85a5a', 1], ['100%', '#5a1414', 1]]));
-    defs.appendChild(el('linearGradient', { id: 'gSweep', x1: '0', y1: '0', x2: '1', y2: '0' }, [
-      el('stop', { offset: '0%', 'stop-color': '#d9c8ff', 'stop-opacity': 0.5 }),
-      el('stop', { offset: '100%', 'stop-color': '#d9c8ff', 'stop-opacity': 0 }),
-    ]));
     return defs;
   }
 
-  function buildBackground() {
-    const g = el('g', { class: 'bg' });
-    g.appendChild(el('rect', { x: 0, y: 0, width: 1920, height: 900, fill: 'url(#gRock)' }));
-    // rock strata: a few slow waves, barely there
-    for (let i = 0; i < 7; i += 1) {
-      const y = 60 + i * 125;
-      const a = (i % 2 ? 1 : -1) * 22;
-      g.appendChild(el('path', { class: 'strata', d: `M 0 ${y} C 380 ${y + a}, 640 ${y - a}, 960 ${y} S 1560 ${y + a}, 1920 ${y - a / 2}` }));
-    }
-    // two boulders of darker rock, for depth
-    g.appendChild(el('ellipse', { class: 'rock', cx: 240, cy: 120, rx: 260, ry: 90 }));
-    g.appendChild(el('ellipse', { class: 'rock', cx: 1700, cy: 780, rx: 220, ry: 80 }));
-    return g;
-  }
-
-  /** Tunnels, cables, pipes, rails and the data link — drawn under the districts. */
-  function buildLinks() {
-    const g = el('g', { class: 'links' });
-    const seg = (cls, [x1, y1], [x2, y2]) =>
-      el('path', { class: `link ${cls}`, d: `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${(y1 + y2) / 2} ${x2} ${y2}`, fill: 'none' });
-
-    g.appendChild(seg('service', corner('POW', 'bottom'), corner('MED', 'top')));
-    g.appendChild(seg('service', corner('COM', 'bottom'), corner('AGR', 'top')));
-
-    // Tunnel 7: Transport to the Core. Quiet until a breach names it.
-    const [tx, ty] = corner('TRN', 'top');
-    const t7 = `M ${tx} ${ty} L ${CORE.x - 20} ${CORE.y + 92}`;
-    g.appendChild(el('path', { class: 'link tunnel', d: t7, fill: 'none' }));
-    g.appendChild(el('path', { class: 'link tunnel-core', d: t7, fill: 'none' }));
-    g.appendChild(text('TUNNEL 7', (tx + CORE.x) / 2 - 70, (ty + CORE.y + 92) / 2 + 6, 't7-label', 'end'));
-
-    g.appendChild(seg('cable', corner('POW', 'right'), [CORE.x - 140, CORE.y + 26]));
-    g.appendChild(seg('cable-flow', corner('POW', 'right'), [CORE.x - 140, CORE.y + 26]));
-    g.appendChild(seg('pipe', corner('WTR', 'bottom'), [CORE.x + 10, CORE.y - 66]));
-    g.appendChild(seg('pipe-flow', corner('WTR', 'bottom'), [CORE.x + 10, CORE.y - 66]));
-    g.appendChild(seg('data', corner('COM', 'left'), [CORE.x + 140, CORE.y + 26]));
-    g.appendChild(seg('data-flow', corner('COM', 'left'), [CORE.x + 140, CORE.y + 26]));
-
-    // The rail: Medical → Transport → Agriculture, corner to corner.
-    const rail = [corner('MED', 'right'), corner('TRN', 'left'), corner('TRN', 'right'), corner('AGR', 'left')];
-    const d = rail.map(([x, y], i) => `${i ? 'L' : 'M'} ${x} ${y}`).join(' ');
-    g.appendChild(el('path', { class: 'link rail', d, fill: 'none' }));
-    g.appendChild(el('path', { class: 'link rail-line', d, fill: 'none' }));
-    g.dataset.rail = `${d} ${rail.slice(0, -1).reverse().map(([x, y]) => `L ${x} ${y}`).join(' ')}`;
-    return g;
-  }
-
-  /** The train shuttles Medical ↔ Agriculture through Transport, above the platforms. */
-  function buildVehicles(railPath) {
-    const g = el('g', { class: 'vehicles' });
-    const train = el('g', { class: 'train-group' }, [
-      el('rect', { class: 'train', x: -16, y: -7, width: 32, height: 14, rx: 4 }),
-      el('rect', { class: 'train-window', x: -10, y: -4, width: 6, height: 5, rx: 1 }),
-      el('rect', { class: 'train-window', x: -1, y: -4, width: 6, height: 5, rx: 1 }),
-      el('rect', { class: 'train-window', x: 8, y: -4, width: 6, height: 5, rx: 1 }),
-    ]);
-    const motion = el('animateMotion', { dur: '22s', repeatCount: 'indefinite', rotate: 'auto', path: railPath });
-    train.appendChild(motion);
-    g.appendChild(train);
-    return g;
-  }
-
-  /** The buildings and machinery of one district, in its own iso coordinates. */
-  function structures(code, lights) {
-    const g = el('g', { class: 'structures' });
-    switch (code) {
-      case 'POW': {
-        g.appendChild(box(-95, -45, 80, 70, 44, '#8a6b22'));
-        g.appendChild(el('polygon', { points: P([iso(-95, -45, 44.5), iso(-15, -45, 44.5), iso(-15, -32, 44.5), iso(-95, -32, 44.5)]), fill: '#3a2c0c' }));
-        for (const [u, v] of [[38, -38], [38, 18]]) {
-          g.appendChild(cylinder(u, v, 20, 26, '#6e5f36'));
-          const [tx, ty] = iso(u, v, 26);
-          const turbine = el('g', { class: 'turbine' }, [el('circle', { r: 20, fill: 'none' })]);
-          for (const a of [0, 120, 240]) turbine.appendChild(el('rect', { x: -3, y: -19, width: 6, height: 19, rx: 2, fill: '#f2d27a', transform: `rotate(${a})` }));
-          turbine.appendChild(el('circle', { r: 4, fill: '#fff3c4' }));
-          g.appendChild(el('g', { transform: `translate(${tx.toFixed(1)},${ty.toFixed(1)})` }, [turbine]));
-          for (let i = 0; i < 3; i += 1) lights.appendChild(el('circle', { class: 'spark', cx: (tx + (i - 1) * 9).toFixed(1), cy: (ty - 16 - i * 4).toFixed(1), r: 2.5, fill: '#ffd36b' }));
-        }
-        g.appendChild(box(-30, 26, 34, 26, 18, '#5c5548'));
-        g.appendChild(el('polyline', { class: 'cable-local', points: P([iso(-40, -10, 30), iso(-25, 15, 24), iso(-13, 26, 18)]), fill: 'none' }));
-        lights.appendChild(lamp(-55, -40, 47));
-        break;
-      }
-      case 'WTR': {
-        g.appendChild(cylinder(-55, -10, 34, 40, '#2f6fb5'));
-        { const [cx, cy] = iso(-55, -10, 40); g.appendChild(el('ellipse', { cx: cx.toFixed(1), cy: cy.toFixed(1), rx: 24, ry: 12, fill: '#6fb3ff', opacity: 0.85 })); }
-        g.appendChild(cylinder(18, 32, 26, 32, '#2f6fb5'));
-        { const [cx, cy] = iso(18, 32, 32); g.appendChild(el('ellipse', { cx: cx.toFixed(1), cy: cy.toFixed(1), rx: 17, ry: 8.5, fill: '#6fb3ff', opacity: 0.85 })); }
-        g.appendChild(box(30, -58, 62, 46, 30, '#3e5c7c'));
-        const pipe = P([iso(-20, -10, 14), iso(30, -28, 14), iso(62, -58, 14)]);
-        g.appendChild(el('polyline', { class: 'pipe-local', points: pipe, fill: 'none' }));
-        g.appendChild(el('polyline', { class: 'pipe-flow', points: pipe, fill: 'none' }));
-        for (let i = 0; i < 3; i += 1) {
-          const [lx, ly] = iso(-25, 14, 12);
-          lights.appendChild(el('circle', { class: 'leak', cx: (lx + i * 7).toFixed(1), cy: (ly + i * 4).toFixed(1), r: 2.5, fill: '#7dc0ff' }));
-        }
-        lights.appendChild(lamp(58, -54, 33));
-        break;
-      }
-      case 'MED': {
-        g.appendChild(box(-75, -45, 105, 72, 40, '#7d3d3d'));
-        g.appendChild(el('polygon', { points: P([iso(-35, -25, 41), iso(-15, -25, 41), iso(-15, 15, 41), iso(-35, 15, 41)]), fill: '#ffe1e1' }));
-        g.appendChild(el('polygon', { points: P([iso(-45, -15, 41), iso(-5, -15, 41), iso(-5, 5, 41), iso(-45, 5, 41)]), fill: '#ffe1e1' }));
-        g.appendChild(box(40, -5, 50, 48, 26, '#6d4b4b'));
-        const [bx, by] = iso(65, 19, 27);
-        lights.appendChild(el('rect', { x: (bx - 2).toFixed(1), y: (by - 8).toFixed(1), width: 4, height: 8, fill: '#3a2222' }));
-        lights.appendChild(el('circle', { class: 'beacon', cx: bx.toFixed(1), cy: (by - 10).toFixed(1), r: 5, fill: '#ff6b6b' }));
-        lights.appendChild(lamp(-60, -40, 43));
-        break;
-      }
-      case 'TRN': {
-        // rails run corner to corner across the slab, exactly where the city rail arrives
-        const [lx, ly] = CORNER.left;
-        const [rx, ry] = CORNER.right;
-        for (const off of [-5, 5]) {
-          g.appendChild(el('line', { class: 'rail-local', x1: lx + 4, y1: ly + off, x2: rx - 4, y2: ry + off }));
-        }
-        for (let t = 0.06; t < 0.95; t += 0.06) {
-          const x = lx + (rx - lx) * t;
-          const y = ly + (ry - ly) * t;
-          g.appendChild(el('line', { class: 'tie', x1: x.toFixed(1), y1: (y - 8).toFixed(1), x2: x.toFixed(1), y2: (y + 8).toFixed(1) }));
-        }
-        g.appendChild(el('ellipse', { class: 'tunnel-mouth', cx: lx + 10, cy: ly - 6, rx: 11, ry: 14 }));
-        g.appendChild(el('ellipse', { class: 'tunnel-mouth', cx: rx - 10, cy: ry - 6, rx: 11, ry: 14 }));
-        g.appendChild(box(-70, -58, 130, 40, 34, '#535c66'));
-        g.appendChild(box(20, -58, 40, 26, 50, '#454d55'));
-        lights.appendChild(lamp(-60, -52, 36));
-        break;
-      }
-      case 'AGR': {
-        for (let i = 0; i < 3; i += 1) {
-          const v = -52 + i * 34;
-          g.appendChild(box(-95, v, 135, 24, 18, '#2f6a3c'));
-          for (let u = -85; u <= 30; u += 30) {
-            const [lx, ly] = iso(u, v + 12, 19);
-            lights.appendChild(el('rect', { class: 'growlight', x: (lx - 7).toFixed(1), y: (ly - 3).toFixed(1), width: 14, height: 5, rx: 2, fill: '#ff8bd6' }));
-          }
-        }
-        g.appendChild(cylinder(70, 22, 20, 28, '#3f6f8f'));
-        lights.appendChild(lamp(-88, -50, 20));
-        break;
-      }
-      case 'COM': {
-        g.appendChild(box(-80, -15, 60, 52, 26, '#5b4a75'));
-        g.appendChild(box(-10, 28, 34, 28, 16, '#4a3d5e'));
-        // The mast stands on the near-right of the slab, short enough to stay
-        // below the district label.
-        const [mx, my] = iso(62, 42, 0);
-        g.appendChild(el('rect', { x: (mx - 3).toFixed(1), y: (my - 100).toFixed(1), width: 6, height: 100, fill: '#8d7aa8' }));
-        for (const dy of [84, 60, 36]) g.appendChild(el('rect', { x: (mx - 16).toFixed(1), y: (my - dy).toFixed(1), width: 32, height: 3, fill: '#7a6893' }));
-        g.appendChild(el('ellipse', { cx: (mx + 13).toFixed(1), cy: (my - 90).toFixed(1), rx: 13, ry: 8, fill: '#c9b8e6', transform: `rotate(-25 ${(mx + 13).toFixed(1)} ${(my - 90).toFixed(1)})` }));
-        const sweep = el('g', { class: 'sweep' }, [
-          el('circle', { r: 56, fill: 'none' }),
-          el('path', { d: 'M 0 0 L 56 -15 A 56 56 0 0 1 56 15 Z', fill: 'url(#gSweep)' }),
-        ]);
-        g.appendChild(el('g', { transform: `translate(${mx.toFixed(1)},${(my - 102).toFixed(1)})` }, [sweep]));
-        lights.appendChild(el('circle', { class: 'signal', cx: mx.toFixed(1), cy: (my - 102).toFixed(1), r: 6, fill: 'none', stroke: '#d9c8ff', 'stroke-width': 2 }));
-        lights.appendChild(el('circle', { cx: mx.toFixed(1), cy: (my - 102).toFixed(1), r: 3.5, fill: '#fff' }));
-        lights.appendChild(lamp(-70, -10, 27));
-        break;
-      }
-      default: break;
-    }
+  /** One label pill: the sector's icon and name, sized to cover the painted callout. */
+  function pill(code, { x, y, w }, name, cls = '') {
+    const h = 50;
+    const g = el('g', { class: `label ${cls}`.trim(), transform: `translate(${x},${y})` });
+    g.appendChild(el('rect', { class: 'l-bg', x: -w / 2, y: -h / 2, width: w, height: h, rx: 10 }));
+    g.appendChild(image(`${ART}/icon-${code}.png`, { class: 'l-icon', x: -w / 2 + 12, y: -17, width: 34, height: 34 }));
+    g.appendChild(text(name, -w / 2 + 58, 8, 'l-text', 'start'));
     return g;
   }
 
   function buildDistrict(code) {
     const d = DISTRICTS[code];
-    const g = el('g', { class: 'district', id: `d-${code}`, 'data-sector': code, 'data-state': 'stable', transform: `translate(${d.x},${d.y})` });
+    const g = el('g', { class: 'district', id: `d-${code}`, 'data-sector': code, 'data-state': 'stable' });
     g.style.setProperty('--accent', d.colour);
+    const pts = P(d.footprint);
 
-    g.appendChild(el('ellipse', { class: 'glow', cx: 0, cy: 10, rx: 230, ry: 115, fill: `url(#glow-${code})` }));
-    g.appendChild(el('ellipse', { class: 'glow-alarm', cx: 0, cy: 10, rx: 230, ry: 115, fill: 'url(#gAlarm)' }));
-    g.appendChild(box(-120, -70, 240, 140, 16, '#1e252c', 'platform'));
-    g.appendChild(el('polygon', { class: 'platform-edge', points: P([iso(-120, -70, 16), iso(120, -70, 16), iso(120, 70, 16), iso(-120, 70, 16)]) }));
-
-    const lights = el('g', { class: 'lights' });
-    g.appendChild(structures(code, lights));
-    g.appendChild(lights);
+    // state overlays on the artwork: greyscale copy when dark, then tint, dim, edge
+    g.appendChild(image(MAP.src, { class: 'd-dark', x: 0, y: 0, width: MAP.w, height: MAP.h, 'clip-path': `url(#clip-${code})` }));
+    g.appendChild(el('polygon', { class: 'd-tint', points: pts }));
+    g.appendChild(el('polygon', { class: 'd-dim', points: pts }));
+    g.appendChild(el('polygon', { class: 'd-edge', points: pts }));
 
     g.appendChild(el('g', { class: 'badges' }));
-    g.appendChild(text(`${d.glyph} ${d.name}`, 0, -124, 'd-label'));
+    g.appendChild(pill(code, d.label, d.name));
 
-    const marker = el('g', { class: 'marker', transform: 'translate(0,94)' });
+    const marker = el('g', { class: 'marker', transform: `translate(${d.marker.x},${d.marker.y})` });
     marker.appendChild(el('rect', { class: 'm-bg', x: -80, y: -22, width: 160, height: 44, rx: 22 }));
     marker.appendChild(el('circle', { class: 'ring-bg', cx: -50, cy: 0, r: RING_R }));
     marker.appendChild(el('circle', { class: 'ring-fg', cx: -50, cy: 0, r: RING_R, transform: 'rotate(-90 -50 0)', 'stroke-dasharray': `${RING_LEN} ${RING_LEN}` }));
     marker.appendChild(text('--', -28, 10, 'd-int', 'start'));
     marker.appendChild(text('', 40, 7, 'd-word', 'start'));
     g.appendChild(marker);
+
+    if (DEBUG) {
+      g.appendChild(el('circle', { cx: d.badges.x, cy: d.badges.y, r: 6, fill: '#0ff' }));
+    }
     return g;
   }
 
   function buildCore() {
-    const g = el('g', { class: 'core', transform: `translate(${CORE.x},${CORE.y})` });
-    g.appendChild(el('ellipse', { class: 'core-floor', cx: 0, cy: 34, rx: 160, ry: 80 }));
-    g.appendChild(el('ellipse', { class: 'core-ring', cx: 0, cy: 34, rx: 124, ry: 60 }));
-    g.appendChild(el('ellipse', { class: 'core-ring core-ring-inner', cx: 0, cy: 34, rx: 86, ry: 42 }));
-    g.appendChild(el('circle', { class: 'core-heat', cx: 0, cy: 0, r: 120 }));
-    g.appendChild(el('circle', { class: 'core-orb', cx: 0, cy: -6, r: 46 }));
-    g.appendChild(el('circle', { class: 'core-orb-inner', cx: 0, cy: -6, r: 22 }));
-    // Caption up and to the left of the orb: clear of the water main on the
-    // right and of Transport's label below.
-    g.appendChild(text('GEOTHERMAL CORE', -48, -112, 'core-label', 'end'));
+    const g = el('g', { class: 'core' });
+    g.appendChild(el('circle', { class: 'core-dim', cx: CORE.x, cy: CORE.y, r: CORE.r * 1.5 }));
+    g.appendChild(el('circle', { class: 'core-glow', cx: CORE.x, cy: CORE.y, r: CORE.r }));
+    g.appendChild(el('circle', { class: 'core-alarm', cx: CORE.x, cy: CORE.y, r: CORE.r * 1.35 }));
+    // Tunnel 7: quiet until a breach names it
+    const [[x1, y1], [x2, y2]] = CORE.tunnel7;
+    g.appendChild(el('line', { class: 'tunnel-7', x1, y1, x2, y2 }));
+    g.appendChild(text('TUNNEL 7', x1 - 22, (y1 + y2) / 2 + 6, 't7-label', 'end'));
+    g.appendChild(pill('CORE', CORE.label, 'GEOTHERMAL CORE', 'core-label'));
     return g;
   }
 
   function buildMap() {
     const svg = $('map');
+    svg.setAttribute('viewBox', `0 0 ${MAP.w} ${MAP.h}`);
+    if (DEBUG) svg.classList.add('debug');
     svg.appendChild(buildDefs());
-    svg.appendChild(buildBackground());
-    const links = buildLinks();
-    svg.appendChild(links);
+    svg.appendChild(image(MAP.src, { class: 'backdrop', x: 0, y: 0, width: MAP.w, height: MAP.h }));
     svg.appendChild(buildCore());
     for (const code of ORDER) {
       const g = buildDistrict(code);
       districtEls[code] = g;
       svg.appendChild(g);
     }
-    svg.appendChild(buildVehicles(links.dataset.rail));
   }
 
   // -- per-frame render ------------------------------------------------------------------
@@ -450,7 +291,6 @@
       const integrity = clamp(s.integrity);
       const ring = g.querySelector('.ring-fg');
       ring.setAttribute('stroke-dasharray', `${((RING_LEN * integrity) / 100).toFixed(1)} ${RING_LEN.toFixed(1)}`);
-      // A round cap on a zero-length dash still paints a dot; an empty ring must be empty.
       ring.setAttribute('stroke-linecap', integrity > 0 ? 'round' : 'butt');
       setText(g.querySelector('.d-int'), `${integrity}%`);
       setText(g.querySelector('.d-word'), WORD[state] ?? '');
@@ -476,7 +316,7 @@
       if (s.workforce && Number(s.workforce.injured) > 0) {
         badges.push({ cls: 'b-injured', text: `⚕ ${s.workforce.injured} INJURED`, extra: '' });
       }
-      renderBadges(g, badges);
+      renderBadges(g, DISTRICTS[code].badges, badges);
     }
   }
 
@@ -487,11 +327,16 @@
     const word = marker.querySelector('.d-word');
     const numW = num.getComputedTextLength();
     const wordW = word.textContent ? word.getComputedTextLength() : 0;
-    const width = 20 + RING_R * 2 + 14 + numW + (wordW ? 14 + wordW : 0) + 20;
-    const left = -width / 2;
     const sig = `${numW.toFixed(0)}|${wordW.toFixed(0)}`;
     if (marker.dataset.sig === sig) return;
     marker.dataset.sig = sig;
+    const width = 20 + RING_R * 2 + 14 + numW + (wordW ? 14 + wordW : 0) + 20;
+    const left = -width / 2;
+    // Anchor: 'left' pins the pill's left edge at x (it grows rightwards),
+    // 'right' pins its right edge; otherwise the pill is centred on x.
+    const spec = DISTRICTS[g.dataset.sector].marker;
+    const cx = spec.anchor === 'left' ? spec.x + width / 2 : spec.anchor === 'right' ? spec.x - width / 2 : spec.x;
+    marker.setAttribute('transform', `translate(${cx.toFixed(1)},${spec.y})`);
     marker.querySelector('.m-bg').setAttribute('x', left.toFixed(1));
     marker.querySelector('.m-bg').setAttribute('width', width.toFixed(1));
     const ringX = left + 20 + RING_R;
@@ -501,24 +346,31 @@
     word.setAttribute('x', (ringX + RING_R + 14 + numW + 14).toFixed(1));
   }
 
-  function renderBadges(g, badges) {
+  /** The warning stack for one district, grown up, left or right from its anchor. */
+  function renderBadges(g, anchor, badges) {
     const host = g.querySelector('.badges');
     const sig = badges.map((b) => `${b.cls}|${b.text}|${b.extra}|${b.clock || ''}`).join('~');
     if (host.dataset.sig === sig) return;
     host.dataset.sig = sig;
     host.innerHTML = '';
-    badges.forEach((b, i) => {
-      const y = -160 - i * 38;
+    let cursor = anchor.dir === 'up' ? anchor.y : anchor.x;
+    badges.forEach((b) => {
       const badge = el('g', { class: `badge ${b.cls}` });
-      const t = text(`${b.text}${b.extra}`, 0, y + 8, 'badge-text');
+      const t = text(`${b.text}${b.extra}`, 0, 8, 'badge-text');
       if (b.clock) { t.dataset.clock = b.clock; t.dataset.extra = b.extra; }
-      const rect = el('rect', { x: -60, y: y - 17, width: 120, height: 34, rx: 8 });
+      const rect = el('rect', { x: -60, y: -17, width: 120, height: 34, rx: 8 });
       badge.appendChild(rect);
       badge.appendChild(t);
       host.appendChild(badge);
       const w = t.getComputedTextLength() + 30;
       rect.setAttribute('x', (-w / 2).toFixed(1));
       rect.setAttribute('width', w.toFixed(1));
+      let cx = anchor.x;
+      let cy = anchor.y;
+      if (anchor.dir === 'up') { cy = cursor; cursor -= 40; }
+      else if (anchor.dir === 'left') { cx = cursor - w / 2; cursor = cx - w / 2 - 10; }
+      else { cx = cursor + w / 2; cursor = cx + w / 2 + 10; }
+      badge.setAttribute('transform', `translate(${cx.toFixed(1)},${cy.toFixed(1)})`);
     });
   }
 
