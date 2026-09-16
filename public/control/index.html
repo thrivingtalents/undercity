@@ -292,12 +292,15 @@
       <!-- TRANSFERS -->
       <div class="tab" id="tab-transfers">
         <div class="row">
-          <span class="label">Transport stamps</span>
+          <span class="label">TRN approvals</span>
           <b id="trn-cap">—</b>
-          <button id="btn-reset-stamps">RESET STAMPS</button>
+          <button id="btn-reset-stamps">RESET</button>
+          <span class="label">MED heals</span>
+          <b id="med-cap">—</b>
+          <button id="btn-reset-heals">RESET</button>
           <button id="btn-expire-transfers" class="danger">EXPIRE PENDING</button>
-          <span class="hint">used / allowed. A round change resets this by itself.</span>
         </div>
+        <div class="hint">Used / allowed. A round change resets both by itself. Only TRN approves a transfer, only MED heals; the buttons below are your override and are logged as one.</div>
         <div class="block">
           <span class="label">Record a transfer</span>
           <div class="row">
@@ -310,11 +313,23 @@
               <option value="workers">workers</option>
             </select>
             <input type="number" id="tr-amt" value="1" min="1" max="9" class="short">
-            <button id="btn-tr-add">RECORD</button>
+            <button id="btn-tr-add">REQUEST</button>
+            <button id="btn-tr-direct">RAISE TRANSFER</button>
           </div>
-          <div class="hint">The signed chit and TRN's stamp are the real record. STAMP here moves the digital stock.</div>
+          <div class="hint">REQUEST asks the left sector for stock; RAISE TRANSFER offers it, straight into Transport's queue.</div>
         </div>
-        <div class="transfers" id="transfers"></div>
+        <div class="block">
+          <span class="label">Requests <em>— waiting on a supplier</em></span>
+          <div class="transfers" id="requests"></div>
+        </div>
+        <div class="block">
+          <span class="label">Transfers <em>— waiting on Transport</em></span>
+          <div class="transfers" id="transfers"></div>
+        </div>
+        <div class="block">
+          <span class="label">Healing <em>— waiting on Medical</em></span>
+          <div class="transfers" id="healing"></div>
+        </div>
       </div>
 
       <!-- SETTINGS -->

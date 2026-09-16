@@ -124,7 +124,12 @@ The server sends each sector client a **filtered** state. Never send the full pi
   "inventory": { "power": 4, "water": 1, "parts": 2, "med": 0 } }
 ```
 
-`set_inventory` is a **declaration, not a transaction** — physical chits are the source of truth; the dashboard mirrors them. Teams keeping this synced out loud is deliberate design (§6.1 of the spec). The server records every declaration in the log; discrepancies between declared and actual chits are debrief material, not errors to prevent.
+`set_inventory` is **no longer accepted from a sector** (2026-09-17). It is
+refused with `inventory_read_only`. A sector's stock moves on production,
+upkeep, a solved fault, and a transfer Transport has approved — and nowhere
+else, because a table that can write its own stock walks straight through the
+supplier's consent and Transport's three approvals a round. The facilitator
+still corrects a count from Admin with `adjust_inventory`, which is logged.
 
 ### `submit_code` resolution logic (server-side, exact order)
 
@@ -132,7 +137,7 @@ The server sends each sector client a **filtered** state. Never send the full pi
 2. `locked_until_s > 0` → `reject: "locked"`.
 3. `workers_assigned >= crew_required` and `≤ workforce.active` → else `reject: "insufficient_crew"`.
 4. `code` (trimmed, uppercased, hyphens normalised) is in `valid_codes` → else increment `attempts`, `reject: "invalid_code"`; on 3 consecutive invalids set `locked_until_s = 20`.
-5. **Resources are NOT auto-deducted.** The team declares spend via `set_inventory`; the server does not enforce it. Enforcement would push arguments onto the screen instead of into the room — and the paper chits already carry the audit trail.
+5. **Resources are deducted by the server** when `deduct_resources_on_resolve` is on (the default), and the shortfall refuses the resolve when `resolve_requires_resources` is on. Both are scenario switches; with both off the original behaviour returns, except that a sector can no longer write its own stock — only the facilitator can.
 6. On success: mark resolved, stop decay, apply `+5` integrity recovery, ticker entry crediting the sector, log it.
 
 **Empty `valid_codes` (F-210, false alarm):** every submission returns `reject: "no_procedure"` with UI text *"No matching procedure. Verify this alert."* The facilitator clears it manually via `clear_fault` once COM confirms the ghost. Do not special-case F-210 by code — drive it off the empty array, so future false alarms need no code change.
@@ -300,16 +305,21 @@ plus this sector's), `effects[]` (temporary effects targeting this sector or
 ALL), and:
 
 - **TRN only** — `transfer_queue { capacity, used, remaining, basis, requires_chit,
-  can_stamp, awaiting_acceptance, items[] }`. `items[]` holds only what the
-  supplier has ACCEPTED (while `require_supplier_acceptance` is on); each item
-  carries `chit_confirmed` and `supplier_ok` — a **boolean**, never the
-  supplier's stock count, so Transport learns whether the chit can be honoured
-  without learning what another table is holding. `awaiting_acceptance` is a
-  count only.
-- **Every sector** — `transfer_rules { require_supplier_acceptance,
+  can_stamp, awaiting_acceptance, items[] }`. `items[]` holds only transfers in
+  `PENDING_TRN_APPROVAL`; each carries `chit_confirmed` and `supplier_ok` — a
+  **boolean**, never the supplier's stock count, so Transport learns whether the
+  chit can be honoured without learning what another table is holding.
+  `awaiting_acceptance` is a count of requests no supplier has answered, and a
+  count only. **No other role is sent this key**, which is what stops any other
+  screen rendering an APPROVE control.
+- **MED only** — `healing_queue { capacity, used, remaining, can_heal, items[] }`,
+  each item carrying `sector`, `worker_id`, `worker_label` and `still_injured`.
+  **No other role is sent this key.**
+- **Every sector** — `requests[]` and `transfers[]` it is party to, its own
+  `healing[]`, `unclaimed_injured`, and `transfer_rules { require_supplier_acceptance,
   require_physical_transfer_chit, notify_supplier_with_sound,
-  enforce_supplier_stock }`, so a screen can gate its own controls without
-  guessing at the scenario.
+  enforce_supplier_stock, approver: "TRN", healer: "MED" }`, so a screen can
+  gate its own controls without guessing at the scenario.
 - **COM only** — `intel { degraded, items[{key,label,value}] }`; values read
   `UNKNOWN` under a brownout (per item `hidden_in_brownout`) or comms blackout.
   `full_telemetry` also drops to false while COM is blind.
@@ -348,21 +358,34 @@ scenario defaults) and `scenario { id name sectors events fault_presets }`.
 
 ```json
 { "type": "fault_open", "fault_code": "F-201" }
-{ "type": "transfer_request", "from": "POW", "to": "MED", "resource": "power", "amount": 2 }
-{ "type": "transfer_accept",  "id": "T-0007" }   // SUPPLIER (`from`) only — never the requester
-{ "type": "transfer_decline", "id": "T-0007" }   // SUPPLIER only
-{ "type": "transfer_update",  "id": "T-0007", "status": "CANCELLED" }   // withdraw, only while REQUESTED
-{ "type": "transfer_chit",    "id": "T-0007", "confirmed": true }        // TRN only — the signed paper is in hand
-{ "type": "transfer_stamp",   "id": "T-0007" }                           // TRN only
+{ "type": "transfer_request", "from": "POW", "to": "MED", "resource": "power", "amount": 2 }  // ASK — any sector
+{ "type": "transfer_create",  "to": "MED", "resource": "power", "amount": 2 }   // OFFER our own stock — any sector
+{ "type": "request_fulfill",  "id": "R-0007" }   // SUPPLIER only — raises a transfer; NOT approval
+{ "type": "request_decline",  "id": "R-0007" }   // SUPPLIER only
+{ "type": "request_cancel",   "id": "R-0007" }   // either party, while still REQUESTED
+{ "type": "transfer_chit",    "id": "T-0008", "confirmed": true }   // TRN only — the signed paper is in hand
+{ "type": "transfer_approve", "id": "T-0008" }   // TRN ONLY — the only step that moves stock
+{ "type": "transfer_decline", "id": "T-0008" }   // TRN only
+{ "type": "heal_request" }                       // any sector, for ITS OWN injured worker; target is always MED
+{ "type": "heal_worker",  "id": "H-0009" }       // MED ONLY
+{ "type": "heal_decline", "id": "H-0009" }       // MED only
+{ "type": "heal_cancel",  "id": "H-0009" }       // the asking sector
 ```
 
-The request carries **no free-text field**: the terms are agreed out loud, by
-Liaisons, on paper. `transfer_accept` from the requesting sector is refused
-with `not_supplier`; a supplier short of stock is refused with
-`insufficient_stock_accept { have, need }`. A stamp is refused, in order, with
-`not_accepted`, `capacity { capacity, used, basis }`, `chit_required` or
-`insufficient_stock_stamp { have, need }` — and a refusal spends no allowance
-and moves no stock.
+Nothing here carries a **free-text field**: the terms are agreed out loud, by
+Liaisons, on paper. A **request** moves nothing and approves nothing; only the
+supplier may answer it, and `request_fulfill` from anyone else is refused with
+`not_supplier`. Fulfilling raises a transfer in `PENDING_TRN_APPROVAL`.
+
+**Only TRN approves and only MED heals**, enforced in the router *and* the
+reducer. `transfer_approve` from another sector is refused with
+`approval_trn_only`, `heal_worker` with `heal_med_only`. An approval is
+refused, in order, with `approval_trn_only`, `capacity { capacity, used,
+basis }`, `chit_required` or `insufficient_stock_stamp { have, need }`; a heal
+with `heal_med_only`, `med_capacity { capacity, used }` or
+`worker_not_injured`. **A refusal spends no allowance and moves nothing.**
+`heal_request` takes no target: the reducer uses the asking sector and always
+writes MED.
 Replies: `transfer_result { ok, reason?, transfer? }`. `submit_result` now
 also carries `recovery` and `consumed` on success, `max_consecutive` on an
 invalid code, and `insufficient_resources { short }` when the scenario
@@ -394,11 +417,15 @@ requires stock.
 { "type": "cancel_scheduled", "id": "S-0004" }
 { "type": "timeline_fire", "id": "R2-01" }  { "type": "timeline_skip", "id": "R2-01" }  { "type": "timeline_delay", "id": "R2-01", "seconds": 120 }
 { "type": "transfer_request", "from": "WTR", "to": "POW", "resource": "water", "amount": 2 }
-{ "type": "transfer_accept", "id": "T-0007" }   { "type": "transfer_decline", "id": "T-0007" }
-{ "type": "transfer_chit", "id": "T-0007", "confirmed": true }
-{ "type": "transfer_update", "id": "T-0007", "status": "DELIVERED" }
-{ "type": "transfer_stamp", "id": "T-0007", "force": true }   // lifts acceptance, allowance and chit — never stock
-{ "type": "reset_stamps", "which": "all" }      { "type": "expire_transfers" }
+{ "type": "transfer_create", "from": "WTR", "to": "POW", "resource": "water", "amount": 2 }
+{ "type": "request_fulfill", "id": "R-0007" }   { "type": "request_decline", "id": "R-0007" }
+{ "type": "transfer_chit", "id": "T-0008", "confirmed": true }
+{ "type": "transfer_approve", "id": "T-0008", "force": true }   // lifts allowance and chit — never stock
+{ "type": "transfer_decline", "id": "T-0008" }
+{ "type": "heal_request", "sector": "AGR" }
+{ "type": "heal_worker", "id": "H-0009", "force": true }   // logged as facilitator_force_heal
+{ "type": "heal_decline", "id": "H-0009" }
+{ "type": "reset_stamps", "which": "all" }   { "type": "reset_heals" }   { "type": "expire_transfers" }
 { "type": "wall_debrief", "on": true }
 { "type": "reset_run", "run_id": "…", "scenario_id": "haven9-hard", "confirm": true }
 ```
@@ -429,8 +456,11 @@ exists, else a synthesised placeholder.
 
 `phase`, `pause`, `fault_opened`, `deadline_expired {penalty}`, `fault_failed`,
 `cycle_processed {summary}`, `upkeep_missed`, `worker_recovered`,
-`transfer_requested/accepted/declined/waiting_trn/chit/stamped/delivered/cancelled/expired/refused`,
-`transfer_accept_refused`, `transport_stamp_counter_reset`,
+`request_created/fulfilled/declined/cancelled/expired`, `request_fulfil_refused`,
+`transfer_created/chit/approved/declined/cancelled/expired/refused`,
+`heal_requested/declined/refused/cancelled/expired`, `worker_healed`,
+`trn_approval_counter_reset`, `med_healing_counter_reset`,
+`facilitator_force_transfer`, `facilitator_force_heal`,
 `council_called/ended/no_order`, `continuity_order`, `blackout_started/rotated/ended`,
 `event_fired`, `effect_started/ended`, `scheduled`, `preset_fired`,
 `timeline_fired/skipped/delayed`, `alert`, `config_patched`, `set_stability`,

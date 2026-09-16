@@ -596,7 +596,11 @@
   $('btn-tr-add').addEventListener('click', () => {
     send({ type: 'transfer_request', from: $('tr-from').value, to: $('tr-to').value, resource: $('tr-res').value, amount: Number($('tr-amt').value) });
   });
+  $('btn-tr-direct').addEventListener('click', () => {
+    send({ type: 'transfer_create', from: $('tr-from').value, to: $('tr-to').value, resource: $('tr-res').value, amount: Number($('tr-amt').value) });
+  });
   $('btn-reset-stamps').addEventListener('click', () => send({ type: 'reset_stamps', which: 'all' }));
+  $('btn-reset-heals').addEventListener('click', () => send({ type: 'reset_heals' }));
   $('btn-expire-transfers').addEventListener('click', () => {
     if (!confirm('EXPIRE PENDING — void every transfer that has not been stamped? Delivered ones are untouched.')) return;
     send({ type: 'expire_transfers' });
@@ -606,39 +610,69 @@
     const cap = state.transfer_capacity || {};
     const left = Math.max(0, (cap.remaining !== undefined ? cap.remaining : (cap.capacity || 0) - (cap.used || 0)));
     $('trn-cap').textContent = `${cap.used} / ${cap.capacity} · ${left} left this ${cap.basis || 'round'}${cap.basis === 'round' && cap.round ? ` (${cap.round})` : ''}`;
+    const hc = state.healing_capacity || {};
+    $('med-cap').textContent = `${hc.used} / ${hc.capacity} · ${Math.max(0, hc.remaining || 0)} left this round`;
 
-    // The facilitator sees every step and can move any of them. STAMP here is
-    // always the override: it lifts acceptance, allowance and chit, and says so.
-    const WORD = { AGREED: 'ACCEPTED', WAITING_TRN: 'WAITING TRN' };
+    const closedStates = ['DELIVERED', 'CANCELLED', 'EXPIRED', 'DECLINED_BY_TRN', 'DECLINED_BY_SUPPLIER', 'HEALED', 'DECLINED_BY_MED'];
+    const flagsFor = (t) => {
+      const out = [];
+      if (t.chit_confirmed) out.push('<span class="tag">CHIT</span>');
+      if (t.facilitator_override) out.push('<span class="tag multi">OVERRIDE</span>');
+      if (t.moved != null && t.moved !== t.amount) out.push(`<span class="tag injury">MOVED ${t.moved}</span>`);
+      if (t.request_id) out.push('<span class="tag">ON REQUEST</span>');
+      return out.join(' ');
+    };
+    const row = (t, title, acts) => `<div class="tr${closedStates.includes(t.status) ? ' closed' : ''}">
+        <div class="who"><b>${title}</b> ${flagsFor(t)}<br>
+        <span class="st ${t.status}">${t.status.replace(/_/g, ' ')} · ${new Date(t.requested_at).toLocaleTimeString()} · by ${esc(t.requested_by || '—')}${t.round_created ? ` · ${t.round_created}` : ''}</span></div>
+        <div class="acts">${acts.join('')}</div></div>`;
+
+    // REQUESTS — the facilitator can answer for a supplier that has walked off.
+    $('requests').innerHTML = (state.requests || []).map((r) => {
+      const acts = r.status === 'REQUESTED' ? [
+        `<button data-fulfill="${r.id}">FULFIL</button>`,
+        `<button data-decreq="${r.id}">DECLINE</button>`,
+        `<button data-cancelreq="${r.id}">CANCEL</button>`,
+      ] : [];
+      return row(r, `${r.requester} ← ${r.supplier} · ${r.amount} ${r.resource}`, acts);
+    }).join('') || '<div class="hint">No requests recorded.</div>';
+
+    // TRANSFERS — APPROVE here is always the override: it lifts the allowance
+    // and the chit, and says so in the log.
     $('transfers').innerHTML = (state.transfers || []).map((t) => {
-      const closed = ['DELIVERED', 'CANCELLED', 'DECLINED', 'EXPIRED'].includes(t.status);
       const acts = [];
-      if (t.status === 'REQUESTED') {
-        acts.push(`<button data-accept="${t.id}">ACCEPT</button>`);
-        acts.push(`<button data-decline="${t.id}">DECLINE</button>`);
-      }
-      if (['REQUESTED', 'AGREED', 'WAITING_TRN'].includes(t.status)) {
+      if (['PENDING_TRN_APPROVAL', 'APPROVED'].includes(t.status)) {
         acts.push(`<button data-chit="${t.id}" data-on="${t.chit_confirmed ? '0' : '1'}" class="${t.chit_confirmed ? 'on' : ''}">CHIT ${t.chit_confirmed ? '✓' : '✗'}</button>`);
-        acts.push(`<button data-stamp="${t.id}" class="danger">FORCE STAMP</button>`);
+        acts.push(`<button data-stamp="${t.id}" class="danger">FORCE APPROVE</button>`);
+        acts.push(`<button data-dectr="${t.id}">DECLINE</button>`);
         acts.push(`<button data-upd="${t.id}" data-st="CANCELLED">CANCEL</button>`);
       }
-      if (t.status === 'STAMPED') acts.push(`<button data-upd="${t.id}" data-st="DELIVERED">DELIVERED</button>`);
-
-      const flags = [];
-      if (t.chit_confirmed) flags.push('<span class="tag">CHIT</span>');
-      if (t.facilitator_override) flags.push('<span class="tag multi">OVERRIDE</span>');
-      if (t.moved != null && t.moved !== t.amount) flags.push(`<span class="tag injury">MOVED ${t.moved}</span>`);
-
-      return `<div class="tr${closed ? ' closed' : ''}"><div class="who"><b>${t.from} → ${t.to}</b> · ${t.amount} ${t.resource} ${flags.join(' ')}<br>
-        <span class="st ${t.status}">${WORD[t.status] || t.status} · ${new Date(t.requested_at).toLocaleTimeString()} · by ${esc(t.requested_by)}${t.round_created ? ` · ${t.round_created}` : ''}</span></div>
-        <div class="acts">${acts.join('')}</div></div>`;
+      if (t.status === 'APPROVED') acts.push(`<button data-upd="${t.id}" data-st="DELIVERED">DELIVERED</button>`);
+      return row(t, `${t.from} → ${t.to} · ${t.amount} ${t.resource}`, acts);
     }).join('') || '<div class="hint">No transfers recorded.</div>';
 
-    for (const b of $('transfers').querySelectorAll('[data-accept]')) b.addEventListener('click', () => send({ type: 'transfer_accept', id: b.dataset.accept }));
-    for (const b of $('transfers').querySelectorAll('[data-decline]')) b.addEventListener('click', () => send({ type: 'transfer_decline', id: b.dataset.decline }));
-    for (const b of $('transfers').querySelectorAll('[data-chit]')) b.addEventListener('click', () => send({ type: 'transfer_chit', id: b.dataset.chit, confirmed: b.dataset.on === '1' }));
-    for (const b of $('transfers').querySelectorAll('[data-stamp]')) b.addEventListener('click', () => send({ type: 'transfer_stamp', id: b.dataset.stamp, force: true }));
-    for (const b of $('transfers').querySelectorAll('[data-upd]')) b.addEventListener('click', () => send({ type: 'transfer_update', id: b.dataset.upd, status: b.dataset.st }));
+    // HEALING — Medical's queue, and the facilitator's override of it.
+    $('healing').innerHTML = (state.healing || []).map((h) => {
+      const acts = h.status === 'WAITING_FOR_MED' ? [
+        `<button data-heal="${h.id}" class="danger">FORCE HEAL</button>`,
+        `<button data-decheal="${h.id}">DECLINE</button>`,
+        `<button data-cancelheal="${h.id}">CANCEL</button>`,
+      ] : [];
+      const label = `${h.sector} → MED · ${h.worker_label}${h.still_injured === false ? ' · NO LONGER INJURED' : ''}`;
+      return row(h, label, acts);
+    }).join('') || '<div class="hint">No healing requests recorded.</div>';
+
+    const on = (sel, fn) => { for (const b of document.querySelectorAll(sel)) b.addEventListener('click', () => fn(b)); };
+    on('[data-fulfill]', (b) => send({ type: 'request_fulfill', id: b.dataset.fulfill }));
+    on('[data-decreq]', (b) => send({ type: 'request_decline', id: b.dataset.decreq }));
+    on('[data-cancelreq]', (b) => send({ type: 'request_cancel', id: b.dataset.cancelreq }));
+    on('[data-chit]', (b) => send({ type: 'transfer_chit', id: b.dataset.chit, confirmed: b.dataset.on === '1' }));
+    on('[data-stamp]', (b) => send({ type: 'transfer_approve', id: b.dataset.stamp, force: true }));
+    on('[data-dectr]', (b) => send({ type: 'transfer_decline', id: b.dataset.dectr }));
+    on('[data-upd]', (b) => send({ type: 'transfer_update', id: b.dataset.upd, status: b.dataset.st }));
+    on('[data-heal]', (b) => send({ type: 'heal_worker', id: b.dataset.heal, force: true }));
+    on('[data-decheal]', (b) => send({ type: 'heal_decline', id: b.dataset.decheal }));
+    on('[data-cancelheal]', (b) => send({ type: 'heal_cancel', id: b.dataset.cancelheal }));
   }
 
   // -- settings tab --------------------------------------------------------------
@@ -663,17 +697,22 @@
     ['core_scales_power_production', 'Core output scales POW production', 'b'],
     ['injured_recovery_per_cycle', 'Injured recovered per cycle (MED)', 'n'], ['injured_recovery_costs_med', 'Med supplies per recovery', 'n'],
     ['deliver_on_stamp', 'Stamp delivers immediately', 'b'],
-    ['TRANSFERS'],
-    ['transfer_limit_basis', 'Stamp allowance counted per', 'e', ['round', 'cycle']],
-    ['transport_stamp_limit', 'Transport stamps per round', 'n'],
+    ['TRANSFERS & HEALING'],
+    ['trn_approval_limit', 'Transport approvals per round', 'n'],
+    ['med_healing_limit', 'Medical heals per round', 'n'],
+    ['transfer_limit_basis', 'Approval allowance counted per', 'e', ['round', 'cycle']],
     ['trn_capacity_per_cycle', 'Transport capacity per cycle (legacy basis)', 'n'],
-    ['require_supplier_acceptance', 'Supplier must accept before Transport sees it', 'b'],
-    ['enforce_supplier_stock', 'Check supplier stock on accept and stamp', 'b'],
+    ['require_supplier_acceptance', 'Supplier must fulfil before Transport sees it', 'b'],
+    ['enforce_supplier_stock', 'Check supplier stock on fulfil and on approval', 'b'],
     ['insufficient_stock_behavior', 'When the supplier is short', 'e', ['refuse', 'legacy_partial_if_supported']],
-    ['expire_pending_transfers_on_round_change', 'Unstamped transfers expire at round change', 'b'],
+    ['expire_pending_requests_on_round_change', 'Unanswered requests expire at round change', 'b'],
+    ['expire_pending_transfers_on_round_change', 'Unapproved transfers expire at round change', 'b'],
+    ['expire_pending_healing_on_round_change', 'Unhealed requests expire at round change', 'b'],
     ['require_physical_transfer_chit', 'Transport must confirm the paper chit', 'b'],
-    ['notify_supplier_with_sound', 'Inbound request rings on the supplier screen', 'b'],
-    ['show_completed_transfer_on_wall', 'Completed transfer shows on the wall', 'b'],
+    ['allow_facilitator_force_transfer', 'Facilitator may force an approval', 'b'],
+    ['allow_facilitator_force_heal', 'Facilitator may force a heal', 'b'],
+    ['notify_supplier_with_sound', 'Arrivals ring on the supplier, Transport and Medical screens', 'b'],
+    ['show_completed_transfer_on_wall', 'Completed transfers and heals show on the wall', 'b'],
     ['FAULTS'],
     ['deadline_default_s.2', 'Default deadline — EMERGENCY (s, blank = none)', 'n?'], ['deadline_default_s.3', 'Default deadline — CRISIS (s)', 'n?'],
     ['deadline_default_s.1', 'Default deadline — INCIDENT (s)', 'n?'],

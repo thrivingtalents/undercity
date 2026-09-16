@@ -825,53 +825,90 @@ function handleSector(client, entry, msg) {
       send(client.ws, submitCode(game, { ...msg, sector: mine }));
       return broadcast(entry);
 
+    /**
+     * A sector cannot write its own stock. It moves on production, upkeep, a
+     * solved fault, and a transfer Transport approved — and nowhere else, or
+     * the supplier's consent and Transport's three approvals a round mean
+     * nothing. The facilitator corrects a count from Admin (`adjust_inventory`).
+     */
     case 'set_inventory':
-      game.setInventory(mine, msg.inventory || {});
-      return broadcast(entry);
+      return send(client.ws, { type: 'error', reason: 'inventory_read_only' });
 
     case 'fault_open':
       game.openFault(mine, msg.fault_code);
       return broadcast(entry);
 
-    /** The digital record of a physical chit — either party may raise it. */
+    /**
+     * A REQUEST: we ask another sector for stock. Every sector may raise one.
+     * It moves nothing and approves nothing.
+     */
     case 'transfer_request': {
-      const from = String(msg.from || mine).toUpperCase();
-      const to = String(msg.to || '').toUpperCase();
+      const from = String(msg.from || '').toUpperCase();
+      const to = String(msg.to || mine).toUpperCase();
       if (from !== mine && to !== mine) return send(client.ws, { type: 'error', reason: 'not_party' });
       const result = game.requestTransfer({
-        from, to, resource: msg.resource, amount: msg.amount, note: msg.note, by: mine,
+        from, to, resource: msg.resource, amount: msg.amount, by: mine,
       });
-      send(client.ws, { type: 'transfer_result', ...result });
-      return broadcast(entry);
-    }
-
-    case 'transfer_update': {
-      const t = game.findTransfer(msg.id);
-      if (!t || (t.from !== mine && t.to !== mine)) return send(client.ws, { type: 'error', reason: 'not_party' });
-      const status = String(msg.status || '').toUpperCase();
-      if (!['AGREED', 'ACCEPTED', 'DECLINED', 'WAITING_TRN', 'CANCELLED'].includes(status)) {
-        return send(client.ws, { type: 'error', reason: 'bad_status' });
-      }
-      send(client.ws, { type: 'transfer_result', ...game.updateTransfer(msg.id, status, { by: mine }) });
+      send(client.ws, { type: 'transfer_result', action: 'request', ...result });
       return broadcast(entry);
     }
 
     /**
-     * Supplier acceptance. The reducer, not this router, decides who may say
-     * yes: only the sector the resource would leave. A requester pressing this
-     * on its own request is refused as `not_supplier`.
+     * A TRANSFER: we offer our OWN stock to another sector. Every sector may
+     * raise one, directly or by fulfilling a request. It lands in Transport's
+     * approval queue and moves nothing until Transport approves.
      */
-    case 'transfer_accept': {
-      const t = game.findTransfer(msg.id);
-      if (!t || (t.from !== mine && t.to !== mine)) return send(client.ws, { type: 'error', reason: 'not_party' });
-      send(client.ws, { type: 'transfer_result', action: 'accept', ...game.acceptTransfer(msg.id, { by: mine }) });
+    case 'transfer_create': {
+      const to = String(msg.to || '').toUpperCase();
+      const result = game.createTransfer({
+        from: mine, to, resource: msg.resource, amount: msg.amount, by: mine,
+      });
+      send(client.ws, { type: 'transfer_result', action: 'create', ...result });
       return broadcast(entry);
     }
 
-    case 'transfer_decline': {
-      const t = game.findTransfer(msg.id);
-      if (!t || (t.from !== mine && t.to !== mine)) return send(client.ws, { type: 'error', reason: 'not_party' });
-      send(client.ws, { type: 'transfer_result', action: 'decline', ...game.declineTransfer(msg.id, { by: mine }) });
+    /**
+     * Supplier consent. FULFIL raises the transfer; DECLINE ends the request.
+     * Neither is approval — that word belongs to Transport alone.
+     */
+    case 'request_fulfill':
+    case 'transfer_accept': {
+      const r = game.findRequest(msg.id);
+      if (!r || (r.supplier !== mine && r.requester !== mine)) {
+        return send(client.ws, { type: 'error', reason: 'not_party' });
+      }
+      send(client.ws, { type: 'transfer_result', action: 'fulfill', ...game.fulfillRequest(msg.id, { by: mine }) });
+      return broadcast(entry);
+    }
+
+    case 'request_decline':
+    case 'transfer_decline_request': {
+      const r = game.findRequest(msg.id);
+      if (!r || (r.supplier !== mine && r.requester !== mine)) {
+        return send(client.ws, { type: 'error', reason: 'not_party' });
+      }
+      send(client.ws, { type: 'transfer_result', action: 'decline_request', ...game.declineRequest(msg.id, { by: mine }) });
+      return broadcast(entry);
+    }
+
+    case 'request_cancel': {
+      const r = game.findRequest(msg.id);
+      if (!r || (r.supplier !== mine && r.requester !== mine)) {
+        return send(client.ws, { type: 'error', reason: 'not_party' });
+      }
+      send(client.ws, { type: 'transfer_result', action: 'cancel_request', ...game.cancelRequest(msg.id, { by: mine }) });
+      return broadcast(entry);
+    }
+
+    case 'transfer_update': {
+      const t = game.findTransfer(msg.id) || game.findRequest(msg.id);
+      const party = t && [t.from, t.to, t.supplier, t.requester].includes(mine);
+      if (!party) return send(client.ws, { type: 'error', reason: 'not_party' });
+      const status = String(msg.status || '').toUpperCase();
+      if (!['AGREED', 'ACCEPTED', 'FULFILLED', 'DECLINED', 'WAITING_TRN', 'CANCELLED'].includes(status)) {
+        return send(client.ws, { type: 'error', reason: 'bad_status' });
+      }
+      send(client.ws, { type: 'transfer_result', ...game.updateTransfer(msg.id, status, { by: mine }) });
       return broadcast(entry);
     }
 
@@ -882,13 +919,49 @@ function handleSector(client, entry, msg) {
       return broadcast(entry);
     }
 
-    /** TRN's stamp. The rubber stamp on the chit is still the real one. */
+    /**
+     * TRN APPROVES. This is the only sector intent that moves stock, and the
+     * router refuses it outright from anyone but Transport — the reducer
+     * refuses it again, so neither layer alone is load-bearing.
+     */
+    case 'transfer_approve':
     case 'transfer_stamp': {
-      if (mine !== 'TRN') return send(client.ws, { type: 'error', reason: 'forbidden' });
+      if (mine !== 'TRN') return send(client.ws, { type: 'error', reason: 'approval_trn_only' });
       if (game.state.sectors.TRN.status === 'DARK') {
         return send(client.ws, { type: 'transfer_result', ok: false, reason: 'sector_dark' });
       }
-      send(client.ws, { type: 'transfer_result', action: 'stamp', ...game.stampTransfer(msg.id, { by: 'TRN' }) });
+      send(client.ws, { type: 'transfer_result', action: 'approve', ...game.approveTransfer(msg.id, { by: 'TRN' }) });
+      return broadcast(entry);
+    }
+
+    /** TRN refuses to carry it. Costs no allowance. */
+    case 'transfer_decline': {
+      if (mine !== 'TRN') return send(client.ws, { type: 'error', reason: 'approval_trn_only' });
+      send(client.ws, { type: 'transfer_result', action: 'decline', ...game.declineTransfer(msg.id, { by: 'TRN' }) });
+      return broadcast(entry);
+    }
+
+    /** Any sector with an injured worker may ask. The target is always MED. */
+    case 'heal_request': {
+      send(client.ws, { type: 'heal_result', action: 'request', ...game.requestHealing(mine, { by: mine }) });
+      return broadcast(entry);
+    }
+
+    case 'heal_cancel': {
+      send(client.ws, { type: 'heal_result', action: 'cancel', ...game.cancelHealing(msg.id, { by: mine }) });
+      return broadcast(entry);
+    }
+
+    /** MED HEALS. Medical only, at both layers. */
+    case 'heal_worker': {
+      if (mine !== 'MED') return send(client.ws, { type: 'error', reason: 'heal_med_only' });
+      send(client.ws, { type: 'heal_result', action: 'heal', ...game.healWorker(msg.id, { by: 'MED' }) });
+      return broadcast(entry);
+    }
+
+    case 'heal_decline': {
+      if (mine !== 'MED') return send(client.ws, { type: 'error', reason: 'heal_med_only' });
+      send(client.ws, { type: 'heal_result', action: 'decline', ...game.declineHealing(msg.id, { by: 'MED' }) });
       return broadcast(entry);
     }
 
@@ -1005,8 +1078,18 @@ function handleControl(client, entry, msg) {
     case 'transfer_update':
       reply({ type: 'transfer_result', ...game.updateTransfer(msg.id, String(msg.status || '').toUpperCase(), { by: 'facilitator' }) });
       return ok();
+    case 'transfer_create':
+      reply({ type: 'transfer_result', ...game.createTransfer({ ...msg, by: 'facilitator' }) });
+      return ok();
+    case 'request_fulfill':
     case 'transfer_accept':
-      reply({ type: 'transfer_result', ...game.acceptTransfer(msg.id, { by: 'facilitator' }) });
+      reply({ type: 'transfer_result', ...game.fulfillRequest(msg.id, { by: 'facilitator' }) });
+      return ok();
+    case 'request_decline':
+      reply({ type: 'transfer_result', ...game.declineRequest(msg.id, { by: 'facilitator' }) });
+      return ok();
+    case 'request_cancel':
+      reply({ type: 'transfer_result', ...game.cancelRequest(msg.id, { by: 'facilitator' }) });
       return ok();
     case 'transfer_decline':
       reply({ type: 'transfer_result', ...game.declineTransfer(msg.id, { by: 'facilitator' }) });
@@ -1014,14 +1097,32 @@ function handleControl(client, entry, msg) {
     case 'transfer_chit':
       reply({ type: 'transfer_result', ...game.confirmChit(msg.id, msg.confirmed !== false, { by: 'facilitator' }) });
       return ok();
+    case 'transfer_approve':
     case 'transfer_stamp':
-      reply({ type: 'transfer_result', ...game.stampTransfer(msg.id, { by: 'facilitator', force: !!msg.force }) });
+      reply({ type: 'transfer_result', ...game.approveTransfer(msg.id, { by: 'facilitator', force: msg.force !== false }) });
       return ok();
     case 'reset_stamps':
       reply({ type: 'stamps_reset', ...game.resetStamps(msg.which || 'all', { by: 'facilitator' }) });
       return ok();
     case 'expire_transfers':
       reply({ type: 'transfers_expired', count: game.expirePendingTransfers({ reason: 'facilitator' }) });
+      return ok();
+
+    // -- healing
+    case 'heal_request':
+      reply({ type: 'heal_result', ...game.requestHealing(msg.sector, { by: 'facilitator' }) });
+      return ok();
+    case 'heal_worker':
+      reply({ type: 'heal_result', ...game.healWorker(msg.id, { by: 'facilitator', force: msg.force !== false }) });
+      return ok();
+    case 'heal_decline':
+      reply({ type: 'heal_result', ...game.declineHealing(msg.id, { by: 'facilitator' }) });
+      return ok();
+    case 'heal_cancel':
+      reply({ type: 'heal_result', ...game.cancelHealing(msg.id, { by: 'facilitator' }) });
+      return ok();
+    case 'reset_heals':
+      reply({ type: 'heals_reset', ...game.resetHeals({ by: 'facilitator' }) });
       return ok();
 
     // -- debrief on the wall

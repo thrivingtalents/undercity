@@ -76,7 +76,20 @@
         <h2 class="ptitle">INBOUND REQUESTS <span class="count" id="inbox-count">0</span></h2>
         <div class="inbox" id="inbox"></div>
         <div class="msg" id="inbox-msg" hidden></div>
-        <div class="declare-note">Accepting only reserves the stock. The chit still needs both Liaison signatures and Transport&#39;s stamp.</div>
+        <div class="declare-note">Fulfilling raises a transfer. Nothing moves until Transport approves it, and the chit still needs both Liaison signatures.</div>
+      </div>
+
+      <div class="panel block injured-block" id="injured-panel" hidden>
+        <h2 class="ptitle">INJURED WORKERS <span class="count" id="injured-count">0</span></h2>
+        <div class="injured-line">
+          <span class="inj-glyph">⚕</span>
+          <b id="injured-num">0</b>
+          <span class="inj-text">INJURED · <span id="injured-unclaimed">0</span> NOT YET WITH MEDICAL</span>
+        </div>
+        <div class="heal-list" id="heal-list"></div>
+        <button type="button" class="primary wide" id="btn-heal-request">REQUEST MED HEALING</button>
+        <div class="msg" id="heal-msg" hidden></div>
+        <div class="declare-note">Healing always goes to Medical Bay. Only Medical can heal; Transport plays no part.</div>
       </div>
 
       <div class="panel block">
@@ -91,7 +104,7 @@
           <span class="wlabel">AVAILABLE</span>
         </div>
         <div class="wextra" id="wf-extra" hidden></div>
-        <div class="declare-note">Declare what is on the table — physical chits are the source of truth.</div>
+        <div class="declare-note">Stock moves on production, upkeep, a solved fault, and a transfer Transport has approved. If the tray and the screen disagree, tell the facilitator.</div>
       </div>
 
       <div class="panel block">
@@ -105,13 +118,15 @@
       </div>
 
       <div class="panel block transfers-block">
-        <h2 class="ptitle">RESOURCE TRANSFERS</h2>
-        <div class="transfers" id="transfers"><div class="empty" id="transfers-empty">No transfers recorded.</div></div>
-        <div class="msg" id="transfer-msg" hidden></div>
+        <h2 class="ptitle">RESOURCES IN &amp; OUT</h2>
+        <div class="tf-tabs" id="tf-tabs">
+          <button type="button" data-mode="request" class="on">REQUEST RESOURCE</button>
+          <button type="button" data-mode="transfer">TRANSFER RESOURCE</button>
+        </div>
         <form class="transfer-form" id="transfer-form" autocomplete="off">
           <div class="tf-row">
-            <span class="tf-label">REQUEST FROM</span>
-            <select id="tf-sector" aria-label="Supplier sector"></select>
+            <span class="tf-label" id="tf-label">REQUEST FROM</span>
+            <select id="tf-sector" aria-label="Other sector"></select>
           </div>
           <div class="tf-row">
             <select id="tf-res" aria-label="Resource">
@@ -124,8 +139,11 @@
             <select id="tf-amt" aria-label="Amount"></select>
             <button type="submit" id="tf-submit">SEND REQUEST</button>
           </div>
+          <div class="tf-hint" id="tf-hint">Asks another sector for stock. Nothing moves until they fulfil it and Transport approves.</div>
         </form>
-        <div class="declare-note">The signed Transfer Chit and TRN&#39;s stamp remain the real record. Terms are agreed face to face.</div>
+        <div class="msg" id="transfer-msg" hidden></div>
+        <div class="transfers" id="transfers"><div class="empty" id="transfers-empty">Nothing in or out yet.</div></div>
+        <div class="declare-note">The signed Transfer Chit and Transport&#39;s approval remain the real record. Terms are agreed face to face.</div>
       </div>
     </section>
 
@@ -188,10 +206,20 @@
         <div class="effects" id="effects"></div>
       </div>
 
-      <div class="panel block" id="queue-panel" hidden>
-        <h2 class="ptitle">TRANSFER QUEUE <span class="cap" id="queue-cap"></span></h2>
+      <!-- TRANSPORT ONLY. The server sends this panel's data to TRN alone. -->
+      <div class="panel block approval-block" id="queue-panel" hidden>
+        <h2 class="ptitle">RESOURCE APPROVAL QUEUE <span class="cap" id="queue-cap"></span></h2>
         <div class="queue" id="queue"></div>
         <div class="msg" id="queue-msg" hidden></div>
+        <div class="declare-note">Only Transport approves resource movement. Confirm the signed chit, then approve.</div>
+      </div>
+
+      <!-- MEDICAL ONLY. The server sends this panel's data to MED alone. -->
+      <div class="panel block healing-block" id="healing-panel" hidden>
+        <h2 class="ptitle">MED HEALING QUEUE <span class="cap" id="healing-cap"></span></h2>
+        <div class="healing" id="healing"></div>
+        <div class="msg" id="healing-msg" hidden></div>
+        <div class="declare-note">Only Medical Bay heals. Transport is not involved.</div>
       </div>
 
       <div class="panel block" id="intel-panel" hidden>

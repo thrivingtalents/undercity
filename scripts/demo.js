@@ -91,12 +91,28 @@ async function main() {
   send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-201', code: 'P-04-340', workers_assigned: 2 });
   await wait(6);
 
-  say('6. Resource transfer WTR → POW, 2 water — requested, then TRN stamps it and stock moves');
-  A({ type: 'transfer_request', from: 'WTR', to: 'POW', resource: 'water', amount: 2 });
-  await wait(5);
+  say('6. POW asks WTR for 2 water — WTR fulfils it, TRN confirms the chit and approves, and stock moves');
+  send(pow, { type: 'transfer_request', from: 'WTR', to: 'POW', resource: 'water', amount: 2 });
+  await wait(4);
+  const req = (admin.state.requests || [])[0];
+  if (req) A({ type: 'request_fulfill', id: req.id });      // stands in for the WTR table
+  await wait(4);
   const t = (admin.state.transfers || [])[0];
-  if (t) send(trn, { type: 'transfer_stamp', id: t.id });
+  if (t) {
+    send(trn, { type: 'transfer_chit', id: t.id, confirmed: true });
+    await wait(3);
+    send(trn, { type: 'transfer_approve', id: t.id });
+  }
   await wait(6);
+
+  say('6b. Healing — a POW worker is hurt, POW asks Medical, and only Medical can heal');
+  A({ type: 'injure_worker', sector: 'POW', count: 1 });
+  await wait(3);
+  send(pow, { type: 'heal_request' });
+  await wait(4);
+  const h = (admin.state.healing || [])[0];
+  if (h) A({ type: 'heal_worker', id: h.id });               // stands in for the MED table
+  await wait(5);
 
   say('7. Integrity reduction — second fault F-202 on POW and −20 by the facilitator');
   A({ type: 'fire_fault', fault_code: 'F-202', sector: 'POW' });

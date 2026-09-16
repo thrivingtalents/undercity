@@ -30,7 +30,7 @@ control extension). Where the two differ, **the contract wins**.
 | Screen | Who | LAN URL | What it does |
 |---|---|---|---|
 | **Wall** | projector, whole room | `/wall` | The HAVEN-9 illustration (`Asset/Map reference`, prepared into `public/wall/art` by `node tools/prepare-wall-art.js`) with everything alive drawn over it: a live label with the sector icon on each painted callout, a compact integrity marker and warning badges (fault clock, low stock, injured) that appear only when something is wrong, traced district footprints that tint amber, pulse red, flicker dark in brownout or go greyscale when offline, a Core that dims and flickers with output · HUD with CITY · CORE · NEXT CYCLE · one most-urgent fault line · one temporary notification at a time · Council, emergency and core-drop takeovers · paused · Round 3 vs Aftershock. Healthy districts are simply lit; nothing says "no faults" |
-| **Sector** | the Systems Lead | `/sector/POW` … `/sector/COM` | What's wrong · how long · what we have · what to enter. Fault list → open card → resolution console with 3-strike 20 s lockout. Transfers panel. TRN gets the transfer queue + STAMP; COM gets City Intelligence |
+| **Sector** | the Systems Lead | `/sector/POW` … `/sector/COM` | What's wrong · how long · what we have · what to enter. Fault list → open card → resolution console with 3-strike 20 s lockout. All six get REQUEST RESOURCE and TRANSFER RESOURCE, an inbound-request card to FULFIL or DECLINE, and an injured-worker panel that asks Medical for healing. TRN alone gets the resource approval queue with APPROVE; MED alone gets the healing queue with HEAL; COM gets City Intelligence |
 | **Admin** | the facilitator | `/admin?token=haven9` | Phase/master timer, seven always-visible quick actions, 2×3 sector control grid, pressure panel (faults · timeline · events · council · core · transfers · settings · debrief), live log, observation pad |
 
 Every screen updates in real time over one websocket; no refresh, ever. A
@@ -149,36 +149,43 @@ npm start                                            # http://localhost:3000/adm
    recovery (MED spends med supplies) → brownout effects → city stability →
    next cycle. Admin sees a per-sector summary; Transport's per-cycle stamp
    capacity resets.
-4. **Transfers.** The Transfer Chit stays physical, and the negotiation stays
-   face to face — there is no message box anywhere in the chain. The sector
-   that *wants* the resource asks; the sector that *holds* it decides; the
-   Liaisons sign the paper; Transport stamps. In detail:
-   **REQUEST** — a team picks a supplier, a resource and an amount. The request
-   lands on the supplier's screen with a banner, a sound and their own current
-   stock beside it. **ACCEPT or DECLINE** — only the supplier may answer, and
-   only if it actually holds the amount; a requester can never approve its own
-   ask. Acceptance moves nothing, it only exposes the chit to Transport.
-   **CHIT** — Transport confirms the signed paper is in its hand.
-   **STAMP** — Transport stamps, and only now does stock move, in full or not
-   at all. Transport gets **three stamps per round**, not per cycle: a cycle
-   boundary hands nothing back, a round change restores all three and voids
-   every chit that was never stamped. A refusal costs no stamp. Every gate is
-   a setting, and the facilitator can force a stamp, reset the counter or
-   expire the queue by hand; a forced stamp is flagged as an override in the
-   log and in the debrief.
-5. **Council.** CALL COUNCIL puts the 5:00 summons on every screen. Admin
+4. **Transfers.** The Transfer Chit stays physical, the negotiation stays face
+   to face, and there is no message box anywhere in the chain. Every sector can
+   **REQUEST RESOURCE** (ask another table for stock) and **TRANSFER RESOURCE**
+   (offer its own). A **request** moves nothing and approves nothing: it lands
+   on the supplier's screen with a banner, a sound and their own stock beside
+   it, and only that supplier may **FULFIL** or **DECLINE** it. Fulfilling
+   raises a **transfer**, which is supplier consent, not approval. A transfer
+   can also be raised directly, without an ask.
+   Every transfer waits in **Transport's approval queue**. Transport confirms
+   the signed **chit** is in its hand, then **APPROVES** — and only now does
+   stock move, in full or not at all, re-checking the supplier's shelf first.
+   **Only Transport approves**, at both the router and the reducer; no other
+   screen is even sent the queue. Transport gets **three approvals per round**:
+   a cycle boundary hands nothing back, a round change restores all three and
+   voids everything unfinished. A refusal costs nothing.
+5. **Healing.** A separate chain that Transport has no part in. Any sector with
+   an injured worker presses **REQUEST MED HEALING**; the target is always
+   Medical Bay and there is no sector to choose. **Only Medical heals**, from
+   its own queue, and it gets **three heals per round** on the same terms: a
+   cycle changes nothing, a round change resets it, a refusal costs nothing,
+   and a worker healed by someone else in the meantime is re-checked and
+   refused. Every gate on both chains is a setting, and the facilitator can
+   force an approval or a heal, reset either counter and expire the queues;
+   a forced action is flagged as an override in the log and the debrief.
+6. **Council.** CALL COUNCIL puts the 5:00 summons on every screen. Admin
    records the **Continuity Order** by clicking sectors in rank order; it
    confirms ("This decision cannot be recalled."), ranks 5 and 6 enter
    BROWNOUT, the wall announces CONTINUITY ORDER ACCEPTED. No order at 00:00
    → NO CONTINUITY ORDER RECEIVED and a one-click **rolling blackout**, which
    rotates brownout through the city until Admin ends it.
-6. **Pressure.** Quick actions (TRIGGER FAULT · CORE −10% · INJURE WORKER ·
+7. **Pressure.** Quick actions (TRIGGER FAULT · CORE −10% · INJURE WORKER ·
    CALL COUNCIL · BROWNOUT · ANNOUNCEMENT · ALERT · PAUSE) are always on
    screen. The pressure dial and configurable **events** (supply delay,
    transport gridlock, false sensor reading, power surge, tunnel collapse,
    communication blackout, biological breach…) each have a visibility:
    `ADMIN_ONLY`, `CITY_WIDE`, `TARGET_SECTOR` or `COMMS_ONLY`.
-7. **Debrief.** Admin → DEBRIEF folds the log into per-round numbers (faults
+8. **Debrief.** Admin → DEBRIEF folds the log into per-round numbers (faults
    resolved, time to first action, average response, failed console entries,
    lockouts, transfers and their timing, critical entries, council decision
    time) and a neutral Round 3 vs Aftershock table that can be put on the
@@ -205,22 +212,28 @@ presets, the round timelines and COM's intelligence items. The status word
 every screen prints (STABLE · DEGRADED · CRITICAL · BROWNOUT · DARK) is
 computed on the server from those thresholds; no client carries a number.
 
-The transfer rules are nine keys, all in the same place:
+The transfer and healing rules are these keys, all in the same place:
 
 | Key | Default | What it does |
 |---|---|---|
+| `trn_approval_limit` | `3` | Transfers Transport may approve per round |
+| `med_healing_limit` | `3` | Workers Medical may heal per round |
 | `transfer_limit_basis` | `round` | Whether Transport's allowance is counted per round or per cycle |
-| `transport_stamp_limit` | `3` | Stamps Transport gets per period |
-| `require_supplier_acceptance` | `true` | Transport sees and stamps only what the supplier accepted |
-| `enforce_supplier_stock` | `true` | Stock is checked on accept and again at the stamp |
+| `require_supplier_acceptance` | `true` | Transport sees only what a supplier fulfilled |
+| `enforce_supplier_stock` | `true` | Stock is checked on fulfil and again at approval |
 | `insufficient_stock_behavior` | `refuse` | `legacy_partial_if_supported` restores the old part-delivery |
-| `expire_pending_transfers_on_round_change` | `true` | Unstamped chits die at the round boundary |
-| `require_physical_transfer_chit` | `true` | No stamp until Transport confirms the signed paper |
-| `notify_supplier_with_sound` | `true` | An inbound request rings on the supplier's laptop |
-| `show_completed_transfer_on_wall` | `true` | A completed transfer is the only step the wall shows |
+| `expire_pending_requests_on_round_change` | `true` | Unanswered asks die at the round boundary |
+| `expire_pending_transfers_on_round_change` | `true` | Unapproved transfers die at the round boundary |
+| `expire_pending_healing_on_round_change` | `true` | Unhealed requests die at the round boundary |
+| `require_physical_transfer_chit` | `true` | No approval until Transport confirms the signed paper |
+| `allow_facilitator_force_transfer` | `true` | The facilitator may force an approval |
+| `allow_facilitator_force_heal` | `true` | The facilitator may force a heal |
+| `notify_supplier_with_sound` | `true` | Arrivals ring on the supplier, Transport and Medical screens |
+| `show_completed_transfer_on_wall` | `true` | Completions are the only step the wall shows |
 
-Turning the first seven off reproduces the pre-2026-09-16 behaviour exactly.
-`trn_capacity_per_cycle` is still read when the basis is `cycle`.
+`trn_capacity_per_cycle` is still read when the basis is `cycle`. Who may
+approve and who may heal are **not** configurable: Transport and Medical
+respectively, enforced in the intent router and again in the reducer.
 
 **SAVE AS SCENARIO** stores the running configuration in SQLite under a name
 (`HAVEN-9 HARD`, `HAVEN-9 CLIENT TEST`…); a saved copy with a built-in's id

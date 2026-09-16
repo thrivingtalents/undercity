@@ -233,379 +233,577 @@ test('city stability: automatic formula reacts to damage; manual mode holds a nu
   assert.equal(forBigscreen(game).city_stability, 55);
 });
 
-// -- transfers -----------------------------------------------------------------------
+// -- requests, transfers, TRN approval and MED healing --------------------------------
 //
-// The full chain is: the sector that WANTS the resource asks, the sector that
-// HOLDS it accepts, both Liaisons sign the paper chit, Transport confirms the
-// chit is in its hand and stamps. Only the stamp moves stock, and Transport
-// gets three stamps for the whole round.
+// The chain the room walks: a sector ASKS, the supplier FULFILS by raising a
+// transfer, the Liaisons sign the paper, TRANSPORT APPROVES and only then does
+// stock move. Healing is a separate chain that Transport has no part in: any
+// sector asks, and only MEDICAL heals. Three approvals and three heals a round.
 
-/** Request → supplier accepts → Transport confirms the paper chit. */
+const ALL_SIX = ['POW', 'WTR', 'MED', 'TRN', 'AGR', 'COM'];
+
+/** Ask, have the supplier fulfil it, and put the chit in Transport's hand. */
 function readyTransfer(game, { from, to, resource, amount }) {
   const r = game.requestTransfer({ from, to, resource, amount, by: to });
-  assert.equal(r.ok, true);
-  assert.equal(game.acceptTransfer(r.transfer.id, { by: from }).ok, true);
-  assert.equal(game.confirmChit(r.transfer.id, true, { by: 'TRN' }).ok, true);
-  return r.transfer;
+  assert.equal(r.ok, true, 'request refused');
+  const f = game.fulfillRequest(r.request.id, { by: from });
+  assert.equal(f.ok, true, `fulfil refused: ${f.reason}`);
+  assert.equal(game.confirmChit(f.transfer.id, true, { by: 'TRN' }).ok, true);
+  return f.transfer;
 }
 
-test('a transfer moves stock only when TRN stamps it, and only once', () => {
+test('every one of the six sectors can raise a resource request', () => {
   const game = running();
-  const t = readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 2 });
-  assert.equal(t.status, 'AGREED');
-  assert.equal(game.state.sectors.POW.inventory.water, 3, 'nothing moved yet');
-
-  const s = game.stampTransfer(t.id, { by: 'TRN' });
-  assert.equal(s.ok, true);
-  assert.equal(s.transfer.status, 'DELIVERED', 'deliver_on_stamp');
-  assert.equal(game.state.sectors.POW.inventory.water, 5);
-  assert.equal(game.state.sectors.WTR.inventory.water, 1);
-  assert.ok(logEvents(game, 'transfer_stamped')[0].t);
-  assert.equal(game.stampTransfer(t.id).reason, 'already_stamped');
+  for (const code of ALL_SIX) {
+    const supplier = code === 'POW' ? 'WTR' : 'POW';
+    const r = game.requestTransfer({ from: supplier, to: code, resource: 'parts', amount: 1, by: code });
+    assert.equal(r.ok, true, `${code} could not request`);
+    assert.equal(r.request.status, 'REQUESTED');
+    assert.equal(r.request.requester, code);
+    assert.equal(r.request.supplier, supplier);
+    assert.equal(forSector(game, code).requests.some((x) => x.id === r.request.id), true, `${code} cannot see it`);
+  }
+  assert.equal(logEvents(game, 'request_created').length, 6);
 });
 
-test('transport capacity is reduced by brownout and by effects, and admin can force', () => {
+test('every one of the six sectors can raise a resource transfer of its own stock', () => {
   const game = running();
-  const cap = game.cfg.transport_stamp_limit;
-  assert.equal(cap, 3);
-  game.state.sectors.WTR.inventory.water = 10;
-  const ids = [];
-  for (let i = 0; i < cap + 1; i += 1) {
-    ids.push(readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 1 }).id);
+  for (const code of ALL_SIX) {
+    const receiver = code === 'POW' ? 'WTR' : 'POW';
+    const t = game.createTransfer({ from: code, to: receiver, resource: 'parts', amount: 1, by: code });
+    assert.equal(t.ok, true, `${code} could not transfer`);
+    assert.equal(t.transfer.status, 'PENDING_TRN_APPROVAL');
+    assert.equal(t.transfer.created_by, code);
   }
-  for (let i = 0; i < cap; i += 1) assert.equal(game.stampTransfer(ids[i]).ok, true);
-  const refused = game.stampTransfer(ids[cap]);
-  assert.equal(refused.reason, 'capacity');
-  assert.equal(refused.basis, 'round');
-  assert.equal(game.stampTransfer(ids[cap], { force: true }).ok, true, 'facilitator override');
+  // …but only its OWN stock.
+  assert.equal(game.createTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'AGR' }).reason, 'not_supplier');
+  assert.equal(forSector(game, 'TRN').transfer_queue.items.length, 6, 'all six land in the approval queue');
+});
 
+test('a request moves no stock and spends no allowance', () => {
+  const game = running();
+  const before = { pow: game.state.sectors.POW.inventory.power, med: game.state.sectors.MED.inventory.power };
+  game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
+  assert.equal(game.state.sectors.POW.inventory.power, before.pow);
+  assert.equal(game.state.sectors.MED.inventory.power, before.med);
+  assert.equal(game.stampsUsed(), 0);
+  assert.equal(forSector(game, 'TRN').transfer_queue.items.length, 0, 'a request is not Transport business');
+});
+
+test('creating a transfer moves no stock and spends no allowance', () => {
+  const game = running();
+  const before = game.state.sectors.POW.inventory.power;
+  game.createTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'POW' });
+  assert.equal(game.state.sectors.POW.inventory.power, before);
+  assert.equal(game.stampsUsed(), 0);
+});
+
+test('the supplier can decline a request, and only the supplier can', () => {
+  const game = running();
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
+  assert.equal(game.declineRequest(r.request.id, { by: 'MED' }).reason, 'not_supplier');
+  assert.equal(game.declineRequest(r.request.id, { by: 'WTR' }).reason, 'not_supplier');
+  const d = game.declineRequest(r.request.id, { by: 'POW' });
+  assert.equal(d.ok, true);
+  assert.equal(d.request.status, 'DECLINED_BY_SUPPLIER');
+  assert.equal(logEvents(game, 'request_declined').length, 1);
+});
+
+test('the supplier fulfils a request by raising a linked transfer, which is not approval', () => {
+  const game = running();
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
+  assert.equal(game.fulfillRequest(r.request.id, { by: 'MED' }).reason, 'not_supplier',
+    'the requester cannot fulfil its own ask');
+
+  const before = game.state.sectors.POW.inventory.power;
+  const f = game.fulfillRequest(r.request.id, { by: 'POW' });
+  assert.equal(f.ok, true);
+  assert.equal(f.request.status, 'TRANSFER_CREATED');
+  assert.equal(f.request.transfer_id, f.transfer.id);
+  assert.equal(f.transfer.request_id, r.request.id);
+  assert.equal(f.transfer.status, 'PENDING_TRN_APPROVAL', 'supplier consent is NOT approval');
+  assert.equal(f.transfer.approved_at, null);
+  assert.equal(game.state.sectors.POW.inventory.power, before, 'fulfilment moves nothing');
+  assert.equal(game.stampsUsed(), 0, 'fulfilment spends no Transport allowance');
+  assert.equal(logEvents(game, 'request_fulfilled').length, 1);
+});
+
+test('a supplier short of stock cannot fulfil', () => {
+  const game = running();
+  game.setInventory('POW', { power: 1 });
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
+  const f = game.fulfillRequest(r.request.id, { by: 'POW' });
+  assert.equal(f.ok, false);
+  assert.equal(f.reason, 'insufficient_stock_accept');
+  assert.equal(game.findRequest(r.request.id).status, 'REQUESTED');
+  assert.equal(game.state.sectors.MED.inventory.power, 3);
+});
+
+test('no sector but Transport can approve a transfer', () => {
+  const game = running();
+  const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 2 });
+  for (const code of ALL_SIX.filter((c) => c !== 'TRN')) {
+    const a = game.approveTransfer(t.id, { by: code });
+    assert.equal(a.ok, false, `${code} approved a transfer`);
+    assert.equal(a.reason, 'approval_trn_only');
+  }
+  assert.equal(game.state.sectors.MED.inventory.power, 3, 'nothing moved');
+  assert.equal(game.stampsUsed(), 0, 'and no allowance was spent');
+  assert.equal(game.approveTransfer(t.id, { by: 'TRN' }).ok, true);
+});
+
+test('only Transport is sent an approval queue, and only Medical a healing queue', () => {
+  const game = running();
+  game.injure('AGR', 1);
+  game.requestHealing('AGR', { by: 'AGR' });
+  readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 });
+  for (const code of ALL_SIX) {
+    const f = forSector(game, code);
+    assert.equal(!!f.transfer_queue, code === 'TRN', `${code} approval queue wrong`);
+    assert.equal(!!f.healing_queue, code === 'MED', `${code} healing queue wrong`);
+  }
+});
+
+test('a successful approval moves the full amount atomically and spends exactly one', () => {
+  const game = running();
+  const before = { pow: game.state.sectors.POW.inventory.power, med: game.state.sectors.MED.inventory.power };
+  const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 2 });
+
+  const a = game.approveTransfer(t.id, { by: 'TRN' });
+  assert.equal(a.ok, true);
+  assert.equal(a.transfer.status, 'DELIVERED');
+  assert.equal(a.transfer.approved_by, 'TRN');
+  assert.equal(game.state.sectors.POW.inventory.power, before.pow - 2);
+  assert.equal(game.state.sectors.MED.inventory.power, before.med + 2);
+  assert.equal(a.transfer.moved, 2);
+  assert.equal(game.stampsUsed(), 1);
+  assert.equal(a.transfer.round_approved, 'R2');
+
+  const log = logEvents(game, 'transfer_approved')[0];
+  assert.equal(log.moved, 2);
+  assert.equal(log.used_after, 1);
+  assert.equal(log.facilitator_override, false);
+  assert.ok(log.t && log.round);
+});
+
+test('a failed approval moves zero and spends no allowance', () => {
+  const game = running();
+  const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 3 });
+  game.setInventory('POW', { power: 2 });
+
+  const a = game.approveTransfer(t.id, { by: 'TRN' });
+  assert.equal(a.ok, false);
+  assert.equal(a.reason, 'insufficient_stock_stamp');
+  assert.equal(game.state.sectors.POW.inventory.power, 2, 'zero moved, not two');
+  assert.equal(game.state.sectors.MED.inventory.power, 3);
+  assert.equal(game.stampsUsed(), 0);
+  assert.equal(game.findTransfer(t.id).status, 'PENDING_TRN_APPROVAL', 'still waiting');
+
+  // The old part-delivery is still available as configuration.
+  game.patchConfig({ insufficient_stock_behavior: 'legacy_partial_if_supported' });
+  assert.equal(game.approveTransfer(t.id, { by: 'TRN' }).ok, true);
+  assert.equal(game.state.sectors.POW.inventory.power, 0);
+  assert.equal(game.state.sectors.MED.inventory.power, 5, 'two moved, not three');
+});
+
+test('Transport approves only three transfers in a round by default', () => {
+  const game = running();
+  game.setInventory('POW', { power: 10 });
+  const ids = [];
+  for (let i = 0; i < 4; i += 1) ids.push(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
+  for (let i = 0; i < 3; i += 1) assert.equal(game.approveTransfer(ids[i], { by: 'TRN' }).ok, true);
+  assert.equal(game.stampsUsed(), 3);
+
+  const fourth = game.approveTransfer(ids[3], { by: 'TRN' });
+  assert.equal(fourth.ok, false);
+  assert.equal(fourth.reason, 'capacity');
+  assert.equal(fourth.capacity, 3);
+  assert.equal(game.findTransfer(ids[3]).status, 'PENDING_TRN_APPROVAL', 'it just waits');
+  assert.equal(game.stampsUsed(), 3, 'the refusal cost nothing');
+});
+
+test('a cycle change does not restore Transport approvals', () => {
+  const game = running();
+  game.setInventory('POW', { power: 10 });
+  for (let i = 0; i < 2; i += 1) {
+    game.approveTransfer(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id, { by: 'TRN' });
+  }
+  const cycle = game.state.cycle.number;
+  game.cycleControl('process');
+  assert.equal(game.state.cycle.number, cycle + 1, 'the cycle really turned over');
+  assert.equal(game.stampsUsed(), 2, 'a cycle boundary hands Transport nothing back');
+  assert.equal(forSector(game, 'TRN').transfer_queue.remaining, 1);
+});
+
+test('a round change resets Transport approvals to zero', () => {
+  const game = running();
+  game.setInventory('POW', { power: 10 });
+  for (let i = 0; i < 3; i += 1) {
+    game.approveTransfer(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id, { by: 'TRN' });
+  }
+  assert.equal(game.stampsUsed(), 3);
+  game.setRound('R3');
+  assert.equal(game.stampsUsed(), 0);
+  assert.equal(forSector(game, 'TRN').transfer_queue.remaining, 3);
+  assert.ok(logEvents(game, 'trn_approval_counter_reset').some((e) => e.by === 'round_change'));
+});
+
+test('Transport can decline a transfer, and that costs no allowance', () => {
+  const game = running();
+  const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 2 });
+  assert.equal(game.declineTransfer(t.id, { by: 'AGR' }).reason, 'approval_trn_only');
+  const d = game.declineTransfer(t.id, { by: 'TRN' });
+  assert.equal(d.ok, true);
+  assert.equal(d.transfer.status, 'DECLINED_BY_TRN');
+  assert.equal(game.stampsUsed(), 0);
+  assert.equal(game.state.sectors.MED.inventory.power, 3);
+  assert.equal(forSector(game, 'TRN').transfer_queue.items.length, 0);
+});
+
+test('no approval until Transport confirms the physical chit', () => {
+  const game = running();
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
+  const f = game.fulfillRequest(r.request.id, { by: 'POW' });
+
+  const early = game.approveTransfer(f.transfer.id, { by: 'TRN' });
+  assert.equal(early.ok, false);
+  assert.equal(early.reason, 'chit_required');
+  assert.equal(game.stampsUsed(), 0);
+
+  game.confirmChit(f.transfer.id, true, { by: 'TRN' });
+  assert.equal(game.approveTransfer(f.transfer.id, { by: 'TRN' }).ok, true);
+  assert.equal(logEvents(game, 'transfer_chit')[0].confirmed, true);
+});
+
+test('unfinished requests, transfers and healing all expire at a round change; finished ones do not', () => {
+  const game = running();
+  const delivered = readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 1 });
+  game.approveTransfer(delivered.id, { by: 'TRN' });
+  const openRequest = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' });
+  const openTransfer = game.createTransfer({ from: 'AGR', to: 'MED', resource: 'parts', amount: 1, by: 'AGR' });
+  game.injure('COM', 1);
+  const openHeal = game.requestHealing('COM', { by: 'COM' });
+  game.injure('WTR', 1);
+  const healed = game.requestHealing('WTR', { by: 'WTR' });
+  game.healWorker(healed.healing.id, { by: 'MED' });
+
+  game.setRound('R3');
+  assert.equal(game.findRequest(openRequest.request.id).status, 'EXPIRED');
+  assert.equal(game.findTransfer(openTransfer.transfer.id).status, 'EXPIRED');
+  assert.equal(game.findHealing(openHeal.healing.id).status, 'EXPIRED');
+  assert.equal(game.findTransfer(delivered.id).status, 'DELIVERED', 'history is not rewritten');
+  assert.equal(game.findHealing(healed.healing.id).status, 'HEALED');
+  assert.equal(game.state.sectors.WTR.workforce.injured, 0, 'a healed worker stays healed');
+  assert.equal(forSector(game, 'TRN').transfer_queue.items.length, 0);
+  assert.equal(forSector(game, 'MED').healing_queue.items.length, 0);
+
+  // Each collection has its own switch.
+  game.patchConfig({ expire_pending_transfers_on_round_change: false });
+  const survivor = game.createTransfer({ from: 'AGR', to: 'MED', resource: 'parts', amount: 1, by: 'AGR' });
+  game.setRound('R4');
+  assert.equal(game.findTransfer(survivor.transfer.id).status, 'PENDING_TRN_APPROVAL');
+});
+
+test('the facilitator can force an approval, and it is flagged as an override', () => {
+  const game = running();
+  game.setInventory('POW', { power: 10 });
+  for (let i = 0; i < 3; i += 1) {
+    game.approveTransfer(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id, { by: 'TRN' });
+  }
+  // Neither chit-confirmed nor within the allowance.
+  const t = game.createTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'POW' });
+  assert.equal(game.approveTransfer(t.transfer.id, { by: 'TRN' }).ok, false);
+
+  const forced = game.approveTransfer(t.transfer.id, { by: 'facilitator', force: true });
+  assert.equal(forced.ok, true);
+  assert.equal(forced.transfer.facilitator_override, true);
+  assert.equal(logEvents(game, 'transfer_approved').at(-1).facilitator_override, true);
+  assert.equal(logEvents(game, 'facilitator_force_transfer').length, 1);
+
+  // The override is not a licence to invent stock.
+  game.setInventory('POW', { power: 0 });
+  const empty = game.createTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'POW' });
+  assert.equal(game.approveTransfer(empty.transfer.id, { force: true }).reason, 'insufficient_stock_stamp');
+});
+
+test('the facilitator can reset the approval allowance by hand, and it is logged', () => {
+  const game = running();
+  game.setInventory('POW', { power: 10 });
+  for (let i = 0; i < 3; i += 1) {
+    game.approveTransfer(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id, { by: 'TRN' });
+  }
+  assert.equal(game.resetStamps('all', { by: 'facilitator' }).ok, true);
+  assert.equal(game.stampsUsed(), 0);
+  assert.equal(forControl(game).transfer_capacity.remaining, 3);
+  assert.ok(logEvents(game, 'trn_approval_counter_reset').some((e) => e.by === 'facilitator'));
+});
+
+test('Transport capacity still bends to brownout and to temporary effects', () => {
+  const game = running();
+  assert.equal(game.trnCapacity(), 3);
   game.setStatus('TRN', 'BROWNOUT');
   assert.equal(game.trnCapacity(), game.cfg.brownout_effects.per_sector.TRN.transfer_capacity);
   game.setStatus('TRN', 'ACTIVE');
   game.fireEvent('transport_gridlock');
   assert.equal(game.trnCapacity(), 0);
   game.tick(181000);
-  assert.equal(game.trnCapacity(), cap, 'the effect expires');
+  assert.equal(game.trnCapacity(), 3, 'the effect expires');
 });
 
 test('a worker loan moves people and is tracked as loaned/borrowed', () => {
   const game = running();
   const t = readyTransfer(game, { from: 'AGR', to: 'MED', resource: 'workers', amount: 2 });
-  game.stampTransfer(t.id);
+  game.approveTransfer(t.id, { by: 'TRN' });
   assert.equal(game.state.sectors.AGR.workforce.active, 6);
   assert.equal(game.state.sectors.AGR.workforce.loaned, 2);
   assert.equal(game.state.sectors.MED.workforce.active, 10);
   assert.equal(forSector(game, 'AGR').sectors.AGR.workforce.total, 8);
 });
 
-test('the TRN screen sees the accepted queue and its allowance; other sectors only their own transfers', () => {
+test('a sector sees only its own paperwork', () => {
   const game = running();
-  readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 2 });
-  game.requestTransfer({ from: 'AGR', to: 'MED', resource: 'med', amount: 1, by: 'MED' });
-  const trn = forSector(game, 'TRN');
-  assert.equal(trn.transfer_queue.items.length, 1, 'the unaccepted one is not Transport business yet');
-  assert.equal(trn.transfer_queue.awaiting_acceptance, 1);
-  assert.equal(trn.transfer_queue.capacity, game.cfg.transport_stamp_limit);
-  assert.equal(trn.transfer_queue.remaining, 3);
-  assert.equal(trn.transfer_queue.basis, 'round');
-  assert.equal(trn.transfer_queue.requires_chit, true);
-  assert.equal(forSector(game, 'POW').transfers.length, 1);
-  assert.equal(forSector(game, 'COM').transfer_queue, undefined);
-  assert.equal(forSector(game, 'COM').transfers.length, 0);
+  game.requestTransfer({ from: 'WTR', to: 'POW', resource: 'water', amount: 2, by: 'POW' });
+  game.createTransfer({ from: 'AGR', to: 'COM', resource: 'parts', amount: 1, by: 'AGR' });
+  assert.equal(forSector(game, 'POW').requests.length, 1);
+  assert.equal(forSector(game, 'POW').transfers.length, 0);
+  assert.equal(forSector(game, 'MED').requests.length, 0);
+  assert.equal(forSector(game, 'MED').transfers.length, 0);
+  assert.equal(forSector(game, 'COM').transfers.length, 1);
 });
 
-// -- transfers: the adjustment spec ---------------------------------------------------
+// -- healing ---------------------------------------------------------------------------
 
-test('supplier_only_can_accept: the requester cannot approve its own request', () => {
+test('any sector with an injured worker can ask, and the target is always Medical', () => {
   const game = running();
-  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
-  const mine = game.acceptTransfer(r.transfer.id, { by: 'MED' });
-  assert.equal(mine.ok, false);
-  assert.equal(mine.reason, 'not_supplier');
-  assert.equal(mine.supplier, 'POW');
-  assert.equal(game.findTransfer(r.transfer.id).status, 'REQUESTED');
-  // A third table cannot answer for the supplier either.
-  assert.equal(game.acceptTransfer(r.transfer.id, { by: 'WTR' }).reason, 'not_supplier');
-  assert.equal(game.declineTransfer(r.transfer.id, { by: 'MED' }).reason, 'not_supplier');
+  for (const code of ALL_SIX) {
+    game.injure(code, 1);
+    const h = game.requestHealing(code, { by: code });
+    assert.equal(h.ok, true, `${code} could not ask`);
+    assert.equal(h.healing.target_sector, 'MED', `${code} aimed elsewhere`);
+    assert.equal(h.healing.sector, code);
+    assert.ok(h.healing.worker_id && h.healing.worker_label);
+  }
+  assert.equal(forSector(game, 'MED').healing_queue.items.length, 6);
+  assert.equal(logEvents(game, 'heal_requested').length, 6);
+  // There is no target to choose: the reducer takes a sector, never a target.
+  assert.equal(logEvents(game, 'heal_requested').every((e) => e.target === 'MED'), true);
 });
 
-test('supplier_can_accept_when_stock_sufficient: it reaches the Transport queue', () => {
+test('a healthy sector cannot put a worker forward, and nor can it ask twice for one worker', () => {
   const game = running();
-  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
-  assert.equal(forSector(game, 'TRN').transfer_queue.items.length, 0, 'not yet Transport business');
+  assert.equal(game.state.sectors.AGR.workforce.injured, 0);
+  const none = game.requestHealing('AGR', { by: 'AGR' });
+  assert.equal(none.ok, false);
+  assert.equal(none.reason, 'worker_not_injured');
 
-  const a = game.acceptTransfer(r.transfer.id, { by: 'POW' });
-  assert.equal(a.ok, true);
-  assert.equal(a.transfer.status, 'AGREED');
-  assert.ok(a.transfer.agreed_at);
-  assert.equal(a.transfer.accepted_by, 'POW');
-  const queue = forSector(game, 'TRN').transfer_queue;
-  assert.equal(queue.items.length, 1);
-  assert.equal(queue.items[0].id, r.transfer.id);
-  assert.equal(queue.items[0].supplier_ok, true);
-  assert.equal(logEvents(game, 'transfer_accepted').length, 1);
+  game.injure('AGR', 1);
+  assert.equal(game.requestHealing('AGR', { by: 'AGR' }).ok, true);
+  const twice = game.requestHealing('AGR', { by: 'AGR' });
+  assert.equal(twice.ok, false, 'one injured worker, one request');
+  assert.equal(twice.reason, 'worker_not_injured');
+  // A sector cannot ask on another sector's behalf.
+  game.injure('COM', 1);
+  assert.equal(game.requestHealing('COM', { by: 'AGR' }).reason, 'not_own_sector');
 });
 
-test('accept_refused_when_supplier_short: no stock moves and it stays REQUESTED', () => {
+test('no sector but Medical can heal', () => {
   const game = running();
-  game.state.sectors.POW.inventory.power = 1;
-  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
-  const a = game.acceptTransfer(r.transfer.id, { by: 'POW' });
-  assert.equal(a.ok, false);
-  assert.equal(a.reason, 'insufficient_stock_accept');
-  assert.equal(a.have, 1);
-  assert.equal(a.need, 2);
-  assert.equal(game.findTransfer(r.transfer.id).status, 'REQUESTED');
-  assert.equal(game.state.sectors.POW.inventory.power, 1);
-  assert.equal(game.state.sectors.MED.inventory.power, 3);
-  assert.equal(logEvents(game, 'transfer_accept_refused').length, 1);
+  game.injure('AGR', 1);
+  const h = game.requestHealing('AGR', { by: 'AGR' });
+  for (const code of ALL_SIX.filter((c) => c !== 'MED')) {
+    const r = game.healWorker(h.healing.id, { by: code });
+    assert.equal(r.ok, false, `${code} healed a worker`);
+    assert.equal(r.reason, 'heal_med_only');
+  }
+  assert.equal(game.state.sectors.AGR.workforce.injured, 1, 'still injured');
+  assert.equal(game.medHealsUsed(), 0, 'and no capacity was spent');
 });
 
-test('transport_cannot_stamp_unaccepted: refused, nothing moves, no allowance spent', () => {
+test('Medical heals an injured worker, spending exactly one heal', () => {
   const game = running();
-  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
-  game.confirmChit(r.transfer.id, true, { by: 'TRN' });
-  const s = game.stampTransfer(r.transfer.id, { by: 'TRN' });
-  assert.equal(s.ok, false);
-  assert.equal(s.reason, 'not_accepted');
-  assert.equal(game.state.sectors.POW.inventory.power, 3);
-  assert.equal(game.state.sectors.MED.inventory.power, 3);
-  assert.equal(game.stampsUsed(), 0, 'a refusal costs no allowance');
-  assert.equal(logEvents(game, 'transfer_refused')[0].reason, 'not_accepted');
+  game.injure('COM', 1);
+  const before = { injured: game.state.sectors.COM.workforce.injured, active: game.state.sectors.COM.workforce.active };
+  const h = game.requestHealing('COM', { by: 'COM' });
+
+  const done = game.healWorker(h.healing.id, { by: 'MED' });
+  assert.equal(done.ok, true);
+  assert.equal(done.healing.status, 'HEALED');
+  assert.equal(done.healing.healed_by, 'MED');
+  assert.equal(game.state.sectors.COM.workforce.injured, before.injured - 1);
+  assert.equal(game.state.sectors.COM.workforce.active, before.active + 1);
+  assert.equal(game.medHealsUsed(), 1);
+  const log = logEvents(game, 'worker_healed')[0];
+  assert.equal(log.sector, 'COM');
+  assert.equal(log.used_after, 1);
+  assert.ok(log.t && log.round);
 });
 
-test('transport_queue_hides_unaccepted: only the accepted transfer is shown', () => {
+test('a failed heal spends no capacity', () => {
   const game = running();
-  const open = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' });
-  const done = game.requestTransfer({ from: 'WTR', to: 'MED', resource: 'water', amount: 1, by: 'MED' });
-  game.acceptTransfer(done.transfer.id, { by: 'WTR' });
-
-  const queue = forSector(game, 'TRN').transfer_queue;
-  assert.equal(queue.items.length, 1);
-  assert.equal(queue.items[0].id, done.transfer.id);
-  assert.ok(!queue.items.some((t) => t.id === open.transfer.id));
-  assert.equal(queue.awaiting_acceptance, 1, 'Transport is told one is still waiting, not what it is');
-  // Turning the rule off restores the original behaviour.
-  game.patchConfig({ require_supplier_acceptance: false });
-  assert.equal(forSector(game, 'TRN').transfer_queue.items.length, 2);
+  game.injure('AGR', 1);
+  const h = game.requestHealing('AGR', { by: 'AGR' });
+  // The facilitator gets there first, through the existing recover path.
+  game.recover('AGR', 1);
+  const late = game.healWorker(h.healing.id, { by: 'MED' });
+  assert.equal(late.ok, false);
+  assert.equal(late.reason, 'worker_not_injured');
+  assert.equal(game.medHealsUsed(), 0);
+  assert.equal(logEvents(game, 'heal_refused').length, 1);
 });
 
-test('round_capacity_is_three: the fourth normal stamp in a round is refused', () => {
+test('Medical heals only three a round by default', () => {
   const game = running();
-  game.state.sectors.POW.inventory.power = 10;
   const ids = [];
-  for (let i = 0; i < 4; i += 1) {
-    ids.push(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
+  for (const code of ['POW', 'WTR', 'AGR', 'COM']) {
+    game.injure(code, 1);
+    ids.push(game.requestHealing(code, { by: code }).healing.id);
   }
-  for (let i = 0; i < 3; i += 1) assert.equal(game.stampTransfer(ids[i]).ok, true);
-  assert.equal(game.stampsUsed(), 3);
-  const fourth = game.stampTransfer(ids[3]);
+  for (let i = 0; i < 3; i += 1) assert.equal(game.healWorker(ids[i], { by: 'MED' }).ok, true);
+  assert.equal(game.medHealsUsed(), 3);
+
+  const fourth = game.healWorker(ids[3], { by: 'MED' });
   assert.equal(fourth.ok, false);
-  assert.equal(fourth.reason, 'capacity');
+  assert.equal(fourth.reason, 'med_capacity');
   assert.equal(fourth.capacity, 3);
-  assert.equal(fourth.used, 3);
+  assert.equal(game.state.sectors.COM.workforce.injured, 1, 'the fourth is still hurt');
+  assert.equal(game.medHealsUsed(), 3, 'the refusal cost nothing');
+  assert.equal(forSector(game, 'MED').healing_queue.remaining, 0);
 });
 
-test('cycle_does_not_reset_round_capacity: 2 of 3 stays 2 of 3 across a cycle', () => {
+test('a cycle change does not restore healing capacity; a round change does', () => {
   const game = running();
-  game.state.sectors.POW.inventory.power = 10;
-  for (let i = 0; i < 2; i += 1) {
-    game.stampTransfer(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
+  // Keep the cycle's own MED recovery out of it — this is about the counter.
+  game.patchConfig({ injured_recovery_per_cycle: 0 });
+  for (const code of ['POW', 'WTR']) {
+    game.injure(code, 1);
+    game.healWorker(game.requestHealing(code, { by: code }).healing.id, { by: 'MED' });
   }
-  assert.equal(game.stampsUsed(), 2);
+  assert.equal(game.medHealsUsed(), 2);
 
-  const cycle = game.state.cycle.number;
   game.cycleControl('process');
-  assert.equal(game.state.cycle.number, cycle + 1, 'the cycle really did turn over');
-  assert.equal(game.stampsUsed(), 2, 'a cycle boundary hands Transport nothing back');
-  assert.equal(game.state.cycle.stamped, 0, 'the cycle counter itself is cleared');
-  assert.equal(forSector(game, 'TRN').transfer_queue.remaining, 1);
-});
-
-test('round_resets_capacity: 3 of 3 becomes 0 of 3 in the next round', () => {
-  const game = running();
-  game.state.sectors.POW.inventory.power = 10;
-  for (let i = 0; i < 3; i += 1) {
-    game.stampTransfer(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
-  }
-  assert.equal(game.stampsUsed(), 3);
-  game.setRound('R3');
-  assert.equal(game.stampsUsed(), 0);
-  assert.equal(forSector(game, 'TRN').transfer_queue.remaining, 3);
-  assert.equal(logEvents(game, 'transport_stamp_counter_reset').some((e) => e.by === 'round_change'), true);
-});
-
-test('pending_requests_expire_on_round_change, and delivered ones are left alone', () => {
-  const game = running();
-  const delivered = readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 1 });
-  game.stampTransfer(delivered.id);
-  const pending = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' });
-  const accepted = readyTransfer(game, { from: 'AGR', to: 'MED', resource: 'parts', amount: 1 });
+  assert.equal(game.medHealsUsed(), 2, 'a cycle boundary hands Medical nothing back');
+  assert.equal(forSector(game, 'MED').healing_queue.remaining, 1);
 
   game.setRound('R3');
-  assert.equal(game.findTransfer(pending.transfer.id).status, 'EXPIRED');
-  assert.equal(game.findTransfer(accepted.id).status, 'EXPIRED');
-  assert.ok(game.findTransfer(pending.transfer.id).expired_at);
-  assert.equal(game.findTransfer(delivered.id).status, 'DELIVERED', 'history is not rewritten');
-  assert.equal(forSector(game, 'TRN').transfer_queue.items.length, 0, 'removed from the active queue');
-  assert.equal(logEvents(game, 'transfer_expired').length, 2);
-  assert.equal(game.stampTransfer(accepted.id).reason, 'expired');
-
-  // The behaviour is configurable.
-  game.patchConfig({ expire_pending_transfers_on_round_change: false });
-  const survivor = readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 1 });
-  game.setRound('R4');
-  assert.equal(game.findTransfer(survivor.id).status, 'AGREED');
+  assert.equal(game.medHealsUsed(), 0);
+  assert.equal(forSector(game, 'MED').healing_queue.remaining, 3);
+  assert.ok(logEvents(game, 'med_healing_counter_reset').some((e) => e.by === 'round_change'));
 });
 
-test('stock_rechecked_at_stamp: accepted while flush, refused once the shelf is bare', () => {
+test('Medical can decline a healing request, and that costs no capacity', () => {
   const game = running();
-  const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 2 });
-  game.setInventory('POW', { power: 1 });          // spent on a repair after accepting
-
-  const s = game.stampTransfer(t.id, { by: 'TRN' });
-  assert.equal(s.ok, false);
-  assert.equal(s.reason, 'insufficient_stock_stamp');
-  assert.equal(s.have, 1);
-  assert.equal(s.need, 2);
-  assert.equal(game.state.sectors.POW.inventory.power, 1, 'zero moved');
-  assert.equal(game.state.sectors.MED.inventory.power, 3);
-  assert.equal(game.stampsUsed(), 0, 'a refusal costs no allowance');
+  game.injure('AGR', 1);
+  const h = game.requestHealing('AGR', { by: 'AGR' });
+  assert.equal(game.declineHealing(h.healing.id, { by: 'AGR' }).reason, 'heal_med_only');
+  const d = game.declineHealing(h.healing.id, { by: 'MED' });
+  assert.equal(d.ok, true);
+  assert.equal(d.healing.status, 'DECLINED_BY_MED');
+  assert.equal(game.medHealsUsed(), 0);
+  assert.equal(game.state.sectors.AGR.workforce.injured, 1);
+  assert.equal(forSector(game, 'MED').healing_queue.items.length, 0);
 });
 
-test('no_partial_delivery: 3 requested with 2 in stock moves 0, not 2', () => {
+test('Medical may ask for healing for its own injured worker, and heal it', () => {
   const game = running();
-  game.setInventory('POW', { power: 3 });
-  const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 3 });
-  game.setInventory('POW', { power: 2 });
-
-  assert.equal(game.stampTransfer(t.id).ok, false);
-  assert.equal(game.state.sectors.POW.inventory.power, 2);
-  assert.equal(game.state.sectors.MED.inventory.power, 3);
-  assert.equal(game.findTransfer(t.id).status, 'AGREED', 'still open, still unstamped');
-
-  // The old part-delivery is still available as configuration.
-  game.patchConfig({ insufficient_stock_behavior: 'legacy_partial_if_supported' });
-  assert.equal(game.stampTransfer(t.id).ok, true);
-  assert.equal(game.state.sectors.POW.inventory.power, 0);
-  assert.equal(game.state.sectors.MED.inventory.power, 5, 'two moved, not three');
+  game.injure('MED', 1);
+  const h = game.requestHealing('MED', { by: 'MED' });
+  assert.equal(h.ok, true);
+  assert.equal(h.healing.sector, 'MED');
+  assert.equal(h.healing.target_sector, 'MED');
+  assert.equal(game.healWorker(h.healing.id, { by: 'MED' }).ok, true);
+  assert.equal(game.state.sectors.MED.workforce.injured, 0);
+  const log = logEvents(game, 'worker_healed')[0];
+  assert.equal(log.sector, 'MED', 'the requester is recorded');
+  assert.equal(log.healed_by, 'MED', 'and so is the healer');
 });
 
-test('physical_chit_required: no stamp until Transport confirms the paper', () => {
+test('the facilitator can force a heal and reset the healing allowance, both logged', () => {
   const game = running();
-  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
-  game.acceptTransfer(r.transfer.id, { by: 'POW' });
-
-  const early = game.stampTransfer(r.transfer.id, { by: 'TRN' });
-  assert.equal(early.ok, false);
-  assert.equal(early.reason, 'chit_required');
-  assert.equal(game.stampsUsed(), 0);
-
-  game.confirmChit(r.transfer.id, true, { by: 'TRN' });
-  assert.equal(game.stampTransfer(r.transfer.id, { by: 'TRN' }).ok, true);
-  assert.equal(logEvents(game, 'transfer_chit')[0].confirmed, true);
-
-  // Off, the chit is a formality the software stops checking.
-  game.patchConfig({ require_physical_transfer_chit: false });
-  const next = readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 1 });
-  game.confirmChit(next.id, false, { by: 'TRN' });
-  assert.equal(game.stampTransfer(next.id).ok, true);
-});
-
-test('successful_atomic_delivery: exactly two move, one stamp is spent, the log is complete', () => {
-  const game = running();
-  const before = { pow: game.state.sectors.POW.inventory.power, med: game.state.sectors.MED.inventory.power };
-  const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 2 });
-
-  const s = game.stampTransfer(t.id, { by: 'TRN' });
-  assert.equal(s.ok, true);
-  assert.equal(s.transfer.status, 'DELIVERED');
-  assert.equal(game.state.sectors.POW.inventory.power, before.pow - 2);
-  assert.equal(game.state.sectors.MED.inventory.power, before.med + 2);
-  assert.equal(s.transfer.moved, 2);
-  assert.equal(game.stampsUsed(), 1);
-  assert.equal(s.transfer.round_stamped, 'R2');
-  assert.equal(s.transfer.stamped_by, 'TRN');
-
-  const stamped = logEvents(game, 'transfer_stamped')[0];
-  assert.equal(stamped.moved, 2);
-  assert.equal(stamped.basis, 'round');
-  assert.equal(stamped.used_after, 1);
-  assert.equal(stamped.chit_confirmed, true);
-  assert.equal(stamped.facilitator_override, false);
-  assert.ok(stamped.t && stamped.round, 'every line carries its timestamp and round');
-  assert.equal(logEvents(game, 'transfer_requested').length, 1);
-  assert.equal(logEvents(game, 'transfer_accepted').length, 1);
-
-  const stats = analyse(game.log.readAll(), { runId: 'test-run' }).rounds.R2.transfers;
-  assert.equal(stats.requested, 1);
-  assert.equal(stats.accepted, 1);
-  assert.equal(stats.stamped, 1);
-  assert.equal(stats.delivered, 1);
-});
-
-test('facilitator_force_stamp_logged: the override lifts the rules and says so', () => {
-  const game = running();
-  // Neither accepted nor chit-confirmed, and the allowance is already gone.
-  game.state.sectors.POW.inventory.power = 10;
-  for (let i = 0; i < 3; i += 1) {
-    game.stampTransfer(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
+  for (const code of ['POW', 'WTR', 'AGR']) {
+    game.injure(code, 1);
+    game.healWorker(game.requestHealing(code, { by: code }).healing.id, { by: 'MED' });
   }
-  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
-  assert.equal(game.stampTransfer(r.transfer.id, { by: 'TRN' }).ok, false);
+  assert.equal(game.medHealsUsed(), 3);
+  game.injure('COM', 1);
+  const h = game.requestHealing('COM', { by: 'COM' });
+  assert.equal(game.healWorker(h.healing.id, { by: 'MED' }).reason, 'med_capacity');
 
-  const forced = game.stampTransfer(r.transfer.id, { by: 'facilitator', force: true });
+  const forced = game.healWorker(h.healing.id, { by: 'facilitator', force: true });
   assert.equal(forced.ok, true);
-  assert.equal(forced.transfer.facilitator_override, true);
-  const stamped = logEvents(game, 'transfer_stamped').at(-1);
-  assert.equal(stamped.facilitator_override, true);
-  assert.equal(stamped.by, 'facilitator');
-  assert.equal(analyse(game.log.readAll(), { runId: 'test-run' }).rounds.R2.transfers.facilitator_overrides, 1);
+  assert.equal(forced.healing.facilitator_override, true);
+  assert.equal(logEvents(game, 'facilitator_force_heal').length, 1);
+  assert.equal(game.state.sectors.COM.workforce.injured, 0);
 
-  // The override is not a licence to invent stock.
-  game.setInventory('POW', { power: 0 });
-  const empty = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
-  assert.equal(game.stampTransfer(empty.transfer.id, { force: true }).reason, 'insufficient_stock_stamp');
+  assert.equal(game.resetHeals({ by: 'facilitator' }).ok, true);
+  assert.equal(game.medHealsUsed(), 0);
+  assert.ok(logEvents(game, 'med_healing_counter_reset').some((e) => e.by === 'facilitator'));
+  assert.equal(forControl(game).healing_capacity.remaining, 3);
 });
 
-test('a sector may withdraw its own ask, but not after the supplier has accepted', () => {
+test('a dark Medical Bay heals nobody, and a dark Transport approves nothing', () => {
   const game = running();
-  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' });
-  const t = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' });
-  assert.equal(game.updateTransfer(r.transfer.id, 'CANCELLED', { by: 'MED' }).ok, true);
-
-  game.acceptTransfer(t.transfer.id, { by: 'POW' });
-  const locked = game.updateTransfer(t.transfer.id, 'CANCELLED', { by: 'MED' });
-  assert.equal(locked.ok, false);
-  assert.equal(locked.reason, 'cancel_locked');
-  assert.equal(game.updateTransfer(t.transfer.id, 'CANCELLED', { by: 'facilitator' }).ok, true);
+  game.setStatus('MED', 'DARK');
+  assert.equal(game.medCapacity(), 0);
+  game.injure('AGR', 1);
+  const h = game.requestHealing('AGR', { by: 'AGR' });
+  assert.equal(game.healWorker(h.healing.id, { by: 'MED' }).reason, 'med_capacity');
+  game.setStatus('TRN', 'DARK');
+  assert.equal(game.trnCapacity(), 0);
 });
 
-test('the facilitator can reset the stamp allowance by hand, and it is logged', () => {
+test('the debrief keeps the whole chain: requests, fulfilment, approvals, heals and overrides', () => {
   const game = running();
-  game.state.sectors.POW.inventory.power = 10;
-  for (let i = 0; i < 3; i += 1) {
-    game.stampTransfer(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
-  }
-  assert.equal(game.stampsUsed(), 3);
-  const reset = game.resetStamps('all', { by: 'facilitator' });
-  assert.equal(reset.ok, true);
-  assert.equal(game.stampsUsed(), 0);
-  assert.equal(forControl(game).transfer_capacity.remaining, 3);
-  assert.ok(logEvents(game, 'transport_stamp_counter_reset').some((e) => e.by === 'facilitator'));
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
+  const f = game.fulfillRequest(r.request.id, { by: 'POW' });
+  game.confirmChit(f.transfer.id, true, { by: 'TRN' });
+  game.approveTransfer(f.transfer.id, { by: 'TRN' });
+  const declined = game.requestTransfer({ from: 'WTR', to: 'MED', resource: 'water', amount: 1, by: 'MED' });
+  game.declineRequest(declined.request.id, { by: 'WTR' });
+  game.injure('AGR', 2);
+  const h1 = game.requestHealing('AGR', { by: 'AGR' });
+  game.healWorker(h1.healing.id, { by: 'MED' });
+  const h2 = game.requestHealing('AGR', { by: 'AGR' });
+  game.declineHealing(h2.healing.id, { by: 'MED' });
+
+  const d = analyse(game.log.readAll(), { runId: 'test-run' }).rounds.R2;
+  assert.equal(d.requests.created, 2);
+  assert.equal(d.requests.fulfilled, 1);
+  assert.equal(d.requests.declined, 1);
+  assert.equal(d.transfers.created, 1);
+  assert.equal(d.transfers.approved, 1);
+  assert.equal(d.transfers.delivered, 1);
+  assert.equal(d.healing.requested, 2);
+  assert.equal(d.healing.healed, 1);
+  assert.equal(d.healing.declined, 1);
+  assert.ok(d.transfers.list.some((x) => x.status === 'DELIVERED'));
+  assert.ok(d.healing.list.some((x) => x.status === 'HEALED'));
 });
 
-test('the allowance basis is configurable back to the original per-cycle behaviour', () => {
+test('a snapshot from the one-array build is split into requests and transfers on restore', () => {
   const game = running();
-  game.patchConfig({ transfer_limit_basis: 'cycle' });
-  game.state.sectors.POW.inventory.power = 10;
-  for (let i = 0; i < 2; i += 1) {
-    game.stampTransfer(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
-  }
-  assert.equal(game.stampBasis(), 'cycle');
-  assert.equal(game.stampsUsed(), 2);
-  game.cycleControl('process');
-  assert.equal(game.stampsUsed(), 0, 'on the cycle basis, a cycle DOES hand the stamps back');
+  const legacy = {
+    state: {
+      ...game.state,
+      requests: undefined,
+      healing: undefined,
+      trn_approvals_used_this_round: undefined,
+      med_heals_used_this_round: undefined,
+      stamps_this_round: 2,
+      transfers: [
+        { id: 'T-1', from: 'POW', to: 'MED', resource: 'power', amount: 2, status: 'REQUESTED', requested_at: new Date().toISOString() },
+        { id: 'T-2', from: 'WTR', to: 'POW', resource: 'water', amount: 1, status: 'AGREED', requested_at: new Date().toISOString() },
+        { id: 'T-3', from: 'AGR', to: 'MED', resource: 'parts', amount: 1, status: 'STAMPED', stamped_at: new Date().toISOString(), requested_at: new Date().toISOString() },
+      ],
+    },
+  };
+  assert.equal(game.restore(legacy), true);
+  assert.equal(game.findRequest('T-1').status, 'REQUESTED');
+  assert.equal(game.findRequest('T-1').supplier, 'POW');
+  assert.equal(game.findTransfer('T-2').status, 'PENDING_TRN_APPROVAL');
+  assert.equal(game.findTransfer('T-3').status, 'APPROVED');
+  assert.equal(game.stampsUsed(), 2, 'the old counter carries over');
+  assert.equal(game.medHealsUsed(), 0);
+  assert.equal(game.state.stamps_this_round, undefined);
 });
 
 // -- council and the Continuity Order ------------------------------------------------
@@ -939,8 +1137,9 @@ test('the debrief folds the log into per-round figures and a Round 3 vs Aftersho
   assert.ok(f301.time_to_first_action_s != null && f301.time_to_resolution_s != null,
     'durations come from real timestamps (game ticks do not move the wall clock)');
   assert.deepEqual(f301.consumed, { parts: 3, water: 2 });
-  assert.equal(r3.transfers.requested, 1);
-  assert.equal(r3.transfers.stamped, 1);
+  assert.equal(r3.requests.created, 1);
+  assert.equal(r3.requests.fulfilled, 1);
+  assert.equal(r3.transfers.approved, 1);
   assert.equal(r3.council.orders, 1);
   assert.equal(r3.council.avg_time_used_s, 120, 'council time used is game time, from the clock');
   assert.equal(r3.sectors.brownouts, 2);
