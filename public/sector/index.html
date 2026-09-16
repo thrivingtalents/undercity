@@ -59,6 +59,7 @@
     <div class="banner banner-alert" id="banner-alert" hidden>
       <b id="banner-alert-title"></b><span id="banner-alert-sub"></span>
     </div>
+    <div class="banner banner-request" id="banner-request" hidden></div>
     <div class="banner banner-council" id="banner-council" hidden>COUNCIL SUMMONED — CHIEF + LIAISON REPORT TO CENTRAL COUNCIL <b class="clock" id="banner-council-clock">05:00</b></div>
     <div class="banner banner-brownout" id="banner-brownout" hidden>⚠ SECTOR BROWNOUT — PRODUCTION REDUCED · OPERATIONS DEGRADED</div>
     <div class="banner banner-breather" id="banner-breather" hidden>BREATHER — SYSTEMS HOLDING</div>
@@ -70,6 +71,14 @@
 
     <!-- LEFT: resources & upkeep -->
     <section class="col col-left">
+      <!-- A request waiting on our answer outranks the reference readouts. -->
+      <div class="panel block inbox-block" id="inbox-panel" hidden>
+        <h2 class="ptitle">INBOUND REQUESTS <span class="count" id="inbox-count">0</span></h2>
+        <div class="inbox" id="inbox"></div>
+        <div class="msg" id="inbox-msg" hidden></div>
+        <div class="declare-note">Accepting only reserves the stock. The chit still needs both Liaison signatures and Transport&#39;s stamp.</div>
+      </div>
+
       <div class="panel block">
         <h2 class="ptitle">RESOURCES</h2>
         <div class="resources" id="resources"></div>
@@ -101,11 +110,8 @@
         <div class="msg" id="transfer-msg" hidden></div>
         <form class="transfer-form" id="transfer-form" autocomplete="off">
           <div class="tf-row">
-            <select id="tf-dir" aria-label="Direction">
-              <option value="out">FROM US →</option>
-              <option value="in">→ TO US FROM</option>
-            </select>
-            <select id="tf-sector" aria-label="Other sector"></select>
+            <span class="tf-label">REQUEST FROM</span>
+            <select id="tf-sector" aria-label="Supplier sector"></select>
           </div>
           <div class="tf-row">
             <select id="tf-res" aria-label="Resource">
@@ -116,10 +122,10 @@
               <option value="workers">👤 WORKERS</option>
             </select>
             <select id="tf-amt" aria-label="Amount"></select>
-            <button type="submit" id="tf-submit">RECORD TRANSFER</button>
+            <button type="submit" id="tf-submit">SEND REQUEST</button>
           </div>
         </form>
-        <div class="declare-note">The signed Transfer Chit and TRN&#39;s stamp remain the real record.</div>
+        <div class="declare-note">The signed Transfer Chit and TRN&#39;s stamp remain the real record. Terms are agreed face to face.</div>
       </div>
     </section>
 

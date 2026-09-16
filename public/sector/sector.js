@@ -34,15 +34,19 @@
   const RES = Object.fromEntries(RESOURCES.map((r) => [r.key, r]));
   RES.workers = { key: 'workers', glyph: '👤', name: 'WORKERS' };
 
+  // AGREED is the engine's ACCEPTED; the screen prints the word participants
+  // were taught, the server keeps the name its logs have always used.
   const TRANSFER_WORD = {
-    REQUESTED: 'REQUESTED', AGREED: 'AGREED', WAITING_TRN: 'WAITING FOR TRANSPORT',
+    REQUESTED: 'REQUESTED', AGREED: 'ACCEPTED', WAITING_TRN: 'WAITING FOR TRANSPORT',
     STAMPED: 'STAMPED', DELIVERED: 'DELIVERED', CANCELLED: 'CANCELLED',
+    DECLINED: 'DECLINED', EXPIRED: 'EXPIRED',
   };
   const OPEN_TRANSFER = new Set(['REQUESTED', 'AGREED', 'WAITING_TRN']);
   const ALERT_FULL_S = 8;
   const WARN_S = 120;
   const DANGER_S = 30;
   const RESULT_BANNER_MS = 9000;
+  const REQUEST_BANNER_MS = 12000;
 
   // -- state ------------------------------------------------------------------
 
@@ -60,6 +64,8 @@
   const cityRows = new Map();  // sector code -> feed row element
   const transferRows = new Map(); // transfer id -> row element
   const queueRows = new Map();    // transfer id -> queue row element
+  const inboxSeen = new Set();    // inbound request ids we have already rung for
+  let requestBannerUntil = 0;     // when the NEW RESOURCE REQUEST banner retires
   let alertSeen = null;       // { id, age, at } — age from the frame + local elapsed
   let resultBanner = null;    // { until }
   let pendingTransferAction = null; // 'transfer' | 'stamp' — routes transfer_result to a panel
@@ -188,7 +194,7 @@
     // Transfer form.
     const amt = $('tf-amt');
     for (let n = 1; n <= 9; n += 1) amt.insertAdjacentHTML('beforeend', `<option value="${n}">${n}</option>`);
-    $('transfer-form').addEventListener('submit', (e) => { e.preventDefault(); recordTransfer(); });
+    $('transfer-form').addEventListener('submit', (e) => { e.preventDefault(); sendRequest(); });
 
     // Console.
     const input = $('code-input');
@@ -258,16 +264,16 @@
     }
   }
 
-  function recordTransfer() {
+  /** We ask another sector for a resource. They decide; Transport carries it. */
+  function sendRequest() {
     if (!mine) return;
-    const other = $('tf-sector').value;
-    const out = $('tf-dir').value === 'out';
-    if (!other) return;
+    const supplier = $('tf-sector').value;
+    if (!supplier) return;
     pendingTransferAction = 'transfer';
     socket.send({
       type: 'transfer_request',
-      from: out ? SECTOR : other,
-      to: out ? other : SECTOR,
+      from: supplier,
+      to: SECTOR,
       resource: $('tf-res').value,
       amount: Number($('tf-amt').value || 1),
     });
@@ -276,6 +282,22 @@
   function updateTransfer(id, status) {
     pendingTransferAction = 'transfer';
     socket.send({ type: 'transfer_update', id, status });
+  }
+
+  function acceptRequest(id) {
+    pendingTransferAction = 'inbox';
+    socket.send({ type: 'transfer_accept', id });
+  }
+
+  function declineRequest(id) {
+    pendingTransferAction = 'inbox';
+    socket.send({ type: 'transfer_decline', id });
+  }
+
+  /** TRN only: the signed paper chit is in our hand. */
+  function confirmChit(id, confirmed) {
+    pendingTransferAction = 'stamp';
+    socket.send({ type: 'transfer_chit', id, confirmed });
   }
 
   function stamp(id) {
@@ -328,8 +350,19 @@
   }
 
   function transferReason(msg) {
+    const res = (RES[msg.resource] || { name: String(msg.resource || '').toUpperCase() }).name;
     switch (msg.reason) {
-      case 'capacity':         return `CAPACITY REACHED THIS CYCLE (${msg.used}/${msg.capacity})`;
+      case 'capacity':
+        return `TRANSPORT HAS USED ALL ${msg.capacity} STAMPS FOR THIS ${String(msg.basis || 'round').toUpperCase()}`;
+      case 'not_supplier':     return `ONLY ${msg.supplier || 'THE SUPPLYING SECTOR'} CAN ACCEPT OR DECLINE THIS REQUEST`;
+      case 'insufficient_stock_accept':
+        return `CANNOT ACCEPT — WE HOLD ${msg.have} ${res}, THE REQUEST IS FOR ${msg.need}`;
+      case 'insufficient_stock_stamp':
+        return `CANNOT STAMP — SUPPLIER NO LONGER HAS ${msg.need} ${res}`;
+      case 'not_accepted':     return 'CANNOT STAMP — THE SUPPLIER HAS NOT ACCEPTED THIS TRANSFER';
+      case 'chit_required':    return 'CANNOT STAMP — PHYSICAL TRANSFER CHIT NOT CONFIRMED';
+      case 'cancel_locked':    return 'ALREADY ACCEPTED — ASK THE FACILITATOR TO CANCEL';
+      case 'expired':          return 'THIS TRANSFER EXPIRED WHEN THE ROUND CHANGED';
       case 'already_stamped':  return 'ALREADY STAMPED';
       case 'transfer_closed':  return 'TRANSFER ALREADY CLOSED';
       case 'unknown_transfer': return 'UNKNOWN TRANSFER';
@@ -341,7 +374,8 @@
   }
 
   function handleTransferResult(msg) {
-    const target = pendingTransferAction === 'stamp' ? 'queue-msg' : 'transfer-msg';
+    const target = pendingTransferAction === 'stamp' ? 'queue-msg'
+      : pendingTransferAction === 'inbox' ? 'inbox-msg' : 'transfer-msg';
     pendingTransferAction = null;
     if (msg.ok) {
       const t = msg.transfer || {};
@@ -363,6 +397,7 @@
     renderModes();
     renderResources();
     renderUpkeep();
+    renderInbox();
     renderTransfers();
     renderFaultList();
     renderCard();
@@ -482,14 +517,83 @@
     $('production-next').classList.toggle('dim', !prodText);
   }
 
+  function sectorLabel(code) {
+    const s = state.sectors && state.sectors[code];
+    return String((s && s.name) || code).toUpperCase();
+  }
+  function resName(key) {
+    return (RES[key] || { name: String(key).toUpperCase() }).name;
+  }
+
+  /** What this transfer is waiting on, said in the words the room uses. */
+  function statusLine(t) {
+    switch (t.status) {
+      case 'REQUESTED':   return `REQUESTED — WAITING FOR ${sectorLabel(t.from)}`;
+      case 'AGREED':      return 'ACCEPTED — WAITING FOR TRANSPORT';
+      case 'WAITING_TRN': return 'WAITING FOR TRANSPORT';
+      case 'DECLINED':    return `DECLINED BY ${sectorLabel(t.from)}`;
+      case 'STAMPED':     return 'STAMPED';
+      case 'DELIVERED':   return 'DELIVERED';
+      case 'CANCELLED':   return 'CANCELLED';
+      case 'EXPIRED':     return `EXPIRED AT END OF ${t.round_created || 'THE ROUND'}`;
+      default:            return TRANSFER_WORD[t.status] || t.status;
+    }
+  }
+
   function transferLine(t) {
-    const res = RES[t.resource] || { glyph: '', name: String(t.resource).toUpperCase() };
-    return `${t.from} → ${t.to} · ${t.amount} ${res.name} · ${TRANSFER_WORD[t.status] || t.status}`;
+    return `${t.from} → ${t.to} · ${t.amount} ${resName(t.resource)} · ${statusLine(t)}`;
+  }
+
+  /**
+   * INBOUND REQUESTS — the supplier's side. Another table has asked us for
+   * stock; only we can say yes. The card shows what we actually hold, so the
+   * answer is a decision and not a guess.
+   */
+  function renderInbox() {
+    const rules = state.transfer_rules || {};
+    const list = (state.transfers || []).filter((t) => t.from === SECTOR && t.status === 'REQUESTED');
+    show($('inbox-panel'), list.length > 0);
+    setText($('inbox-count'), String(list.length));
+
+    const host = $('inbox');
+    const html = list.map((t) => {
+      const have = Number((mine.inventory || {})[t.resource] ?? (t.resource === 'workers' ? (mine.workforce || {}).active : 0)) || 0;
+      const short = rules.enforce_supplier_stock !== false && have < t.amount;
+      return `<div class="inbound${short ? ' short' : ''}" data-id="${esc(t.id)}">
+          <div class="ib-title">NEW RESOURCE REQUEST</div>
+          <div class="ib-msg">${esc(sectorLabel(t.to))} IS REQUESTING <b>${esc(t.amount)} ${esc(resName(t.resource))}</b></div>
+          <div class="ib-stock">CURRENT STOCK: <b>${have} ${esc(resName(t.resource))}</b>${short ? ' — NOT ENOUGH TO ACCEPT' : ''}</div>
+          <div class="ib-btns">
+            <button type="button" class="primary" data-accept="${esc(t.id)}"${short ? ' disabled' : ''}>ACCEPT</button>
+            <button type="button" class="ghost" data-decline="${esc(t.id)}">DECLINE</button>
+          </div>
+        </div>`;
+    }).join('');
+    if (host.dataset.sig !== html) {
+      host.dataset.sig = html;
+      host.innerHTML = html;
+      for (const b of host.querySelectorAll('[data-accept]')) b.addEventListener('click', () => acceptRequest(b.dataset.accept));
+      for (const b of host.querySelectorAll('[data-decline]')) b.addEventListener('click', () => declineRequest(b.dataset.decline));
+    }
+
+    // Ring and banner once, when a request first lands on this screen.
+    const fresh = list.filter((t) => !inboxSeen.has(t.id));
+    for (const t of list) inboxSeen.add(t.id);
+    for (const id of [...inboxSeen]) if (!list.some((t) => t.id === id)) inboxSeen.delete(id);
+    if (fresh.length) {
+      const t = fresh[0];
+      setText($('banner-request'), `NEW RESOURCE REQUEST — ${sectorLabel(t.to)} REQUESTS ${t.amount} ${resName(t.resource)}`);
+      show($('banner-request'), true);
+      requestBannerUntil = performance.now() + REQUEST_BANNER_MS;
+      if (rules.notify_supplier_with_sound !== false) U.playSting('chime');
+    }
+    if (!list.length) { show($('banner-request'), false); requestBannerUntil = 0; }
   }
 
   function renderTransfers() {
     const host = $('transfers');
-    const list = state.transfers || [];
+    // Requests waiting on us are the inbox's business, not this ledger's.
+    const list = (state.transfers || []).filter((t) => !(t.from === SECTOR && t.status === 'REQUESTED'));
     const seen = new Set();
     list.forEach((t, i) => {
       seen.add(t.id);
@@ -504,17 +608,18 @@
       if (row.dataset.status !== t.status) {
         row.dataset.status = t.status;
         row.className = `transfer st-${t.status}`;
-        const open = OPEN_TRANSFER.has(t.status);
-        const btns = [];
-        if (open && t.status === 'REQUESTED') btns.push(`<button type="button" data-s="AGREED">AGREED</button>`);
-        if (open && t.status !== 'WAITING_TRN') btns.push(`<button type="button" data-s="WAITING_TRN">SEND TO TRANSPORT</button>`);
-        if (open) btns.push(`<button type="button" class="ghost" data-s="CANCELLED">CANCEL</button>`);
+        // Withdraw our own ask while it is still unanswered; once the supplier
+        // has accepted it belongs to Transport, and only Admin can undo it.
+        const btns = t.status === 'REQUESTED'
+          ? [`<button type="button" class="ghost" data-s="CANCELLED">WITHDRAW</button>`] : [];
         row.innerHTML =
           `<div class="t-line"><span class="t-id">${esc(t.id)}</span> <span class="t-text">${esc(transferLine(t))}</span></div>` +
           (btns.length ? `<div class="t-btns">${btns.join('')}</div>` : '');
         for (const b of row.querySelectorAll('button')) {
           b.addEventListener('click', () => updateTransfer(t.id, b.dataset.s));
         }
+      } else {
+        setText(row.querySelector('.t-text'), transferLine(t));
       }
       if (host.children[i] !== row) host.insertBefore(row, host.children[i] || null);
     });
@@ -525,7 +630,7 @@
     show(empty, list.length === 0);
     if (list.length === 0 && empty.parentNode !== host) host.appendChild(empty);
 
-    // Other-sector select: the five that are not us.
+    // Supplier select: the five sectors that are not us.
     const sel = $('tf-sector');
     const others = Object.keys(state.sectors).filter((c) => c !== SECTOR);
     if (sel.dataset.keys !== others.join(',')) {
@@ -782,12 +887,19 @@
     show($('effects-panel'), list.length > 0);
   }
 
+  /**
+   * TRANSFER QUEUE — Transport only. Accepted chits, the allowance left this
+   * round, and the two gates before a stamp: the paper chit in our hand, and
+   * the supplier still holding the goods.
+   */
   function renderQueue() {
     const q = state.transfer_queue;
     show($('queue-panel'), !!q);
     if (!q) return;
     const full = q.used >= q.capacity;
-    setText($('queue-cap'), `— CAPACITY ${q.used}/${q.capacity} THIS CYCLE`);
+    const left = Math.max(0, (q.remaining !== undefined ? q.remaining : q.capacity - q.used));
+    const period = String(q.basis || 'round').toUpperCase();
+    setText($('queue-cap'), `${q.used}/${q.capacity} USED · ${left} LEFT THIS ${period}`);
     $('queue-cap').classList.toggle('warn', full);
 
     const host = $('queue');
@@ -800,25 +912,47 @@
         row.className = 'q-row';
         row.innerHTML =
           `<span class="q-n"></span><span class="q-text"></span>` +
-          `<b class="q-wait clock"></b><button type="button" class="q-stamp">STAMP</button>`;
-        row.querySelector('button').addEventListener('click', () => stamp(t.id));
+          `<b class="q-wait clock"></b>` +
+          `<button type="button" class="q-chit">CHIT</button>` +
+          `<button type="button" class="q-stamp">STAMP</button>`;
+        row.querySelector('.q-chit').addEventListener('click', () => confirmChit(t.id, !row.dataset.chit || row.dataset.chit === 'no'));
+        row.querySelector('.q-stamp').addEventListener('click', () => stamp(t.id));
         queueRows.set(t.id, row);
       }
       if (host.children[i] !== row) host.insertBefore(row, host.children[i] || null);
       row.dataset.since = t.requested_at || '';
+      row.dataset.chit = t.chit_confirmed ? 'yes' : 'no';
       setText(row.querySelector('.q-n'), `${i + 1}.`);
-      const res = RES[t.resource] || { name: String(t.resource).toUpperCase() };
-      setText(row.querySelector('.q-text'), `${t.from} → ${t.to} · ${t.amount} ${res.name} · ${TRANSFER_WORD[t.status] || t.status}`);
-      const btn = row.querySelector('button');
-      btn.disabled = !q.can_stamp || full;
-      btn.title = !q.can_stamp ? 'Transport is dark' : full ? 'Capacity reached this cycle' : 'Stamp this chit';
+      setText(row.querySelector('.q-text'), `${t.from} → ${t.to} · ${t.amount} ${resName(t.resource)}`);
+
+      const chitBtn = row.querySelector('.q-chit');
+      const needsChit = q.requires_chit !== false;
+      show(chitBtn, needsChit);
+      chitBtn.classList.toggle('on', !!t.chit_confirmed);
+      setText(chitBtn, t.chit_confirmed ? 'CHIT ✓' : 'CHIT');
+      chitBtn.title = t.chit_confirmed
+        ? 'Signed chit received — click to withdraw'
+        : 'Confirm the signed paper chit is in your hand';
+
+      const btn = row.querySelector('.q-stamp');
+      const chitMissing = needsChit && !t.chit_confirmed;
+      const shortStock = t.supplier_ok === false;
+      btn.disabled = !q.can_stamp || full || chitMissing || shortStock;
+      btn.title = !q.can_stamp ? 'Transport is dark'
+        : full ? `No stamps left this ${period.toLowerCase()}`
+          : chitMissing ? 'Physical Transfer Chit not confirmed'
+            : shortStock ? 'Supplier no longer has the stock'
+              : 'Stamp this chit';
+      row.classList.toggle('blocked', shortStock);
     });
     for (const [id, row] of queueRows) {
       if (!seen.has(id)) { row.remove(); queueRows.delete(id); }
     }
+    const waiting = Number(q.awaiting_acceptance) || 0;
     const noteHtml = !q.items || !q.items.length
-      ? '<div class="empty" data-empty>Queue empty.</div>'
-      : full ? '<div class="empty warn" data-empty>CAPACITY REACHED THIS CYCLE</div>' : !q.can_stamp ? '<div class="empty warn" data-empty>TRANSPORT DARK — CANNOT STAMP</div>' : '';
+      ? `<div class="empty" data-empty>Queue empty.${waiting ? ` ${waiting} request${waiting === 1 ? '' : 's'} not yet accepted by the supplier.` : ''}</div>`
+      : full ? `<div class="empty warn" data-empty>NO STAMPS LEFT THIS ${period}</div>`
+        : !q.can_stamp ? '<div class="empty warn" data-empty>TRANSPORT DARK — CANNOT STAMP</div>' : '';
     let note = host.querySelector('[data-empty]');
     if (noteHtml) {
       if (!note) { host.insertAdjacentHTML('beforeend', noteHtml); }
@@ -913,6 +1047,12 @@
     if (resultBanner && performance.now() > resultBanner.until) {
       resultBanner = null;
       show($('banner-result'), false);
+    }
+
+    // The inbound-request banner retires; the card itself stays until answered.
+    if (requestBannerUntil && performance.now() > requestBannerUntil) {
+      requestBannerUntil = 0;
+      show($('banner-request'), false);
     }
 
     // TRN queue waiting times.

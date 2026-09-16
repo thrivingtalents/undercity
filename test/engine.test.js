@@ -234,40 +234,51 @@ test('city stability: automatic formula reacts to damage; manual mode holds a nu
 });
 
 // -- transfers -----------------------------------------------------------------------
+//
+// The full chain is: the sector that WANTS the resource asks, the sector that
+// HOLDS it accepts, both Liaisons sign the paper chit, Transport confirms the
+// chit is in its hand and stamps. Only the stamp moves stock, and Transport
+// gets three stamps for the whole round.
 
-test('a transfer moves stock only when TRN stamps it, within capacity', () => {
-  const game = running();
-  const r = game.requestTransfer({ from: 'WTR', to: 'POW', resource: 'water', amount: 2, by: 'WTR' });
+/** Request → supplier accepts → Transport confirms the paper chit. */
+function readyTransfer(game, { from, to, resource, amount }) {
+  const r = game.requestTransfer({ from, to, resource, amount, by: to });
   assert.equal(r.ok, true);
-  assert.equal(r.transfer.status, 'REQUESTED');
-  game.updateTransfer(r.transfer.id, 'AGREED', { by: 'POW' });
-  game.updateTransfer(r.transfer.id, 'WAITING_TRN', { by: 'WTR' });
+  assert.equal(game.acceptTransfer(r.transfer.id, { by: from }).ok, true);
+  assert.equal(game.confirmChit(r.transfer.id, true, { by: 'TRN' }).ok, true);
+  return r.transfer;
+}
+
+test('a transfer moves stock only when TRN stamps it, and only once', () => {
+  const game = running();
+  const t = readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 2 });
+  assert.equal(t.status, 'AGREED');
   assert.equal(game.state.sectors.POW.inventory.water, 3, 'nothing moved yet');
 
-  const s = game.stampTransfer(r.transfer.id, { by: 'TRN' });
+  const s = game.stampTransfer(t.id, { by: 'TRN' });
   assert.equal(s.ok, true);
   assert.equal(s.transfer.status, 'DELIVERED', 'deliver_on_stamp');
   assert.equal(game.state.sectors.POW.inventory.water, 5);
   assert.equal(game.state.sectors.WTR.inventory.water, 1);
   assert.ok(logEvents(game, 'transfer_stamped')[0].t);
-  assert.equal(game.stampTransfer(r.transfer.id).reason, 'already_stamped');
+  assert.equal(game.stampTransfer(t.id).reason, 'already_stamped');
 });
 
-test('transport capacity is per cycle, reduced by brownout and by effects, and admin can force', () => {
+test('transport capacity is reduced by brownout and by effects, and admin can force', () => {
   const game = running();
-  const cap = game.cfg.trn_capacity_per_cycle;
+  const cap = game.cfg.transport_stamp_limit;
+  assert.equal(cap, 3);
+  game.state.sectors.WTR.inventory.water = 10;
   const ids = [];
   for (let i = 0; i < cap + 1; i += 1) {
-    ids.push(game.requestTransfer({ from: 'WTR', to: 'POW', resource: 'water', amount: 1 }).transfer.id);
+    ids.push(readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 1 }).id);
   }
   for (let i = 0; i < cap; i += 1) assert.equal(game.stampTransfer(ids[i]).ok, true);
   const refused = game.stampTransfer(ids[cap]);
   assert.equal(refused.reason, 'capacity');
-  assert.equal(logEvents(game, 'transfer_refused').length, 1);
+  assert.equal(refused.basis, 'round');
   assert.equal(game.stampTransfer(ids[cap], { force: true }).ok, true, 'facilitator override');
 
-  game.cycleControl('process');
-  assert.equal(game.transfersStampedThisCycle(), 0, 'a new cycle resets the count');
   game.setStatus('TRN', 'BROWNOUT');
   assert.equal(game.trnCapacity(), game.cfg.brownout_effects.per_sector.TRN.transfer_capacity);
   game.setStatus('TRN', 'ACTIVE');
@@ -279,24 +290,322 @@ test('transport capacity is per cycle, reduced by brownout and by effects, and a
 
 test('a worker loan moves people and is tracked as loaned/borrowed', () => {
   const game = running();
-  const r = game.requestTransfer({ from: 'AGR', to: 'MED', resource: 'workers', amount: 2 });
-  game.stampTransfer(r.transfer.id);
+  const t = readyTransfer(game, { from: 'AGR', to: 'MED', resource: 'workers', amount: 2 });
+  game.stampTransfer(t.id);
   assert.equal(game.state.sectors.AGR.workforce.active, 6);
   assert.equal(game.state.sectors.AGR.workforce.loaned, 2);
   assert.equal(game.state.sectors.MED.workforce.active, 10);
   assert.equal(forSector(game, 'AGR').sectors.AGR.workforce.total, 8);
 });
 
-test('the TRN screen sees the queue and capacity; other sectors only their own transfers', () => {
+test('the TRN screen sees the accepted queue and its allowance; other sectors only their own transfers', () => {
   const game = running();
-  game.requestTransfer({ from: 'WTR', to: 'POW', resource: 'water', amount: 2 });
-  game.requestTransfer({ from: 'AGR', to: 'MED', resource: 'med', amount: 1 });
+  readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 2 });
+  game.requestTransfer({ from: 'AGR', to: 'MED', resource: 'med', amount: 1, by: 'MED' });
   const trn = forSector(game, 'TRN');
-  assert.equal(trn.transfer_queue.items.length, 2);
-  assert.equal(trn.transfer_queue.capacity, game.cfg.trn_capacity_per_cycle);
+  assert.equal(trn.transfer_queue.items.length, 1, 'the unaccepted one is not Transport business yet');
+  assert.equal(trn.transfer_queue.awaiting_acceptance, 1);
+  assert.equal(trn.transfer_queue.capacity, game.cfg.transport_stamp_limit);
+  assert.equal(trn.transfer_queue.remaining, 3);
+  assert.equal(trn.transfer_queue.basis, 'round');
+  assert.equal(trn.transfer_queue.requires_chit, true);
   assert.equal(forSector(game, 'POW').transfers.length, 1);
   assert.equal(forSector(game, 'COM').transfer_queue, undefined);
   assert.equal(forSector(game, 'COM').transfers.length, 0);
+});
+
+// -- transfers: the adjustment spec ---------------------------------------------------
+
+test('supplier_only_can_accept: the requester cannot approve its own request', () => {
+  const game = running();
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
+  const mine = game.acceptTransfer(r.transfer.id, { by: 'MED' });
+  assert.equal(mine.ok, false);
+  assert.equal(mine.reason, 'not_supplier');
+  assert.equal(mine.supplier, 'POW');
+  assert.equal(game.findTransfer(r.transfer.id).status, 'REQUESTED');
+  // A third table cannot answer for the supplier either.
+  assert.equal(game.acceptTransfer(r.transfer.id, { by: 'WTR' }).reason, 'not_supplier');
+  assert.equal(game.declineTransfer(r.transfer.id, { by: 'MED' }).reason, 'not_supplier');
+});
+
+test('supplier_can_accept_when_stock_sufficient: it reaches the Transport queue', () => {
+  const game = running();
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
+  assert.equal(forSector(game, 'TRN').transfer_queue.items.length, 0, 'not yet Transport business');
+
+  const a = game.acceptTransfer(r.transfer.id, { by: 'POW' });
+  assert.equal(a.ok, true);
+  assert.equal(a.transfer.status, 'AGREED');
+  assert.ok(a.transfer.agreed_at);
+  assert.equal(a.transfer.accepted_by, 'POW');
+  const queue = forSector(game, 'TRN').transfer_queue;
+  assert.equal(queue.items.length, 1);
+  assert.equal(queue.items[0].id, r.transfer.id);
+  assert.equal(queue.items[0].supplier_ok, true);
+  assert.equal(logEvents(game, 'transfer_accepted').length, 1);
+});
+
+test('accept_refused_when_supplier_short: no stock moves and it stays REQUESTED', () => {
+  const game = running();
+  game.state.sectors.POW.inventory.power = 1;
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
+  const a = game.acceptTransfer(r.transfer.id, { by: 'POW' });
+  assert.equal(a.ok, false);
+  assert.equal(a.reason, 'insufficient_stock_accept');
+  assert.equal(a.have, 1);
+  assert.equal(a.need, 2);
+  assert.equal(game.findTransfer(r.transfer.id).status, 'REQUESTED');
+  assert.equal(game.state.sectors.POW.inventory.power, 1);
+  assert.equal(game.state.sectors.MED.inventory.power, 3);
+  assert.equal(logEvents(game, 'transfer_accept_refused').length, 1);
+});
+
+test('transport_cannot_stamp_unaccepted: refused, nothing moves, no allowance spent', () => {
+  const game = running();
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
+  game.confirmChit(r.transfer.id, true, { by: 'TRN' });
+  const s = game.stampTransfer(r.transfer.id, { by: 'TRN' });
+  assert.equal(s.ok, false);
+  assert.equal(s.reason, 'not_accepted');
+  assert.equal(game.state.sectors.POW.inventory.power, 3);
+  assert.equal(game.state.sectors.MED.inventory.power, 3);
+  assert.equal(game.stampsUsed(), 0, 'a refusal costs no allowance');
+  assert.equal(logEvents(game, 'transfer_refused')[0].reason, 'not_accepted');
+});
+
+test('transport_queue_hides_unaccepted: only the accepted transfer is shown', () => {
+  const game = running();
+  const open = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' });
+  const done = game.requestTransfer({ from: 'WTR', to: 'MED', resource: 'water', amount: 1, by: 'MED' });
+  game.acceptTransfer(done.transfer.id, { by: 'WTR' });
+
+  const queue = forSector(game, 'TRN').transfer_queue;
+  assert.equal(queue.items.length, 1);
+  assert.equal(queue.items[0].id, done.transfer.id);
+  assert.ok(!queue.items.some((t) => t.id === open.transfer.id));
+  assert.equal(queue.awaiting_acceptance, 1, 'Transport is told one is still waiting, not what it is');
+  // Turning the rule off restores the original behaviour.
+  game.patchConfig({ require_supplier_acceptance: false });
+  assert.equal(forSector(game, 'TRN').transfer_queue.items.length, 2);
+});
+
+test('round_capacity_is_three: the fourth normal stamp in a round is refused', () => {
+  const game = running();
+  game.state.sectors.POW.inventory.power = 10;
+  const ids = [];
+  for (let i = 0; i < 4; i += 1) {
+    ids.push(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
+  }
+  for (let i = 0; i < 3; i += 1) assert.equal(game.stampTransfer(ids[i]).ok, true);
+  assert.equal(game.stampsUsed(), 3);
+  const fourth = game.stampTransfer(ids[3]);
+  assert.equal(fourth.ok, false);
+  assert.equal(fourth.reason, 'capacity');
+  assert.equal(fourth.capacity, 3);
+  assert.equal(fourth.used, 3);
+});
+
+test('cycle_does_not_reset_round_capacity: 2 of 3 stays 2 of 3 across a cycle', () => {
+  const game = running();
+  game.state.sectors.POW.inventory.power = 10;
+  for (let i = 0; i < 2; i += 1) {
+    game.stampTransfer(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
+  }
+  assert.equal(game.stampsUsed(), 2);
+
+  const cycle = game.state.cycle.number;
+  game.cycleControl('process');
+  assert.equal(game.state.cycle.number, cycle + 1, 'the cycle really did turn over');
+  assert.equal(game.stampsUsed(), 2, 'a cycle boundary hands Transport nothing back');
+  assert.equal(game.state.cycle.stamped, 0, 'the cycle counter itself is cleared');
+  assert.equal(forSector(game, 'TRN').transfer_queue.remaining, 1);
+});
+
+test('round_resets_capacity: 3 of 3 becomes 0 of 3 in the next round', () => {
+  const game = running();
+  game.state.sectors.POW.inventory.power = 10;
+  for (let i = 0; i < 3; i += 1) {
+    game.stampTransfer(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
+  }
+  assert.equal(game.stampsUsed(), 3);
+  game.setRound('R3');
+  assert.equal(game.stampsUsed(), 0);
+  assert.equal(forSector(game, 'TRN').transfer_queue.remaining, 3);
+  assert.equal(logEvents(game, 'transport_stamp_counter_reset').some((e) => e.by === 'round_change'), true);
+});
+
+test('pending_requests_expire_on_round_change, and delivered ones are left alone', () => {
+  const game = running();
+  const delivered = readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 1 });
+  game.stampTransfer(delivered.id);
+  const pending = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' });
+  const accepted = readyTransfer(game, { from: 'AGR', to: 'MED', resource: 'parts', amount: 1 });
+
+  game.setRound('R3');
+  assert.equal(game.findTransfer(pending.transfer.id).status, 'EXPIRED');
+  assert.equal(game.findTransfer(accepted.id).status, 'EXPIRED');
+  assert.ok(game.findTransfer(pending.transfer.id).expired_at);
+  assert.equal(game.findTransfer(delivered.id).status, 'DELIVERED', 'history is not rewritten');
+  assert.equal(forSector(game, 'TRN').transfer_queue.items.length, 0, 'removed from the active queue');
+  assert.equal(logEvents(game, 'transfer_expired').length, 2);
+  assert.equal(game.stampTransfer(accepted.id).reason, 'expired');
+
+  // The behaviour is configurable.
+  game.patchConfig({ expire_pending_transfers_on_round_change: false });
+  const survivor = readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 1 });
+  game.setRound('R4');
+  assert.equal(game.findTransfer(survivor.id).status, 'AGREED');
+});
+
+test('stock_rechecked_at_stamp: accepted while flush, refused once the shelf is bare', () => {
+  const game = running();
+  const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 2 });
+  game.setInventory('POW', { power: 1 });          // spent on a repair after accepting
+
+  const s = game.stampTransfer(t.id, { by: 'TRN' });
+  assert.equal(s.ok, false);
+  assert.equal(s.reason, 'insufficient_stock_stamp');
+  assert.equal(s.have, 1);
+  assert.equal(s.need, 2);
+  assert.equal(game.state.sectors.POW.inventory.power, 1, 'zero moved');
+  assert.equal(game.state.sectors.MED.inventory.power, 3);
+  assert.equal(game.stampsUsed(), 0, 'a refusal costs no allowance');
+});
+
+test('no_partial_delivery: 3 requested with 2 in stock moves 0, not 2', () => {
+  const game = running();
+  game.setInventory('POW', { power: 3 });
+  const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 3 });
+  game.setInventory('POW', { power: 2 });
+
+  assert.equal(game.stampTransfer(t.id).ok, false);
+  assert.equal(game.state.sectors.POW.inventory.power, 2);
+  assert.equal(game.state.sectors.MED.inventory.power, 3);
+  assert.equal(game.findTransfer(t.id).status, 'AGREED', 'still open, still unstamped');
+
+  // The old part-delivery is still available as configuration.
+  game.patchConfig({ insufficient_stock_behavior: 'legacy_partial_if_supported' });
+  assert.equal(game.stampTransfer(t.id).ok, true);
+  assert.equal(game.state.sectors.POW.inventory.power, 0);
+  assert.equal(game.state.sectors.MED.inventory.power, 5, 'two moved, not three');
+});
+
+test('physical_chit_required: no stamp until Transport confirms the paper', () => {
+  const game = running();
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
+  game.acceptTransfer(r.transfer.id, { by: 'POW' });
+
+  const early = game.stampTransfer(r.transfer.id, { by: 'TRN' });
+  assert.equal(early.ok, false);
+  assert.equal(early.reason, 'chit_required');
+  assert.equal(game.stampsUsed(), 0);
+
+  game.confirmChit(r.transfer.id, true, { by: 'TRN' });
+  assert.equal(game.stampTransfer(r.transfer.id, { by: 'TRN' }).ok, true);
+  assert.equal(logEvents(game, 'transfer_chit')[0].confirmed, true);
+
+  // Off, the chit is a formality the software stops checking.
+  game.patchConfig({ require_physical_transfer_chit: false });
+  const next = readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 1 });
+  game.confirmChit(next.id, false, { by: 'TRN' });
+  assert.equal(game.stampTransfer(next.id).ok, true);
+});
+
+test('successful_atomic_delivery: exactly two move, one stamp is spent, the log is complete', () => {
+  const game = running();
+  const before = { pow: game.state.sectors.POW.inventory.power, med: game.state.sectors.MED.inventory.power };
+  const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 2 });
+
+  const s = game.stampTransfer(t.id, { by: 'TRN' });
+  assert.equal(s.ok, true);
+  assert.equal(s.transfer.status, 'DELIVERED');
+  assert.equal(game.state.sectors.POW.inventory.power, before.pow - 2);
+  assert.equal(game.state.sectors.MED.inventory.power, before.med + 2);
+  assert.equal(s.transfer.moved, 2);
+  assert.equal(game.stampsUsed(), 1);
+  assert.equal(s.transfer.round_stamped, 'R2');
+  assert.equal(s.transfer.stamped_by, 'TRN');
+
+  const stamped = logEvents(game, 'transfer_stamped')[0];
+  assert.equal(stamped.moved, 2);
+  assert.equal(stamped.basis, 'round');
+  assert.equal(stamped.used_after, 1);
+  assert.equal(stamped.chit_confirmed, true);
+  assert.equal(stamped.facilitator_override, false);
+  assert.ok(stamped.t && stamped.round, 'every line carries its timestamp and round');
+  assert.equal(logEvents(game, 'transfer_requested').length, 1);
+  assert.equal(logEvents(game, 'transfer_accepted').length, 1);
+
+  const stats = analyse(game.log.readAll(), { runId: 'test-run' }).rounds.R2.transfers;
+  assert.equal(stats.requested, 1);
+  assert.equal(stats.accepted, 1);
+  assert.equal(stats.stamped, 1);
+  assert.equal(stats.delivered, 1);
+});
+
+test('facilitator_force_stamp_logged: the override lifts the rules and says so', () => {
+  const game = running();
+  // Neither accepted nor chit-confirmed, and the allowance is already gone.
+  game.state.sectors.POW.inventory.power = 10;
+  for (let i = 0; i < 3; i += 1) {
+    game.stampTransfer(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
+  }
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
+  assert.equal(game.stampTransfer(r.transfer.id, { by: 'TRN' }).ok, false);
+
+  const forced = game.stampTransfer(r.transfer.id, { by: 'facilitator', force: true });
+  assert.equal(forced.ok, true);
+  assert.equal(forced.transfer.facilitator_override, true);
+  const stamped = logEvents(game, 'transfer_stamped').at(-1);
+  assert.equal(stamped.facilitator_override, true);
+  assert.equal(stamped.by, 'facilitator');
+  assert.equal(analyse(game.log.readAll(), { runId: 'test-run' }).rounds.R2.transfers.facilitator_overrides, 1);
+
+  // The override is not a licence to invent stock.
+  game.setInventory('POW', { power: 0 });
+  const empty = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
+  assert.equal(game.stampTransfer(empty.transfer.id, { force: true }).reason, 'insufficient_stock_stamp');
+});
+
+test('a sector may withdraw its own ask, but not after the supplier has accepted', () => {
+  const game = running();
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' });
+  const t = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' });
+  assert.equal(game.updateTransfer(r.transfer.id, 'CANCELLED', { by: 'MED' }).ok, true);
+
+  game.acceptTransfer(t.transfer.id, { by: 'POW' });
+  const locked = game.updateTransfer(t.transfer.id, 'CANCELLED', { by: 'MED' });
+  assert.equal(locked.ok, false);
+  assert.equal(locked.reason, 'cancel_locked');
+  assert.equal(game.updateTransfer(t.transfer.id, 'CANCELLED', { by: 'facilitator' }).ok, true);
+});
+
+test('the facilitator can reset the stamp allowance by hand, and it is logged', () => {
+  const game = running();
+  game.state.sectors.POW.inventory.power = 10;
+  for (let i = 0; i < 3; i += 1) {
+    game.stampTransfer(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
+  }
+  assert.equal(game.stampsUsed(), 3);
+  const reset = game.resetStamps('all', { by: 'facilitator' });
+  assert.equal(reset.ok, true);
+  assert.equal(game.stampsUsed(), 0);
+  assert.equal(forControl(game).transfer_capacity.remaining, 3);
+  assert.ok(logEvents(game, 'transport_stamp_counter_reset').some((e) => e.by === 'facilitator'));
+});
+
+test('the allowance basis is configurable back to the original per-cycle behaviour', () => {
+  const game = running();
+  game.patchConfig({ transfer_limit_basis: 'cycle' });
+  game.state.sectors.POW.inventory.power = 10;
+  for (let i = 0; i < 2; i += 1) {
+    game.stampTransfer(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
+  }
+  assert.equal(game.stampBasis(), 'cycle');
+  assert.equal(game.stampsUsed(), 2);
+  game.cycleControl('process');
+  assert.equal(game.stampsUsed(), 0, 'on the cycle basis, a cycle DOES hand the stamps back');
 });
 
 // -- council and the Continuity Order ------------------------------------------------
@@ -602,9 +911,9 @@ test('the debrief folds the log into per-round figures and a Round 3 vs Aftersho
   submitCode(game, { sector: 'POW', fault_code: 'F-301', code: 'P-06-000', workers_assigned: 3 });
   game.tick(15000);
   submitCode(game, { sector: 'POW', fault_code: 'F-301', code: 'P-06-142-261', workers_assigned: 3 });
-  const t = game.requestTransfer({ from: 'WTR', to: 'POW', resource: 'water', amount: 1 });
+  const t = readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 1 });
   game.tick(20000);
-  game.stampTransfer(t.transfer.id);
+  game.stampTransfer(t.id);
   game.callCouncil();
   game.tick(120000);
   game.submitContinuityOrder(['POW', 'MED', 'WTR', 'TRN', 'COM', 'AGR']);

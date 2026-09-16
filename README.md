@@ -149,10 +149,23 @@ npm start                                            # http://localhost:3000/adm
    recovery (MED spends med supplies) → brownout effects → city stability →
    next cycle. Admin sees a per-sector summary; Transport's per-cycle stamp
    capacity resets.
-4. **Transfers.** The Transfer Chit stays physical. The digital record follows
-   `REQUESTED → AGREED → WAITING_TRN → STAMPED → DELIVERED`; only TRN's STAMP
-   (or Admin) moves stock, and only within Transport's capacity, which
-   brownout, gridlock and tunnel collapse reduce.
+4. **Transfers.** The Transfer Chit stays physical, and the negotiation stays
+   face to face — there is no message box anywhere in the chain. The sector
+   that *wants* the resource asks; the sector that *holds* it decides; the
+   Liaisons sign the paper; Transport stamps. In detail:
+   **REQUEST** — a team picks a supplier, a resource and an amount. The request
+   lands on the supplier's screen with a banner, a sound and their own current
+   stock beside it. **ACCEPT or DECLINE** — only the supplier may answer, and
+   only if it actually holds the amount; a requester can never approve its own
+   ask. Acceptance moves nothing, it only exposes the chit to Transport.
+   **CHIT** — Transport confirms the signed paper is in its hand.
+   **STAMP** — Transport stamps, and only now does stock move, in full or not
+   at all. Transport gets **three stamps per round**, not per cycle: a cycle
+   boundary hands nothing back, a round change restores all three and voids
+   every chit that was never stamped. A refusal costs no stamp. Every gate is
+   a setting, and the facilitator can force a stamp, reset the counter or
+   expire the queue by hand; a forced stamp is flagged as an override in the
+   log and in the debrief.
 5. **Council.** CALL COUNCIL puts the 5:00 summons on every screen. Admin
    records the **Continuity Order** by clicking sectors in rank order; it
    confirms ("This decision cannot be recalled."), ranks 5 and 6 enter
@@ -186,11 +199,28 @@ round, cycle length, production and upkeep per sector, deadline defaults and
 penalties by severity, per-fault overrides (a deadline, an expiry penalty and
 extra accepted codes for one fault), brownout effects (with per-sector
 specials: COM loses telemetry, TRN capacity drops, POW production collapses),
-transport capacity, the city stability formula and its weights, resource
-minimums, wall detail switches, event presets, fault presets, the round
-timelines and COM's intelligence items. The status word every screen prints
-(STABLE · DEGRADED · CRITICAL · BROWNOUT · DARK) is computed on the server
-from those thresholds; no client carries a number.
+the whole transfer chain (see below), the city stability formula and its
+weights, resource minimums, wall detail switches, event presets, fault
+presets, the round timelines and COM's intelligence items. The status word
+every screen prints (STABLE · DEGRADED · CRITICAL · BROWNOUT · DARK) is
+computed on the server from those thresholds; no client carries a number.
+
+The transfer rules are nine keys, all in the same place:
+
+| Key | Default | What it does |
+|---|---|---|
+| `transfer_limit_basis` | `round` | Whether Transport's allowance is counted per round or per cycle |
+| `transport_stamp_limit` | `3` | Stamps Transport gets per period |
+| `require_supplier_acceptance` | `true` | Transport sees and stamps only what the supplier accepted |
+| `enforce_supplier_stock` | `true` | Stock is checked on accept and again at the stamp |
+| `insufficient_stock_behavior` | `refuse` | `legacy_partial_if_supported` restores the old part-delivery |
+| `expire_pending_transfers_on_round_change` | `true` | Unstamped chits die at the round boundary |
+| `require_physical_transfer_chit` | `true` | No stamp until Transport confirms the signed paper |
+| `notify_supplier_with_sound` | `true` | An inbound request rings on the supplier's laptop |
+| `show_completed_transfer_on_wall` | `true` | A completed transfer is the only step the wall shows |
+
+Turning the first seven off reproduces the pre-2026-09-16 behaviour exactly.
+`trn_capacity_per_cycle` is still read when the basis is `cycle`.
 
 **SAVE AS SCENARIO** stores the running configuration in SQLite under a name
 (`HAVEN-9 HARD`, `HAVEN-9 CLIENT TEST`…); a saved copy with a built-in's id

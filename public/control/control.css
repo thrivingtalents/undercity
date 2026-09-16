@@ -272,7 +272,12 @@ button.big { font-size: 13px; padding: 10px 14px; font-weight: 700; }
 .tr .st.DELIVERED { color: var(--green); }
 .tr .st.CANCELLED { color: var(--ink-faint); }
 .tr .st.WAITING_TRN { color: var(--amber); }
-.tr .acts { display: flex; gap: 3px; }
+.tr .st.AGREED { color: var(--green); }
+.tr .st.REQUESTED { color: var(--blue); }
+.tr .st.DECLINED, .tr .st.EXPIRED { color: var(--red); }
+.tr .who .tag { margin-left: 4px; }
+.tr .acts { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+.tr .acts button.on { border-color: var(--green); color: var(--green); }
 .tr .acts button { font-size: 9px; padding: 3px 6px; }
 .tr.closed { opacity: 0.5; }
 

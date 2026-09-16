@@ -849,10 +849,36 @@ function handleSector(client, entry, msg) {
       const t = game.findTransfer(msg.id);
       if (!t || (t.from !== mine && t.to !== mine)) return send(client.ws, { type: 'error', reason: 'not_party' });
       const status = String(msg.status || '').toUpperCase();
-      if (!['AGREED', 'WAITING_TRN', 'CANCELLED'].includes(status)) {
+      if (!['AGREED', 'ACCEPTED', 'DECLINED', 'WAITING_TRN', 'CANCELLED'].includes(status)) {
         return send(client.ws, { type: 'error', reason: 'bad_status' });
       }
       send(client.ws, { type: 'transfer_result', ...game.updateTransfer(msg.id, status, { by: mine }) });
+      return broadcast(entry);
+    }
+
+    /**
+     * Supplier acceptance. The reducer, not this router, decides who may say
+     * yes: only the sector the resource would leave. A requester pressing this
+     * on its own request is refused as `not_supplier`.
+     */
+    case 'transfer_accept': {
+      const t = game.findTransfer(msg.id);
+      if (!t || (t.from !== mine && t.to !== mine)) return send(client.ws, { type: 'error', reason: 'not_party' });
+      send(client.ws, { type: 'transfer_result', action: 'accept', ...game.acceptTransfer(msg.id, { by: mine }) });
+      return broadcast(entry);
+    }
+
+    case 'transfer_decline': {
+      const t = game.findTransfer(msg.id);
+      if (!t || (t.from !== mine && t.to !== mine)) return send(client.ws, { type: 'error', reason: 'not_party' });
+      send(client.ws, { type: 'transfer_result', action: 'decline', ...game.declineTransfer(msg.id, { by: mine }) });
+      return broadcast(entry);
+    }
+
+    /** TRN records that the signed paper chit is physically in its hand. */
+    case 'transfer_chit': {
+      if (mine !== 'TRN') return send(client.ws, { type: 'error', reason: 'forbidden' });
+      send(client.ws, { type: 'transfer_result', action: 'chit', ...game.confirmChit(msg.id, msg.confirmed !== false, { by: 'TRN' }) });
       return broadcast(entry);
     }
 
@@ -862,7 +888,7 @@ function handleSector(client, entry, msg) {
       if (game.state.sectors.TRN.status === 'DARK') {
         return send(client.ws, { type: 'transfer_result', ok: false, reason: 'sector_dark' });
       }
-      send(client.ws, { type: 'transfer_result', ...game.stampTransfer(msg.id, { by: 'TRN' }) });
+      send(client.ws, { type: 'transfer_result', action: 'stamp', ...game.stampTransfer(msg.id, { by: 'TRN' }) });
       return broadcast(entry);
     }
 
@@ -979,8 +1005,23 @@ function handleControl(client, entry, msg) {
     case 'transfer_update':
       reply({ type: 'transfer_result', ...game.updateTransfer(msg.id, String(msg.status || '').toUpperCase(), { by: 'facilitator' }) });
       return ok();
+    case 'transfer_accept':
+      reply({ type: 'transfer_result', ...game.acceptTransfer(msg.id, { by: 'facilitator' }) });
+      return ok();
+    case 'transfer_decline':
+      reply({ type: 'transfer_result', ...game.declineTransfer(msg.id, { by: 'facilitator' }) });
+      return ok();
+    case 'transfer_chit':
+      reply({ type: 'transfer_result', ...game.confirmChit(msg.id, msg.confirmed !== false, { by: 'facilitator' }) });
+      return ok();
     case 'transfer_stamp':
       reply({ type: 'transfer_result', ...game.stampTransfer(msg.id, { by: 'facilitator', force: !!msg.force }) });
+      return ok();
+    case 'reset_stamps':
+      reply({ type: 'stamps_reset', ...game.resetStamps(msg.which || 'all', { by: 'facilitator' }) });
+      return ok();
+    case 'expire_transfers':
+      reply({ type: 'transfers_expired', count: game.expirePendingTransfers({ reason: 'facilitator' }) });
       return ok();
 
     // -- debrief on the wall

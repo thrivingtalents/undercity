@@ -76,6 +76,7 @@
   text-align: center; border-bottom: 1px solid var(--line);
 }
 .banner-brownout { background: #3a2a0c; color: var(--amber); }
+.banner-request { background: #123047; color: #cfe8ff; animation: bannerIn 400ms ease; }
 .banner-council { background: #2a1a3a; color: #e8d6ff; }
 .banner-council b { margin-left: 14px; font-size: 1.15em; color: #fff; }
 .banner-breather { background: #0f2a17; color: var(--green); }
@@ -93,7 +94,10 @@
 @media (min-width: 1700px) {
   .columns { grid-template-columns: 340px minmax(0, 1fr) 380px; }
 }
-.col { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+/* Each column scrolls on its own; the page never does. A fifth panel on the
+   left (inbound requests) must not push the resource readout off a 13" screen. */
+.col { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; }
+.col > .panel { flex: 0 0 auto; }
 .panel { padding: 10px 12px; }
 .block { display: flex; flex-direction: column; min-height: 0; }
 .ptitle {
@@ -113,6 +117,25 @@
 .msg.ok { color: var(--green); }
 .msg.bad { color: var(--red); }
 .declare-note { font-size: 10px; color: var(--ink-faint); line-height: 1.4; margin-top: 6px; }
+
+/* -- inbound requests (the supplier's decision) ------------------------------ */
+
+.inbox-block { border-color: var(--blue); }
+.inbox { display: flex; flex-direction: column; gap: 5px; max-height: 34vh; overflow-y: auto; }
+.inbound {
+  border: 1px solid var(--blue); border-left-width: 4px; background: #101d28;
+  padding: 6px 8px; animation: bannerIn 400ms ease;
+}
+.inbound.short { border-color: var(--red); background: #1d1214; }
+.ib-title { font-size: 9px; letter-spacing: 0.2em; color: var(--blue); font-weight: 700; }
+.inbound.short .ib-title { color: var(--red); }
+.ib-msg { font-size: 13px; letter-spacing: 0.04em; margin-top: 2px; line-height: 1.25; }
+.ib-msg b { font-size: 15px; }
+.ib-stock { font-size: 10px; color: var(--ink-dim); letter-spacing: 0.06em; margin-top: 2px; }
+.ib-stock b { color: var(--ink); }
+.inbound.short .ib-stock { color: var(--red); }
+.ib-btns { display: flex; gap: 5px; margin-top: 6px; }
+.ib-btns button { flex: 1; font-size: 11px; padding: 5px 8px; letter-spacing: 0.12em; }
 
 /* -- left: resources -------------------------------------------------------- */
 
@@ -169,7 +192,8 @@
 .t-btns button { padding: 2px 7px; font-size: 10px; }
 .t-btns button.ghost { color: var(--ink-dim); }
 .transfer-form { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; border-top: 1px solid var(--line); padding-top: 6px; }
-.tf-row { display: flex; gap: 4px; }
+.tf-row { display: flex; gap: 4px; align-items: center; }
+.tf-label { font-size: 10px; letter-spacing: 0.18em; color: var(--ink-dim); white-space: nowrap; }
 .tf-row select { flex: 1; min-width: 0; padding: 3px 4px; font-size: 11px; }
 .tf-row #tf-amt { flex: 0 0 48px; }
 .tf-row button { padding: 3px 8px; font-size: 10px; white-space: nowrap; }
@@ -284,10 +308,13 @@
 .effect b { color: var(--ink); }
 
 .queue { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
-.q-row { display: grid; grid-template-columns: 20px 1fr auto auto; align-items: center; gap: 6px; font-size: 11px; background: var(--steel); border: 1px solid var(--line); padding: 4px 6px; }
+.q-row { display: grid; grid-template-columns: 20px 1fr auto auto auto; align-items: center; gap: 6px; font-size: 11px; background: var(--steel); border: 1px solid var(--line); padding: 4px 6px; }
+.q-row.blocked { border-color: var(--red); }
 .q-n { color: var(--ink-faint); }
 .q-text { letter-spacing: 0.04em; }
 .q-wait { color: var(--amber); font-size: 11px; white-space: nowrap; }
+.q-chit { padding: 3px 7px; font-size: 10px; letter-spacing: 0.1em; white-space: nowrap; }
+.q-chit.on { background: #123a1c; border-color: var(--green); color: #b8f0c2; font-weight: 700; }
 .q-stamp { padding: 3px 8px; font-size: 11px; background: var(--amber); color: #17130a; border-color: var(--amber); font-weight: 700; }
 
 .intel { display: flex; flex-direction: column; gap: 3px; }

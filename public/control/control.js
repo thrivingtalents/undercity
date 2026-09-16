@@ -596,17 +596,47 @@
   $('btn-tr-add').addEventListener('click', () => {
     send({ type: 'transfer_request', from: $('tr-from').value, to: $('tr-to').value, resource: $('tr-res').value, amount: Number($('tr-amt').value) });
   });
+  $('btn-reset-stamps').addEventListener('click', () => send({ type: 'reset_stamps', which: 'all' }));
+  $('btn-expire-transfers').addEventListener('click', () => {
+    if (!confirm('EXPIRE PENDING — void every transfer that has not been stamped? Delivered ones are untouched.')) return;
+    send({ type: 'expire_transfers' });
+  });
 
   function renderTransfers() {
-    const cap = state.transfer_capacity;
-    $('trn-cap').textContent = `${cap.used} / ${cap.capacity}`;
-    const NEXT = { REQUESTED: ['AGREED', 'WAITING_TRN', 'STAMPED', 'CANCELLED'], AGREED: ['WAITING_TRN', 'STAMPED', 'CANCELLED'], WAITING_TRN: ['STAMPED', 'CANCELLED'], STAMPED: ['DELIVERED', 'CANCELLED'] };
+    const cap = state.transfer_capacity || {};
+    const left = Math.max(0, (cap.remaining !== undefined ? cap.remaining : (cap.capacity || 0) - (cap.used || 0)));
+    $('trn-cap').textContent = `${cap.used} / ${cap.capacity} · ${left} left this ${cap.basis || 'round'}${cap.basis === 'round' && cap.round ? ` (${cap.round})` : ''}`;
+
+    // The facilitator sees every step and can move any of them. STAMP here is
+    // always the override: it lifts acceptance, allowance and chit, and says so.
+    const WORD = { AGREED: 'ACCEPTED', WAITING_TRN: 'WAITING TRN' };
     $('transfers').innerHTML = (state.transfers || []).map((t) => {
-      const closed = ['DELIVERED', 'CANCELLED'].includes(t.status);
-      const acts = (NEXT[t.status] || []).map((n) => n === 'STAMPED'
-        ? `<button data-stamp="${t.id}">STAMP</button>` : `<button data-upd="${t.id}" data-st="${n}">${n.replace('_', ' ')}</button>`).join('');
-      return `<div class="tr${closed ? ' closed' : ''}"><div class="who"><b>${t.from} → ${t.to}</b> · ${t.amount} ${t.resource}${t.moved != null && t.moved !== t.amount ? ` (moved ${t.moved})` : ''}<br><span class="st ${t.status}">${t.status.replace('_', ' ')} · ${new Date(t.requested_at).toLocaleTimeString()} · by ${esc(t.requested_by)}</span></div><div class="acts">${acts}</div></div>`;
+      const closed = ['DELIVERED', 'CANCELLED', 'DECLINED', 'EXPIRED'].includes(t.status);
+      const acts = [];
+      if (t.status === 'REQUESTED') {
+        acts.push(`<button data-accept="${t.id}">ACCEPT</button>`);
+        acts.push(`<button data-decline="${t.id}">DECLINE</button>`);
+      }
+      if (['REQUESTED', 'AGREED', 'WAITING_TRN'].includes(t.status)) {
+        acts.push(`<button data-chit="${t.id}" data-on="${t.chit_confirmed ? '0' : '1'}" class="${t.chit_confirmed ? 'on' : ''}">CHIT ${t.chit_confirmed ? '✓' : '✗'}</button>`);
+        acts.push(`<button data-stamp="${t.id}" class="danger">FORCE STAMP</button>`);
+        acts.push(`<button data-upd="${t.id}" data-st="CANCELLED">CANCEL</button>`);
+      }
+      if (t.status === 'STAMPED') acts.push(`<button data-upd="${t.id}" data-st="DELIVERED">DELIVERED</button>`);
+
+      const flags = [];
+      if (t.chit_confirmed) flags.push('<span class="tag">CHIT</span>');
+      if (t.facilitator_override) flags.push('<span class="tag multi">OVERRIDE</span>');
+      if (t.moved != null && t.moved !== t.amount) flags.push(`<span class="tag injury">MOVED ${t.moved}</span>`);
+
+      return `<div class="tr${closed ? ' closed' : ''}"><div class="who"><b>${t.from} → ${t.to}</b> · ${t.amount} ${t.resource} ${flags.join(' ')}<br>
+        <span class="st ${t.status}">${WORD[t.status] || t.status} · ${new Date(t.requested_at).toLocaleTimeString()} · by ${esc(t.requested_by)}${t.round_created ? ` · ${t.round_created}` : ''}</span></div>
+        <div class="acts">${acts.join('')}</div></div>`;
     }).join('') || '<div class="hint">No transfers recorded.</div>';
+
+    for (const b of $('transfers').querySelectorAll('[data-accept]')) b.addEventListener('click', () => send({ type: 'transfer_accept', id: b.dataset.accept }));
+    for (const b of $('transfers').querySelectorAll('[data-decline]')) b.addEventListener('click', () => send({ type: 'transfer_decline', id: b.dataset.decline }));
+    for (const b of $('transfers').querySelectorAll('[data-chit]')) b.addEventListener('click', () => send({ type: 'transfer_chit', id: b.dataset.chit, confirmed: b.dataset.on === '1' }));
     for (const b of $('transfers').querySelectorAll('[data-stamp]')) b.addEventListener('click', () => send({ type: 'transfer_stamp', id: b.dataset.stamp, force: true }));
     for (const b of $('transfers').querySelectorAll('[data-upd]')) b.addEventListener('click', () => send({ type: 'transfer_update', id: b.dataset.upd, status: b.dataset.st }));
   }
@@ -632,7 +662,18 @@
     ['upkeep_shortfall_penalty', 'Penalty per missing upkeep unit', 'n'], ['upkeep_shortfall_penalty_cap', 'Penalty cap per cycle', 'n'],
     ['core_scales_power_production', 'Core output scales POW production', 'b'],
     ['injured_recovery_per_cycle', 'Injured recovered per cycle (MED)', 'n'], ['injured_recovery_costs_med', 'Med supplies per recovery', 'n'],
-    ['trn_capacity_per_cycle', 'Transport capacity per cycle', 'n'], ['deliver_on_stamp', 'Stamp delivers immediately', 'b'],
+    ['deliver_on_stamp', 'Stamp delivers immediately', 'b'],
+    ['TRANSFERS'],
+    ['transfer_limit_basis', 'Stamp allowance counted per', 'e', ['round', 'cycle']],
+    ['transport_stamp_limit', 'Transport stamps per round', 'n'],
+    ['trn_capacity_per_cycle', 'Transport capacity per cycle (legacy basis)', 'n'],
+    ['require_supplier_acceptance', 'Supplier must accept before Transport sees it', 'b'],
+    ['enforce_supplier_stock', 'Check supplier stock on accept and stamp', 'b'],
+    ['insufficient_stock_behavior', 'When the supplier is short', 'e', ['refuse', 'legacy_partial_if_supported']],
+    ['expire_pending_transfers_on_round_change', 'Unstamped transfers expire at round change', 'b'],
+    ['require_physical_transfer_chit', 'Transport must confirm the paper chit', 'b'],
+    ['notify_supplier_with_sound', 'Inbound request rings on the supplier screen', 'b'],
+    ['show_completed_transfer_on_wall', 'Completed transfer shows on the wall', 'b'],
     ['FAULTS'],
     ['deadline_default_s.2', 'Default deadline — EMERGENCY (s, blank = none)', 'n?'], ['deadline_default_s.3', 'Default deadline — CRISIS (s)', 'n?'],
     ['deadline_default_s.1', 'Default deadline — INCIDENT (s)', 'n?'],
@@ -670,16 +711,21 @@
     if (!force && cfgJson === lastConfigJson) return;
     lastConfigJson = cfgJson;
     const cfg = state.config;
-    $('settings').innerHTML = SETTINGS.map(([key, label, type]) => {
+    $('settings').innerHTML = SETTINGS.map(([key, label, type, options]) => {
       if (!label) return `<div class="sg">${key}</div>`;
       const v = getPath(cfg, key);
       if (type === 'b') return `<label>${esc(label)}<input type="checkbox" data-key="${key}" data-type="b" ${v ? 'checked' : ''}></label>`;
+      if (type === 'e') {
+        return `<label>${esc(label)}<select data-key="${key}" data-type="e">${(options || [])
+          .map((o) => `<option value="${esc(o)}"${String(v) === o ? ' selected' : ''}>${esc(o.replace(/_/g, ' '))}</option>`).join('')}</select></label>`;
+      }
       return `<label>${esc(label)}<input type="number" step="${type === 'f' ? '0.05' : '1'}" data-key="${key}" data-type="${type}" value="${v == null ? '' : v}"></label>`;
     }).join('');
-    for (const input of $('settings').querySelectorAll('input')) {
+    for (const input of $('settings').querySelectorAll('input, select')) {
       input.addEventListener('change', () => {
         let v;
         if (input.dataset.type === 'b') v = input.checked;
+        else if (input.dataset.type === 'e') v = input.value;
         else if (input.value === '' && input.dataset.type === 'n?') v = null;
         else v = Number(input.value);
         send({ type: 'set_config', patch: setPath({}, input.dataset.key, v) });

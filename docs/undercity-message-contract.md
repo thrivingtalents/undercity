@@ -299,7 +299,17 @@ Plus: `transfers[]` (those involving this sector), `announcements[]` (public
 plus this sector's), `effects[]` (temporary effects targeting this sector or
 ALL), and:
 
-- **TRN only** — `transfer_queue { capacity, used, can_stamp, items[] }`.
+- **TRN only** — `transfer_queue { capacity, used, remaining, basis, requires_chit,
+  can_stamp, awaiting_acceptance, items[] }`. `items[]` holds only what the
+  supplier has ACCEPTED (while `require_supplier_acceptance` is on); each item
+  carries `chit_confirmed` and `supplier_ok` — a **boolean**, never the
+  supplier's stock count, so Transport learns whether the chit can be honoured
+  without learning what another table is holding. `awaiting_acceptance` is a
+  count only.
+- **Every sector** — `transfer_rules { require_supplier_acceptance,
+  require_physical_transfer_chit, notify_supplier_with_sound,
+  enforce_supplier_stock }`, so a screen can gate its own controls without
+  guessing at the scenario.
 - **COM only** — `intel { degraded, items[{key,label,value}] }`; values read
   `UNKNOWN` under a brownout (per item `hidden_in_brownout`) or comms blackout.
   `full_telemetry` also drops to false while COM is blind.
@@ -338,10 +348,21 @@ scenario defaults) and `scenario { id name sectors events fault_presets }`.
 
 ```json
 { "type": "fault_open", "fault_code": "F-201" }
-{ "type": "transfer_request", "from": "WTR", "to": "POW", "resource": "water", "amount": 2, "note": "" }
-{ "type": "transfer_update", "id": "T-0007", "status": "AGREED" }        // AGREED | WAITING_TRN | CANCELLED
-{ "type": "transfer_stamp", "id": "T-0007" }                              // TRN only
+{ "type": "transfer_request", "from": "POW", "to": "MED", "resource": "power", "amount": 2 }
+{ "type": "transfer_accept",  "id": "T-0007" }   // SUPPLIER (`from`) only — never the requester
+{ "type": "transfer_decline", "id": "T-0007" }   // SUPPLIER only
+{ "type": "transfer_update",  "id": "T-0007", "status": "CANCELLED" }   // withdraw, only while REQUESTED
+{ "type": "transfer_chit",    "id": "T-0007", "confirmed": true }        // TRN only — the signed paper is in hand
+{ "type": "transfer_stamp",   "id": "T-0007" }                           // TRN only
 ```
+
+The request carries **no free-text field**: the terms are agreed out loud, by
+Liaisons, on paper. `transfer_accept` from the requesting sector is refused
+with `not_supplier`; a supplier short of stock is refused with
+`insufficient_stock_accept { have, need }`. A stamp is refused, in order, with
+`not_accepted`, `capacity { capacity, used, basis }`, `chit_required` or
+`insufficient_stock_stamp { have, need }` — and a refusal spends no allowance
+and moves no stock.
 Replies: `transfer_result { ok, reason?, transfer? }`. `submit_result` now
 also carries `recovery` and `consumed` on success, `max_consecutive` on an
 invalid code, and `insufficient_resources { short }` when the scenario
@@ -373,8 +394,11 @@ requires stock.
 { "type": "cancel_scheduled", "id": "S-0004" }
 { "type": "timeline_fire", "id": "R2-01" }  { "type": "timeline_skip", "id": "R2-01" }  { "type": "timeline_delay", "id": "R2-01", "seconds": 120 }
 { "type": "transfer_request", "from": "WTR", "to": "POW", "resource": "water", "amount": 2 }
+{ "type": "transfer_accept", "id": "T-0007" }   { "type": "transfer_decline", "id": "T-0007" }
+{ "type": "transfer_chit", "id": "T-0007", "confirmed": true }
 { "type": "transfer_update", "id": "T-0007", "status": "DELIVERED" }
-{ "type": "transfer_stamp", "id": "T-0007", "force": true }
+{ "type": "transfer_stamp", "id": "T-0007", "force": true }   // lifts acceptance, allowance and chit — never stock
+{ "type": "reset_stamps", "which": "all" }      { "type": "expire_transfers" }
 { "type": "wall_debrief", "on": true }
 { "type": "reset_run", "run_id": "…", "scenario_id": "haven9-hard", "confirm": true }
 ```
@@ -405,7 +429,8 @@ exists, else a synthesised placeholder.
 
 `phase`, `pause`, `fault_opened`, `deadline_expired {penalty}`, `fault_failed`,
 `cycle_processed {summary}`, `upkeep_missed`, `worker_recovered`,
-`transfer_requested/agreed/waiting_trn/stamped/delivered/cancelled/refused`,
+`transfer_requested/accepted/declined/waiting_trn/chit/stamped/delivered/cancelled/expired/refused`,
+`transfer_accept_refused`, `transport_stamp_counter_reset`,
 `council_called/ended/no_order`, `continuity_order`, `blackout_started/rotated/ended`,
 `event_fired`, `effect_started/ended`, `scheduled`, `preset_fired`,
 `timeline_fired/skipped/delayed`, `alert`, `config_patched`, `set_stability`,
