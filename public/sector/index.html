@@ -60,6 +60,7 @@
       <b id="banner-alert-title"></b><span id="banner-alert-sub"></span>
     </div>
     <div class="banner banner-request" id="banner-request" hidden></div>
+    <div class="banner banner-city" id="banner-city" hidden>CITY ANNOUNCEMENT UPDATED — READ IT ON THE BIG SCREEN</div>
     <div class="banner banner-council" id="banner-council" hidden>COUNCIL SUMMONED — CHIEF + LIAISON REPORT TO CENTRAL COUNCIL <b class="clock" id="banner-council-clock">05:00</b></div>
     <div class="banner banner-brownout" id="banner-brownout" hidden>⚠ SECTOR BROWNOUT — PRODUCTION REDUCED · OPERATIONS DEGRADED</div>
     <div class="banner banner-breather" id="banner-breather" hidden>BREATHER — SYSTEMS HOLDING</div>
@@ -230,14 +231,19 @@
         <div class="declare-note">Only Medical Bay heals. Transport is not involved.</div>
       </div>
 
-      <!-- THE CITY BIG SCREEN: what COM has told the city. COM alone gets the inputs. -->
-      <div class="panel block broadcast-block" id="broadcast-panel" hidden>
-        <h2 class="ptitle"><span id="bc-title">CITY BIG SCREEN</span> <span class="cap" id="bc-round"></span></h2>
+      <!--
+        COM ONLY: the controls for the shared big screen. The board itself is
+        on the wall; a table's console shows its own truth, not the city's
+        reported figures. The server sends this panel's data to COM alone.
+      -->
+      <div class="panel block broadcast-block editable" id="broadcast-panel" hidden>
+        <h2 class="ptitle"><span id="bc-title">CITY BIG SCREEN CONTROL</span> <span class="cap" id="bc-round"></span></h2>
+        <div class="tf-label">PUBLISHED NOW</div>
         <div class="bc-ann" id="bc-ann" hidden><b id="bc-ann-head"></b><span id="bc-ann-msg"></span><em id="bc-ann-meta"></em></div>
-        <div class="empty" id="bc-ann-none" hidden>No priority announcement.</div>
+        <div class="empty" id="bc-ann-none" hidden>No priority announcement on the wall.</div>
+        <div class="tf-label">EDIT RESOURCE BOARD</div>
         <div class="bc-rows" id="bc-rows"></div>
-        <div class="bc-key">⚡ POWER · 💧 WATER · ⚕ MED · 🔧 PARTS, in that order — reported by Comms, not measured</div>
-        <div class="bc-editor" id="bc-editor" hidden>
+        <div class="bc-editor" id="bc-editor">
           <div class="tf-label">PRIORITY ANNOUNCEMENT</div>
           <input type="text" id="bc-head" maxlength="40" placeholder="Headline (40 characters)">
           <input type="text" id="bc-msg" maxlength="160" placeholder="Message (160 characters)">

@@ -77,6 +77,7 @@
 }
 .banner-brownout { background: #3a2a0c; color: var(--amber); }
 .banner-request { background: #123047; color: #cfe8ff; animation: bannerIn 400ms ease; }
+.banner-city { background: #1a1630; color: #d9c8ff; }
 .banner-council { background: #2a1a3a; color: #e8d6ff; }
 .banner-council b { margin-left: 14px; font-size: 1.15em; color: #fff; }
 .banner-breather { background: #0f2a17; color: var(--green); }
@@ -228,19 +229,15 @@ button.wide { width: 100%; }
 .bc-row { display: grid; grid-template-columns: 52px 1fr auto; gap: 4px 6px; align-items: center; background: var(--steel); border: 1px solid var(--line); padding: 3px 6px; font-size: 11px; }
 .bc-row .bc-code { letter-spacing: 0.1em; color: var(--ink-dim); white-space: nowrap; }
 .bc-cells { display: flex; gap: 6px; }
-.bc-cells b { min-width: 30px; font-variant-numeric: tabular-nums; }
-.bc-cells b[data-k="power"]::before { content: "⚡"; margin-right: 2px; }
-.bc-cells b[data-k="water"]::before { content: "💧"; margin-right: 2px; }
-.bc-cells b[data-k="med"]::before { content: "⚕"; margin-right: 2px; color: var(--red); }
-.bc-cells b[data-k="parts"]::before { content: "🔧"; margin-right: 2px; }
-.bc-cells input { width: 42px; padding: 2px 4px; font-size: 11px; }
+.bc-cell { display: inline-flex; align-items: center; gap: 2px; }
+.bc-glyph { font-size: 11px; }
+.bc-cells input { width: 40px; padding: 2px 4px; font-size: 11px; }
 .bc-meta { grid-column: 1 / -1; display: flex; gap: 8px; }
 .bc-fresh { font-style: normal; font-weight: 700; font-size: 9px; letter-spacing: 0.16em; }
 .bc-fresh[data-fresh="CURRENT"] { color: var(--green); }
 .bc-fresh[data-fresh="STALE"] { color: var(--amber); }
 .bc-fresh[data-fresh="OUTDATED"], .bc-fresh[data-fresh="NOT UPDATED"] { color: var(--red); }
 .bc-save { padding: 2px 8px; font-size: 10px; }
-.bc-key { font-size: 9px; color: var(--ink-faint); margin-top: 4px; letter-spacing: 0.04em; }
 .bc-editor { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
 .bc-editor input[type="text"] { width: 100%; box-sizing: border-box; font-size: 11px; padding: 4px 6px; }
 

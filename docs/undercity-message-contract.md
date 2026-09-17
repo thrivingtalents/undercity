@@ -322,12 +322,16 @@ ALL), and:
   `{ id, title, summary, category, target }` plus `sectors[]`, `choices{}` or
   `ties[]` where a choice is needed. Never the deck. **No other role is sent
   this key.**
-- **Every role, including the wall** — `broadcast { round, round_number,
+- **The wall and COM** — `broadcast { round, round_number,
   rows{ CODE: { power, water, med, parts, round, round_number, freshness } },
   announcement | null, editable }`. Reported by COM, never read from
   inventory; `freshness` is CURRENT / STALE / OUTDATED / NOT UPDATED from
   round distance alone, and no field carries a clock time. `editable` is true
   only in COM's frame.
+- **Every other sector** — `broadcast { round, round_number, editable: false,
+  announcement_active }` and nothing more (2026-09-17). A table's console is
+  local truth; the city's reported board lives on the wall; the screen shows
+  only CITY ANNOUNCEMENT UPDATED when one exists, never the words.
 - **The wall** — `requests[]` (open) and `transfers[]` (open, plus any closed in
   the last 20 s so an animation can finish), each `{ id, from/to or
   supplier/requester, resource, amount, status, updated_at }`. What is moving

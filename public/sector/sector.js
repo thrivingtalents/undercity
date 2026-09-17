@@ -794,15 +794,16 @@
     if (fresh.length) notifyArrival(`HEALING REQUEST — ${sectorLabel(fresh[0].sector)} ${fresh[0].worker_label}`);
   }
 
-  // -- the city broadcast: COM writes it, everyone reads it ----------------------
+  // -- the city big screen: COM controls it; everyone else reads it on the wall --
   //
-  // The board is what COM last REPORTED, stamped with a round, never a live
-  // mirror of anyone's stock. COM's inputs are a draft the frame must not
-  // clobber mid-keystroke: the rows are built once and only their freshness
-  // badges are touched afterwards.
+  // A table's console shows local truth. The city's reported board lives on
+  // the shared big screen, and only COM gets the editor here: six rows of
+  // inputs (a draft the frame must not clobber mid-keystroke), the
+  // announcement form, and one line saying what is on the wall right now.
+  // Any other sector sees just a nudge that an announcement exists.
 
   const BOARD_KEYS = ['power', 'water', 'med', 'parts'];
-  let boardBuiltFor = null;     // 'edit' | 'view' — which shape the rows were built in
+  let boardBuilt = false;
 
   function saveBoardRow(code) {
     const values = {};
@@ -829,29 +830,24 @@
 
   function renderBroadcast() {
     const b = state.broadcast;
-    show($('broadcast-panel'), !!b);
-    if (!b) return;
-    const editable = !!b.editable;
-    const mode = editable ? 'edit' : 'view';
-    setText($('bc-title'), editable ? 'CITY BROADCAST CONTROL' : 'CITY BIG SCREEN');
-    setText($('bc-round'), `CURRENT ROUND: ${b.round_number}`);
-    show($('bc-editor'), editable);
-    $('broadcast-panel').classList.toggle('editable', editable);
+    const editable = !!(b && b.editable && b.rows);
+    // Everyone but COM: a nudge towards the wall, never the words.
+    show($('banner-city'), !!(b && !editable && b.announcement_active));
+    show($('broadcast-panel'), editable);
+    if (!editable) return;
 
+    setText($('bc-round'), `CURRENT ROUND: ${b.round_number}`);
     const host = $('bc-rows');
     const codes = Object.keys(b.rows);
-    if (boardBuiltFor !== mode || host.children.length !== codes.length) {
-      boardBuiltFor = mode;
+    if (!boardBuilt || host.children.length !== codes.length) {
+      boardBuilt = true;
       host.innerHTML = codes.map((code) => {
         const row = b.rows[code];
-        const cells = BOARD_KEYS.map((k) => (editable
-          ? `<input type="number" min="0" step="1" id="bc-${code}-${k}" value="${row[k] ?? ''}" placeholder="—" aria-label="${code} ${k}">`
-          : `<b class="bc-v" data-k="${k}">${row[k] ?? '—'}</b>`)).join('');
-        const save = editable ? `<button type="button" class="bc-save" data-save="${code}">SAVE</button>` : '';
+        const cells = BOARD_KEYS.map((k) => `<label class="bc-cell"><span class="bc-glyph">${U.GLYPH[k]}</span><input type="number" min="0" step="1" id="bc-${code}-${k}" value="${row[k] ?? ''}" placeholder="—" aria-label="${code} ${k}"></label>`).join('');
         return `<div class="bc-row" data-code="${code}">
             <span class="bc-code">${U.SECTOR_GLYPH[code] || ''} ${code}</span>
             <span class="bc-cells">${cells}</span>
-            ${save}
+            <button type="button" class="bc-save" data-save="${code}">SAVE</button>
             <span class="bc-meta"><em class="bc-upd"></em> <i class="bc-fresh"></i></span>
           </div>`;
       }).join('');
@@ -861,25 +857,23 @@
       const row = b.rows[code];
       const el = host.querySelector(`[data-code="${code}"]`);
       if (!el) continue;
-      setText(el.querySelector('.bc-upd'), row.round_number === null ? 'NEVER UPDATED' : `LAST UPDATED: ROUND ${row.round_number}`);
+      setText(el.querySelector('.bc-upd'), row.round_number === null ? 'NOT PUBLISHED' : `PUBLISHED ROUND ${row.round_number}`);
       const fresh = el.querySelector('.bc-fresh');
       setText(fresh, freshWord(row.freshness));
       fresh.dataset.fresh = row.freshness;
-      if (!editable) {
-        for (const k of BOARD_KEYS) setText(el.querySelector(`[data-k="${k}"]`), String(row[k] ?? '—'));
-      }
     }
 
+    // What the wall says right now — the compact preview.
     const a = b.announcement;
     show($('bc-ann'), !!a);
     if (a) {
       setText($('bc-ann-head'), a.headline);
       setText($('bc-ann-msg'), a.message);
-      setText($('bc-ann-meta'), `LAST UPDATED: ROUND ${a.round_number} · ${freshWord(a.freshness)}`);
+      setText($('bc-ann-meta'), `ON THE WALL · ROUND ${a.round_number} · ${freshWord(a.freshness)}`);
       $('bc-ann').dataset.fresh = a.freshness;
     }
     show($('bc-ann-none'), !a);
-    if (editable) $('bc-clear').disabled = !a;
+    $('bc-clear').disabled = !a;
   }
 
   // -- AGR: the round's three interventions -------------------------------------

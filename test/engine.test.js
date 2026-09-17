@@ -1007,7 +1007,8 @@ test('a COM save stamps the current round, and players see a round, not a clock'
   const r = game.setBroadcastRow('POW', { power: 2 }, { by: 'COM' });
   assert.equal(r.row.round, 'R3');
   assert.equal(r.freshness, 'CURRENT');
-  const row = forSector(game, 'WTR').broadcast.rows.POW;
+  const row = forBigscreen(game).broadcast.rows.POW;
+  assert.equal(forSector(game, 'WTR').broadcast.rows, undefined, 'a table is not sent the board');
   assert.equal(row.round_number, 3);
   assert.equal(row.freshness, 'CURRENT');
   // The player-facing projection carries no timestamp field of any kind.
@@ -1059,7 +1060,9 @@ test('COM publishes one priority announcement, replaces it, and clears it; nothi
   const snap = JSON.stringify({ s: game.state.sectors, t: game.state.transfers, h: game.state.healing });
   assert.equal(game.setBroadcastAnnouncement({}, { by: 'COM' }).reason, 'empty_announcement');
   assert.equal(game.setBroadcastAnnouncement({ headline: 'MED NEEDS POWER', message: 'Send 2 power via TRN' }, { by: 'COM' }).ok, true);
-  assert.equal(forSector(game, 'POW').broadcast.announcement.headline, 'MED NEEDS POWER');
+  assert.equal(forSector(game, 'COM').broadcast.announcement.headline, 'MED NEEDS POWER');
+  assert.equal(forSector(game, 'POW').broadcast.announcement_active, true, 'a table is told one exists');
+  assert.equal(forSector(game, 'POW').broadcast.announcement, undefined, 'but never the words');
   game.setBroadcastAnnouncement({ headline: 'A'.repeat(60), message: 'B'.repeat(200) }, { by: 'COM' });
   const a = forBigscreen(game).broadcast.announcement;
   assert.equal(a.headline.length, 40, 'headline capped at 40');
@@ -1744,6 +1747,116 @@ test('a scenario override changes one reward without touching the table; disabli
   assert.equal(res.reward.applied, false);
   assert.equal(res.reward.reason, 'disabled');
   assert.equal(game.state.sectors.WTR.inventory.power, before);
+});
+
+// -- v9: the city board lives on the wall ---------------------------------------------
+//
+// A table's console is local truth. The city's reported figures are COM's to
+// publish and the wall's to show; a laptop gets the round and one flag.
+
+const SECTOR_INDEX = fs.readFileSync(path.join(__dirname, '..', 'public', 'sector', 'index.html'), 'utf8');
+const SECTOR_SCRIPT = fs.readFileSync(path.join(__dirname, '..', 'public', 'sector', 'sector.js'), 'utf8');
+
+test('POW, WTR, MED, TRN and AGR are not sent the six-sector board; COM and the wall are', () => {
+  const game = running();
+  game.setBroadcastRow('POW', { power: 5 }, { by: 'COM' });
+  game.setBroadcastAnnouncement({ headline: 'HOLD', message: 'Route parts to POW' }, { by: 'COM' });
+  for (const code of ['POW', 'WTR', 'MED', 'TRN', 'AGR']) {
+    const b = forSector(game, code).broadcast;
+    assert.equal(b.rows, undefined, `${code} carries the board`);
+    assert.equal(b.announcement, undefined, `${code} carries the announcement text`);
+    assert.equal(b.editable, false);
+    assert.equal(b.announcement_active, true);
+    assert.equal(typeof b.round_number, 'number');
+    assert.ok(!JSON.stringify(forSector(game, code)).includes('Route parts to POW'), `${code}'s frame carries the message`);
+  }
+  const com = forSector(game, 'COM').broadcast;
+  assert.deepEqual(Object.keys(com.rows).sort(), ['AGR', 'COM', 'MED', 'POW', 'TRN', 'WTR']);
+  assert.equal(com.editable, true);
+  assert.equal(com.announcement.headline, 'HOLD');
+  const wall = forBigscreen(game).broadcast;
+  assert.deepEqual(Object.keys(wall.rows).sort(), ['AGR', 'COM', 'MED', 'POW', 'TRN', 'WTR']);
+  assert.equal(wall.rows.POW.power, 5);
+  assert.equal(wall.rows.POW.freshness, 'CURRENT');
+  assert.equal(wall.rows.WTR.freshness, 'NOT UPDATED');
+  assert.equal(wall.announcement.headline, 'HOLD');
+  assert.equal(forControl(game).broadcast.editable, true, 'the facilitator keeps the override editor');
+});
+
+test("the round is on every sector screen, and it is not COM's to control", () => {
+  const game = running();
+  for (const code of BOARD_ROLES) {
+    const f = forSector(game, code);
+    assert.equal(f.round, 'R2');
+    assert.ok(f.round_name);
+    assert.equal(f.broadcast.round_number, 2);
+  }
+  game.setRound('R3');
+  assert.equal(forSector(game, 'AGR').broadcast.round_number, 3);
+  assert.ok(/id="hdr-phase"/.test(SECTOR_INDEX), 'the header prints the round');
+});
+
+test("a sector sees its own real stock and never another sector's", () => {
+  const game = running();
+  game.setInventory('POW', { power: 7 });
+  const pow = forSector(game, 'POW').sectors;
+  assert.equal(pow.POW.inventory.power, 7);
+  for (const code of BOARD_ROLES.filter((c) => c !== 'POW')) {
+    assert.equal(pow[code].inventory, undefined, `POW can see ${code}'s stock`);
+    assert.equal(forSector(game, code).sectors.POW.inventory, undefined, `${code} can see POW's stock`);
+  }
+});
+
+test("the board is COM's report, untouched by production, upkeep, a transfer, a reward, a card or a round", () => {
+  const game = running();
+  game.setBroadcastRow('POW', { power: 9, water: 9, parts: 9 }, { by: 'COM' });
+  game.setBroadcastRow('AGR', { parts: 9 }, { by: 'COM' });
+  const wall = () => forBigscreen(game).broadcast.rows;
+  game.cycleControl('process');                                   // production and upkeep
+  assert.equal(wall().POW.power, 9, 'the cycle moved the board');
+  const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 });
+  game.approveTransfer(t.id, { by: 'TRN' });
+  assert.equal(wall().POW.power, 9, 'a transfer moved the board');
+  const def = loadContent().faults.faults.find((f) => f.code === 'F-001');
+  game.fireFault('F-001', 'POW');
+  submitCode(game, { sector: 'POW', fault_code: 'F-001', code: def.valid_codes[0], workers_assigned: def.crew_required });
+  assert.equal(wall().POW.water, 9, 'a reward moved the board');
+  game.state.agr.offered = ['AGR_EMERGENCY_PARTS', 'AGR_POWER_SURGE', 'AGR_WATER_RESERVE'];
+  assert.equal(game.agrActivate('AGR_EMERGENCY_PARTS', { by: 'AGR' }).ok, true);
+  assert.equal(wall().AGR.parts, 9, 'a card moved the board');
+  game.setRound('R3');
+  assert.equal(wall().POW.power, 9, 'the round change moved the board');
+  assert.equal(wall().POW.freshness, 'STALE');
+  assert.notEqual(game.state.sectors.POW.inventory.power, 9, 'real stock and the board have parted, as they should');
+});
+
+test('the sector features survive the removal: faults, upkeep, healing, approvals, cards, stock', () => {
+  const game = running();
+  game.fireFault('F-201', 'POW');
+  game.injure('AGR', 1);
+  game.requestHealing('AGR', { by: 'AGR' });
+  readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 });
+  const pow = forSector(game, 'POW');
+  assert.equal(pow.sectors.POW.faults.length, 1);
+  assert.ok(pow.sectors.POW.upkeep_delivery && pow.sectors.POW.inventory && pow.sectors.POW.workforce);
+  assert.equal(forSector(game, 'MED').healing_queue.items.length, 1);
+  assert.equal(forSector(game, 'TRN').transfer_queue.items.length, 1);
+  assert.equal(forSector(game, 'AGR').agr_cards.offered.length, 3);
+  for (const code of BOARD_ROLES) {
+    assert.equal(forSector(game, code).broadcast.rows === undefined, code !== 'COM', `${code} board presence wrong`);
+  }
+});
+
+test("the sector markup has no city table, no legend, an announcement nudge, and COM's controls", () => {
+  assert.equal(SECTOR_INDEX.includes('bc-key'), false, 'the legend is still there');
+  assert.equal(SECTOR_SCRIPT.includes('bc-v'), false, 'the read-only board cells are still built');
+  assert.equal(SECTOR_SCRIPT.includes("'CITY BIG SCREEN'"), false, 'a read-only board title remains');
+  assert.ok(/id="banner-city"/.test(SECTOR_INDEX), 'no announcement nudge');
+  assert.ok(/CITY ANNOUNCEMENT UPDATED/.test(SECTOR_INDEX));
+  assert.ok(/id="bc-rows"/.test(SECTOR_INDEX) && /id="bc-publish"/.test(SECTOR_INDEX) && /id="bc-clear"/.test(SECTOR_INDEX), 'COM lost a control');
+  assert.ok(/CITY BIG SCREEN CONTROL/.test(SECTOR_INDEX));
+  assert.ok(/show\(\$\('broadcast-panel'\), editable\)/.test(SECTOR_SCRIPT), 'the panel is not gated to COM');
+  assert.ok(/show\(\$\('banner-city'\), !!\(b && !editable && b\.announcement_active\)\)/.test(SECTOR_SCRIPT), 'the nudge is not gated to non-COM');
 });
 
 // -- council and the Continuity Order ------------------------------------------------
