@@ -2,7 +2,7 @@
 /**
  * CITY WALL — the command centre view of HAVEN-9.
  *
- * Four bands, top to bottom: the command bar (round, CITY, CORE, NEXT CYCLE),
+ * Four bands, top to bottom: the command bar (round, CITY, CORE, NEXT ROUND),
  * ONE priority event, the city beside its six health monitors, and the last
  * four things that happened. The city is the hero: the illustration in
  * public/wall/art/haven9-map.png with everything alive drawn over it in an
@@ -296,7 +296,7 @@
     setText($('phase-name'), label);
     setStat('hud-city', 'stability', frame.city_stability);
     setStat('hud-core', 'core-output', frame.core_output);
-    setText($('time-label'), inCouncil() ? 'COUNCIL' : 'NEXT CYCLE');
+    setText($('time-label'), inCouncil() ? 'COUNCIL' : 'NEXT ROUND');
     show($('tag-blackout'), !!(frame.blackout && frame.blackout.active));
     show($('tag-breather'), !!frame.breather);
     show($('tag-sensors'), !!frame.telemetry_degraded);
@@ -666,14 +666,14 @@
 
   function renderPaused() { show($('paused'), !!frame.paused); }
 
-  /** The cycle boundary: 3.5 seconds of CYCLE n COMPLETE, with what it cost. */
+  /** The round's upkeep pass: 3.5 seconds of UPKEEP PROCESSED, with what it cost. */
   function renderCycle() {
     const n = Number(frame.cycle && frame.cycle.number);
     if (prevCycle !== null && Number.isFinite(n) && n > prevCycle) {
       const feed = Array.isArray(frame.ticker) ? frame.ticker : (frame.feed || []);
       const cost = feed.filter((e) => e.kind === 'cycle' && ageOf(e.t) < 6 && /missed upkeep/i.test(e.text))
         .map((e) => `${e.text.slice(0, 3)} MISSED UPKEEP`);
-      setText($('cycle-flash-title'), `CYCLE ${prevCycle} COMPLETE — CYCLE ${n} BEGINS`);
+      setText($('cycle-flash-title'), 'ROUND UPKEEP PROCESSED');
       setText($('cycle-flash-sub'), cost.length ? cost.join('  ·  ') : '');
       cycleFlashUntil = performance.now() + CYCLE_FLASH_MS;
       show($('cycle-flash'), true);
@@ -714,7 +714,7 @@
         if ((m = t.match(/^CORE OUTPUT (\d+)%/))) return { cls: 'warn', text: `CORE OUTPUT ${m[1]}%` };
         return { cls: 'warn', text: t.toUpperCase() };
       case 'cycle':
-        if ((m = t.match(/^CORE CYCLE (\d+) PROCESSED/))) return { cls: 'info', text: `CYCLE ${m[1]} COMPLETE` };
+        if ((m = t.match(/^(R\d+) UPKEEP PROCESSED/))) return { cls: 'info', text: `${m[1]} UPKEEP PROCESSED` };
         if ((m = t.match(/^(\w{3}) missed upkeep/))) return { cls: 'warn', text: `${m[1]} MISSED UPKEEP` };
         return null;
       case 'council':
@@ -775,9 +775,9 @@
     const now = performance.now();
     const frozen = !!frame.frozen;
 
-    // Command bar time: the council clock while the Council sits, else the next cycle.
+    // Command bar time: the council clock while the Council sits, else the round clock — upkeep falls due when it ends.
     const council = inCouncil();
-    const clockObj = council ? frame.council_clock : frame.cycle;
+    const clockObj = council ? frame.council_clock : frame.round_clock;
     const secs = U.countdown(clockObj, frozen);
     const running = !!(clockObj && clockObj.running) && !frozen;
     setText($('cycle-clock'), U.mmss(secs));
@@ -786,9 +786,9 @@
     const hud = $('hud-time');
     if (hud.className !== cls) hud.className = cls;
 
-    // The final ten seconds of a cycle, as a number the whole room can count.
-    const cyc = U.countdown(frame.cycle, frozen);
-    const finalOn = !council && !!(frame.cycle && frame.cycle.running) && !frozen && cyc > 0 && cyc <= 10;
+    // The final ten seconds of a round, as a number the whole room can count.
+    const cyc = U.countdown(frame.round_clock, frozen);
+    const finalOn = !council && !!(frame.round_clock && frame.round_clock.running) && !frozen && cyc > 0 && cyc <= 10;
     const fc = $('final-count');
     if (finalOn) {
       const digit = String(Math.ceil(cyc));

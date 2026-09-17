@@ -89,7 +89,7 @@
         el.hidden = false;
       }
       if (msg.type === 'submit_result') handleResult(msg);
-      if (['transfer_result', 'heal_result', 'broadcast_result', 'agr_result'].includes(msg.type)) handleTransferResult(msg);
+      if (['transfer_result', 'heal_result', 'broadcast_result', 'agr_result', 'output_result'].includes(msg.type)) handleTransferResult(msg);
       if (msg.type === 'sting') U.playSting(msg.sound);
     },
   });
@@ -191,6 +191,7 @@
     $('btn-heal-request').addEventListener('click', requestHealing);
     $('bc-publish').addEventListener('click', publishAnnouncement);
     $('bc-clear').addEventListener('click', clearAnnouncement);
+    $('btn-generate').addEventListener('click', generateOutput);
 
     // Console.
     const input = $('code-input');
@@ -415,9 +416,14 @@
   function handleTransferResult(msg) {
     const target = {
       stamp: 'queue-msg', inbox: 'inbox-msg', heal: 'heal-msg', healing: 'healing-msg',
-      broadcast: 'broadcast-msg', agr: 'agr-msg',
+      broadcast: 'broadcast-msg', agr: 'agr-msg', output: 'output-msg',
     }[pendingTransferAction] || 'transfer-msg';
     pendingTransferAction = null;
+    if (msg.type === 'output_result') {
+      if (msg.ok) transientMsg(target, `${fmtAdded(msg.added)} GENERATED`, 'ok', 6000);
+      else transientMsg(target, OUTPUT_WORD[msg.reason] || String(msg.reason || 'REFUSED').toUpperCase().replace(/_/g, ' '), 'bad', 6000);
+      return;
+    }
     if (msg.ok && msg.type === 'agr_result') {
       if (msg.action === 'activate') { agrPick = null; transientMsg(target, 'INTERVENTION ACTIVATED — LOCKED UNTIL NEXT ROUND', 'ok', 8000); }
       return;
@@ -449,13 +455,14 @@
     renderModes();
     renderResources();
     renderUpkeep();
+    renderOutput();
     renderInbox();
     renderInjured();
     renderTransfers();
     renderFaultList();
     renderCard();
     renderCity();
-    renderAnnouncements();
+    renderNotice();
     renderEffects();
     renderQueue();
     renderHealing();
@@ -482,7 +489,6 @@
     if (bar.className !== cls) bar.className = cls;
     bar.firstElementChild.style.width = `${Math.max(0, Math.min(100, value))}%`;
 
-    setText($('hdr-core'), `${Math.round(state.core_output)}%`);
     setText($('hdr-phase'), String(state.phase_name || state.phase || '—').toUpperCase());
   }
 
@@ -504,8 +510,8 @@
     const council = !!(state.council && state.council.active) || state.mode === 'COUNCIL';
     show($('council'), council);
     show($('banner-council'), council);
-    show($('city-block'), !council);
-    show($('announce-block'), !council);
+    // The city feed is COM's product — its sensors, undelayed. Every other table reads the wall.
+    show($('city-block'), SECTOR === 'COM' && !council);
 
     // Alert: remember the frame's age so the tick can promote full → reduced locally.
     const a = state.alert;
@@ -566,11 +572,60 @@
     }
     show(full, !!mine.brownout);
 
-    const prod = mine.production_next || {};
-    const prodText = Object.entries(prod).filter(([, v]) => Number(v) > 0)
-      .map(([k, v]) => `+${v} ${(RES[k] || {}).glyph || k}`).join('  ');
-    setText($('production-next'), prodText || '—');
-    $('production-next').classList.toggle('dim', !prodText);
+    // READY or SHORTFALL, from the tray's real stock — never COM's board.
+    const status = $('upkeep-status');
+    const short = mine.upkeep_short || {};
+    const shortText = Object.entries(short).map(([k, v]) => `${v} ${(RES[k] || { name: k }).name}`).join(', ');
+    const word = mine.upkeep_status || (shortText ? 'SHORTFALL' : 'READY');
+    setText(status, word === 'SHORTFALL' && shortText ? `SHORTFALL — ${shortText} SHORT` : word);
+    status.dataset.status = word;
+  }
+
+  // -- ROUND OUTPUT: a producing table generates its own stock, once a round --
+
+  const OUTPUT_WORD = {
+    already_generated: 'ROUND OUTPUT ALREADY GENERATED',
+    sector_dark: 'SECTOR DARK — NO OUTPUT',
+    no_output_now: 'NO OUTPUT AVAILABLE THIS ROUND',
+    no_output: 'THIS SECTOR HAS NO OUTPUT',
+    frozen: 'CLOCKS FROZEN',
+    output_automatic: 'OUTPUT IS AUTOMATIC IN THIS SCENARIO',
+  };
+
+  function fmtAdded(o) {
+    return Object.entries(o || {}).filter(([, v]) => Number(v) > 0)
+      .map(([k, v]) => `+${v} ${(RES[k] || { name: k }).name}`).join(' ');
+  }
+
+  function generateOutput() {
+    pendingTransferAction = 'output';
+    socket.send({ type: 'generate_output' });
+  }
+
+  function renderOutput() {
+    const ro = mine.round_output;
+    show($('output-panel'), !!ro);
+    if (!ro) return;
+    const resKey = Object.keys(ro.base)[0];
+    const resName = (RES[resKey] || { name: resKey }).name;
+    setText($('output-round'), `ROUND ${state.round_number || ''}`);
+    setText($('output-amount'), ro.used ? fmtAdded(ro.added) : (fmtAdded(ro.amount) || `+0 ${resName}`));
+    $('output-amount').classList.toggle('reduced', !ro.used && ro.reduced);
+    const note = [];
+    if (!ro.manual) note.push('GENERATED AUTOMATICALLY WHEN THE ROUND ENDS');
+    else if (!ro.used && ro.reduced) {
+      if (mine.brownout) note.push('BROWNOUT — OUTPUT HALVED');
+      if (resKey === 'power' && ro.core_output < 100) note.push(`CORE AT ${ro.core_output}% — OUTPUT SCALED`);
+      if (!Object.values(ro.amount).some((v) => v > 0)) note.push('NO OUTPUT THIS ROUND');
+      if (!note.length) note.push(`ENTITLEMENT ${fmtAdded(ro.base)}`);
+    }
+    setText($('output-note'), note.join(' · '));
+    show($('output-note'), note.length > 0);
+    const btn = $('btn-generate');
+    setText(btn, `GENERATE ${resName}`);
+    show(btn, ro.manual && !ro.used);
+    btn.disabled = !ro.available;
+    show($('output-used'), ro.used);
   }
 
   function sectorLabel(code) {
@@ -765,7 +820,7 @@
     if (!q) return;
     const full = q.used >= q.capacity;
     const left = Math.max(0, q.remaining !== undefined ? q.remaining : q.capacity - q.used);
-    setText($('healing-cap'), `${q.used}/${q.capacity} USED · ${left} LEFT THIS ROUND`);
+    setText($('healing-cap'), `${q.used} / ${q.capacity} USED · ${left} LEFT`);
     $('healing-cap').classList.toggle('warn', full);
 
     const items = q.items || [];
@@ -919,7 +974,9 @@
     const a = state.agr_cards;
     show($('agr-panel'), !!a);
     if (!a) return;
-    setText($('agr-round'), `ROUND ${a.round_number} — ${a.used ? 'INTERVENTION USED' : '1 CHOICE AVAILABLE'}`);
+    setText($('agr-round'), `ROUND ${a.round_number}`);
+    setText($('agr-cap'), a.used ? 'INTERVENTION USED — LOCKED UNTIL NEXT ROUND' : '3 RANDOM CARDS · CHOOSE 1');
+    $('agr-cap').classList.toggle('warn', !!a.used);
     setText($('agr-instruction'), a.message);
     $('agr-panel').classList.toggle('used', !!a.used);
 
@@ -1132,6 +1189,7 @@
   // -- right column -----------------------------------------------------------
 
   function renderCity() {
+    if (SECTOR !== 'COM') return;
     setText($('delay-note'), state.full_telemetry ? 'FULL TELEMETRY' : '60s DELAY');
     const host = $('city');
     for (const [code, s] of Object.entries(state.sectors)) {
@@ -1166,21 +1224,20 @@
     }
   }
 
-  function renderAnnouncements() {
-    const host = $('announcements');
-    const list = state.announcements || [];
-    const html = list.length
-      ? list.map((a) => {
-        const t = a.t ? new Date(a.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-        return `<div class="announcement"><span class="t">${esc(t)}${a.sector ? ' · ' + esc(a.sector) : ''}</span>${esc(a.text)}</div>`;
-      }).join('')
-      : '<div class="empty">Nothing yet.</div>';
-    if (host.innerHTML !== html) host.innerHTML = html;
+  /**
+   * A facilitator notice addressed to THIS table shows as a banner. City-wide
+   * announcements are the wall's; a table reads them there.
+   */
+  function renderNotice() {
+    const a = (state.announcements || []).find((n) => n.sector === SECTOR);
+    const el = $('banner-notice');
+    setText(el, a ? `NOTICE TO ${SECTOR}: ${a.text}` : '');
+    show(el, !!a);
   }
 
   function effectLabel(e) {
     switch (e.kind) {
-      case 'no_production': return 'NO PRODUCTION NEXT CYCLE';
+      case 'no_production': return 'NO ROUND OUTPUT';
       case 'trn_capacity':  return 'TRANSPORT CAPACITY REDUCED';
       case 'com_blind':     return 'TELEMETRY OFFLINE';
       default:              return String(e.kind || 'EFFECT').toUpperCase().replace(/_/g, ' ');
@@ -1192,7 +1249,7 @@
     const host = $('effects');
     const html = list.map((e) =>
       `<div class="effect" data-id="${esc(e.id)}"><span>${effectLabel(e)}</span>` +
-      `<b class="clock ef-clock">${e.cycles_remaining !== undefined && e.remaining_s == null ? esc(`${e.cycles_remaining} CYCLE${e.cycles_remaining === 1 ? '' : 'S'}`) : ''}</b></div>`).join('');
+      `<b class="clock ef-clock">${e.cycles_remaining !== undefined && e.remaining_s == null ? esc(`${e.cycles_remaining} ROUND${e.cycles_remaining === 1 ? '' : 'S'}`) : ''}</b></div>`).join('');
     if (host.dataset.sig !== html) { host.dataset.sig = html; host.innerHTML = html; }
     show($('effects-panel'), list.length > 0);
   }
@@ -1210,7 +1267,7 @@
     const full = q.used >= q.capacity;
     const left = Math.max(0, (q.remaining !== undefined ? q.remaining : q.capacity - q.used));
     const period = String(q.basis || 'round').toUpperCase();
-    setText($('queue-cap'), `${q.used}/${q.capacity} USED · ${left} LEFT THIS ${period}`);
+    setText($('queue-cap'), `${q.used} / ${q.capacity} USED · ${left} LEFT${period === 'ROUND' ? '' : ' THIS ' + period}`);
     $('queue-cap').classList.toggle('warn', full);
 
     const host = $('queue');
@@ -1313,15 +1370,11 @@
     if (!state || !mine) return;
     const frozen = !!state.frozen;
 
-    // Header + upkeep share the cycle clock.
-    const cyc = U.countdown(state.cycle, frozen);
-    const cycText = state.cycle && state.cycle.running === false && !frozen && cyc <= 0 ? 'HOLD' : U.mmss(cyc);
-    setText($('hdr-cycle'), cycText);
-    setUrgency($('hdr-cycle'), cyc, true);
-    setText($('upkeep-due'), cycText);
-    setUrgency($('upkeep-due'), cyc, true);
-
-    setText($('hdr-round-clock'), U.mmss(U.countdown(state.round_clock, frozen)));
+    // One clock: the round's. Upkeep falls due when it ends.
+    const rc = U.countdown(state.round_clock, frozen);
+    const rcText = state.round_clock && state.round_clock.running === false && !frozen && rc <= 0 ? 'HOLD' : U.mmss(rc);
+    setText($('hdr-round-clock'), rcText);
+    setUrgency($('hdr-round-clock'), rc, true);
     const council = U.countdown(state.council_clock, frozen);
     setText($('council-clock'), U.mmss(council));
     setUrgency($('council-clock'), council, true);

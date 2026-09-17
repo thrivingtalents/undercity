@@ -51,9 +51,9 @@
 .hval.huge { font-size: 34px; font-weight: 700; letter-spacing: 0.06em; }
 .integrity-row { display: flex; align-items: center; gap: 10px; }
 .integrity-block .bar { width: 120px; height: 12px; }
-.cycle-block { border-left: 2px solid var(--sector); }
-.phase-block { flex: 1; }
-.phase-block .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+.round-block { flex: 1; }
+.round-block .hval { font-size: 15px; letter-spacing: 0.12em; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+.next-block { border-left: 2px solid var(--sector); }
 .status-block .hval { font-weight: 700; }
 .status-block[data-status="STABLE"]   .hval { color: var(--green); }
 .status-block[data-status="DEGRADED"] .hval { color: var(--amber); }
@@ -78,6 +78,7 @@
 .banner-brownout { background: #3a2a0c; color: var(--amber); }
 .banner-request { background: #123047; color: #cfe8ff; animation: bannerIn 400ms ease; }
 .banner-city { background: #1a1630; color: #d9c8ff; }
+.banner-notice { background: #2a2210; color: #ffe2a8; }
 .banner-council { background: #2a1a3a; color: #e8d6ff; }
 .banner-council b { margin-left: 14px; font-size: 1.15em; color: #fff; }
 .banner-breather { background: #0f2a17; color: var(--green); }
@@ -173,7 +174,9 @@
 .upkeep-full em { font-style: normal; font-size: 9px; letter-spacing: 0.14em; background: var(--amber); color: #17130a; padding: 1px 5px; margin-left: 4px; }
 .upkeep-row { display: flex; align-items: baseline; justify-content: space-between; margin-top: 4px; }
 .upkeep-row b { font-size: 18px; font-weight: 700; }
-.due-clock { font-size: 24px !important; }
+.uk-status { letter-spacing: 0.14em; }
+.uk-status[data-status="READY"] { color: var(--green); }
+.uk-status[data-status="SHORTFALL"] { color: var(--red); }
 
 /* -- left: transfers -------------------------------------------------------- */
 
@@ -361,10 +364,19 @@ button.wide { width: 100%; }
 .c-faults { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 .c-fault { font-size: 9px; letter-spacing: 0.08em; background: #2a1a1a; border: 1px solid #4a2a2a; color: #E89A9A; padding: 1px 5px; }
 
-.announce-block { flex: 1 1 auto !important; min-height: 60px; }
-.announcements { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
-.announcement { font-size: 11px; line-height: 1.5; border-left: 2px solid var(--amber); padding-left: 8px; }
-.announcement .t { display: block; font-size: 9px; color: var(--ink-faint); letter-spacing: 0.1em; }
+/* -- right: the table's MAIN ROLE — the most prominent thing on the screen -- */
+
+.main-panel { border-width: 2px; background: linear-gradient(180deg, rgba(255,255,255,0.035), transparent 60%); }
+.main-panel .ptitle { color: var(--ink); }
+.output-block { border-color: var(--sector); }
+.cap-big { font-size: 22px; font-weight: 700; letter-spacing: 0.08em; line-height: 1.1; margin: 2px 0 8px; }
+.cap-big.warn { color: var(--amber); }
+.sub-title { font-size: 10px; letter-spacing: 0.22em; color: var(--ink-dim); font-weight: 700; margin: 6px 0 4px; }
+.ro-amount { font-size: 34px; font-weight: 700; letter-spacing: 0.06em; line-height: 1; margin: 4px 0 8px; }
+.ro-amount.reduced { color: var(--amber); }
+.ro-note { font-size: 10px; letter-spacing: 0.12em; color: var(--amber); margin-bottom: 8px; }
+.ro-btn { font-size: 15px; letter-spacing: 0.16em; padding: 12px; }
+.ro-used { font-size: 12px; letter-spacing: 0.14em; color: var(--green); font-weight: 700; padding: 10px 0 4px; }
 
 /* -- right: specials -------------------------------------------------------- */
 

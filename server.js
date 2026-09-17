@@ -985,6 +985,12 @@ function handleSector(client, entry, msg) {
       return broadcast(entry);
     }
 
+    /** ROUND OUTPUT: POW and WTR generate their own stock, once a round. Nobody else has a line. */
+    case 'generate_output': {
+      send(client.ws, { type: 'output_result', ...game.generateOutput(mine, { by: mine }) });
+      return broadcast(entry);
+    }
+
     /** AGR's dealt hand. Agriculture only. Activation is checked against the live world. */
     case 'agr_select': {
       if (mine !== 'AGR') return send(client.ws, { type: 'error', reason: 'agr_only' });
@@ -1154,6 +1160,11 @@ function handleControl(client, entry, msg) {
       return ok();
     case 'reset_heals':
       reply({ type: 'heals_reset', ...game.resetHeals({ by: 'facilitator' }) });
+      return ok();
+
+    // -- a table's round output, as an override
+    case 'generate_output':
+      reply({ type: 'output_result', ...game.generateOutput(String(msg.sector || '').toUpperCase(), { by: 'facilitator' }) });
       return ok();
 
     // -- COM's board and AGR's hand, as overrides

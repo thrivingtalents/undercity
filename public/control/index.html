@@ -54,7 +54,7 @@
     <div class="tb-figures">
       <div class="fig"><span class="label">CORE</span><b id="core-value">—</b></div>
       <div class="fig"><span class="label">CITY</span><b id="city-value">—</b></div>
-      <div class="fig"><span class="label">CYCLE</span><b id="cycle-clock">--:--</b></div>
+      <div class="fig"><span class="label">UPKEEP IN</span><b id="cycle-clock">--:--</b></div>
       <div class="fig"><span class="label">COUNCIL</span><b id="council-clock">--:--</b></div>
     </div>
 
@@ -264,16 +264,13 @@
           </div>
         </div>
         <div class="block">
-          <span class="label">Core cycle</span>
+          <span class="label">Round upkeep <em>— charged when a played round ends</em></span>
           <div class="row">
             <b id="cycle-clock-2">--:--</b>
             <span id="cycle-number" class="hint"></span>
-            <button data-cycle="start">RUN</button>
-            <button data-cycle="pause">HOLD</button>
-            <button data-cycle="add" data-sec="60">+1:00</button>
-            <button data-cycle="process" class="primary">PROCESS CYCLE NOW</button>
+            <button data-cycle="process" class="primary">PROCESS UPKEEP NOW</button>
           </div>
-          <div class="cycle-summary" id="cycle-summary"><div class="hint">No cycle processed yet.</div></div>
+          <div class="cycle-summary" id="cycle-summary"><div class="hint">No upkeep pass yet.</div></div>
         </div>
         <div class="block">
           <span class="label">Telemetry</span>
@@ -385,7 +382,7 @@
         <div class="hint">Nothing here is playtested. Every field applies live to this run; SAVE to keep it.</div>
         <div class="settings" id="settings"></div>
         <div class="block">
-          <span class="label">Sector economy <em>— per cycle</em></span>
+          <span class="label">Sector economy <em>— per round</em></span>
           <div class="sector-config" id="sector-config"></div>
         </div>
         <div class="block">

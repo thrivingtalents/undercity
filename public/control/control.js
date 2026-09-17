@@ -21,7 +21,7 @@
   const RESOURCES = ['power', 'water', 'parts', 'med'];
   const ANNOUNCE_PRESETS = [
     'Core output dropping. Council convenes in 10 minutes.',
-    'Upkeep suspended this cycle.',
+    'Upkeep suspended this round.',
     'Core output dropping to 60 percent.',
     'Continuity Order due in 5 minutes.',
     'Transport capacity reduced — expect transfer delays.',
@@ -160,7 +160,7 @@
   $('quick-pause').addEventListener('click', togglePause);
   function togglePause() { send({ type: state && state.paused ? 'resume' : 'pause' }); }
   $('btn-end-phase').addEventListener('click', () => {
-    if (!confirm('END PHASE — stop the round clock and the core cycle?')) return;
+    if (!confirm('END PHASE — stop the round clock?')) return;
     send({ type: 'clock', which: 'round', action: 'end' });
   });
   $('btn-next-phase').addEventListener('click', () => send({ type: 'next_phase' }));
@@ -422,7 +422,7 @@
       case 'core': return `CORE OUTPUT → ${item.value}%`;
       case 'announce': return `ANNOUNCE: ${item.text}`;
       case 'alert': return `ALERT: ${item.text}`;
-      case 'cycle': return 'PROCESS CYCLE';
+      case 'cycle': return 'PROCESS UPKEEP';
       default: return item.kind;
     }
   }
@@ -486,7 +486,7 @@
       });
     }
     const eff = state.effects || [];
-    $('effects').innerHTML = eff.map((e) => `<div class="ef"><b>${esc(e.kind)}</b> ${esc(e.target)} ${e.remaining_s != null ? `<span data-cd-effect="${e.id}">${U.mmss(e.remaining_s)}</span>` : ''}${e.cycles_remaining != null ? `${e.cycles_remaining} cycle(s)` : ''} <span class="hint">${esc(e.source || '')}</span></div>`).join('') || '<div class="hint">None.</div>';
+    $('effects').innerHTML = eff.map((e) => `<div class="ef"><b>${esc(e.kind)}</b> ${esc(e.target)} ${e.remaining_s != null ? `<span data-cd-effect="${e.id}">${U.mmss(e.remaining_s)}</span>` : ''}${e.cycles_remaining != null ? `${e.cycles_remaining} round(s)` : ''} <span class="hint">${esc(e.source || '')}</span></div>`).join('') || '<div class="hint">None.</div>';
   }
 
   $('btn-alert').addEventListener('click', () => {
@@ -569,13 +569,13 @@
     if (document.activeElement !== $('stab-value')) $('stab-value').value = state.city_stability;
     if (document.activeElement !== $('stab-mode')) $('stab-mode').value = state.stability_mode;
     $('stab-hint').textContent = state.stability_mode === 'auto' ? 'auto: integrity + core, minus critical faults, dark, brownout, missed upkeep' : 'manual';
-    $('cycle-number').textContent = `cycle ${state.cycle.number} · ${state.cycle.length_s}s · ${state.cycle.running ? 'running' : 'held'}`;
+    $('cycle-number').textContent = `pass ${state.cycle.number} · ${state.cycle.running ? 'legacy timer running' : 'at round end'}`;
     if (document.activeElement !== $('tel-wtr')) $('tel-wtr').value = state.telemetry.wtr_reservoir_pressure;
 
     const sum = state.cycle_summary;
     if (sum) {
       const fmt = (o) => Object.entries(o || {}).map(([k, v]) => `${v}${U.GLYPH[k] || k}`).join(' ') || '—';
-      $('cycle-summary').innerHTML = `<div class="label">CYCLE ${sum.cycle} COMPLETE · ${new Date(sum.t).toLocaleTimeString()}${sum.missed_upkeep_count ? ` · <span class="bad">${sum.missed_upkeep_count} missed upkeep</span>` : ''}</div>
+      $('cycle-summary').innerHTML = `<div class="label">UPKEEP PASS ${sum.cycle}${sum.round ? ' · ' + sum.round : ''} COMPLETE · ${new Date(sum.t).toLocaleTimeString()}${sum.missed_upkeep_count ? ` · <span class="bad">${sum.missed_upkeep_count} missed upkeep</span>` : ''}</div>
         <table><tr><th>SECTOR</th><th>PRODUCED</th><th>UPKEEP</th><th>SHORT</th><th>INT</th><th>NOTES</th></tr>
         ${Object.entries(sum.sectors).map(([c, l]) => `<tr><td><b>${c}</b></td><td class="good">${fmt(l.produced)}</td><td>${fmt(l.upkeep)}</td><td class="bad">${fmt(l.shortfall)}</td><td class="${l.integrity_delta < 0 ? 'bad' : ''}">${l.integrity_delta || ''}</td><td>${esc((l.notes || []).join(', '))}${l.recovered ? ` +${l.recovered} recovered` : ''}</td></tr>`).join('')}
         </table>`;
@@ -772,10 +772,11 @@
     ['auto_economy', 'Digital economy on (production, upkeep, stock moves)', 'b'],
     ['deduct_resources_on_resolve', 'Deduct resources on resolve', 'b'],
     ['resolve_requires_resources', 'Refuse resolve when short of stock', 'b'],
-    ['cycle_length_s', 'Cycle length (s)', 'n'], ['cycle_autostart', 'Cycle runs with the round clock', 'b'],
-    ['upkeep_shortfall_penalty', 'Penalty per missing upkeep unit', 'n'], ['upkeep_shortfall_penalty_cap', 'Penalty cap per cycle', 'n'],
-    ['core_scales_power_production', 'Core output scales POW production', 'b'],
-    ['injured_recovery_per_cycle', 'Injured recovered per cycle (MED)', 'n'], ['injured_recovery_costs_med', 'Med supplies per recovery', 'n'],
+    ['upkeep_on_round_change', 'Upkeep charged when a played round ends', 'b'], ['round_output_manual', 'POW / WTR generate output by button, once a round', 'b'],
+    ['cycle_length_s', 'Legacy cycle timer length (s)', 'n'], ['cycle_autostart', 'Legacy cycle timer runs with the round clock', 'b'],
+    ['upkeep_shortfall_penalty', 'Penalty per missing upkeep unit', 'n'], ['upkeep_shortfall_penalty_cap', 'Penalty cap per upkeep pass', 'n'],
+    ['core_scales_power_production', 'Core output scales POW output', 'b'],
+    ['injured_recovery_per_cycle', 'Injured recovered per upkeep pass (MED)', 'n'], ['injured_recovery_costs_med', 'Med supplies per recovery', 'n'],
     ['deliver_on_stamp', 'Stamp delivers immediately', 'b'],
     ['FAULT REWARDS'],
     ['fault_rewards_enabled', 'Faults pay their reward on resolution', 'b'],
@@ -860,7 +861,7 @@
         ${RESOURCES.map((r) => `<td><input type="number" data-up="${r}" value="${d.upkeep[r] || 0}"></td>`).join('')}
         <td><input type="number" data-si value="${d.start_integrity}"></td><td><input type="number" data-sw value="${d.start_workforce}"></td>
         <td><button data-apply="${c}">APPLY</button></td></tr>`).join('')}</table>
-      <div class="hint">Production and upkeep apply from the next cycle. Start values apply on the next reset. AGR/TRN/COM economies are unspecified by design — set them here once playtested.</div>`;
+      <div class="hint">Output and upkeep apply from the next round. Start values apply on the next reset. AGR/TRN/COM economies are unspecified by design — set them here once playtested.</div>`;
     for (const b of $('sector-config').querySelectorAll('[data-apply]')) {
       b.addEventListener('click', () => {
         const row = $('sector-config').querySelector(`[data-sc="${b.dataset.apply}"]`);
@@ -1038,9 +1039,12 @@
     const rc = U.countdown(state.round_clock, state.frozen);
     $('master-clock').textContent = U.mmss(rc);
     $('master-clock').classList.toggle('low', rc <= 60 && state.round_clock.running);
-    const cy = U.countdown(state.cycle, state.frozen);
+    // Upkeep is due when the round ends; the legacy cycle timer only if a scenario runs it.
+    const legacy = !!(state.cycle && state.cycle.running);
+    const cy = legacy ? U.countdown(state.cycle, state.frozen) : rc;
+    const on = legacy || !!state.round_clock.running;
     $('cycle-clock').textContent = U.mmss(cy);
-    $('cycle-clock').className = cy <= 30 && state.cycle.running ? 'low' : cy <= 120 && state.cycle.running ? 'warn' : '';
+    $('cycle-clock').className = cy <= 30 && on ? 'low' : cy <= 120 && on ? 'warn' : '';
     $('cycle-clock-2').textContent = U.mmss(cy);
     const cc = U.countdown(state.council_clock, state.frozen);
     $('council-clock').textContent = U.mmss(cc);

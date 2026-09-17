@@ -152,11 +152,16 @@ npm start                                            # http://localhost:3000/adm
    nothing by default (a switch, logged as an override); clearing the one
    ghost fault, which has no code, is its real completion and does pay. Deadline reached → `EXPIRED`, an integrity penalty by severity, and
    the fault stays solvable (all configurable).
-3. **Core cycle.** A city-wide countdown (default 7:00). At zero the server
-   processes the cycle: production → upkeep → shortage penalties → worker
-   recovery (MED spends med supplies) → brownout effects → city stability →
-   next cycle. Admin sees a per-sector summary; Transport's per-cycle stamp
-   capacity resets.
+3. **Round upkeep.** One clock: the round's. POW and WTR generate their own
+   output by pressing **GENERATE** once a round (+3, straight into their real
+   tray; halved in brownout, scaled by core output for POW). When a played
+   round ends the server runs one economy pass for it: upkeep → shortage
+   penalties → worker recovery (MED spends med supplies) → brownout effects →
+   city stability. Admin sees a per-sector summary and can force a pass
+   (PROCESS UPKEEP NOW); the old 7-minute cycle timer is off by default
+   (`cycle_autostart`). Every sector screen shows NEXT ROUND UPKEEP with
+   READY / SHORTFALL from real stock, its own role as the main panel, and
+   nothing city-wide but a nudge to the wall.
 4. **Transfers.** The Transfer Chit stays physical, the negotiation stays face
    to face, and there is no message box anywhere in the chain. Every sector can
    **REQUEST RESOURCE** (ask another table for stock) and **TRANSFER RESOURCE**

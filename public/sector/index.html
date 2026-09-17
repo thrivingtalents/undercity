@@ -27,26 +27,22 @@
     </div>
 
     <div class="hstat integrity-block">
-      <span class="label">Integrity</span>
+      <span class="label">Health</span>
       <div class="integrity-row">
         <b class="hval big" id="hdr-integrity">—</b>
         <div class="bar" id="hdr-integrity-bar"><i style="width:0%"></i></div>
       </div>
     </div>
 
-    <div class="hstat cycle-block">
-      <span class="label">Next core cycle</span>
-      <b class="hval huge clock" id="hdr-cycle">--:--</b>
+    <div class="hstat round-block">
+      <span class="label">Current round</span>
+      <b class="hval" id="hdr-phase">—</b>
     </div>
 
-    <div class="hstat">
-      <span class="label">Core output</span>
-      <b class="hval big" id="hdr-core">—</b>
-    </div>
-
-    <div class="hstat phase-block">
-      <span class="label" id="hdr-phase">—</span>
-      <b class="hval clock" id="hdr-round-clock">--:--</b>
+    <!-- One clock. Upkeep falls due when it runs out. -->
+    <div class="hstat next-block">
+      <span class="label">Next round in</span>
+      <b class="hval huge clock" id="hdr-round-clock">--:--</b>
     </div>
 
     <div class="conn" id="conn" data-status="down">
@@ -61,6 +57,7 @@
     </div>
     <div class="banner banner-request" id="banner-request" hidden></div>
     <div class="banner banner-city" id="banner-city" hidden>CITY ANNOUNCEMENT UPDATED — READ IT ON THE BIG SCREEN</div>
+    <div class="banner banner-notice" id="banner-notice" hidden></div>
     <div class="banner banner-council" id="banner-council" hidden>COUNCIL SUMMONED — CHIEF + LIAISON REPORT TO CENTRAL COUNCIL <b class="clock" id="banner-council-clock">05:00</b></div>
     <div class="banner banner-brownout" id="banner-brownout" hidden>⚠ SECTOR BROWNOUT — PRODUCTION REDUCED · OPERATIONS DEGRADED</div>
     <div class="banner banner-breather" id="banner-breather" hidden>BREATHER — SYSTEMS HOLDING</div>
@@ -77,7 +74,6 @@
         <h2 class="ptitle">INBOUND REQUESTS <span class="count" id="inbox-count">0</span></h2>
         <div class="inbox" id="inbox"></div>
         <div class="msg" id="inbox-msg" hidden></div>
-        <div class="declare-note">Fulfilling raises a transfer. Nothing moves until Transport approves it, and the chit still needs both Liaison signatures.</div>
       </div>
 
       <div class="panel block injured-block" id="injured-panel" hidden>
@@ -90,11 +86,11 @@
         <div class="heal-list" id="heal-list"></div>
         <button type="button" class="primary wide" id="btn-heal-request">REQUEST MED HEALING</button>
         <div class="msg" id="heal-msg" hidden></div>
-        <div class="declare-note">Healing always goes to Medical Bay. Only Medical can heal; Transport plays no part.</div>
       </div>
 
+      <!-- LOCAL TRUTH: this table's real stock, nobody else's. -->
       <div class="panel block">
-        <h2 class="ptitle">RESOURCES</h2>
+        <h2 class="ptitle">INVENTORY</h2>
         <div class="resources" id="resources"></div>
         <div class="workers">
           <span class="wglyph">👤</span>
@@ -105,17 +101,16 @@
           <span class="wlabel">AVAILABLE</span>
         </div>
         <div class="wextra" id="wf-extra" hidden></div>
-        <div class="declare-note">Stock moves on production, upkeep, a solved fault, and a transfer Transport has approved. If the tray and the screen disagree, tell the facilitator.</div>
       </div>
 
-      <div class="panel block">
-        <h2 class="ptitle">NEXT CYCLE UPKEEP</h2>
+      <!-- What the round's end will cost, and whether the tray can pay it now. -->
+      <div class="panel block upkeep-block">
+        <h2 class="ptitle">NEXT ROUND UPKEEP</h2>
         <div class="upkeep-line">
           <span class="upkeep-items" id="upkeep-delivery">—</span>
           <span class="upkeep-full" id="upkeep-full" hidden></span>
         </div>
-        <div class="upkeep-row"><span class="label">Production next cycle</span><b id="production-next">—</b></div>
-        <div class="upkeep-row"><span class="label">Due in</span><b class="clock due-clock" id="upkeep-due">--:--</b></div>
+        <div class="upkeep-row"><span class="label">Status</span><b class="uk-status" id="upkeep-status" data-status="">—</b></div>
       </div>
 
       <div class="panel block transfers-block">
@@ -144,7 +139,6 @@
         </form>
         <div class="msg" id="transfer-msg" hidden></div>
         <div class="transfers" id="transfers"><div class="empty" id="transfers-empty">Nothing in or out yet.</div></div>
-        <div class="declare-note">The signed Transfer Chit and Transport&#39;s approval remain the real record. Terms are agreed face to face.</div>
       </div>
     </section>
 
@@ -194,7 +188,7 @@
       </div>
     </section>
 
-    <!-- RIGHT: city feed (deliberately degraded), announcements, specials -->
+    <!-- RIGHT: this table's MAIN ROLE, then its specials. City-wide news lives on the wall. -->
     <section class="col col-right">
       <div class="panel council" id="council" hidden>
         <div class="council-label">COUNCIL SUMMONED</div>
@@ -202,33 +196,43 @@
         <div class="council-call">CHIEF + LIAISON<br>REPORT TO CENTRAL COUNCIL</div>
       </div>
 
-      <!-- AGRICULTURE ONLY. The server deals three cards to AGR alone. -->
-      <div class="panel block agr-block" id="agr-panel" hidden>
-        <h2 class="ptitle">AGR — EMERGENCY INTERVENTIONS <span class="cap" id="agr-round"></span></h2>
-        <div class="agr-instruction" id="agr-instruction"></div>
-        <div class="agr-cards" id="agr-cards"></div>
-        <div class="msg" id="agr-msg" hidden></div>
+      <!-- POWER and WATER: the round's output, generated by hand, once. The server sends this to a producing sector alone. -->
+      <div class="panel block main-panel output-block" id="output-panel" hidden>
+        <h2 class="ptitle">ROUND OUTPUT <span class="cap" id="output-round"></span></h2>
+        <div class="ro-amount" id="output-amount">—</div>
+        <div class="ro-note" id="output-note" hidden></div>
+        <button type="button" class="primary wide ro-btn" id="btn-generate">GENERATE</button>
+        <div class="ro-used" id="output-used" hidden>ROUND OUTPUT ALREADY GENERATED</div>
+        <div class="msg" id="output-msg" hidden></div>
       </div>
 
-      <div class="panel block" id="effects-panel" hidden>
-        <h2 class="ptitle">ACTIVE EFFECTS</h2>
-        <div class="effects" id="effects"></div>
+      <!-- MEDICAL ONLY. The server sends this panel's data to MED alone. -->
+      <div class="panel block main-panel healing-block" id="healing-panel" hidden>
+        <h2 class="ptitle">HEALING THIS ROUND</h2>
+        <div class="cap-big" id="healing-cap">—</div>
+        <div class="sub-title">HEALING QUEUE</div>
+        <div class="healing" id="healing"></div>
+        <div class="msg" id="healing-msg" hidden></div>
+        <div class="declare-note">Only Medical Bay heals. Transport is not involved.</div>
       </div>
 
       <!-- TRANSPORT ONLY. The server sends this panel's data to TRN alone. -->
-      <div class="panel block approval-block" id="queue-panel" hidden>
-        <h2 class="ptitle">RESOURCE APPROVAL QUEUE <span class="cap" id="queue-cap"></span></h2>
+      <div class="panel block main-panel approval-block" id="queue-panel" hidden>
+        <h2 class="ptitle">TRANSFER APPROVALS THIS ROUND</h2>
+        <div class="cap-big" id="queue-cap">—</div>
+        <div class="sub-title">PENDING APPROVALS</div>
         <div class="queue" id="queue"></div>
         <div class="msg" id="queue-msg" hidden></div>
         <div class="declare-note">Only Transport approves resource movement. Confirm the signed chit, then approve.</div>
       </div>
 
-      <!-- MEDICAL ONLY. The server sends this panel's data to MED alone. -->
-      <div class="panel block healing-block" id="healing-panel" hidden>
-        <h2 class="ptitle">MED HEALING QUEUE <span class="cap" id="healing-cap"></span></h2>
-        <div class="healing" id="healing"></div>
-        <div class="msg" id="healing-msg" hidden></div>
-        <div class="declare-note">Only Medical Bay heals. Transport is not involved.</div>
+      <!-- AGRICULTURE ONLY. The server deals three cards to AGR alone. -->
+      <div class="panel block main-panel agr-block" id="agr-panel" hidden>
+        <h2 class="ptitle">INTERVENTIONS THIS ROUND <span class="cap" id="agr-round"></span></h2>
+        <div class="cap-big" id="agr-cap">3 RANDOM CARDS · CHOOSE 1</div>
+        <div class="agr-instruction" id="agr-instruction"></div>
+        <div class="agr-cards" id="agr-cards"></div>
+        <div class="msg" id="agr-msg" hidden></div>
       </div>
 
       <!--
@@ -236,7 +240,7 @@
         on the wall; a table's console shows its own truth, not the city's
         reported figures. The server sends this panel's data to COM alone.
       -->
-      <div class="panel block broadcast-block editable" id="broadcast-panel" hidden>
+      <div class="panel block main-panel broadcast-block editable" id="broadcast-panel" hidden>
         <h2 class="ptitle"><span id="bc-title">CITY BIG SCREEN CONTROL</span> <span class="cap" id="bc-round"></span></h2>
         <div class="tf-label">PUBLISHED NOW</div>
         <div class="bc-ann" id="bc-ann" hidden><b id="bc-ann-head"></b><span id="bc-ann-msg"></span><em id="bc-ann-meta"></em></div>
@@ -252,19 +256,20 @@
         <div class="msg" id="broadcast-msg" hidden></div>
       </div>
 
+      <div class="panel block" id="effects-panel" hidden>
+        <h2 class="ptitle">ACTIVE EFFECTS</h2>
+        <div class="effects" id="effects"></div>
+      </div>
+
       <div class="panel block" id="intel-panel" hidden>
         <h2 class="ptitle">CITY INTELLIGENCE <span class="tag warn" id="intel-degraded" hidden>TELEMETRY DEGRADED</span></h2>
         <div class="intel" id="intel"></div>
       </div>
 
-      <div class="panel block city-block" id="city-block">
-        <h2 class="ptitle">CITY FEED <span class="tag" id="delay-note">60s DELAY</span></h2>
+      <!-- COM ONLY: the city as its sensors read it — COM's own product, undelayed. Every other table reads the wall. -->
+      <div class="panel block city-block" id="city-block" hidden>
+        <h2 class="ptitle">CITY FEED <span class="tag" id="delay-note">FULL TELEMETRY</span></h2>
         <div class="city" id="city"></div>
-      </div>
-
-      <div class="panel block announce-block" id="announce-block">
-        <h2 class="ptitle">ANNOUNCEMENTS</h2>
-        <div class="announcements" id="announcements"><div class="empty">Nothing yet.</div></div>
       </div>
 
       <div class="panel block resolved-block" id="resolved-block" hidden>

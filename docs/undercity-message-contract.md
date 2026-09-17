@@ -268,7 +268,7 @@ The Admin page prompts for the token if the URL does not carry one.
   "round": "R2", "round_name": "Interdependence", "round_length_s": 1800,
   "round_clock":   { "running": true,  "remaining_s": 1140 },
   "council_clock": { "running": false, "remaining_s": 300 },
-  "cycle": { "number": 3, "length_s": 420, "remaining_s": 267, "running": true },
+  "cycle": { "number": 3, "length_s": 420, "remaining_s": 267, "running": false },   // legacy timer; see §8.7
   "paused": false, "breather": false, "frozen": false,
   "core_output": 83, "core_integrity": 83,
   "city_stability": 71, "stability_mode": "auto",
@@ -296,8 +296,9 @@ default 8 s), then a reduced persistent banner until `dismiss_alert`.
 
 Own sector: `brownout`, `dark`, `workforce { active injured loaned borrowed
 available total }`, `low { power water parts med }` (below threshold or zero),
-`production_next`, `upkeep_delivery` (next cycle's cost after brownout),
-`upkeep_due_in_s` (= cycle remaining). Own faults add `id status deadline_s
+`production_next`, `upkeep_delivery` (next round's cost after brownout),
+`upkeep_due_in_s` (= round clock remaining, since 2026-09-18), `round_output`,
+`upkeep_status`, `upkeep_short` (§8.7). Own faults add `id status deadline_s
 deadline_remaining_s integrity_penalty expired opened_at`. Fault `status`:
 `ACTIVE RESOLVED EXPIRED FAILED CLEARED`. The dependency half of the flavour
 line is still cut; the screen says *consult your binder*, nothing more.
@@ -511,3 +512,38 @@ exists, else a synthesised placeholder.
 `event_fired`, `effect_started/ended`, `scheduled`, `preset_fired`,
 `timeline_fired/skipped/delayed`, `alert`, `config_patched`, `set_stability`,
 `intel`, `sound`. Every line also carries `round` and `phase`.
+
+### 8.7 One clock: the round's (2026-09-18)
+
+The free-running core cycle is retired. `round_clock` is the only clock a
+table sees, and **upkeep falls due when a played round ends**: the
+facilitator advancing the phase runs one economy pass for the outgoing round
+(`cycle_processed {cycle, round, summary}`; a round whose clock never
+started is not charged). The `cycle` object stays in every frame for
+compatibility — `number` now counts upkeep passes, and `running` is false
+unless a scenario turns the legacy timer back on with `cycle_autostart`.
+Admin's PROCESS UPKEEP NOW (`cycle {action:"process"}`) still forces a pass.
+
+Own sector adds `round_output` — `null` for a sector with no production
+line, else `{ manual, used, base, amount, added, reduced, core_output,
+available }` — and `upkeep_status` (`READY` | `SHORTFALL`) with
+`upkeep_short {resource: n}`, both from the sector's real stock and never
+from COM's board. The common frame adds `round_number`.
+
+```json
+{ "type": "generate_output" }    // POW / WTR only — their own output, once a round, into the real tray
+```
+
+Reply `output_result { ok, sector, round, added, moved }`; refusals
+`already_generated`, `no_output` (no production line), `no_output_now` (a
+supply delay, or core at 0), `sector_dark`, `frozen`, `not_your_sector`,
+`output_automatic` (scenario switch `round_output_manual: false`). A second
+press in the same round adds nothing; a refresh, a reconnect or a restart
+keeps the stamp. Brownout halves it and core output scales POW's, exactly as
+they shaped the old automatic production. COM's board never moves. The
+facilitator may run it for a table with `generate_output {sector}`.
+
+Sector screens no longer render the City Feed (COM alone keeps it — its
+sensors are its product) or an Announcements panel; a facilitator notice
+addressed to one table shows as a banner there, and city-wide announcements
+are read on the wall.
