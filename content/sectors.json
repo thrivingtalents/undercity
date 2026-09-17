@@ -55,7 +55,7 @@
       "code": "MED",
       "name": "Medical Bay",
       "colour": "#E85A5A",
-      "produces": "med",
+      "produces": null,
       "start_integrity": 100,
       "start_workforce": 8,
       "start_inventory": {

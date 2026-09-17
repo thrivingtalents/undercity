@@ -77,7 +77,7 @@ SECTOR_INFO = {
             "strongest moral claim in any triage argument and the weakest ability to generate the "
             "resources you need. Both of those are true at once."
         ),
-        "produces": "Med Supplies (⚕) — 1 per cycle; restores injured Workforce",
+        "produces": "Nothing. Med Supplies (⚕) are finite — opening stock, fault rewards and AGR cards — and each restores one injured Worker",
     },
     "TRN": {
         "name": "Transport & Tunnels",

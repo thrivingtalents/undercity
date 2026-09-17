@@ -329,7 +329,7 @@ test('PROCESS CYCLE: production, upkeep, shortage penalty, recovery, summary, ne
   assert.equal(wtr.inventory.water, 3 + 3 - 1);
   assert.equal(wtr.workforce.injured, 1);
   assert.equal(summary.sectors.WTR.recovered, 1);
-  assert.equal(game.state.sectors.MED.inventory.med, 3 + 1 - 1, 'MED produced 1, spent 1');
+  assert.equal(game.state.sectors.MED.inventory.med, 3 - 1, 'MED made nothing and spent 1');
   assert.equal(game.state.cycle.number, 2);
   assert.equal(game.state.cycle.remaining_s, game.cfg.cycle_length_s);
   const ev = logEvents(game, 'cycle_processed');
@@ -364,14 +364,34 @@ test('brownout halves production and upkeep; DARK has no economy; a supply delay
   const game = running();
   game.setStatus('WTR', 'BROWNOUT');
   game.setStatus('TRN', 'DARK');
-  game.fireEvent('supply_delay', { target: 'MED' });
+  game.fireEvent('supply_delay', { target: 'POW' });
   const frame = forControl(game);
   assert.deepEqual(frame.sectors.WTR.production_next, { water: 1 }, 'floor(3 × 0.5)');
   assert.deepEqual(frame.sectors.WTR.upkeep_delivery, { power: 1, water: 0 });
   assert.deepEqual(frame.sectors.TRN.production_next, {});
-  assert.deepEqual(frame.sectors.MED.production_next, {});
+  assert.deepEqual(frame.sectors.POW.production_next, {}, 'the delayed sector still shows production');
+  assert.deepEqual(frame.sectors.MED.production_next, {}, 'MED never produces');
   game.cycleControl('process');
-  assert.equal(game.hasEffect('no_production', 'MED'), false, 'the one-cycle effect is spent');
+  assert.equal(game.hasEffect('no_production', 'POW'), false, 'the one-cycle effect is spent');
+});
+
+test('MED produces nothing: medical stock is finite, and no scenario falls back to a med line', () => {
+  const content = loadContent();
+  assert.equal(content.sectors.sectors.MED.produces, null, 'the content still says MED produces med');
+  const lib = new ScenarioLibrary({ rounds, content });
+  assert.deepEqual(lib.resolve('haven9-standard').sectors.MED.production, {});
+  assert.deepEqual(lib.resolve('haven9-demo').sectors.MED.production, {});
+  const game = running();
+  const med = game.state.sectors.MED;
+  assert.deepEqual(forSector(game, 'MED').sectors.MED.production_next, {});
+  med.inventory.med = 2;
+  game.cycleControl('process');                       // nobody injured: nothing spent, nothing made
+  assert.equal(med.inventory.med, 2, 'a cycle made med');
+  game.state.sectors.WTR.workforce.injured = 1;
+  game.state.sectors.WTR.workforce.active = 7;
+  game.cycleControl('process');                       // one recovery costs one med, and nothing refills it
+  assert.equal(med.inventory.med, 1);
+  assert.equal(game.state.sectors.WTR.workforce.injured, 0);
 });
 
 test('city stability: automatic formula reacts to damage; manual mode holds a number', () => {

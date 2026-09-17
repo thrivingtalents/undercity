@@ -41,7 +41,7 @@ INJURIES = {"F-207": 2, "F-303": 1, "F-304": 1}
 SECTOR_DEFS = {
     "POW": {"name": "Power Grid",          "colour": "#E8B33A", "produces": "power"},
     "WTR": {"name": "Water & Filtration",  "colour": "#3A8FE8", "produces": "water"},
-    "MED": {"name": "Medical Bay",         "colour": "#E85A5A", "produces": "med"},
+    "MED": {"name": "Medical Bay",         "colour": "#E85A5A", "produces": None},
     "TRN": {"name": "Transport & Tunnels", "colour": "#9A9A9A", "produces": None},
     "AGR": {"name": "Agriculture",         "colour": "#5AB86A", "produces": None},
     "COM": {"name": "Comms & Sensors",     "colour": "#B07AD8", "produces": None},
