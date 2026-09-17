@@ -276,6 +276,13 @@ button.big { font-size: 13px; padding: 10px 14px; font-weight: 700; }
 .tr .st.REQUESTED { color: var(--blue); }
 .tr .st.DECLINED, .tr .st.EXPIRED { color: var(--red); }
 .tr .who .tag { margin-left: 4px; }
+.ca-rows { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+.ca-row { display: grid; grid-template-columns: 40px repeat(4, 58px) auto 1fr; gap: 4px; align-items: center; font-size: 11px; }
+.ca-row input { width: 54px; }
+.ca-meta { font-size: 10px; color: var(--ink-dim); }
+.ca-pools { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 4px; }
+.ca-pool { font-size: 11px; display: inline-flex; gap: 4px; align-items: center; }
+.ca-pool.off { opacity: 0.5; }
 .tr .acts { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
 .tr .acts button.on { border-color: var(--green); color: var(--green); }
 .tr .acts button { font-size: 9px; padding: 3px 6px; }

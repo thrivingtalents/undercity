@@ -89,7 +89,7 @@
         el.hidden = false;
       }
       if (msg.type === 'submit_result') handleResult(msg);
-      if (msg.type === 'transfer_result' || msg.type === 'heal_result') handleTransferResult(msg);
+      if (['transfer_result', 'heal_result', 'broadcast_result', 'agr_result'].includes(msg.type)) handleTransferResult(msg);
       if (msg.type === 'sting') U.playSting(msg.sound);
     },
   });
@@ -200,6 +200,8 @@
       b.addEventListener('click', () => setFormMode(b.dataset.mode));
     }
     $('btn-heal-request').addEventListener('click', requestHealing);
+    $('bc-publish').addEventListener('click', publishAnnouncement);
+    $('bc-clear').addEventListener('click', clearAnnouncement);
 
     // Console.
     const input = $('code-input');
@@ -405,6 +407,19 @@
       case 'worker_not_injured': return 'THAT WORKER IS NOT CURRENTLY INJURED';
       case 'not_own_sector':   return 'A SECTOR MAY ONLY ASK FOR ITS OWN WORKERS';
       case 'healing_closed':   return 'THAT HEALING REQUEST IS ALREADY ANSWERED';
+      // the city broadcast
+      case 'com_edit_forbidden': return 'ONLY COMMS & SENSORS CAN UPDATE THE CITY BIG SCREEN';
+      case 'empty_announcement': return 'WRITE A HEADLINE OR A MESSAGE FIRST';
+      // AGR interventions
+      case 'agr_only':               return 'ONLY AGRICULTURE CAN PLAY AN INTERVENTION';
+      case 'agr_offer_not_ready':    return 'INTERVENTION CARDS HAVE NOT BEEN DEALT FOR THIS ROUND';
+      case 'agr_card_not_in_offer':  return 'THAT CARD IS NOT IN THIS ROUND\'S HAND';
+      case 'agr_card_already_used':  return 'INTERVENTION ALREADY USED THIS ROUND — NEW CARDS NEXT ROUND';
+      case 'agr_target_required':    return 'CHOOSE A VALID TARGET BEFORE ACTIVATING';
+      case 'agr_invalid_target':     return 'THAT TARGET IS NOT VALID FOR THIS INTERVENTION';
+      case 'agr_injured_worker_blocked': return 'INJURED WORKERS MUST BE HEALED BY MEDICAL BAY';
+      case 'agr_no_valid_worker':    return 'NO ELIGIBLE NON-INJURED WORKER IS AVAILABLE FOR RECOVERY';
+      case 'agr_activation_failed':  return 'INTERVENTION COULD NOT BE APPLIED — YOUR CHOICE HAS NOT BEEN CONSUMED';
       default:                 return String(msg.reason || 'REFUSED').toUpperCase().replace(/_/g, ' ');
     }
   }
@@ -412,8 +427,20 @@
   function handleTransferResult(msg) {
     const target = {
       stamp: 'queue-msg', inbox: 'inbox-msg', heal: 'heal-msg', healing: 'healing-msg',
+      broadcast: 'broadcast-msg', agr: 'agr-msg',
     }[pendingTransferAction] || 'transfer-msg';
     pendingTransferAction = null;
+    if (msg.ok && msg.type === 'agr_result') {
+      if (msg.action === 'activate') { agrPick = null; transientMsg(target, 'INTERVENTION ACTIVATED — LOCKED UNTIL NEXT ROUND', 'ok', 8000); }
+      return;
+    }
+    if (msg.ok && msg.type === 'broadcast_result') {
+      const word = msg.action === 'row' ? `ROW SAVED — LAST UPDATED: ROUND ${state ? state.broadcast.round_number : ''}`
+        : msg.action === 'announce' ? 'ANNOUNCEMENT PUBLISHED' : 'ANNOUNCEMENT CLEARED';
+      if (msg.action === 'announce') { $('bc-head').value = ''; $('bc-msg').value = ''; }
+      transientMsg(target, word, 'ok', 5000);
+      return;
+    }
     if (msg.ok) {
       const t = msg.transfer || msg.request || msg.healing || {};
       transientMsg(target, `${t.id ? `${t.id} ` : ''}${TRANSFER_WORD[t.status] || 'RECORDED'}`, 'ok', 4000);
@@ -444,6 +471,8 @@
     renderEffects();
     renderQueue();
     renderHealing();
+    renderBroadcast();
+    renderAgr();
     renderIntel();
     renderResolved();
     tick();
@@ -775,6 +804,179 @@
     for (const h of items) healSeen.add(h.id);
     for (const id of [...healSeen]) if (!items.some((h) => h.id === id)) healSeen.delete(id);
     if (fresh.length) notifyArrival(`HEALING REQUEST — ${sectorLabel(fresh[0].sector)} ${fresh[0].worker_label}`);
+  }
+
+  // -- the city broadcast: COM writes it, everyone reads it ----------------------
+  //
+  // The board is what COM last REPORTED, stamped with a round, never a live
+  // mirror of anyone's stock. COM's inputs are a draft the frame must not
+  // clobber mid-keystroke: the rows are built once and only their freshness
+  // badges are touched afterwards.
+
+  const BOARD_KEYS = ['power', 'water', 'med', 'parts'];
+  let boardBuiltFor = null;     // 'edit' | 'view' — which shape the rows were built in
+
+  function saveBoardRow(code) {
+    const values = {};
+    for (const k of BOARD_KEYS) {
+      const el = $(`bc-${code}-${k}`);
+      if (el && el.value !== '') values[k] = Number(el.value);
+    }
+    pendingTransferAction = 'broadcast';
+    // 'row', not 'sector': a sector message naming another table is refused upstream.
+    socket.send({ type: 'com_board_set', row: code, values });
+  }
+
+  function publishAnnouncement() {
+    pendingTransferAction = 'broadcast';
+    socket.send({ type: 'com_announce', headline: $('bc-head').value, message: $('bc-msg').value });
+  }
+
+  function clearAnnouncement() {
+    pendingTransferAction = 'broadcast';
+    socket.send({ type: 'com_announce_clear' });
+  }
+
+  function freshWord(f) { return f || 'NOT UPDATED'; }
+
+  function renderBroadcast() {
+    const b = state.broadcast;
+    show($('broadcast-panel'), !!b);
+    if (!b) return;
+    const editable = !!b.editable;
+    const mode = editable ? 'edit' : 'view';
+    setText($('bc-title'), editable ? 'CITY BROADCAST CONTROL' : 'CITY BIG SCREEN');
+    setText($('bc-round'), `CURRENT ROUND: ${b.round_number}`);
+    show($('bc-editor'), editable);
+    $('broadcast-panel').classList.toggle('editable', editable);
+
+    const host = $('bc-rows');
+    const codes = Object.keys(b.rows);
+    if (boardBuiltFor !== mode || host.children.length !== codes.length) {
+      boardBuiltFor = mode;
+      host.innerHTML = codes.map((code) => {
+        const row = b.rows[code];
+        const cells = BOARD_KEYS.map((k) => (editable
+          ? `<input type="number" min="0" step="1" id="bc-${code}-${k}" value="${row[k] ?? ''}" placeholder="—" aria-label="${code} ${k}">`
+          : `<b class="bc-v" data-k="${k}">${row[k] ?? '—'}</b>`)).join('');
+        const save = editable ? `<button type="button" class="bc-save" data-save="${code}">SAVE</button>` : '';
+        return `<div class="bc-row" data-code="${code}">
+            <span class="bc-code">${U.SECTOR_GLYPH[code] || ''} ${code}</span>
+            <span class="bc-cells">${cells}</span>
+            ${save}
+            <span class="bc-meta"><em class="bc-upd"></em> <i class="bc-fresh"></i></span>
+          </div>`;
+      }).join('');
+      for (const btn of host.querySelectorAll('[data-save]')) btn.addEventListener('click', () => saveBoardRow(btn.dataset.save));
+    }
+    for (const code of codes) {
+      const row = b.rows[code];
+      const el = host.querySelector(`[data-code="${code}"]`);
+      if (!el) continue;
+      setText(el.querySelector('.bc-upd'), row.round_number === null ? 'NEVER UPDATED' : `LAST UPDATED: ROUND ${row.round_number}`);
+      const fresh = el.querySelector('.bc-fresh');
+      setText(fresh, freshWord(row.freshness));
+      fresh.dataset.fresh = row.freshness;
+      if (!editable) {
+        for (const k of BOARD_KEYS) setText(el.querySelector(`[data-k="${k}"]`), String(row[k] ?? '—'));
+      }
+    }
+
+    const a = b.announcement;
+    show($('bc-ann'), !!a);
+    if (a) {
+      setText($('bc-ann-head'), a.headline);
+      setText($('bc-ann-msg'), a.message);
+      setText($('bc-ann-meta'), `LAST UPDATED: ROUND ${a.round_number} · ${freshWord(a.freshness)}`);
+      $('bc-ann').dataset.fresh = a.freshness;
+    }
+    show($('bc-ann-none'), !a);
+    if (editable) $('bc-clear').disabled = !a;
+  }
+
+  // -- AGR: the round's three interventions -------------------------------------
+  //
+  // Three cards, dealt by the server once per round and sent to AGR alone.
+  // This screen never rolls anything: a refresh shows the same three. One
+  // SELECT opens a target choice where the card needs one, then CONFIRM.
+
+  let agrPick = null;       // { card, target } while AGR is confirming
+
+  function agrStart(card) {
+    agrPick = { card, target: {} };
+    socket.send({ type: 'agr_select', card: card.id });
+    renderAgr();
+  }
+
+  function agrConfirm() {
+    if (!agrPick) return;
+    pendingTransferAction = 'agr';
+    const target = Object.keys(agrPick.target).length ? agrPick.target : null;
+    socket.send({ type: 'agr_activate', card: agrPick.card.id, target });
+  }
+
+  function agrCancel() { agrPick = null; renderAgr(); }
+
+  function agrTargetPicker(card) {
+    if (card.target === 'sector' || (card.ties && card.ties.length > 1)) {
+      const list = card.target === 'sector' ? (card.sectors || []) : card.ties;
+      return `<div class="agr-target"><span class="tf-label">${card.target === 'sector' ? 'SECTOR' : 'TIED — CHOOSE'}</span>
+        <select id="agr-target">${list.map((c) => `<option value="${c}">${U.SECTOR_GLYPH[c] || ''} ${c}</option>`).join('')}</select></div>`;
+    }
+    if (card.target === 'resource_type') {
+      return `<div class="agr-target"><span class="tf-label">RESOURCE</span>
+        <select id="agr-target">${Object.entries(card.choices || {}).map(([k, v]) => `<option value="${k}">+${v} ${resName(k)}</option>`).join('')}</select></div>`;
+    }
+    if (card.target === 'worker') {
+      return `<div class="agr-target warn">No eligible non-injured worker. Injured workers are healed by Medical Bay.</div>`;
+    }
+    return '';
+  }
+
+  function renderAgr() {
+    const a = state.agr_cards;
+    show($('agr-panel'), !!a);
+    if (!a) return;
+    setText($('agr-round'), `ROUND ${a.round_number} — ${a.used ? 'INTERVENTION USED' : '1 CHOICE AVAILABLE'}`);
+    setText($('agr-instruction'), a.message);
+    $('agr-panel').classList.toggle('used', !!a.used);
+
+    const host = $('agr-cards');
+    const html = (a.offered || []).map((card) => {
+      const isUsed = a.used && a.selected === card.id;
+      const locked = a.used && a.selected !== card.id;
+      const confirming = agrPick && agrPick.card.id === card.id && !a.used;
+      const needs = card.target ? `<span class="agr-needs">${card.target === 'sector' ? 'CHOOSE A SECTOR' : card.target === 'resource_type' ? 'CHOOSE A RESOURCE' : 'CHOOSE A WORKER'}</span>` : '';
+      const body = confirming
+        ? `${agrTargetPicker(card)}<div class="agr-btns"><button type="button" class="primary" data-confirm>CONFIRM — ACTIVATE</button><button type="button" class="ghost" data-cancel>CANCEL</button></div>`
+        : `<button type="button" class="agr-select${isUsed ? ' on' : ''}" data-pick="${card.id}"${a.used ? ' disabled' : ''}>${isUsed ? 'USED' : locked ? 'LOCKED' : 'SELECT'}</button>`;
+      return `<div class="agr-card cat-${card.category}${isUsed ? ' used' : locked ? ' locked' : ''}${confirming ? ' confirming' : ''}">
+          <div class="agr-title">${esc(card.title)}</div>
+          <div class="agr-summary">${esc(card.summary)}</div>
+          ${needs}
+          ${body}
+        </div>`;
+    }).join('') || '<div class="empty">No cards dealt for this round yet.</div>';
+    if (host.dataset.sig !== html) {
+      host.dataset.sig = html;
+      host.innerHTML = html;
+      for (const btn of host.querySelectorAll('[data-pick]')) {
+        btn.addEventListener('click', () => agrStart(a.offered.find((c) => c.id === btn.dataset.pick)));
+      }
+      const confirm = host.querySelector('[data-confirm]');
+      if (confirm) {
+        confirm.addEventListener('click', () => {
+          const sel = $('agr-target');
+          if (sel && agrPick) {
+            const card = agrPick.card;
+            agrPick.target = card.target === 'resource_type' ? { resource: sel.value } : { sector: sel.value };
+          }
+          agrConfirm();
+        });
+      }
+      const cancel = host.querySelector('[data-cancel]');
+      if (cancel) cancel.addEventListener('click', agrCancel);
+    }
   }
 
   // -- faults -----------------------------------------------------------------

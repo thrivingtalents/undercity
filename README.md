@@ -29,8 +29,8 @@ control extension). Where the two differ, **the contract wins**.
 
 | Screen | Who | LAN URL | What it does |
 |---|---|---|---|
-| **Wall** | projector, whole room | `/wall` | The HAVEN-9 illustration (`Asset/Map reference`, prepared into `public/wall/art` by `node tools/prepare-wall-art.js`) with everything alive drawn over it: a live label with the sector icon on each painted callout, a compact integrity marker and warning badges (fault clock, low stock, injured) that appear only when something is wrong, traced district footprints that tint amber, pulse red, flicker dark in brownout or go greyscale when offline, a Core that dims and flickers with output · HUD with CITY · CORE · NEXT CYCLE · one most-urgent fault line · one temporary notification at a time · Council, emergency and core-drop takeovers · paused · Round 3 vs Aftershock. Healthy districts are simply lit; nothing says "no faults" |
-| **Sector** | the Systems Lead | `/sector/POW` … `/sector/COM` | What's wrong · how long · what we have · what to enter. Fault list → open card → resolution console with 3-strike 20 s lockout. All six get REQUEST RESOURCE and TRANSFER RESOURCE, an inbound-request card to FULFIL or DECLINE, and an injured-worker panel that asks Medical for healing. TRN alone gets the resource approval queue with APPROVE; MED alone gets the healing queue with HEAL; COM gets City Intelligence |
+| **Wall** | projector, whole room | `/wall` | The city command centre, in four bands: a command bar (round · CITY · CORE · NEXT CYCLE, the timer going amber under 2:00, red under 1:00, pulsing in the last ten seconds); ONE priority event (a timed emergency, a DARK sector, a CRITICAL sector, core insufficiency, the Council, a resource request, a transfer waiting on Transport, a fault, COM's broadcast — in that order — with its own countdown); the full HAVEN-9 illustration (`Asset/Map reference`, prepared into `public/wall/art` by `node tools/prepare-wall-art.js`) with live labels, state tints, one fault badge per district, transfer routes that light only while something moves, and a Core that glows with its output; six fixed-order SECTOR HEALTH monitors beside it (icon, code, name, integrity, STABLE / WARNING / CRITICAL / BROWNOUT / DARK, small flags for a fault, a request, a transfer, injuries, and what COM last reported with a round-based freshness word); and the last four events. Council keeps the city visible; a cycle boundary flashes for 3.5 s. Nothing says "no active faults"; nothing shows a hidden code |
+| **Sector** | the Systems Lead | `/sector/POW` … `/sector/COM` | What's wrong · how long · what we have · what to enter. Fault list → open card → resolution console with 3-strike 20 s lockout. All six get REQUEST RESOURCE and TRANSFER RESOURCE, an inbound-request card to FULFIL or DECLINE, and an injured-worker panel that asks Medical for healing. TRN alone gets the resource approval queue with APPROVE; MED alone gets the healing queue with HEAL; COM gets City Intelligence and CITY BROADCAST CONTROL (the only editable big screen); AGR gets its three intervention cards; every screen reads the big screen |
 | **Admin** | the facilitator | `/admin?token=haven9` | Phase/master timer, seven always-visible quick actions, 2×3 sector control grid, pressure panel (faults · timeline · events · council · core · transfers · settings · debrief), live log, observation pad |
 
 Every screen updates in real time over one websocket; no refresh, ever. A
@@ -173,19 +173,35 @@ npm start                                            # http://localhost:3000/adm
    refused. Every gate on both chains is a setting, and the facilitator can
    force an approval or a heal, reset either counter and expire the queues;
    a forced action is flagged as an override in the log and the debrief.
-6. **Council.** CALL COUNCIL puts the 5:00 summons on every screen. Admin
+6. **The city broadcast and AGR's hand.** The wall's resource board is a
+   public information layer that **COM alone** maintains by hand: COM reports
+   each sector's stock and a priority announcement, each stamped with the
+   ROUND it was reported in and shown as CURRENT, STALE, OUTDATED or NOT
+   UPDATED — never a clock time, never a live mirror. Nothing syncs it, not
+   production, not a transfer, not a card, not a round change; stale
+   information is the exercise. Editing it never touches real inventory.
+   **AGR** is dealt **three random, unique intervention cards** at the start
+   of every round from `lib/agr-cards.json`, server-side and kept in state, so
+   a refresh, a reconnect or a cycle boundary shows the same three; last
+   round's cards sit the next draw out while the pool allows. AGR activates
+   **one**: the effect is validated against the live world and the round's
+   choice is spent only when it lands. Cards can widen Transport's or
+   Medical's allowance for the round, but Transport still approves and
+   Medical still heals. The facilitator can write the board, reroll the hand,
+   force a card or bench one, each logged as an override.
+7. **Council.** CALL COUNCIL puts the 5:00 summons on every screen. Admin
    records the **Continuity Order** by clicking sectors in rank order; it
    confirms ("This decision cannot be recalled."), ranks 5 and 6 enter
    BROWNOUT, the wall announces CONTINUITY ORDER ACCEPTED. No order at 00:00
    → NO CONTINUITY ORDER RECEIVED and a one-click **rolling blackout**, which
    rotates brownout through the city until Admin ends it.
-7. **Pressure.** Quick actions (TRIGGER FAULT · CORE −10% · INJURE WORKER ·
+8. **Pressure.** Quick actions (TRIGGER FAULT · CORE −10% · INJURE WORKER ·
    CALL COUNCIL · BROWNOUT · ANNOUNCEMENT · ALERT · PAUSE) are always on
    screen. The pressure dial and configurable **events** (supply delay,
    transport gridlock, false sensor reading, power surge, tunnel collapse,
    communication blackout, biological breach…) each have a visibility:
    `ADMIN_ONLY`, `CITY_WIDE`, `TARGET_SECTOR` or `COMMS_ONLY`.
-8. **Debrief.** Admin → DEBRIEF folds the log into per-round numbers (faults
+9. **Debrief.** Admin → DEBRIEF folds the log into per-round numbers (faults
    resolved, time to first action, average response, failed console entries,
    lockouts, transfers and their timing, critical entries, council decision
    time) and a neutral Round 3 vs Aftershock table that can be put on the
@@ -230,6 +246,9 @@ The transfer and healing rules are these keys, all in the same place:
 | `allow_facilitator_force_heal` | `true` | The facilitator may force a heal |
 | `notify_supplier_with_sound` | `true` | Arrivals ring on the supplier, Transport and Medical screens |
 | `show_completed_transfer_on_wall` | `true` | Completions are the only step the wall shows |
+| `agr_cards_per_round` | `3` | Cards dealt to AGR at each round start |
+| `agr_anti_repeat` | `true` | Last round's cards sit the next draw out while the pool allows |
+| `agr_disabled_cards` | `["AGR_WORKFORCE_RECOVERY"]` | Cards kept out of the draw (see the note on that card in `lib/agr-cards.json`) |
 
 `trn_capacity_per_cycle` is still read when the basis is `cycle`. Who may
 approve and who may heal are **not** configurable: Transport and Medical

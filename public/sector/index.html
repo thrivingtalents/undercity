@@ -201,6 +201,14 @@
         <div class="council-call">CHIEF + LIAISON<br>REPORT TO CENTRAL COUNCIL</div>
       </div>
 
+      <!-- AGRICULTURE ONLY. The server deals three cards to AGR alone. -->
+      <div class="panel block agr-block" id="agr-panel" hidden>
+        <h2 class="ptitle">AGR — EMERGENCY INTERVENTIONS <span class="cap" id="agr-round"></span></h2>
+        <div class="agr-instruction" id="agr-instruction"></div>
+        <div class="agr-cards" id="agr-cards"></div>
+        <div class="msg" id="agr-msg" hidden></div>
+      </div>
+
       <div class="panel block" id="effects-panel" hidden>
         <h2 class="ptitle">ACTIVE EFFECTS</h2>
         <div class="effects" id="effects"></div>
@@ -220,6 +228,22 @@
         <div class="healing" id="healing"></div>
         <div class="msg" id="healing-msg" hidden></div>
         <div class="declare-note">Only Medical Bay heals. Transport is not involved.</div>
+      </div>
+
+      <!-- THE CITY BIG SCREEN: what COM has told the city. COM alone gets the inputs. -->
+      <div class="panel block broadcast-block" id="broadcast-panel" hidden>
+        <h2 class="ptitle"><span id="bc-title">CITY BIG SCREEN</span> <span class="cap" id="bc-round"></span></h2>
+        <div class="bc-ann" id="bc-ann" hidden><b id="bc-ann-head"></b><span id="bc-ann-msg"></span><em id="bc-ann-meta"></em></div>
+        <div class="empty" id="bc-ann-none" hidden>No priority announcement.</div>
+        <div class="bc-rows" id="bc-rows"></div>
+        <div class="bc-key">⚡ POWER · 💧 WATER · ⚕ MED · 🔧 PARTS, in that order — reported by Comms, not measured</div>
+        <div class="bc-editor" id="bc-editor" hidden>
+          <div class="tf-label">PRIORITY ANNOUNCEMENT</div>
+          <input type="text" id="bc-head" maxlength="40" placeholder="Headline (40 characters)">
+          <input type="text" id="bc-msg" maxlength="160" placeholder="Message (160 characters)">
+          <div class="agr-btns"><button type="button" class="primary" id="bc-publish">PUBLISH ANNOUNCEMENT</button><button type="button" class="ghost" id="bc-clear">CLEAR ANNOUNCEMENT</button></div>
+        </div>
+        <div class="msg" id="broadcast-msg" hidden></div>
       </div>
 
       <div class="panel block" id="intel-panel" hidden>

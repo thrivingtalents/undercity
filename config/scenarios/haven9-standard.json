@@ -54,6 +54,9 @@
     "allow_facilitator_force_heal": true,
     "notify_supplier_with_sound": true,
     "show_completed_transfer_on_wall": true,
+    "agr_cards_per_round": 3,
+    "agr_anti_repeat": true,
+    "agr_disabled_cards": ["AGR_WORKFORCE_RECOVERY"],
     "deliver_on_stamp": true,
 
     "brownout_effects": {

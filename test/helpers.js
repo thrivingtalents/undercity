@@ -16,10 +16,10 @@ function loadContent() {
 const rounds = JSON.parse(fs.readFileSync(path.join(ROOT, 'lib', 'rounds.json'), 'utf8'));
 
 /** A GameState writing its log into a scratch dir, in PLAY mode and ready. */
-function newGame() {
+function newGame({ runId = 'test-run' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'undercity-test-'));
   const log = new RunLog(path.join(dir, 'runlog.jsonl'), path.join(dir, 'snapshot.json'));
-  const game = new GameState({ content: loadContent(), rounds, runId: 'test-run', log });
+  const game = new GameState({ content: loadContent(), rounds, runId, log });
   log.setContext({ round: game.state.round, phase: game.state.phase });
   game.state.mode = 'PLAY';
   game.dir = dir;

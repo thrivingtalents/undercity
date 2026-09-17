@@ -601,10 +601,94 @@
   });
   $('btn-reset-stamps').addEventListener('click', () => send({ type: 'reset_stamps', which: 'all' }));
   $('btn-reset-heals').addEventListener('click', () => send({ type: 'reset_heals' }));
+  $('btn-ca-publish').addEventListener('click', () => {
+    send({ type: 'com_announce', headline: $('ca-head').value, message: $('ca-msg').value });
+    $('ca-head').value = ''; $('ca-msg').value = '';
+  });
+  $('btn-ca-clear').addEventListener('click', () => send({ type: 'com_announce_clear' }));
+  $('btn-agr-reroll').addEventListener('click', () => {
+    if (confirm('Deal AGR a new hand for this round? This is logged as a facilitator override.')) send({ type: 'agr_reroll' });
+  });
   $('btn-expire-transfers').addEventListener('click', () => {
     if (!confirm('EXPIRE PENDING — void every transfer that has not been stamped? Delivered ones are untouched.')) return;
     send({ type: 'expire_transfers' });
   });
+
+  // -- COM's board and AGR's hand, as the facilitator sees them --------------------
+  //
+  // Everything here is an OVERRIDE of a sector's own authority and is logged
+  // as one. The board inputs are a draft: rows are built once per shape and
+  // the frame only touches their freshness afterwards.
+
+  const BOARD_KEYS = ['power', 'water', 'med', 'parts'];
+  let boardBuilt = false;
+
+  function renderComAgr() {
+    const b = state.broadcast;
+    if (b) {
+      $('ca-round').textContent = `CURRENT ROUND: ${b.round_number}`;
+      const host = $('ca-rows');
+      const codes = Object.keys(b.rows);
+      if (!boardBuilt || host.children.length !== codes.length) {
+        boardBuilt = true;
+        host.innerHTML = codes.map((code) => `<div class="ca-row" data-code="${code}">
+            <b>${code}</b>
+            ${BOARD_KEYS.map((k) => `<input type="number" min="0" id="ca-${code}-${k}" value="${b.rows[code][k] ?? ''}" placeholder="${k}" title="${k}">`).join('')}
+            <button data-casave="${code}">SAVE</button>
+            <span class="ca-meta"></span>
+          </div>`).join('');
+        for (const btn of host.querySelectorAll('[data-casave]')) {
+          btn.addEventListener('click', () => {
+            const code = btn.dataset.casave;
+            const values = {};
+            for (const k of BOARD_KEYS) { const el = $(`ca-${code}-${k}`); if (el.value !== '') values[k] = Number(el.value); }
+            send({ type: 'com_board_set', sector: code, values });
+          });
+        }
+      }
+      for (const code of codes) {
+        const row = b.rows[code];
+        const meta = host.querySelector(`[data-code="${code}"] .ca-meta`);
+        if (meta) meta.textContent = row.round_number === null ? 'NOT UPDATED' : `R${row.round_number} · ${row.freshness}`;
+      }
+      const a = b.announcement;
+      $('ca-ann-now').textContent = a ? `${a.headline} — ${a.message} (R${a.round_number} · ${a.freshness})` : 'No announcement on the wall.';
+    }
+
+    const agr = state.agr;
+    if (!agr) return;
+    const titles = Object.fromEntries((agr.pool || []).map((c) => [c.id, c]));
+    $('ca-agr-round').textContent = `${agr.round || '—'} · ${agr.used ? `USED: ${agr.selected}` : '1 choice open'}${agr.reroll_count ? ` · rerolled ×${agr.reroll_count}` : ''}`;
+    $('ca-offer').innerHTML = (agr.offered || []).map((id) => {
+      const c = titles[id] || { title: id, summary: '', target: null };
+      const isUsed = agr.used && agr.selected === id;
+      return `<div class="tr${agr.used && !isUsed ? ' closed' : ''}"><div class="who"><b>${esc(c.title)}</b> ${isUsed ? '<span class="tag multi">USED</span>' : ''}<br><span class="st">${esc(c.summary)}${c.target ? ` · needs ${c.target.replace('_', ' ')}` : ''}</span></div>
+        <div class="acts">${agr.used ? '' : `<button data-force="${id}" class="danger">FORCE ACTIVATE</button>`}</div></div>`;
+    }).join('') || '<div class="hint">No hand dealt.</div>';
+    for (const btn of $('ca-offer').querySelectorAll('[data-force]')) {
+      btn.addEventListener('click', () => {
+        const c = titles[btn.dataset.force] || {};
+        const target = {};
+        if (c.target === 'sector' || (c.effect && c.effect.type === 'health_lowest')) target.sector = $('ca-target-sector').value;
+        if (c.target === 'resource_type') target.resource = $('ca-target-res').value;
+        send({ type: 'agr_activate', card: btn.dataset.force, target: Object.keys(target).length ? target : null, force: true });
+      });
+    }
+    const sel = $('ca-target-sector');
+    const codes = agr.active_sectors || [];
+    if (sel.dataset.keys !== codes.join(',')) {
+      sel.dataset.keys = codes.join(',');
+      sel.innerHTML = codes.map((c) => `<option value="${c}">${c}</option>`).join('');
+    }
+    const poolHtml = (agr.pool || []).map((c) => `<label class="ca-pool${c.enabled ? '' : ' off'}"><input type="checkbox" data-card="${c.id}" ${c.enabled ? 'checked' : ''}> ${esc(c.title)}</label>`).join('');
+    if ($('ca-pool').dataset.sig !== poolHtml) {
+      $('ca-pool').dataset.sig = poolHtml;
+      $('ca-pool').innerHTML = poolHtml;
+      for (const cb of $('ca-pool').querySelectorAll('[data-card]')) {
+        cb.addEventListener('change', () => send({ type: 'agr_card_enabled', card: cb.dataset.card, enabled: cb.checked }));
+      }
+    }
+  }
 
   function renderTransfers() {
     const cap = state.transfer_capacity || {};
@@ -946,6 +1030,7 @@
     renderCouncil();
     renderCore();
     renderTransfers();
+    renderComAgr();
     renderSettings();
     renderObsSectors();
     renderFeed();

@@ -315,6 +315,22 @@ ALL), and:
 - **MED only** — `healing_queue { capacity, used, remaining, can_heal, items[] }`,
   each item carrying `sector`, `worker_id`, `worker_label` and `still_injured`.
   **No other role is sent this key.**
+- **AGR only** — `agr_cards { round, round_number, used, selected, target,
+  offered[], message }`. `offered[]` is the three dealt cards with
+  `{ id, title, summary, category, target }` plus `sectors[]`, `choices{}` or
+  `ties[]` where a choice is needed. Never the deck. **No other role is sent
+  this key.**
+- **Every role, including the wall** — `broadcast { round, round_number,
+  rows{ CODE: { power, water, med, parts, round, round_number, freshness } },
+  announcement | null, editable }`. Reported by COM, never read from
+  inventory; `freshness` is CURRENT / STALE / OUTDATED / NOT UPDATED from
+  round distance alone, and no field carries a clock time. `editable` is true
+  only in COM's frame.
+- **The wall** — `requests[]` (open) and `transfers[]` (open, plus any closed in
+  the last 20 s so an animation can finish), each `{ id, from/to or
+  supplier/requester, resource, amount, status, updated_at }`. What is moving
+  and between whom, never what anyone holds. Empty when
+  `show_completed_transfer_on_wall` is off.
 - **Every sector** — `requests[]` and `transfers[]` it is party to, its own
   `healing[]`, `unclaimed_injured`, and `transfer_rules { require_supplier_acceptance,
   require_physical_transfer_chit, notify_supplier_with_sound,
@@ -370,7 +386,23 @@ scenario defaults) and `scenario { id name sectors events fault_presets }`.
 { "type": "heal_worker",  "id": "H-0009" }       // MED ONLY
 { "type": "heal_decline", "id": "H-0009" }       // MED only
 { "type": "heal_cancel",  "id": "H-0009" }       // the asking sector
+{ "type": "com_board_set", "row": "POW", "values": { "power": 5, "water": 1, "med": 0, "parts": 2 } }  // COM ONLY — row, not sector
+{ "type": "com_announce", "headline": "MED NEEDS POWER", "message": "…" }   // COM only; 40 / 160 chars
+{ "type": "com_announce_clear" }                                             // COM only
+{ "type": "agr_select",   "card": "AGR_STABILISE_SECTOR" }                   // AGR only — inspect, spends nothing
+{ "type": "agr_activate", "card": "AGR_STABILISE_SECTOR", "target": { "sector": "POW" } }   // AGR ONLY
 ```
+
+**COM writes the big screen; nobody else does.** `com_board_set` from any
+other sector is refused with `com_edit_forbidden`. It changes displayed
+values only — never a sector's inventory — and stamps the row with the
+current round. **AGR plays one card a round.** `agr_activate` from another
+sector is refused with `agr_only`; a card outside the dealt hand with
+`agr_card_not_in_offer`; a second card with `agr_card_already_used`; a
+missing or bad target with `agr_target_required` / `agr_invalid_target`.
+A refusal never spends the round's choice. `target` is
+`{ sector }` for sector cards and tied CRISIS RESPONSE, `{ resource }` for
+RESERVE CACHE.
 
 Nothing here carries a **free-text field**: the terms are agreed out loud, by
 Liaisons, on paper. A **request** moves nothing and approves nothing; only the
@@ -426,6 +458,11 @@ requires stock.
 { "type": "heal_worker", "id": "H-0009", "force": true }   // logged as facilitator_force_heal
 { "type": "heal_decline", "id": "H-0009" }
 { "type": "reset_stamps", "which": "all" }   { "type": "reset_heals" }   { "type": "expire_transfers" }
+{ "type": "com_board_set", "sector": "POW", "values": { "power": 5 } }   // logged as facilitator_com_override
+{ "type": "com_announce", "headline": "…", "message": "…" }   { "type": "com_announce_clear" }
+{ "type": "agr_reroll" }                                        // logged as agr_admin_reroll
+{ "type": "agr_activate", "card": "AGR_POWER_SURGE", "target": null, "force": true }   // agr_admin_force_activate
+{ "type": "agr_card_enabled", "card": "AGR_RELIEF_CREW", "enabled": false }
 { "type": "wall_debrief", "on": true }
 { "type": "reset_run", "run_id": "…", "scenario_id": "haven9-hard", "confirm": true }
 ```
@@ -461,6 +498,9 @@ exists, else a synthesised placeholder.
 `heal_requested/declined/refused/cancelled/expired`, `worker_healed`,
 `trn_approval_counter_reset`, `med_healing_counter_reset`,
 `facilitator_force_transfer`, `facilitator_force_heal`,
+`com_row_updated`, `com_announcement_published/cleared`, `facilitator_com_override`,
+`agr_random_offer_generated`, `agr_card_selected/activated/activation_refused`,
+`agr_round_offer_archived`, `agr_admin_reroll`, `agr_admin_force_activate`, `agr_card_enabled`,
 `council_called/ended/no_order`, `continuity_order`, `blackout_started/rotated/ended`,
 `event_fired`, `effect_started/ended`, `scheduled`, `preset_fired`,
 `timeline_fired/skipped/delayed`, `alert`, `config_patched`, `set_stability`,

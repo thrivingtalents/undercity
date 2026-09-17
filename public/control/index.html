@@ -108,6 +108,7 @@
         <button data-tab="council">COUNCIL</button>
         <button data-tab="core">CORE</button>
         <button data-tab="transfers">TRANSFERS</button>
+        <button data-tab="comagr">COM · AGR</button>
         <button data-tab="settings">SETTINGS</button>
         <button data-tab="debrief">DEBRIEF</button>
       </nav>
@@ -333,6 +334,40 @@
       </div>
 
       <!-- SETTINGS -->
+      <!-- COM's public board and AGR's dealt hand. Everything here is an override. -->
+      <div class="tab" id="tab-comagr">
+        <div class="block">
+          <span class="label">City broadcast <em>— COM's public board. Saving here overrides COM and is logged.</em></span>
+          <div class="hint" id="ca-round">—</div>
+          <div class="ca-rows" id="ca-rows"></div>
+        </div>
+        <div class="block">
+          <span class="label">Priority announcement</span>
+          <div class="hint" id="ca-ann-now">—</div>
+          <div class="row">
+            <input type="text" id="ca-head" maxlength="40" placeholder="Headline (40)">
+            <input type="text" id="ca-msg" maxlength="160" placeholder="Message (160)">
+            <button id="btn-ca-publish">PUBLISH</button>
+            <button id="btn-ca-clear">CLEAR</button>
+          </div>
+        </div>
+        <div class="block">
+          <span class="label">AGR interventions <em>— this round's hand. Dealt once per round; a reroll is an override.</em></span>
+          <div class="row">
+            <b id="ca-agr-round">—</b>
+            <button id="btn-agr-reroll" class="danger">REROLL HAND</button>
+            <span class="label">Force target</span>
+            <select id="ca-target-sector"></select>
+            <select id="ca-target-res"><option value="power">power</option><option value="water">water</option><option value="med">med</option><option value="parts">parts</option></select>
+          </div>
+          <div class="transfers" id="ca-offer"></div>
+        </div>
+        <div class="block">
+          <span class="label">Card pool <em>— untick a card to keep it out of the draw</em></span>
+          <div class="ca-pools" id="ca-pool"></div>
+        </div>
+      </div>
+
       <div class="tab" id="tab-settings">
         <div class="block">
           <span class="label">Scenario</span>

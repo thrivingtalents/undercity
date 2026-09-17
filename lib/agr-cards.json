@@ -1,0 +1,102 @@
+{
+  "_comment": "AGR's intervention pool (spec v5). Cards are data; lib/state.js agrResolve() applies them. Three are drawn per round from the enabled set, minus last round's draw when enough remain. Disable one with the scenario key agr_disabled_cards.",
+  "cards": [
+    {
+      "id": "AGR_CITY_RECOVERY",
+      "title": "CITY RECOVERY",
+      "category": "health",
+      "summary": "+10 Health to every active sector.",
+      "target": null,
+      "effect": { "type": "health_all", "delta": 10 }
+    },
+    {
+      "id": "AGR_EMERGENCY_STOCKPILE",
+      "title": "EMERGENCY STOCKPILE",
+      "category": "resources",
+      "summary": "AGR gains +5 Power, +5 Water, +2 Med, +1 Parts.",
+      "target": null,
+      "effect": { "type": "stock", "sector": "AGR", "add": { "power": 5, "water": 5, "med": 2, "parts": 1 } }
+    },
+    {
+      "id": "AGR_WORKFORCE_RECOVERY",
+      "title": "WORKFORCE RECOVERY",
+      "category": "workforce",
+      "summary": "Recover 1 eligible non-injured unavailable worker.",
+      "target": "worker",
+      "effect": { "type": "workforce_recovery", "quantity": 1 },
+      "_conflict": "This game's workers are counts with no non-injury unavailable state. The card refuses until one exists; it is off by default (agr_disabled_cards)."
+    },
+    {
+      "id": "AGR_POWER_SURGE",
+      "title": "POWER SURGE",
+      "category": "sector_support",
+      "summary": "POW immediately gains +3 Power.",
+      "target": null,
+      "effect": { "type": "stock", "sector": "POW", "add": { "power": 3 } }
+    },
+    {
+      "id": "AGR_WATER_RESERVE",
+      "title": "WATER RESERVE",
+      "category": "sector_support",
+      "summary": "WTR immediately gains +3 Water.",
+      "target": null,
+      "effect": { "type": "stock", "sector": "WTR", "add": { "water": 3 } }
+    },
+    {
+      "id": "AGR_MEDICAL_REINFORCEMENT",
+      "title": "MEDICAL REINFORCEMENT",
+      "category": "capacity",
+      "summary": "MED gains +1 healing capacity this round. MED still performs the heal.",
+      "target": null,
+      "effect": { "type": "capacity", "kind": "med_capacity", "sector": "MED", "delta": 1 }
+    },
+    {
+      "id": "AGR_LOGISTICS_BOOST",
+      "title": "LOGISTICS BOOST",
+      "category": "capacity",
+      "summary": "TRN gains +1 transfer approval this round. TRN still approves.",
+      "target": null,
+      "effect": { "type": "capacity", "kind": "trn_capacity", "sector": "TRN", "delta": 1 }
+    },
+    {
+      "id": "AGR_CRISIS_RESPONSE",
+      "title": "CRISIS RESPONSE",
+      "category": "health",
+      "summary": "The active sector with the lowest Health gains +20 Health.",
+      "target": null,
+      "effect": { "type": "health_lowest", "delta": 20 }
+    },
+    {
+      "id": "AGR_STABILISE_SECTOR",
+      "title": "STABILISE SECTOR",
+      "category": "health",
+      "summary": "Choose 1 active sector and restore +15 Health.",
+      "target": "sector",
+      "effect": { "type": "health_one", "delta": 15 }
+    },
+    {
+      "id": "AGR_EMERGENCY_PARTS",
+      "title": "EMERGENCY PARTS",
+      "category": "resources",
+      "summary": "AGR gains +3 Parts.",
+      "target": null,
+      "effect": { "type": "stock", "sector": "AGR", "add": { "parts": 3 } }
+    },
+    {
+      "id": "AGR_RELIEF_CREW",
+      "title": "RELIEF CREW",
+      "category": "workforce",
+      "summary": "Choose 1 sector to receive +1 temporary worker until the round ends.",
+      "target": "sector",
+      "effect": { "type": "relief_crew", "workers": 1 }
+    },
+    {
+      "id": "AGR_RESERVE_CACHE",
+      "title": "RESERVE CACHE",
+      "category": "resources",
+      "summary": "Choose one resource type and gain an emergency cache.",
+      "target": "resource_type",
+      "effect": { "type": "cache", "sector": "AGR", "choices": { "power": 3, "water": 3, "med": 2, "parts": 2 } }
+    }
+  ]
+}

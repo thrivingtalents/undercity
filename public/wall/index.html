@@ -9,9 +9,15 @@
 <link rel="stylesheet" href="/assets/wall/wall.css">
 </head>
 <body>
+<!--
+  The city command centre, in four bands: the command bar, ONE priority
+  event, the city beside its six health monitors, and the last four things
+  that happened. Every value comes from the server's frame; nothing here is
+  computed for looks.
+-->
 <div class="wall" id="wall" data-core="healthy">
 
-  <!-- HUD: the three values that matter, and nothing else -->
+  <!-- 1. COMMAND BAR: identity, round, the three numbers -->
   <header class="hud">
     <div class="hud-brand">
       <h1>HAVEN-9</h1>
@@ -29,45 +35,39 @@
     </div>
   </header>
 
-  <!-- the reduced form of an emergency overlay, after its full-screen seconds -->
-  <div class="strip-alert" id="strip-alert" hidden>
-    <span class="strip-light"></span>
-    <b id="strip-alert-title"></b>
-    <span id="strip-alert-sub"></span>
-    <em id="strip-alert-big"></em>
-  </div>
-
-  <!-- THE CITY -->
-  <main class="city" id="city">
-    <svg id="map" viewBox="0 0 1672 941" preserveAspectRatio="xMidYMid meet" role="img" aria-label="HAVEN-9 underground city"></svg>
-    <div class="final-count" id="final-count" hidden></div>
-    <div class="toast" id="toast" hidden>
-      <span class="toast-icon" id="toast-icon"></span>
-      <span class="toast-text" id="toast-text"></span>
+  <!-- 2. PRIORITY EVENT: the one thing that matters most right now -->
+  <section class="banner" id="banner" data-accent="green" data-level="10">
+    <div class="b-light"></div>
+    <div class="b-text">
+      <span class="b-sev" id="b-sev">STATUS</span>
+      <b class="b-head" id="b-head">CITY OPERATIONS NORMAL</b>
+      <span class="b-route" id="b-route"></span>
     </div>
+    <b class="b-clock clock" id="b-clock" hidden></b>
+  </section>
+
+  <!-- 3. THE CITY and its six monitors -->
+  <main class="main">
+    <section class="city" id="city">
+      <svg id="map" viewBox="0 0 1672 941" preserveAspectRatio="xMidYMid meet" role="img" aria-label="HAVEN-9 underground city"></svg>
+      <div class="final-count" id="final-count" hidden></div>
+      <!-- the cycle boundary, for 3.5 seconds -->
+      <div class="cycle-flash" id="cycle-flash" hidden>
+        <b id="cycle-flash-title"></b>
+        <span id="cycle-flash-sub"></span>
+      </div>
+    </section>
+
+    <aside class="health" id="health">
+      <h2 class="h-title">SECTOR HEALTH</h2>
+      <div class="h-cards" id="h-cards"></div>
+    </aside>
   </main>
 
-  <!-- ONE most urgent fault, or nothing -->
-  <footer class="urgent" id="urgent" hidden>
-    <span class="u-icon">⚠</span>
-    <span class="u-sector" id="urgent-sector"></span>
-    <span class="u-code" id="urgent-code"></span>
-    <span class="u-name" id="urgent-name"></span>
-    <span class="u-sev" id="urgent-sev"></span>
-    <b class="u-clock clock" id="urgent-clock"></b>
-  </footer>
+  <!-- 4. RECENT EVENTS: the last four things worth knowing -->
+  <footer class="ticker" id="ticker"></footer>
 
   <!-- takeovers: the city stays faintly visible behind each -->
-  <div class="takeover council" id="council" hidden>
-    <div class="t-inner">
-      <div class="t-tag">CENTRAL COUNCIL</div>
-      <div class="t-title">COUNCIL SUMMONED</div>
-      <div class="t-clock clock" id="council-clock">--:--</div>
-      <div class="t-sub" id="council-sub">CHIEFS + LIAISONS REPORT TO CENTRAL COUNCIL</div>
-      <div class="t-order" id="council-order" hidden></div>
-    </div>
-  </div>
-
   <div class="takeover alert" id="alert-full" hidden>
     <div class="t-inner">
       <div class="t-tag">MAJOR EMERGENCY</div>

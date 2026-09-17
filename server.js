@@ -965,6 +965,38 @@ function handleSector(client, entry, msg) {
       return broadcast(entry);
     }
 
+    /**
+     * COM writes the city's public board. Comms only, at both layers; the
+     * reducer touches displayed values and never a sector's stock.
+     */
+    case 'com_board_set': {
+      if (mine !== 'COM') return send(client.ws, { type: 'error', reason: 'com_edit_forbidden' });
+      send(client.ws, { type: 'broadcast_result', action: 'row', ...game.setBroadcastRow(msg.row || msg.sector, msg.values || {}, { by: 'COM' }) });
+      return broadcast(entry);
+    }
+    case 'com_announce': {
+      if (mine !== 'COM') return send(client.ws, { type: 'error', reason: 'com_edit_forbidden' });
+      send(client.ws, { type: 'broadcast_result', action: 'announce', ...game.setBroadcastAnnouncement(msg, { by: 'COM' }) });
+      return broadcast(entry);
+    }
+    case 'com_announce_clear': {
+      if (mine !== 'COM') return send(client.ws, { type: 'error', reason: 'com_edit_forbidden' });
+      send(client.ws, { type: 'broadcast_result', action: 'clear', ...game.clearBroadcastAnnouncement({ by: 'COM' }) });
+      return broadcast(entry);
+    }
+
+    /** AGR's dealt hand. Agriculture only. Activation is checked against the live world. */
+    case 'agr_select': {
+      if (mine !== 'AGR') return send(client.ws, { type: 'error', reason: 'agr_only' });
+      send(client.ws, { type: 'agr_result', action: 'select', ...game.agrSelect(msg.card, { by: 'AGR' }) });
+      return broadcast(entry);
+    }
+    case 'agr_activate': {
+      if (mine !== 'AGR') return send(client.ws, { type: 'error', reason: 'agr_only' });
+      send(client.ws, { type: 'agr_result', action: 'activate', ...game.agrActivate(msg.card, { by: 'AGR', target: msg.target || null }) });
+      return broadcast(entry);
+    }
+
     default:
       return send(client.ws, { type: 'error', reason: 'forbidden' });
   }
@@ -1123,6 +1155,26 @@ function handleControl(client, entry, msg) {
       return ok();
     case 'reset_heals':
       reply({ type: 'heals_reset', ...game.resetHeals({ by: 'facilitator' }) });
+      return ok();
+
+    // -- COM's board and AGR's hand, as overrides
+    case 'com_board_set':
+      reply({ type: 'broadcast_result', ...game.setBroadcastRow(msg.row || msg.sector, msg.values || {}, { by: 'facilitator' }) });
+      return ok();
+    case 'com_announce':
+      reply({ type: 'broadcast_result', ...game.setBroadcastAnnouncement(msg, { by: 'facilitator' }) });
+      return ok();
+    case 'com_announce_clear':
+      reply({ type: 'broadcast_result', ...game.clearBroadcastAnnouncement({ by: 'facilitator' }) });
+      return ok();
+    case 'agr_reroll':
+      reply({ type: 'agr_result', ...game.agrReroll({ by: 'facilitator' }) });
+      return ok();
+    case 'agr_activate':
+      reply({ type: 'agr_result', ...game.agrActivate(msg.card, { by: 'facilitator', target: msg.target || null, force: msg.force !== false }) });
+      return ok();
+    case 'agr_card_enabled':
+      reply({ type: 'agr_result', ...game.agrSetCardEnabled(msg.card, msg.enabled !== false, { by: 'facilitator' }) });
       return ok();
 
     // -- debrief on the wall

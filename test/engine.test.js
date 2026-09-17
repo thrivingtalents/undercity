@@ -806,6 +806,512 @@ test('a snapshot from the one-array build is split into requests and transfers o
   assert.equal(game.state.stamps_this_round, undefined);
 });
 
+const economy = require('../lib/economy');
+const economyFor = (game, code) => economy.productionFor(game, game.state.sectors[code]);
+
+// -- COM: the city broadcast ------------------------------------------------------------
+//
+// The big screen's resource board is a public information layer COM keeps by
+// hand. It is never read from inventory, never written to it, and it goes
+// stale on purpose: freshness is a round count, never a clock.
+
+const BOARD_ROLES = ['POW', 'WTR', 'MED', 'TRN', 'AGR', 'COM'];
+
+test('only COM can edit the public big screen; the facilitator overrides and is logged as such', () => {
+  const game = running();
+  for (const code of BOARD_ROLES.filter((c) => c !== 'COM')) {
+    const r = game.setBroadcastRow('POW', { power: 8 }, { by: code });
+    assert.equal(r.ok, false, `${code} edited the board`);
+    assert.equal(r.reason, 'com_edit_forbidden');
+    assert.equal(game.setBroadcastAnnouncement({ headline: 'X' }, { by: code }).reason, 'com_edit_forbidden');
+  }
+  assert.equal(game.setBroadcastRow('POW', { power: 8 }, { by: 'COM' }).ok, true);
+  const f = game.setBroadcastRow('WTR', { water: 1 }, { by: 'facilitator' });
+  assert.equal(f.ok, true);
+  assert.equal(logEvents(game, 'com_row_updated').at(-1).facilitator_override, true);
+  assert.equal(logEvents(game, 'facilitator_com_override').length, 1);
+  // Only COM's frame says the board is editable.
+  for (const code of BOARD_ROLES) assert.equal(forSector(game, code).broadcast.editable, code === 'COM', `${code} editable wrong`);
+});
+
+test('changing COM displayed stock never changes real inventory', () => {
+  const game = running();
+  game.setInventory('POW', { power: 2 });
+  const r = game.setBroadcastRow('POW', { power: 8, water: 9, med: 9, parts: 9 }, { by: 'COM' });
+  assert.equal(r.ok, true);
+  assert.equal(forBigscreen(game).broadcast.rows.POW.power, 8, 'the wall shows what COM reported');
+  assert.equal(game.state.sectors.POW.inventory.power, 2, 'real stock untouched');
+  assert.deepEqual(game.state.sectors.POW.inventory, { ...game.state.sectors.POW.inventory, power: 2 });
+});
+
+test('a COM save stamps the current round, and players see a round, not a clock', () => {
+  const game = running();
+  game.setRound('R3');
+  const r = game.setBroadcastRow('POW', { power: 2 }, { by: 'COM' });
+  assert.equal(r.row.round, 'R3');
+  assert.equal(r.freshness, 'CURRENT');
+  const row = forSector(game, 'WTR').broadcast.rows.POW;
+  assert.equal(row.round_number, 3);
+  assert.equal(row.freshness, 'CURRENT');
+  // The player-facing projection carries no timestamp field of any kind.
+  for (const key of Object.keys(row)) assert.ok(!/(_at|time|stamp)/i.test(key), `player row leaks ${key}`);
+  const a = game.setBroadcastAnnouncement({ headline: 'HOLD POWER', message: 'MED needs 2 power' }, { by: 'COM' });
+  assert.equal(a.announcement.round, 'R3');
+  for (const key of Object.keys(forBigscreen(game).broadcast.announcement)) assert.ok(!/(_at|time|stamp)/i.test(key), `announcement leaks ${key}`);
+  // The audit trail keeps the backend timestamp.
+  assert.ok(logEvents(game, 'com_row_updated')[0].t);
+});
+
+test('displayed values do not auto-sync after production, a transfer, or an AGR card', () => {
+  const game = running();
+  game.setBroadcastRow('POW', { power: 5 }, { by: 'COM' });
+  game.setBroadcastRow('AGR', { parts: 1 }, { by: 'COM' });
+  game.setInventory('POW', { power: 3 });
+  assert.equal(forBigscreen(game).broadcast.rows.POW.power, 5, 'a stock change did not move the board');
+
+  game.cycleControl('process');                                              // production + upkeep
+  assert.equal(forBigscreen(game).broadcast.rows.POW.power, 5, 'production did not move the board');
+
+  const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 });
+  game.approveTransfer(t.id, { by: 'TRN' });
+  assert.equal(forBigscreen(game).broadcast.rows.POW.power, 5, 'a transfer did not move the board');
+
+  game.state.agr.offered = ['AGR_EMERGENCY_PARTS', 'AGR_POWER_SURGE', 'AGR_WATER_RESERVE'];
+  assert.equal(game.agrActivate('AGR_EMERGENCY_PARTS', { by: 'AGR' }).ok, true);
+  assert.equal(game.state.sectors.AGR.inventory.parts, 6, 'the card changed real stock');
+  assert.equal(forBigscreen(game).broadcast.rows.AGR.parts, 1, 'but not the board');
+  assert.equal(forBigscreen(game).broadcast.rows.POW.power, 5);
+});
+
+test('a row from last round is STALE, two rounds old is OUTDATED, never set is NOT UPDATED', () => {
+  const game = running();
+  game.setBroadcastRow('POW', { power: 5 }, { by: 'COM' });
+  assert.equal(forBigscreen(game).broadcast.rows.POW.freshness, 'CURRENT');
+  assert.equal(forBigscreen(game).broadcast.rows.WTR.freshness, 'NOT UPDATED');
+  game.setRound('R3');
+  assert.equal(forBigscreen(game).broadcast.rows.POW.freshness, 'STALE');
+  assert.equal(forBigscreen(game).broadcast.rows.POW.power, 5, 'values survive the round change unchanged');
+  game.setRound('R4');
+  assert.equal(forBigscreen(game).broadcast.rows.POW.freshness, 'OUTDATED');
+  assert.equal(forBigscreen(game).broadcast.rows.POW.round_number, 2);
+  assert.equal(forBigscreen(game).broadcast.round_number, 4);
+});
+
+test('COM publishes one priority announcement, replaces it, and clears it; nothing else moves', () => {
+  const game = running();
+  const snap = JSON.stringify({ s: game.state.sectors, t: game.state.transfers, h: game.state.healing });
+  assert.equal(game.setBroadcastAnnouncement({}, { by: 'COM' }).reason, 'empty_announcement');
+  assert.equal(game.setBroadcastAnnouncement({ headline: 'MED NEEDS POWER', message: 'Send 2 power via TRN' }, { by: 'COM' }).ok, true);
+  assert.equal(forSector(game, 'POW').broadcast.announcement.headline, 'MED NEEDS POWER');
+  game.setBroadcastAnnouncement({ headline: 'A'.repeat(60), message: 'B'.repeat(200) }, { by: 'COM' });
+  const a = forBigscreen(game).broadcast.announcement;
+  assert.equal(a.headline.length, 40, 'headline capped at 40');
+  assert.equal(a.message.length, 160, 'message capped at 160');
+  assert.equal(game.clearBroadcastAnnouncement({ by: 'AGR' }).reason, 'com_edit_forbidden');
+  assert.equal(game.clearBroadcastAnnouncement({ by: 'COM' }).ok, true);
+  assert.equal(forBigscreen(game).broadcast.announcement, null);
+  assert.equal(JSON.stringify({ s: game.state.sectors, t: game.state.transfers, h: game.state.healing }), snap, 'the world is untouched');
+  assert.equal(logEvents(game, 'com_announcement_published').length, 2);
+  assert.equal(logEvents(game, 'com_announcement_cleared').length, 1);
+});
+
+// -- AGR: the random draw ----------------------------------------------------------------
+
+test('exactly three unique cards are dealt at round start, from the enabled pool only', () => {
+  const game = running();
+  const agr = game.state.agr;
+  assert.equal(agr.round, 'R2');
+  assert.equal(agr.offered.length, 3);
+  assert.equal(new Set(agr.offered).size, 3, 'duplicates dealt');
+  const enabled = new Set(game.agrEnabledIds());
+  for (const id of agr.offered) assert.ok(enabled.has(id), `${id} is not enabled`);
+  assert.ok(!agr.offered.includes('AGR_WORKFORCE_RECOVERY'), 'the disabled card was dealt');
+  assert.equal(forSector(game, 'AGR').agr_cards.offered.length, 3);
+  assert.ok(logEvents(game, 'agr_random_offer_generated').some((e) => e.round === 'R2'));
+});
+
+test('a refresh, a reconnect, a reopened screen and a cycle change all show the same hand', () => {
+  const game = running();
+  const hand = [...game.state.agr.offered];
+  // A "refresh"/"reconnect"/"reopen" is a new projection of the same state.
+  for (let i = 0; i < 5; i += 1) assert.deepEqual(forSector(game, 'AGR').agr_cards.offered.map((c) => c.id), hand);
+  game.cycleControl('process');
+  assert.deepEqual(game.state.agr.offered, hand, 'the cycle redealt');
+  // A restart from snapshot keeps the hand too.
+  const again = newGame({ runId: 'agr-restore' });
+  again.restore(JSON.parse(JSON.stringify(game.serialise())));
+  assert.deepEqual(again.state.agr.offered, hand, 'a restore redealt');
+  assert.equal(logEvents(game, 'agr_random_offer_generated').length, 2, 'only the reset and the round dealt (R0, R2)');
+});
+
+test('a new round deals a new hand, archives the old one, and last round\'s cards sit it out', () => {
+  const game = running();
+  const r2 = [...game.state.agr.offered];
+  game.setRound('R3');
+  const r3 = [...game.state.agr.offered];
+  assert.equal(r3.length, 3);
+  assert.notDeepEqual(r3, r2);
+  for (const id of r3) assert.ok(!r2.includes(id), `${id} repeated from the round before`);
+  assert.deepEqual(game.state.agr.previous, r2);
+  assert.equal(game.state.agr.history[0].round, 'R2');
+  assert.ok(logEvents(game, 'agr_round_offer_archived').some((e) => e.round === 'R2'));
+  // Two rounds back is fair game again.
+  game.setRound('R4');
+  const r4 = game.state.agr.offered;
+  for (const id of r4) assert.ok(!r3.includes(id), `${id} repeated from R3`);
+});
+
+test('the fallback fills from last round when fewer than three fresh cards remain', () => {
+  const game = running();
+  // Five enabled cards: three dealt this round leave two fresh for the next.
+  const keep = ['AGR_POWER_SURGE', 'AGR_WATER_RESERVE', 'AGR_EMERGENCY_PARTS', 'AGR_CITY_RECOVERY', 'AGR_LOGISTICS_BOOST'];
+  const all = game.agrPool().map((c) => c.id);
+  game.patchConfig({ agr_disabled_cards: all.filter((id) => !keep.includes(id)) });
+  game.setRound('R3');
+  const r3 = [...game.state.agr.offered];
+  assert.equal(r3.length, 3);
+  game.setRound('R4');
+  const r4 = game.state.agr.offered;
+  assert.equal(r4.length, 3, 'still three');
+  assert.equal(new Set(r4).size, 3, 'still unique');
+  const fresh = keep.filter((id) => !r3.includes(id));
+  for (const id of fresh) assert.ok(r4.includes(id), `fresh card ${id} was not dealt first`);
+  assert.equal(r4.filter((id) => r3.includes(id)).length, 1, 'exactly one slot came from last round');
+  for (const id of r4) assert.ok(keep.includes(id), 'a disabled card was dealt');
+});
+
+test('the same run and round deal the same hand; a different run deals differently', () => {
+  const a = newGame({ runId: 'seeded-run' }); a.setPhase('ROUND_2');
+  const b = newGame({ runId: 'seeded-run' }); b.setPhase('ROUND_2');
+  const c = newGame({ runId: 'another-run' }); c.setPhase('ROUND_2');
+  assert.deepEqual(a.state.agr.offered, b.state.agr.offered);
+  const differs = ['R3', 'R4'].some((r) => { a.setRound(r); c.setRound(r); return JSON.stringify(a.state.agr.offered) !== JSON.stringify(c.state.agr.offered); })
+    || JSON.stringify(a.state.agr.offered) !== JSON.stringify(c.state.agr.offered);
+  assert.ok(differs, 'two different runs dealt identical hands every round');
+  assert.ok(logEvents(a, 'agr_random_offer_generated').every((e) => typeof e.seed === 'number'));
+});
+
+// -- AGR: selection and activation -------------------------------------------------------
+
+test('AGR activates exactly one card a round; a second is refused, and only AGR may play', () => {
+  const game = running();
+  game.state.agr.offered = ['AGR_POWER_SURGE', 'AGR_WATER_RESERVE', 'AGR_EMERGENCY_PARTS'];
+  for (const code of ['POW', 'WTR', 'MED', 'TRN', 'COM']) {
+    assert.equal(game.agrActivate('AGR_POWER_SURGE', { by: code }).reason, 'agr_only', `${code} played a card`);
+  }
+  assert.equal(game.agrSelect('AGR_POWER_SURGE', { by: 'AGR' }).ok, true);
+  const first = game.agrActivate('AGR_POWER_SURGE', { by: 'AGR' });
+  assert.equal(first.ok, true);
+  assert.equal(game.state.agr.used, true);
+  assert.equal(game.state.agr.selected, 'AGR_POWER_SURGE');
+  const second = game.agrActivate('AGR_WATER_RESERVE', { by: 'AGR' });
+  assert.equal(second.ok, false);
+  assert.equal(second.reason, 'agr_card_already_used');
+  assert.equal(game.state.sectors.WTR.inventory.water, 3, 'the second card did nothing');
+  assert.equal(game.agrSelect('AGR_EMERGENCY_PARTS', { by: 'AGR' }).reason, 'agr_card_already_used');
+  assert.equal(forSector(game, 'AGR').agr_cards.used, true);
+});
+
+test('a card not in the hand cannot be played; a failed activation does not spend the round', () => {
+  const game = running();
+  game.state.agr.offered = ['AGR_STABILISE_SECTOR', 'AGR_POWER_SURGE', 'AGR_WATER_RESERVE'];
+  assert.equal(game.agrActivate('AGR_EMERGENCY_STOCKPILE', { by: 'AGR' }).reason, 'agr_card_not_in_offer');
+  // Needs a target: refused, nothing spent.
+  const noTarget = game.agrActivate('AGR_STABILISE_SECTOR', { by: 'AGR' });
+  assert.equal(noTarget.reason, 'agr_target_required');
+  // Bad target: refused, nothing spent.
+  game.setStatus('COM', 'DARK');
+  const dark = game.agrActivate('AGR_STABILISE_SECTOR', { by: 'AGR', target: { sector: 'COM' } });
+  assert.equal(dark.reason, 'agr_invalid_target');
+  assert.equal(game.state.agr.used, false, 'a refusal consumed the round');
+  assert.equal(logEvents(game, 'agr_card_activation_refused').length, 3);
+  // The same round's choice is still live.
+  assert.equal(game.agrActivate('AGR_STABILISE_SECTOR', { by: 'AGR', target: { sector: 'POW' } }).ok, true);
+  assert.equal(game.state.agr.used, true);
+});
+
+test('a new round clears the selection and deals again; a cycle does neither', () => {
+  const game = running();
+  const hand = [...game.state.agr.offered];
+  game.state.agr.offered = ['AGR_POWER_SURGE', 'AGR_WATER_RESERVE', 'AGR_EMERGENCY_PARTS'];
+  game.agrActivate('AGR_POWER_SURGE', { by: 'AGR' });
+  game.cycleControl('process');
+  assert.equal(game.state.agr.used, true, 'a cycle unlocked the choice');
+  assert.equal(game.agrActivate('AGR_WATER_RESERVE', { by: 'AGR' }).reason, 'agr_card_already_used');
+  game.setRound('R3');
+  assert.equal(game.state.agr.used, false);
+  assert.equal(game.state.agr.selected, null);
+  assert.equal(game.state.agr.round, 'R3');
+  assert.notDeepEqual(game.state.agr.offered, hand);
+  assert.equal(game.state.agr.offered.length, 3);
+});
+
+// -- AGR: the cards themselves -----------------------------------------------------------
+
+/** Put a card in the hand so it can be played, whatever the draw was. */
+function deal(game, ...ids) {
+  game.state.agr.offered = ids.concat(['AGR_POWER_SURGE', 'AGR_WATER_RESERVE', 'AGR_EMERGENCY_PARTS']).slice(0, 3);
+  if (!game.state.agr.offered.includes(ids[0])) game.state.agr.offered[0] = ids[0];
+}
+
+test('CITY RECOVERY: +10 to every active sector, capped at 100, and 0/DARK stays at 0', () => {
+  const game = running();
+  game.setIntegrity('POW', 60);
+  game.setIntegrity('WTR', 95);
+  game.setIntegrity('COM', 0);
+  assert.equal(game.state.sectors.COM.status, 'DARK');
+  deal(game, 'AGR_CITY_RECOVERY');
+  const r = game.agrActivate('AGR_CITY_RECOVERY', { by: 'AGR' });
+  assert.equal(r.ok, true);
+  assert.equal(game.state.sectors.POW.integrity, 70);
+  assert.equal(game.state.sectors.WTR.integrity, 100);
+  assert.equal(game.state.sectors.COM.integrity, 0);
+  assert.equal(game.state.sectors.COM.status, 'DARK');
+  assert.equal(game.state.sectors.MED.integrity, 100, 'a full sector stays full');
+  assert.equal(r.before.POW, 60); assert.equal(r.after.POW, 70);
+  assert.equal(game.state.sectors.AGR.workforce.injured, 0, 'health, not workers');
+});
+
+test('EMERGENCY STOCKPILE: +5 power, +5 water, +2 med, +1 parts to AGR and nobody else', () => {
+  const game = running();
+  const before = JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(game.state.sectors).map(([c, s]) => [c, s.inventory]))));
+  deal(game, 'AGR_EMERGENCY_STOCKPILE');
+  assert.equal(game.agrActivate('AGR_EMERGENCY_STOCKPILE', { by: 'AGR' }).ok, true);
+  const agr = game.state.sectors.AGR.inventory;
+  assert.equal(agr.power, before.AGR.power + 5);
+  assert.equal(agr.water, before.AGR.water + 5);
+  assert.equal(agr.med, before.AGR.med + 2);
+  assert.equal(agr.parts, before.AGR.parts + 1);
+  for (const code of Object.keys(before).filter((c) => c !== 'AGR')) {
+    assert.deepEqual(game.state.sectors[code].inventory, before[code], `${code} changed`);
+  }
+  assert.equal(game.stampsUsed(), 0, 'no Transport allowance spent');
+});
+
+test('WORKFORCE RECOVERY: refuses an injured worker and finds no eligible one; MED stays required', () => {
+  const game = running();
+  game.injure('AGR', 1);
+  game.patchConfig({ agr_disabled_cards: [] });
+  deal(game, 'AGR_WORKFORCE_RECOVERY');
+  const injured = game.agrActivate('AGR_WORKFORCE_RECOVERY', { by: 'AGR', target: { worker_id: 'AGR-W1', injured: true } });
+  assert.equal(injured.ok, false);
+  assert.equal(injured.reason, 'agr_injured_worker_blocked');
+  const none = game.agrActivate('AGR_WORKFORCE_RECOVERY', { by: 'AGR', target: { worker_id: 'AGR-W9' } });
+  assert.equal(none.reason, 'agr_no_valid_worker');
+  assert.equal(game.state.sectors.AGR.workforce.injured, 1, 'still hurt');
+  assert.equal(game.state.agr.used, false, 'the refusal cost nothing');
+  // Medical still heals it.
+  const h = game.requestHealing('AGR', { by: 'AGR' });
+  assert.equal(game.healWorker(h.healing.id, { by: 'MED' }).ok, true);
+  // And the card is out of the default draw.
+  const fresh = running();
+  assert.ok(fresh.cfg.agr_disabled_cards.includes('AGR_WORKFORCE_RECOVERY'));
+  assert.equal(forSector(game, 'AGR').agr_cards.offered.find((c) => c.id === 'AGR_WORKFORCE_RECOVERY').workers.length, 0);
+});
+
+test('POWER SURGE and WATER RESERVE add exactly +3 once, and production is unchanged', () => {
+  const game = running();
+  const prodPow = JSON.stringify(economyFor(game, 'POW'));
+  const prodWtr = JSON.stringify(economyFor(game, 'WTR'));
+  deal(game, 'AGR_POWER_SURGE');
+  assert.equal(game.agrActivate('AGR_POWER_SURGE', { by: 'AGR' }).ok, true);
+  assert.equal(game.state.sectors.POW.inventory.power, 6);
+  assert.equal(JSON.stringify(economyFor(game, 'POW')), prodPow, 'POW production changed');
+  game.setRound('R3');
+  deal(game, 'AGR_WATER_RESERVE');
+  assert.equal(game.agrActivate('AGR_WATER_RESERVE', { by: 'AGR' }).ok, true);
+  assert.equal(game.state.sectors.WTR.inventory.water, 6);
+  assert.equal(JSON.stringify(economyFor(game, 'WTR')), prodWtr, 'WTR production changed');
+});
+
+test('MEDICAL REINFORCEMENT: +1 heal this round only, and AGR still cannot heal', () => {
+  const game = running();
+  assert.equal(game.medCapacity(), 3);
+  deal(game, 'AGR_MEDICAL_REINFORCEMENT');
+  assert.equal(game.agrActivate('AGR_MEDICAL_REINFORCEMENT', { by: 'AGR' }).ok, true);
+  assert.equal(game.medCapacity(), 4);
+  assert.equal(forSector(game, 'MED').healing_queue.capacity, 4);
+  game.injure('POW', 1);
+  const h = game.requestHealing('POW', { by: 'POW' });
+  assert.equal(game.healWorker(h.healing.id, { by: 'AGR' }).reason, 'heal_med_only');
+  assert.equal(game.healWorker(h.healing.id, { by: 'MED' }).ok, true);
+  game.cycleControl('process');
+  assert.equal(game.medCapacity(), 4, 'a cycle did not end the bonus');
+  game.setRound('R3');
+  assert.equal(game.medCapacity(), 3, 'the round end did');
+  assert.ok(logEvents(game, 'effect_ended').some((e) => e.kind === 'med_capacity'));
+});
+
+test('LOGISTICS BOOST: +1 approval this round only, and AGR still cannot approve', () => {
+  const game = running();
+  assert.equal(game.trnCapacity(), 3);
+  deal(game, 'AGR_LOGISTICS_BOOST');
+  assert.equal(game.agrActivate('AGR_LOGISTICS_BOOST', { by: 'AGR' }).ok, true);
+  assert.equal(game.trnCapacity(), 4);
+  assert.equal(forSector(game, 'TRN').transfer_queue.capacity, 4);
+  game.setInventory('POW', { power: 10 });
+  const ids = [];
+  for (let i = 0; i < 4; i += 1) ids.push(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
+  assert.equal(game.approveTransfer(ids[0], { by: 'AGR' }).reason, 'approval_trn_only');
+  for (const id of ids) assert.equal(game.approveTransfer(id, { by: 'TRN' }).ok, true, 'the fourth approval failed');
+  game.setRound('R3');
+  assert.equal(game.trnCapacity(), 3, 'the bonus outlived the round');
+});
+
+test('CRISIS RESPONSE: +20 to the lowest active sector; AGR chooses among ties; DARK is skipped', () => {
+  const game = running();
+  game.setIntegrity('POW', 40);
+  game.setIntegrity('WTR', 55);
+  game.setIntegrity('COM', 0);
+  deal(game, 'AGR_CRISIS_RESPONSE');
+  assert.equal(game.agrActivate('AGR_CRISIS_RESPONSE', { by: 'AGR' }).ok, true);
+  assert.equal(game.state.sectors.POW.integrity, 60);
+  assert.equal(game.state.sectors.COM.integrity, 0, 'DARK is not the lowest');
+  // A tie needs AGR's pick.
+  game.setRound('R3');
+  game.setIntegrity('POW', 30);
+  game.setIntegrity('WTR', 30);
+  deal(game, 'AGR_CRISIS_RESPONSE');
+  assert.deepEqual(forSector(game, 'AGR').agr_cards.offered[0].ties, ['POW', 'WTR']);
+  const tie = game.agrActivate('AGR_CRISIS_RESPONSE', { by: 'AGR' });
+  assert.equal(tie.reason, 'agr_target_required');
+  assert.deepEqual(tie.ties, ['POW', 'WTR']);
+  assert.equal(game.agrActivate('AGR_CRISIS_RESPONSE', { by: 'AGR', target: { sector: 'MED' } }).reason, 'agr_invalid_target');
+  assert.equal(game.agrActivate('AGR_CRISIS_RESPONSE', { by: 'AGR', target: { sector: 'WTR' } }).ok, true);
+  assert.equal(game.state.sectors.WTR.integrity, 50);
+  assert.equal(game.state.sectors.POW.integrity, 30);
+});
+
+test('STABILISE SECTOR: +15 to one chosen active sector, capped at 100', () => {
+  const game = running();
+  game.setIntegrity('MED', 90);
+  deal(game, 'AGR_STABILISE_SECTOR');
+  assert.equal(game.agrActivate('AGR_STABILISE_SECTOR', { by: 'AGR', target: { sector: 'MED' } }).ok, true);
+  assert.equal(game.state.sectors.MED.integrity, 100);
+  assert.equal(game.state.sectors.POW.integrity, 100, 'only the chosen sector');
+});
+
+test('EMERGENCY PARTS: +3 parts to AGR only', () => {
+  const game = running();
+  deal(game, 'AGR_EMERGENCY_PARTS');
+  assert.equal(game.agrActivate('AGR_EMERGENCY_PARTS', { by: 'AGR' }).ok, true);
+  assert.equal(game.state.sectors.AGR.inventory.parts, 6);
+  assert.equal(game.state.sectors.POW.inventory.parts, 3);
+});
+
+test('RELIEF CREW: one temporary worker for a chosen sector until the round ends', () => {
+  const game = running();
+  const pow = game.state.sectors.POW;
+  const base = game.availableWorkers(pow);
+  deal(game, 'AGR_RELIEF_CREW');
+  assert.equal(game.agrActivate('AGR_RELIEF_CREW', { by: 'AGR', target: { sector: 'POW' } }).ok, true);
+  assert.equal(game.availableWorkers(pow), base + 1);
+  assert.equal(pow.workforce.active, 8, 'the base count is untouched');
+  assert.equal(forSector(game, 'POW').sectors.POW.workforce.available, base + 1);
+  game.cycleControl('process');
+  assert.equal(game.availableWorkers(pow), base + 1, 'a cycle did not end it');
+  game.setRound('R3');
+  assert.equal(game.availableWorkers(pow), base, 'the round end did');
+  assert.equal(pow.workforce.injured, 0, 'nothing to do with injury');
+});
+
+test('RESERVE CACHE: exactly the one resource AGR chose', () => {
+  const game = running();
+  deal(game, 'AGR_RESERVE_CACHE');
+  assert.equal(game.agrActivate('AGR_RESERVE_CACHE', { by: 'AGR' }).reason, 'agr_target_required');
+  assert.equal(game.agrActivate('AGR_RESERVE_CACHE', { by: 'AGR', target: { resource: 'gold' } }).reason, 'agr_invalid_target');
+  assert.equal(game.agrActivate('AGR_RESERVE_CACHE', { by: 'AGR', target: { resource: 'med' } }).ok, true);
+  const inv = game.state.sectors.AGR.inventory;
+  assert.equal(inv.med, 3);
+  assert.equal(inv.power, 3); assert.equal(inv.water, 3); assert.equal(inv.parts, 3);
+});
+
+// -- AGR: across systems -----------------------------------------------------------------
+
+test('resources a card created still need Transport to leave AGR', () => {
+  const game = running();
+  deal(game, 'AGR_EMERGENCY_STOCKPILE');
+  game.agrActivate('AGR_EMERGENCY_STOCKPILE', { by: 'AGR' });
+  const t = game.createTransfer({ from: 'AGR', to: 'MED', resource: 'power', amount: 2, by: 'AGR' });
+  assert.equal(t.ok, true);
+  assert.equal(t.transfer.status, 'PENDING_TRN_APPROVAL');
+  assert.equal(game.state.sectors.MED.inventory.power, 3, 'nothing moved yet');
+  assert.equal(game.approveTransfer(t.transfer.id, { by: 'AGR' }).reason, 'approval_trn_only');
+  game.confirmChit(t.transfer.id, true, { by: 'TRN' });
+  assert.equal(game.approveTransfer(t.transfer.id, { by: 'TRN' }).ok, true);
+  assert.equal(game.state.sectors.MED.inventory.power, 5);
+  assert.equal(game.stampsUsed(), 1);
+});
+
+test('the facilitator can reroll, force a card, and disable one, each logged as an override', () => {
+  const game = running();
+  const before = [...game.state.agr.offered];
+  assert.equal(game.agrReroll({ by: 'AGR' }).reason, 'agr_only');
+  assert.equal(game.agrReroll({ by: 'facilitator' }).ok, true);
+  assert.notDeepEqual(game.state.agr.offered, before);
+  assert.equal(game.state.agr.offered.length, 3);
+  assert.equal(logEvents(game, 'agr_admin_reroll').length, 1);
+
+  game.agrActivate(game.state.agr.offered[0], { by: 'facilitator', force: true, target: { sector: 'POW', resource: 'power' } });
+  assert.equal(game.state.agr.used, true);
+  assert.equal(logEvents(game, 'agr_admin_force_activate').length, 1);
+  assert.equal(logEvents(game, 'agr_card_activated').at(-1).facilitator_override, true);
+  assert.equal(game.agrReroll({ by: 'facilitator' }).reason, 'agr_card_already_used', 'no reroll after the choice is spent');
+
+  assert.equal(game.agrSetCardEnabled('AGR_POWER_SURGE', false).ok, true);
+  assert.ok(!game.agrEnabledIds().includes('AGR_POWER_SURGE'));
+  game.setRound('R3');
+  assert.ok(!game.state.agr.offered.includes('AGR_POWER_SURGE'));
+  assert.equal(forControl(game).agr.pool.find((c) => c.id === 'AGR_POWER_SURGE').enabled, false);
+});
+
+test('the wall is sent the movement it may watch, never what anyone holds, and nothing when the scenario says so', () => {
+  const game = running();
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 2, by: 'MED' });
+  let w = forBigscreen(game);
+  assert.equal(w.requests.length, 1);
+  assert.equal(w.requests[0].status, 'REQUESTED');
+  assert.equal(w.transfers.length, 0);
+  const f = game.fulfillRequest(r.request.id, { by: 'POW' });
+  game.confirmChit(f.transfer.id, true, { by: 'TRN' });
+  game.approveTransfer(f.transfer.id, { by: 'TRN' });
+  w = forBigscreen(game);
+  const t = w.transfers.find((x) => x.id === f.transfer.id);
+  assert.equal(t.status, 'DELIVERED', 'a just-delivered transfer is still shown so the wall can animate it');
+  assert.deepEqual(Object.keys(t).sort(), ['amount', 'approved_at', 'from', 'id', 'request_id', 'resource', 'status', 'to', 'updated_at']);
+  assert.equal(w.sectors.POW.inventory === undefined || typeof w.sectors.POW.inventory === 'object', true);
+  game.patchConfig({ show_completed_transfer_on_wall: false });
+  w = forBigscreen(game);
+  assert.equal(w.requests.length + w.transfers.length, 0, 'the scenario switch keeps movement off the wall');
+});
+
+test('only AGR is dealt the hand, and nobody is shown the deck', () => {
+  const game = running();
+  for (const code of BOARD_ROLES) assert.equal(!!forSector(game, code).agr_cards, code === 'AGR', `${code} hand wrong`);
+  assert.equal(forSector(game, 'AGR').agr_cards.pool, undefined, 'AGR sees the deck');
+  assert.equal(forBigscreen(game).agr_cards, undefined);
+  assert.ok(forControl(game).agr.pool.length >= 12);
+});
+
+test('the debrief keeps COM edits, announcements, AGR offers, activations, refusals and rerolls', () => {
+  const game = running();
+  game.setBroadcastRow('POW', { power: 2 }, { by: 'COM' });
+  game.setBroadcastAnnouncement({ headline: 'HOLD', message: 'x' }, { by: 'COM' });
+  game.agrReroll({ by: 'facilitator' });
+  deal(game, 'AGR_STABILISE_SECTOR');
+  game.agrActivate('AGR_STABILISE_SECTOR', { by: 'AGR' });                       // refused: no target
+  game.agrActivate('AGR_STABILISE_SECTOR', { by: 'AGR', target: { sector: 'POW' } });
+  const d = analyse(game.log.readAll(), { runId: 'test-run' }).rounds.R2;
+  assert.equal(d.broadcast.row_updates, 1);
+  assert.equal(d.broadcast.announcements, 1);
+  assert.ok(d.agr.offers >= 1);
+  assert.equal(d.agr.rerolls, 1);
+  assert.equal(d.agr.refused, 1);
+  assert.equal(d.agr.activations, 1);
+  assert.equal(d.agr.cards.AGR_STABILISE_SECTOR, 1);
+  assert.ok(d.agr.list.some((x) => x.kind === 'activated' && x.before && x.after));
+});
+
 // -- council and the Continuity Order ------------------------------------------------
 
 test('CALL COUNCIL reaches every projection with a running 5:00 clock', () => {
