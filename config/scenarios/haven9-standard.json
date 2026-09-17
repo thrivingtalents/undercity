@@ -57,6 +57,12 @@
     "agr_cards_per_round": 3,
     "agr_anti_repeat": true,
     "agr_disabled_cards": ["AGR_WORKFORCE_RECOVERY"],
+    "fault_rewards_enabled": true,
+    "show_fault_reward_preview": true,
+    "reward_on_facilitator_force_resolve": false,
+    "reward_on_false_alarm_clear": true,
+    "reward_health_cap": 100,
+    "fault_reward_overrides": {},
     "deliver_on_stamp": true,
 
     "brownout_effects": {

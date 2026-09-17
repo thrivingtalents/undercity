@@ -158,6 +158,8 @@ test('unknown fault, wrong sector and dark sector are all refused', () => {
 
 test('resource deduction on resolve is configuration: on by default', () => {
   const game = newGame();
+  // Deduction and the fault's reward are separate switches; this test is about deduction.
+  game.patchConfig({ fault_rewards_enabled: false });
   game.fireFault('F-201', 'POW');                    // requires 2 parts, 1 water
   const before = { ...game.state.sectors.POW.inventory };
   const res = submit(game);
@@ -168,6 +170,8 @@ test('resource deduction on resolve is configuration: on by default', () => {
 
 test('with deduct_resources_on_resolve off, resolve is a declaration only (contract §3.5)', () => {
   const game = newGame();
+  // Deduction and the fault's reward are separate switches; this test is about deduction.
+  game.patchConfig({ fault_rewards_enabled: false });
   game.patchConfig({ deduct_resources_on_resolve: false });
   game.fireFault('F-201', 'POW');
   const before = { ...game.state.sectors.POW.inventory };

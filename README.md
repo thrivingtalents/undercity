@@ -142,7 +142,15 @@ npm start                                            # http://localhost:3000/adm
    resolution code. Wrong code → attempt recorded; three consecutive wrong
    codes → console locked 20 s (server-controlled). Right code → +5 integrity,
    the procedure's resources leave the digital stock, the wall credits the
-   sector. Deadline reached → `EXPIRED`, an integrity penalty by severity, and
+   sector, and the fault pays its **reward** (`lib/fault-rewards.json`: one per
+   fault, 36 in all, balanced per phase at 12 / 8 / 18 / 18 / 12 value units
+   that players never see). The reward goes to the owning sector's real stock
+   or health, once per run, only from the authoritative completion — never
+   for opening a card, assigning crew or a wrong code. Health is capped at 100
+   and never revives a DARK sector; resources still need Transport to leave;
+   COM's board stays whatever COM last reported. A facilitator clear pays
+   nothing by default (a switch, logged as an override); clearing the one
+   ghost fault, which has no code, is its real completion and does pay. Deadline reached → `EXPIRED`, an integrity penalty by severity, and
    the fault stays solvable (all configurable).
 3. **Core cycle.** A city-wide countdown (default 7:00). At zero the server
    processes the cycle: production → upkeep → shortage penalties → worker
@@ -249,6 +257,12 @@ The transfer and healing rules are these keys, all in the same place:
 | `agr_cards_per_round` | `3` | Cards dealt to AGR at each round start |
 | `agr_anti_repeat` | `true` | Last round's cards sit the next draw out while the pool allows |
 | `agr_disabled_cards` | `["AGR_WORKFORCE_RECOVERY"]` | Cards kept out of the draw (see the note on that card in `lib/agr-cards.json`) |
+| `fault_rewards_enabled` | `true` | Faults pay their reward on resolution |
+| `show_fault_reward_preview` | `true` | Sector screens print REWARD before completion |
+| `reward_on_facilitator_force_resolve` | `false` | A facilitator clear of a real fault also pays, logged as an override |
+| `reward_on_false_alarm_clear` | `true` | Clearing a ghost fault (no procedure) pays its reward |
+| `reward_health_cap` | `100` | Ceiling for reward health points |
+| `fault_reward_overrides` | `{}` | Per-fault overrides of the reward table, e.g. `{ "F-002": { "resources": { "power": 3 }, "rvu": 3 } }` |
 
 `trn_capacity_per_cycle` is still read when the basis is `cycle`. Who may
 approve and who may heal are **not** configurable: Transport and Medical

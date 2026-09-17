@@ -344,8 +344,9 @@
       localLock.delete(msg.fault_code);
       if (consoleFor === msg.fault_code) $('code-input').value = '';
       const spent = fmtRes(msg.consumed, ' ');
+      const reward = msg.reward && msg.reward.applied && msg.reward.text ? `  ·  REWARD CLAIMED: ${msg.reward.text}` : '';
       const text = `${msg.fault_code}  FAULT RESOLVED  +${Number(msg.recovery) || 0} INTEGRITY` +
-        (spent ? `  ·  SPENT ${spent}` : '');
+        (spent ? `  ·  SPENT ${spent}` : '') + reward;
       const banner = $('banner-result');
       banner.textContent = text;
       banner.hidden = false;
@@ -1075,6 +1076,9 @@
     ].filter(Boolean).map((m) => `<span>${m}</span>`).join('');
     const metaHost = $('card-meta');
     if (metaHost.innerHTML !== meta) metaHost.innerHTML = meta;
+    // REWARD: what finishing this pays, before the team commits. Never the units.
+    show($('card-reward'), !!(f.reward && f.reward.text) && !f.resolved);
+    if (f.reward && f.reward.text) setText($('card-reward-text'), f.reward.text);
 
     // Console: switch drafts only when the selected fault changes.
     const input = $('code-input');
@@ -1332,7 +1336,7 @@
     const list = (mine.recently_resolved || []).slice().reverse();
     show($('resolved-block'), list.length > 0);
     // RESOLVED by the team; CLEARED by the facilitator; FAILED at a deadline.
-    const html = list.map((f) => `<div class="resolved-row"><span>${esc(f.code)}</span><span class="r-name">${esc(f.name)}</span><span class="r-st">${esc(f.status === 'RESOLVED' || !f.status ? 'RESOLVED' : f.status)}</span></div>`).join('');
+    const html = list.map((f) => `<div class="resolved-row"><span>${esc(f.code)}</span><span class="r-name">${esc(f.name)}</span><span class="r-st">${esc(f.status === 'RESOLVED' || !f.status ? 'RESOLVED' : f.status)}${f.reward_claimed ? ' · REWARD CLAIMED' : ''}</span></div>`).join('');
     const host = $('resolved');
     if (host.innerHTML !== html) host.innerHTML = html;
   }

@@ -213,6 +213,12 @@
 .heal-row.st-DECLINED_BY_MED .h-status, .heal-row.st-EXPIRED .h-status { color: var(--red); }
 button.wide { width: 100%; }
 
+/* -- the fault's reward ------------------------------------------------------ */
+
+.card-reward { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; padding: 5px 8px; border: 1px solid #1d4a2a; background: #0e1a12; }
+.card-reward .label { font-size: 9.5px; letter-spacing: 0.22em; color: var(--green); }
+.card-reward b { font-size: 12px; letter-spacing: 0.08em; color: var(--green); }
+
 /* -- the city big screen ----------------------------------------------------- */
 
 .broadcast-block.editable { border-color: var(--sector); }
