@@ -259,11 +259,6 @@ function procedurePages(b) {
         cell(proc.resources, { width: W - 7400 }),
       ]}),
     ], [1900, 1700, 1200, 900, 1700, W - 7400]));
-    if (proc.deadline) {
-      out.push(p([body("TIME LIMIT: ", { bold: true, color: "B00000" }),
-                  body(`${proc.deadline} from alert. After that the fault is not recoverable by this procedure.`)],
-                 { spacing: { before: 120, after: 60 } }));
-    }
     proc.steps.forEach((s, n) => {
       out.push(new Paragraph({
         spacing: { after: 60 }, indent: { left: 340, hanging: 340 },

@@ -74,7 +74,7 @@ async function main() {
   A({ type: 'fire_fault', fault_code: 'F-201', sector: 'POW' });
   await wait(6);
 
-  say('3. Countdown running (EMERGENCY default deadline) — POW opens the card');
+  say('3. Decay running — POW opens the card');
   send(pow, { type: 'fault_open', fault_code: 'F-201' });
   await wait(6);
 

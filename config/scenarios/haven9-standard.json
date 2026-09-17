@@ -8,7 +8,6 @@
     "broadcast_ms": 10000,
     "snapshot_ms": 10000,
     "delay_window_s": 60,
-    "card_shows_dependency": false,
 
     "critical_below": 30,
     "degraded_below": 60,
@@ -32,9 +31,6 @@
     "injured_recovery_per_cycle": 1,
     "injured_recovery_costs_med": 1,
 
-    "deadline_default_s": { "1": null, "2": 480, "3": 360 },
-    "deadline_penalty": { "1": 5, "2": 10, "3": 15 },
-    "expired_faults_remain_solvable": true,
 
     "resource_min_thresholds": { "power": 1, "water": 1, "parts": 1, "med": 0 },
 
@@ -68,7 +64,6 @@
     "brownout_effects": {
       "production_multiplier": 0.5,
       "upkeep_delivery_multiplier": 0.5,
-      "fault_timer_multiplier": 0.75,
       "worker_penalty": 2,
       "decay_per_min": 0.5,
       "per_sector": {

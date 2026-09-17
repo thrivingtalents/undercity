@@ -389,11 +389,9 @@
           <div class="sector-config" id="sector-config"></div>
         </div>
         <div class="block">
-          <span class="label">Fault overrides <em>— one fault: deadline, expiry penalty, extra accepted codes</em></span>
+          <span class="label">Fault overrides <em>— one fault: extra accepted codes</em></span>
           <div class="row">
             <select id="fo-fault"></select>
-            <input type="number" id="fo-deadline" class="short" min="0" placeholder="deadline s" title="Deadline in seconds; blank keeps the content/severity default">
-            <input type="number" id="fo-penalty" class="short" min="0" placeholder="penalty" title="Integrity lost at the deadline; blank keeps the severity default">
             <input type="text" id="fo-extra" placeholder="extra accepted codes, comma-separated (e.g. the value your binder prints)" autocomplete="off">
             <button id="btn-fo-apply" class="primary">APPLY</button>
           </div>

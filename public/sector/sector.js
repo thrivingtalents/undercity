@@ -150,17 +150,6 @@
     return Number(s.integrity) >= 60 ? 'STABLE' : 'DEGRADED';
   }
 
-  function hasDeadline(f) {
-    return f.deadline_remaining_s !== null && f.deadline_remaining_s !== undefined;
-  }
-  function faultRemaining(f) {
-    return U.countdown({ running: !f.paused && !state.frozen, remaining_s: f.deadline_remaining_s }, state.frozen);
-  }
-  function deadlineText(f) {
-    if (f.expired) return 'DEADLINE PASSED';
-    if (!hasDeadline(f)) return 'NO DEADLINE';
-    return U.mmss(faultRemaining(f));
-  }
   function lockRemaining(f) {
     const server = U.countdown({ running: !state.frozen, remaining_s: f.locked_until_s || 0 }, state.frozen);
     const local = localLock.has(f.code) ? (localLock.get(f.code) - performance.now()) / 1000 : 0;
@@ -343,10 +332,8 @@
       consecutive.delete(msg.fault_code);
       localLock.delete(msg.fault_code);
       if (consoleFor === msg.fault_code) $('code-input').value = '';
-      const spent = fmtRes(msg.consumed, ' ');
       const reward = msg.reward && msg.reward.applied && msg.reward.text ? `  ·  REWARD CLAIMED: ${msg.reward.text}` : '';
-      const text = `${msg.fault_code}  FAULT RESOLVED  +${Number(msg.recovery) || 0} INTEGRITY` +
-        (spent ? `  ·  SPENT ${spent}` : '') + reward;
+      const text = `${msg.fault_code}  FAULT RESOLVED  +${Number(msg.recovery) || 0} INTEGRITY` + reward;
       const banner = $('banner-result');
       banner.textContent = text;
       banner.hidden = false;
@@ -988,7 +975,6 @@
     row.dataset.code = f.code;
     row.innerHTML =
       `<span class="fr-code">${esc(f.code)}</span>` +
-      `<span class="fr-dl clock">—</span>` +
       `<span class="fr-sev"><i>${U.severityPips(f.severity)}</i> ${U.severityName(f.severity)}</span>` +
       `<span class="fr-name">${esc(f.name)}</span>`;
     row.addEventListener('click', () => selectFault(f.code));
@@ -1011,7 +997,7 @@
       let row = faultRows.get(f.code);
       if (!row) { row = makeFaultRow(f); faultRows.set(f.code, row); }
       if (host.children[i] !== row) host.insertBefore(row, host.children[i] || null);
-      const cls = `fault-row sev-${f.severity}${f.code === selected ? ' selected' : ''}${f.expired ? ' expired' : ''}${f.paused ? ' paused' : ''}`;
+      const cls = `fault-row sev-${f.severity}${f.code === selected ? ' selected' : ''}${f.paused ? ' paused' : ''}`;
       if (row.className !== cls) row.className = cls;
       setText(row.querySelector('.fr-name'), f.name);
     });
@@ -1065,20 +1051,14 @@
     setText($('card-code'), f.code);
     setText($('card-name'), String(f.name || '').toUpperCase());
     setText($('card-flavour'), f.flavour || '');
-
-    const spend = fmtRes(f.resources_required, ' ');
-    const meta = [
-      `CREW REQUIRED <b>${esc(f.crew_required)}</b>`,
-      `DECAY <b>${esc(f.decay_per_min)}</b>/min`,
-      spend ? `SPEND <b>${esc(spend)}</b>` : null,
-      `ATTEMPTS <b>${esc(f.attempts)}</b>`,
-      f.paused ? `<b class="warn">TIMER PAUSED</b>` : null,
-    ].filter(Boolean).map((m) => `<span>${m}</span>`).join('');
-    const metaHost = $('card-meta');
-    if (metaHost.innerHTML !== meta) metaHost.innerHTML = meta;
-    // REWARD: what finishing this pays, before the team commits. Never the units.
+    // How urgent: the bleed, in the room's words. A fault the facilitator paused says so.
+    const rate = Number(f.decay_per_min) || 0;
+    setText($('card-decay'), f.paused ? 'DECAY PAUSED' : rate > 0 ? `DECAY −${rate} HEALTH / MIN` : 'NO DECAY');
+    $('card-decay').classList.toggle('paused', !!f.paused);
+    // What it pays, before the team commits. Never the units.
     show($('card-reward'), !!(f.reward && f.reward.text) && !f.resolved);
     if (f.reward && f.reward.text) setText($('card-reward-text'), f.reward.text);
+    setText($('card-attempts'), `ATTEMPTS ${Number(f.attempts) || 0}`);
 
     // Console: switch drafts only when the selected fault changes.
     const input = $('code-input');
@@ -1097,7 +1077,7 @@
       const opts = [];
       for (let n = 0; n <= avail; n += 1) opts.push(`<option value="${n}">${n}</option>`);
       select.innerHTML = opts.join('');
-      const want = d.workers !== undefined ? Number(d.workers) : Number(f.crew_required) || 0;
+      const want = d.workers !== undefined ? Number(d.workers) : 1;
       select.value = String(Math.min(avail, Math.max(0, want)));
       d.workers = select.value;
       draft.set(f.code, d);
@@ -1129,7 +1109,7 @@
     if (dark) {
       cls = 'bad'; text = 'SECTOR IS DARK — CONSOLE DISABLED';
     } else if (lock > 0) {
-      cls = 'locked'; text = `CONSOLE LOCKED ${U.mmss(lock)} — verify the procedure before retrying`;
+      cls = 'locked'; text = `CONSOLE LOCKED ${U.mmss(lock)}`;
     } else {
       let v = verdict.get(f.code);
       // The verdict that caused a lockout is spent once the lock clears.
@@ -1137,24 +1117,16 @@
       if (v && !v.accepted) {
         cls = 'bad';
         switch (v.reason) {
-          case 'invalid_code': {
-            const n = consecutive.get(f.code) || 0;
-            const max = Number(v.max_consecutive) || 3;
-            text = `INVALID RESOLUTION CODE — ATTEMPTS: ${n} / ${max}  (TOTAL ${v.attempts})`;
-            break;
-          }
-          case 'insufficient_crew':
-            text = `Not enough crew assigned (needs ${v.crew_required}, ${v.workforce_active} available).`;
-            break;
-          case 'insufficient_resources':
-            text = `Insufficient resources: ${Object.entries(v.short || {}).map(([k, n]) => `${n} ${(RES[k] || { name: k }).name}`).join(', ') || 'see binder'}`;
-            break;
+          case 'invalid_code':           text = 'RESOLUTION REJECTED'; break;
+          case 'insufficient_crew':      text = 'INSUFFICIENT CREW'; break;
+          case 'invalid_workers':        text = 'WORKER ASSIGNMENT INVALID'; break;
+          case 'insufficient_resources': text = 'MATERIALS NOT READY'; break;
           // Driven by an empty valid_codes array, never by the fault code (§3).
-          case 'no_procedure':  text = 'No matching procedure. Verify this alert.'; break;
-          case 'sector_dark':   text = 'Sector is dark.'; break;
-          case 'locked':        text = 'Console locked — wait for the timer.'; break;
-          case 'unknown_fault': text = 'That fault is not active here.'; break;
-          default:              text = 'REJECTED.';
+          case 'no_procedure':  text = 'NO MATCHING PROCEDURE — VERIFY THIS ALERT'; break;
+          case 'sector_dark':   text = 'SECTOR IS DARK'; break;
+          case 'locked':        text = 'CONSOLE LOCKED'; break;
+          case 'unknown_fault': text = 'THAT FAULT IS NOT ACTIVE HERE'; break;
+          default:              text = 'RESOLUTION REJECTED';
         }
       }
     }
@@ -1335,7 +1307,7 @@
   function renderResolved() {
     const list = (mine.recently_resolved || []).slice().reverse();
     show($('resolved-block'), list.length > 0);
-    // RESOLVED by the team; CLEARED by the facilitator; FAILED at a deadline.
+    // RESOLVED by the team; CLEARED by the facilitator.
     const html = list.map((f) => `<div class="resolved-row"><span>${esc(f.code)}</span><span class="r-name">${esc(f.name)}</span><span class="r-st">${esc(f.status === 'RESOLVED' || !f.status ? 'RESOLVED' : f.status)}${f.reward_claimed ? ' · REWARD CLAIMED' : ''}</span></div>`).join('');
     const host = $('resolved');
     if (host.innerHTML !== html) host.innerHTML = html;
@@ -1361,38 +1333,9 @@
     setUrgency($('council-clock'), council, true);
     setText($('banner-council-clock'), U.mmss(council));
 
-    // Fault list deadlines.
-    for (const f of mine.faults || []) {
-      const row = faultRows.get(f.code);
-      if (!row) continue;
-      const dl = row.querySelector('.fr-dl');
-      setText(dl, deadlineText(f));
-      const rem = faultRemaining(f);
-      setUrgency(dl, rem, hasDeadline(f) && !f.expired);
-      dl.classList.toggle('passed', !!f.expired);
-    }
-
-    // Open card.
+    // The open card's console: the lockout count and the verdict.
     const f = selectedFault();
-    if (f) {
-      const el = $('card-deadline');
-      const pen = $('card-penalty');
-      if (f.expired) {
-        setText($('card-time-label'), 'Deadline');
-        setText(el, 'DEADLINE PASSED');
-        setText(pen, `−${Number(f.integrity_penalty) || 0} INTEGRITY`);
-        show(pen, true);
-        setUrgency(el, 0, true);
-        el.classList.add('passed');
-      } else {
-        setText($('card-time-label'), hasDeadline(f) ? 'Time remaining' : 'Deadline');
-        setText(el, hasDeadline(f) ? U.mmss(faultRemaining(f)) : 'NONE');
-        show(pen, false);
-        setUrgency(el, faultRemaining(f), hasDeadline(f));
-        el.classList.remove('passed');
-      }
-      updateConsole(f);
-    }
+    if (f) updateConsole(f);
 
     // Alert: full-screen for its first seconds, then a persistent banner.
     if (alertSeen) {

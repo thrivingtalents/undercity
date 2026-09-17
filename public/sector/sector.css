@@ -215,9 +215,6 @@ button.wide { width: 100%; }
 
 /* -- the fault's reward ------------------------------------------------------ */
 
-.card-reward { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; padding: 5px 8px; border: 1px solid #1d4a2a; background: #0e1a12; }
-.card-reward .label { font-size: 9.5px; letter-spacing: 0.22em; color: var(--green); }
-.card-reward b { font-size: 12px; letter-spacing: 0.08em; color: var(--green); }
 
 /* -- the city big screen ----------------------------------------------------- */
 
@@ -283,7 +280,7 @@ button.wide { width: 100%; }
 .faults-panel { display: flex; flex-direction: column; flex: 0 1 auto; max-height: 42%; min-height: 0; }
 .fault-list { overflow-y: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
 .fault-row {
-  display: grid; grid-template-columns: 90px 150px 150px 1fr; align-items: center; gap: 10px;
+  display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 10px;
   padding: 6px 10px; background: var(--steel); border: 1px solid var(--line);
   border-left: 4px solid var(--amber); cursor: pointer; user-select: none;
 }
@@ -292,10 +289,8 @@ button.wide { width: 100%; }
 .fault-row.sev-2 { border-left-color: #E8853A; }
 .fault-row.sev-3 { border-left-color: var(--red); }
 .fault-row.selected { background: #232c35; outline: 1px solid var(--sector); }
-.fault-row.expired { border-color: #4a2a2a; }
 .fault-row.paused { opacity: 0.7; }
 .fr-code { font-size: 20px; font-weight: 700; letter-spacing: 0.06em; }
-.fr-dl { font-size: 20px; font-weight: 700; letter-spacing: 0.04em; }
 .fr-sev { font-size: 11px; letter-spacing: 0.14em; color: var(--ink-dim); white-space: nowrap; }
 .fr-sev i { font-style: normal; color: var(--amber); margin-right: 4px; }
 .sev-3 .fr-sev i { color: var(--red); }
@@ -318,27 +313,24 @@ button.wide { width: 100%; }
   20% { transform: translateX(-6px); } 40% { transform: translateX(6px); }
   60% { transform: translateX(-4px); } 80% { transform: translateX(4px); }
 }
-.card-head { display: flex; flex-direction: column; gap: 3px; }
-.card-sev { font-size: 12px; letter-spacing: 0.24em; color: var(--amber); font-weight: 700; }
-.card.sev-3 .card-sev { color: var(--red); }
-.card-code { font-size: 34px; font-weight: 700; letter-spacing: 0.08em; line-height: 1; }
-.card-name { font-size: 18px; letter-spacing: 0.12em; font-weight: 600; }
-.card-flavour { font-size: 13px; color: var(--ink-dim); line-height: 1.5; margin-top: 4px; max-width: 70ch; }
-
-.card-time {
-  display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
-  background: #0c1013; border: 1px solid var(--line); padding: 8px 14px;
-}
-.card-time .label { flex-basis: 100%; }
-.card-clock { font-size: 56px; font-weight: 700; line-height: 1; letter-spacing: 0.04em; }
-.card-penalty { font-size: 16px; font-weight: 700; color: var(--red); letter-spacing: 0.1em; }
-
-.card-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 11px; letter-spacing: 0.12em; color: var(--ink-dim); }
-.card-meta b { color: var(--ink); font-size: 14px; }
-.card-hints { font-size: 10px; letter-spacing: 0.18em; color: var(--ink-faint); line-height: 1.7; }
+.card-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.card-code { font-size: 28px; font-weight: 700; letter-spacing: 0.08em; line-height: 1; }
+.card-name { font-size: 17px; letter-spacing: 0.12em; font-weight: 600; }
+.card-flavour { font-size: 13px; color: var(--ink-dim); line-height: 1.5; margin: 4px 0 10px; max-width: 70ch; }
 
 /* console: persistent element, never rebuilt while typing */
-.console { margin-top: auto; background: #0c1013; border: 1px solid var(--line); padding: 10px 12px; }
+/* severity, decay and reward: one row of chips, no boxes inside boxes */
+.card-status { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.chip { font-size: 11px; letter-spacing: 0.14em; font-weight: 700; padding: 4px 9px; border: 1px solid var(--line); background: var(--steel); white-space: nowrap; }
+.chip-sev { color: var(--amber); }
+.card.sev-3 .chip-sev { color: var(--red); border-color: #4a1c1c; }
+.chip-decay { color: var(--ink); }
+.chip-decay.paused { color: var(--ink-faint); }
+.chip-reward { color: var(--green); border-color: #1d4a2a; background: #0e1a12; }
+.chip-reward b { margin-left: 4px; }
+
+/* the one action area: code, workers, submit — and the attempts, small, beside the verdict */
+.console { margin-top: auto; background: #0c1013; border-top: 1px solid var(--line); padding: 10px 0 0; }
 .console.locked { border-color: var(--amber); }
 .console-row { display: flex; gap: 10px; align-items: flex-end; }
 .cfield { display: flex; flex-direction: column; gap: 4px; flex: 1; }
@@ -349,7 +341,9 @@ button.wide { width: 100%; }
 }
 #workers-select { font-size: 20px; padding: 8px 8px; width: 100%; }
 #submit-btn { font-size: 15px; padding: 12px 22px; letter-spacing: 0.16em; }
-.console-msg { min-height: 16px; margin-top: 8px; font-size: 12px; letter-spacing: 0.08em; }
+.console-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 8px; }
+.console-msg { min-height: 16px; font-size: 12px; letter-spacing: 0.08em; }
+.card-attempts { font-size: 10px; letter-spacing: 0.18em; color: var(--ink-faint); white-space: nowrap; }
 .console-msg.bad { color: var(--red); font-weight: 700; }
 .console-msg.locked { color: var(--amber); font-weight: 700; }
 

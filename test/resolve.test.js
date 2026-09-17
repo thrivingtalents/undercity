@@ -110,7 +110,9 @@ test('crew requirement is enforced at both ends', () => {
   game.fireFault('F-201', 'POW');       // crew_required: 2
 
   assert.equal(submit(game, { workers_assigned: 1 }).reason, 'insufficient_crew');
-  assert.equal(submit(game, { workers_assigned: 99 }).reason, 'insufficient_crew',
+  const few = submit(game, { workers_assigned: 1 });
+  assert.equal('crew_required' in few && 'workforce_active' in few, false, 'a refusal never says how many');
+  assert.equal(submit(game, { workers_assigned: 99 }).reason, 'invalid_workers',
     'cannot assign more workers than are actually standing');
   assert.equal(submit(game, { workers_assigned: 2 }).accepted, true);
 });
@@ -194,7 +196,10 @@ test('a short team is only refused when resolve_requires_resources is on', () =>
   strict.setInventory('POW', { power: 0, water: 0, parts: 0, med: 0 });
   const res = submit(strict);
   assert.equal(res.reason, 'insufficient_resources');
-  assert.deepEqual(res.short, { parts: 2, water: 1 });
+  assert.equal(res.short, undefined, 'the shortfall is for the binder to reveal, never the console');
+  const lines = strict.log.readAll().trim().split(String.fromCharCode(10)).filter((l) => l.includes('insufficient_resources'));
+  const logged = JSON.parse(lines[lines.length - 1]);
+  assert.deepEqual(logged.short, { parts: 2, water: 1 }, 'the debrief still has it');
   const fault = strict.state.sectors.POW.faults[0];
   assert.equal(fault.attempts, 0, 'a resource refusal is not a code guess');
 });

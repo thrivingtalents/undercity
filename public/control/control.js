@@ -292,11 +292,8 @@
       const faults = live.map((f) => {
         const keys = f.valid_codes.length ? `<span class="keys" title="answer key">${f.valid_codes.join(' / ')}</span>`
           : '<span class="keys none">NO CODE — clear by hand</span>';
-        const cd = f.deadline_remaining_s === null ? '<span class="cd">—</span>'
-          : `<span class="cd${f.expired ? ' expired' : ''}" data-cd-fault="${code}:${f.code}">${f.expired ? 'EXPIRED' : U.mmss(f.deadline_remaining_s)}</span>`;
         return `<div class="sec-fault">
-            <span class="c">${f.code}</span>${cd}${keys}
-            <button data-time="${f.code}" data-sec="${code}" title="+1:00 on the deadline">+1m</button>
+            <span class="c">${f.code}</span>${keys}
             <button data-acc="${f.code}" data-sec="${code}" title="double decay">FAST</button>
             <button data-clear="${f.code}" data-sec="${code}">CLEAR</button>
           </div>`;
@@ -356,7 +353,6 @@
     on('[data-wf]', (b) => send({ type: 'adjust_workforce', sector: code, active: Number(b.dataset.wf), injured: 0 }));
     on('[data-inj]', (b) => send({ type: 'adjust_workforce', sector: code, active: 0, injured: Number(b.dataset.inj) }));
     on('[data-clear]', (b) => send({ type: 'clear_fault', sector: code, fault_code: b.dataset.clear, reason: 'facilitator cleared' }));
-    on('[data-time]', (b) => send({ type: 'fault_add_time', sector: code, fault_code: b.dataset.time, seconds: 60 }));
     on('[data-acc]', (b) => {
       const f = s.faults.find((x) => x.code === b.dataset.acc && !x.resolved);
       if (f) send({ type: 'accelerate_fault', sector: code, fault_code: f.code, decay_per_min: Math.round(f.decay_per_min * 2 * 10) / 10 });
@@ -804,13 +800,9 @@
     ['notify_supplier_with_sound', 'Arrivals ring on the supplier, Transport and Medical screens', 'b'],
     ['show_completed_transfer_on_wall', 'Completed transfers and heals show on the wall', 'b'],
     ['FAULTS'],
-    ['deadline_default_s.2', 'Default deadline — EMERGENCY (s, blank = none)', 'n?'], ['deadline_default_s.3', 'Default deadline — CRISIS (s)', 'n?'],
-    ['deadline_default_s.1', 'Default deadline — INCIDENT (s)', 'n?'],
-    ['deadline_penalty.1', 'Expiry penalty — INCIDENT', 'n'], ['deadline_penalty.2', 'Expiry penalty — EMERGENCY', 'n'], ['deadline_penalty.3', 'Expiry penalty — CRISIS', 'n'],
-    ['expired_faults_remain_solvable', 'Expired faults stay solvable', 'b'],
     ['BROWNOUT'],
     ['brownout_effects.production_multiplier', 'Production ×', 'f'], ['brownout_effects.upkeep_delivery_multiplier', 'Upkeep ×', 'f'],
-    ['brownout_effects.fault_timer_multiplier', 'Fault timer ×', 'f'], ['brownout_effects.worker_penalty', 'Workers unavailable', 'n'],
+    ['brownout_effects.worker_penalty', 'Workers unavailable', 'n'],
     ['brownout_effects.decay_per_min', 'Integrity decay / min', 'f'],
     ['brownout_effects.per_sector.POW.production_multiplier', 'POW production ×', 'f'],
     ['brownout_effects.per_sector.TRN.transfer_capacity', 'TRN capacity under brownout', 'n'],
@@ -881,13 +873,13 @@
       });
     }
 
-    // Per-fault overrides in force (spec §44): deadline, expiry penalty, extra accepted codes.
+    // Per-fault overrides in force (spec §44): extra accepted codes.
     const overrides = Object.entries(cfg.fault_overrides || {});
     $('fault-overrides').innerHTML = overrides.map(([code, o]) => `<div class="fo">
         <b>${esc(code)}</b>
-        <span>${o.deadline_s != null ? `deadline ${U.mmss(o.deadline_s)}` : ''}${o.integrity_penalty != null ? ` · penalty −${esc(o.integrity_penalty)}` : ''}${(o.extra_valid_codes || []).length ? ` · also accepts ${esc(o.extra_valid_codes.join(', '))}` : ''}</span>
+        <span>${(o.extra_valid_codes || []).length ? `also accepts ${esc(o.extra_valid_codes.join(', '))}` : ''}</span>
         <button data-fo-remove="${esc(code)}">REMOVE</button>
-      </div>`).join('') || '<div class="hint">None. Faults use the content deadline, the severity defaults and the content answer.</div>';
+      </div>`).join('') || '<div class="hint">None. Faults use the content answer.</div>';
     for (const b of $('fault-overrides').querySelectorAll('[data-fo-remove]')) {
       b.addEventListener('click', () => send({ type: 'set_fault_override', fault_code: b.dataset.foRemove, patch: null }));
     }
@@ -897,11 +889,9 @@
     const code = $('fo-fault').value;
     if (!code) return;
     const patch = {};
-    if ($('fo-deadline').value !== '') patch.deadline_s = Number($('fo-deadline').value);
-    if ($('fo-penalty').value !== '') patch.integrity_penalty = Number($('fo-penalty').value);
     patch.extra_valid_codes = $('fo-extra').value.split(',').map((c) => c.trim()).filter(Boolean);
     send({ type: 'set_fault_override', fault_code: code, patch });
-    $('fo-deadline').value = ''; $('fo-penalty').value = ''; $('fo-extra').value = '';
+    $('fo-extra').value = '';
   });
 
   $('btn-save-scenario').addEventListener('click', async () => {
@@ -1057,16 +1047,7 @@
     $('council-clock').className = state.council.active ? (cc <= 30 ? 'low' : '') : '';
     const big = $('council-big');
     if (big) { big.textContent = U.mmss(cc); big.classList.toggle('low', cc <= 30 && state.council.active); }
-    $('tl-elapsed').textContent = `${U.mmss(state.round_length_s - rc)} elapsed`;
-    for (const el of document.querySelectorAll('[data-cd-fault]')) {
-      const [sec, code] = el.dataset.cdFault.split(':');
-      const f = state.sectors[sec] && state.sectors[sec].faults.find((x) => x.code === code && !x.resolved);
-      if (!f || f.expired || f.deadline_remaining_s == null) continue;
-      const left = U.countdown({ running: !f.paused, remaining_s: f.deadline_remaining_s }, state.frozen);
-      el.textContent = U.mmss(left);
-      el.classList.toggle('low', left <= 30);
-    }
-    for (const el of document.querySelectorAll('[data-cd-effect]')) {
+    $('tl-elapsed').textContent = `${U.mmss(state.round_length_s - rc)} elapsed`;    for (const el of document.querySelectorAll('[data-cd-effect]')) {
       const e = (state.effects || []).find((x) => x.id === el.dataset.cdEffect);
       if (e && e.remaining_s != null) el.textContent = U.mmss(U.countdown({ running: true, remaining_s: e.remaining_s }, state.frozen));
     }

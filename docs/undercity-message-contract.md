@@ -77,7 +77,6 @@ The only message that carries game state. Full snapshot every time.
           "crew_required": 2,
           "resources_required": { "parts": 2, "water": 1 },
           "decay_per_min": 1.5,
-          "deadline_remaining_s": null,
           "attempts": 3,
           "locked_until_s": 0,
           "fired_at": "2026-09-14T10:38:00.000Z"
@@ -135,10 +134,12 @@ still corrects a count from Admin with `adjust_inventory`, which is logged.
 
 1. Fault exists, belongs to this sector, is unresolved → else `reject: "unknown_fault"`.
 2. `locked_until_s > 0` → `reject: "locked"`.
-3. `workers_assigned >= crew_required` and `≤ workforce.active` → else `reject: "insufficient_crew"`.
+3. `workers_assigned` must be a whole number no greater than the sector's available workers → else `reject: "invalid_workers"`; and at least `crew_required` → else `reject: "insufficient_crew"`. Neither reply carries the required number or the shortfall; those go to the log only. A materials refusal (`insufficient_resources`) likewise names no material. The screen prints WORKER ASSIGNMENT INVALID, INSUFFICIENT CREW, MATERIALS NOT READY and RESOLUTION REJECTED.
 4. `code` (trimmed, uppercased, hyphens normalised) is in `valid_codes` → else increment `attempts`, `reject: "invalid_code"`; on 3 consecutive invalids set `locked_until_s = 20`.
 5. **Resources are deducted by the server** when `deduct_resources_on_resolve` is on (the default), and the shortfall refuses the resolve when `resolve_requires_resources` is on. Both are scenario switches; with both off the original behaviour returns, except that a sector can no longer write its own stock — only the facilitator can.
 6. On success: mark resolved, stop decay, apply `+5` integrity recovery, ticker entry crediting the sector, log it.
+
+**There is no deadline** (2026-09-17). A fault carries no countdown, expiry or penalty at a moment in time; decay is the only pressure. A sector's fault view carries `code, name, flavour` (the symptom only), `severity, decay_per_min, attempts, locked_until_s, status, reward, reward_claimed` and never `crew_required`, `resources_required`, `procedure` or a deadline field. Old `deadline_*` fields in a snapshot or the content are read and ignored.
 7. **Then the fault's reward** (`lib/fault-rewards.json`, one per fault): resources into the owner's real inventory and/or health capped at 100 (a DARK sector stays at 0), claimed once per run under `faultReward:{run_id}:{code}` and kept in `state.rewards_claimed` so a re-fired fault, a refresh, a reconnect or a duplicate frame can never pay twice. `submit_result` carries `reward { applied, resources, health, health_before, health_after, text }` or `{ applied: false, reason }`. Every sector frame's fault carries `reward { resources, health, text }` (null when the preview is off) and `reward_claimed`. Facilitator `clear_fault` pays nothing unless `reward_on_facilitator_force_resolve` is on (then logged as an override), except for a fault with no procedure, whose clear is its completion. Events: `fault_reward_applied`, `fault_reward_duplicate_blocked`, `fault_reward_force_resolve_skipped`, `fault_reward_admin_override`.
 
 **Empty `valid_codes` (F-210, false alarm):** every submission returns `reject: "no_procedure"` with UI text *"No matching procedure. Verify this alert."* The facilitator clears it manually via `clear_fault` once COM confirms the ghost. Do not special-case F-210 by code — drive it off the empty array, so future false alarms need no code change.

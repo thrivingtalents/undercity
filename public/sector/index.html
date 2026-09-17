@@ -156,28 +156,23 @@
         <div class="empty" id="fault-pick" hidden>SELECT A FAULT TO OPEN ITS CARD</div>
       </div>
 
+      <!--
+        THE OPEN FAULT. It says WHAT is wrong and how fast it bleeds; the binder
+        says HOW to fix it. No crew, no materials, no procedure, no table, no
+        clock — those are the puzzle.
+      -->
       <div class="panel card" id="card" hidden>
         <div class="card-head">
-          <div class="card-sev" id="card-sev">▲▲ EMERGENCY</div>
-          <div class="card-code" id="card-code">F-000</div>
-          <div class="card-name" id="card-name">—</div>
-          <div class="card-flavour" id="card-flavour"></div>
+          <span class="card-code" id="card-code">F-000</span>
+          <span class="card-name" id="card-name">—</span>
         </div>
-
-        <div class="card-time">
-          <span class="label" id="card-time-label">Time remaining</span>
-          <b class="card-clock clock" id="card-deadline">--:--</b>
-          <span class="card-penalty" id="card-penalty" hidden></span>
+        <div class="card-flavour" id="card-flavour"></div>
+        <div class="card-status">
+          <span class="chip chip-sev" id="card-sev">▲ INCIDENT</span>
+          <span class="chip chip-decay" id="card-decay">DECAY −0 HEALTH / MIN</span>
+          <span class="chip chip-reward" id="card-reward" hidden>REWARD <b id="card-reward-text"></b></span>
         </div>
-
-        <div class="card-meta" id="card-meta"></div>
-        <!-- what finishing this fault pays; the words come from the server -->
-        <div class="card-reward" id="card-reward" hidden><span class="label">Reward</span><b id="card-reward-text"></b></div>
-        <div class="card-hints">
-          <div>LOOK UP THIS CODE IN YOUR FAULT INDEX</div>
-          <div>CONSULT TECHNICAL OPERATIONS BINDER</div>
-        </div>
-
+        <!-- the one action area -->
         <div class="console" id="console">
           <div class="console-row">
             <label class="cfield">
@@ -190,7 +185,10 @@
             </label>
             <button class="primary" id="submit-btn" type="button">SUBMIT</button>
           </div>
-          <div class="console-msg" id="console-msg"></div>
+          <div class="console-foot">
+            <span class="console-msg" id="console-msg"></span>
+            <span class="card-attempts" id="card-attempts">ATTEMPTS 0</span>
+          </div>
         </div>
       </div>
     </section>
@@ -285,7 +283,7 @@
 
   <div class="overlay pause-overlay" id="pause-overlay" hidden>
     <div class="stencil pause">SIMULATION PAUSED</div>
-    <div class="overlay-sub">Countdowns are frozen.</div>
+    <div class="overlay-sub">Every clock is frozen.</div>
   </div>
 
   <div class="sound-hint" id="sound-hint">🔈 CLICK ANYWHERE TO ENABLE SOUND</div>

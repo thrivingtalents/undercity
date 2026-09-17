@@ -340,8 +340,8 @@
     if (tf) {
       spec = {
         cls: Number(tf.severity) >= 3 ? 'badge b-crisis' : 'badge',
-        text: tf.expired ? '⚠ DEADLINE PASSED' : tf.deadline_remaining_s == null ? `⚠ ${tf.code}` : `⚠ ${U.mmss(tf.deadline_remaining_s)}`,
-        clock: !tf.expired && tf.deadline_remaining_s != null ? code : null,
+        text: `⚠ ${tf.code}`,
+        clock: null,
         extra: unresolved > 1 ? ` ×${unresolved}` : '',
       };
     } else if (unresolved > 0) {
@@ -402,14 +402,11 @@
       show(fault, unresolved > 0);
       if (unresolved > 0) {
         fault.classList.toggle('crisis', !!(tf && Number(tf.severity) >= 3));
-        const clockable = tf && !tf.expired && tf.deadline_remaining_s != null;
         const more = unresolved > 1 ? ` ×${unresolved}` : '';
-        const sig = `${tf ? tf.code : ''}|${more}|${clockable ? 'c' : ''}`;
+        const sig = `${tf ? tf.code : ''}|${more}`;
         if (fault.dataset.sig !== sig) {
           fault.dataset.sig = sig;
-          fault.innerHTML = clockable
-            ? `⚠ <b class="clock" data-fclock="${code}"></b>${more}`
-            : `⚠ ${tf ? tf.code : ''}${more}`.replace(/\s+/g, ' ');
+          fault.textContent = `⚠ ${tf ? tf.code : ''}${more}`.replace(/\s+/g, ' ');
         }
       }
       show(card.querySelector('.f-req'), requests.some((r) => r.status === 'REQUESTED' && r.requester === code));
@@ -553,15 +550,7 @@
     if (f.alert) {
       return { key: `alert:${f.alert.id}`, level: 1, accent: 'red', sev: 'MAJOR EMERGENCY',
         head: String(f.alert.title || ''), route: String(f.alert.subtitle || ''), clock: f.alert.big ? { kind: 'text', text: f.alert.big } : null };
-    }
-    const timed = faults.filter((x) => !x.tf.expired && x.tf.deadline_remaining_s != null)
-      .sort((a, b) => a.tf.deadline_remaining_s - b.tf.deadline_remaining_s)[0];
-    if (timed && timed.tf.deadline_remaining_s <= 120) {
-      return { key: `deadline:${timed.code}:${timed.tf.code}`, level: 1, accent: 'red', sev: `${U.severityName(timed.tf.severity)} — DEADLINE`,
-        head: `${sectorName(timed.code)} · ${timed.tf.code} ${String(timed.tf.name || '').toUpperCase()}`,
-        route: 'RESOLVE BEFORE THE DEADLINE', clock: { kind: 'fault', sector: timed.code }, sector: timed.code };
-    }
-    const dark = PANEL_ORDER.find((c) => healthState(sec(c)) === 'dark');
+    }    const dark = PANEL_ORDER.find((c) => healthState(sec(c)) === 'dark');
     if (dark) {
       return { key: `dark:${dark}`, level: 2, accent: 'red', sev: 'SECTOR OFFLINE',
         head: `${sectorName(dark)} IS DARK`, route: 'INTEGRITY AT ZERO', clock: null, sector: dark };
@@ -602,14 +591,13 @@
         head: `${pending.amount} ${resName(pending.resource)} · ${sectorName(pending.from)} → ${sectorName(pending.to)}`,
         route: `${pending.from} → TRN → ${pending.to}`, clock: null };
     }
-    const major = faults.sort((a, b) => (Number(b.tf.severity) - Number(a.tf.severity))
-      || ((a.tf.deadline_remaining_s ?? Infinity) - (b.tf.deadline_remaining_s ?? Infinity)))[0];
+    const major = faults.sort((a, b) => Number(b.tf.severity) - Number(a.tf.severity))[0];
     if (major) {
       const sev = Number(major.tf.severity) || 1;
       return { key: `fault:${major.code}:${major.tf.code}`, level: 8, accent: sev >= 3 ? 'red' : 'amber', sev: U.severityName(sev),
         head: `${sectorName(major.code)} · ${major.tf.code} ${String(major.tf.name || '').toUpperCase()}`,
-        route: major.tf.expired ? 'DEADLINE PASSED — STILL SOLVABLE' : 'RESOLUTION REQUIRED',
-        clock: !major.tf.expired && major.tf.deadline_remaining_s != null ? { kind: 'fault', sector: major.code } : (major.tf.expired ? { kind: 'text', text: 'DEADLINE PASSED', cls: 'passed' } : null),
+        route: 'RESOLUTION REQUIRED',
+        clock: null,
         sector: major.code };
     }
     const a = f.broadcast && f.broadcast.announcement;
@@ -708,11 +696,7 @@
         return { cls: 'ok', text: t.toUpperCase() };
       case 'clear':
         if ((m = t.match(/^(\w{3}) (F-\d+) cleared/))) return { cls: 'ok', text: `${m[1]} ${m[2]} CLEARED` };
-        return null;
-      case 'expired':
-        if ((m = t.match(/^(\w{3}) (F-\d+) DEADLINE PASSED/))) return { cls: 'bad', text: `${m[1]} ${m[2]} DEADLINE PASSED` };
-        return { cls: 'bad', text: t.toUpperCase() };
-      case 'status':
+        return null;      case 'status':
         if ((m = t.match(/^(\w{3}) CRITICAL$/))) return { cls: 'bad', text: `${m[1]} ENTERED CRITICAL` };
         if ((m = t.match(/^(\w{3}) IS DARK$/))) return { cls: 'bad', text: `${m[1]} WENT DARK` };
         if ((m = t.match(/^(\w{3}) → (\w+)$/))) {
@@ -812,32 +796,13 @@
       fc.hidden = false;
     } else if (!fc.hidden) { fc.hidden = true; fc.textContent = ''; }
 
-    // The banner's clock: a fault deadline or the council countdown.
+    // The banner's clock: the council countdown.
     if (bannerClock && bannerClock.kind !== 'text') {
       const c = $('b-clock');
       if (bannerClock.kind === 'council') {
         const cc = U.countdown(frame.council_clock, frozen);
         setText(c, U.mmss(cc));
-        c.className = `b-clock clock${cc < 30 ? ' danger' : cc < 60 ? ' warn' : ''}`;
-      } else if (bannerClock.kind === 'fault') {
-        const s = frame.sectors && frame.sectors[bannerClock.sector];
-        const tf = s && s.top_fault;
-        if (tf && !tf.expired && tf.deadline_remaining_s != null) {
-          const left = U.countdown({ running: !frozen, remaining_s: tf.deadline_remaining_s }, frozen);
-          setText(c, U.mmss(left));
-          c.className = `b-clock clock${left < 30 ? ' danger' : left < 120 ? ' warn' : ''}`;
-        }
-      }
-    }
-
-    // Fault clocks on the map and in the cards.
-    for (const t of document.querySelectorAll('[data-clock], [data-fclock]')) {
-      const code = t.dataset.clock || t.dataset.fclock;
-      const s = frame.sectors && frame.sectors[code];
-      const tf = s && s.top_fault;
-      if (!tf || tf.expired || tf.deadline_remaining_s == null) continue;
-      const left = U.countdown({ running: !frozen, remaining_s: tf.deadline_remaining_s }, frozen);
-      setText(t, t.dataset.clock ? `⚠ ${U.mmss(left)}${t.dataset.extra || ''}` : U.mmss(left));
+        c.className = `b-clock clock${cc < 30 ? ' danger' : cc < 60 ? ' warn' : ''}`;      }
     }
 
     // Overlays and routes with a life of their own.

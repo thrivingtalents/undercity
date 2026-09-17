@@ -295,14 +295,14 @@ C.push(callout("Council sittings are your richest data.", "Whole-group, compress
 C.push(p([t("Breather, five minutes.", { bold: true })]));
 
 C.push(H2("5.3 Round 3 — Core Failure (30 min)"));
-C.push(p(t("The climax. Two-spec faults, deadlines, and a decision with no right answer.")));
+C.push(p(t("The climax. Two-spec faults, fast decay, and a decision with no right answer.")));
 C.push(tbl([
   headRow(["TIME", "DO THIS", "WATCH FOR"], BW),
   beat("00:00", "Announce: \"Core integrity is falling. Assume nothing is routine.\" Start clock.", ""),
   beat("01:00", "Fire F-301 (POW), F-303 (MED).", "Two specs each now. Coordination cost doubles."),
-  beat("04:00", "Fire F-302 (WTR, 8:00 deadline) and F-305 (AGR).", "Both need their own buried Appendix C. Watch how long before anyone opens the back of the binder."),
+  beat("04:00", "Fire F-302 (WTR, 3.0/min decay) and F-305 (AGR).", "Both need their own buried Appendix C. Watch how long before anyone opens the back of the binder."),
   beat("05:00", "Drop Core Integrity to 60. Announce: \"Core output cannot sustain six sectors.\" Klaxon.", "The room changes here. Note who moves first — toward the problem or toward protecting their own sector."),
-  beat("08:00", "Fire F-304 (TRN, 6:00 deadline), F-306 (COM).", "Deadlines now visible on cards. Watch for panic-guessing at the console."),
+  beat("08:00", "Fire F-304 (TRN, 2.5/min decay), F-306 (COM).", "Health is draining fast now. Watch for panic-guessing at the console."),
   beat("15:00", "Set mode to COUNCIL. Announce the Continuity Order is due. Place the form on the centre table.", "Clause 7 says essential services take precedence and never defines essential. The argument about what essential means IS the exercise."),
   beat("20:00", "Ninety-second warning. Do not offer help or extend.", "Decision paralysis, or one voice bulldozing. Both are common. Tag both."),
   beat("20:00", "If the form is submitted: apply brownout to the two lowest-ranked sectors. If not: announce rolling blackouts across all six.", "Indecision must cost more than any decision. Do not soften this."),
@@ -330,7 +330,7 @@ C.push(tbl([
   headRow(["TIME", "DO THIS", "WATCH FOR"], BW),
   beat("00:00", "Announce an aftershock. Restore brownout sectors to active. Remind everyone their commitment is on the table.", "Whether commitments are visible or already buried under paper."),
   beat("02:00", "Fire F-401 (POW), F-402 (MED).", "Both need buried appendices from other sectors. Watch the asking behaviour — it should look different from Round 2."),
-  beat("07:00", "Fire F-403 (WTR), F-404 (TRN, 10:00 deadline).", "TRN's is the mini-triage feed. Deadline pressure returns."),
+  beat("07:00", "Fire F-403 (WTR), F-404 (TRN).", "TRN's is the mini-triage feed. Decay pressure returns."),
   beat("14:00", "Optional short Council if the group is coping well. Skip if they are not.", "Compare directly against the Round 2 sitting. Same people, same format, measurable difference."),
   beat("22:00", "Close. Leave the final state up.", ""),
 ], BW));

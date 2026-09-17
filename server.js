@@ -1020,7 +1020,6 @@ function handleControl(client, entry, msg) {
     case 'clear_fault':      game.clearFault(msg.sector, msg.fault_code, msg.reason); return ok();
     case 'accelerate_fault': game.accelerateFault(msg.sector, msg.fault_code, msg.decay_per_min); return ok();
     case 'pause_fault':      game.pauseFault(msg.sector, msg.fault_code, msg.paused); return ok();
-    case 'fault_add_time':   game.addFaultTime(msg.sector, msg.fault_code, msg.seconds); return ok();
     case 'runbook_mark': {
       if (msg.done) game.runbookDone.add(msg.beat_id);
       else game.runbookDone.delete(msg.beat_id);
@@ -1226,7 +1225,7 @@ function handleControl(client, entry, msg) {
 // -- loops --------------------------------------------------------------------
 
 /**
- * The engine ticks every second (deadlines, lockouts and the cycle need
+ * The engine ticks every second (decay, lockouts and the cycle need
  * that precision) but only broadcasts when something changed, or every
  * broadcast_ms as a heartbeat. Clients interpolate countdowns in between.
  */

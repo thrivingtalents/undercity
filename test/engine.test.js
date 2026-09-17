@@ -1,6 +1,6 @@
 'use strict';
 /**
- * The game control layer: phases, the city cycle, deadlines, transfers,
+ * The game control layer: phases, the city cycle, decay, transfers,
  * council and the Continuity Order, rolling blackout, events, the timeline,
  * pause, configuration and the debrief analytics.
  *
@@ -67,7 +67,7 @@ test('START runs the round clock and the city cycle together; frozen states stop
   assert.equal(game.state.round_clock.remaining_s, before.round - 6, 'resumes from the exact remaining time');
 });
 
-test('pause freezes fault deadlines, decay and the council clock but not the lockout', () => {
+test('pause freezes decay and the council clock but not the lockout', () => {
   const game = running();
   game.fireFault('F-201', 'POW');
   const fault = game.findFault('POW', 'F-201');
@@ -75,10 +75,8 @@ test('pause freezes fault deadlines, decay and the council clock but not the loc
   assert.equal(fault.locked_until_s, 20);
   game.callCouncil();
   game.pause();
-  const deadline = fault.deadline_remaining_s;
   const integrity = game.state.sectors.POW.integrity;
   game.tick(25000);
-  assert.equal(fault.deadline_remaining_s, deadline);
   assert.equal(game.state.sectors.POW.integrity, integrity);
   assert.equal(game.state.council_clock.remaining_s, 300);
   assert.equal(fault.locked_until_s, 0, 'a locked console still unlocks while paused');
@@ -87,45 +85,7 @@ test('pause freezes fault deadlines, decay and the council clock but not the loc
   assert.equal(frame.round_clock.running, false, 'clients must not interpolate while frozen');
 });
 
-// -- faults: deadlines and expiry --------------------------------------------------
-
-test('a fault without a content deadline gets the scenario default for its severity', () => {
-  const game = running();
-  game.fireFault('F-201', 'POW');   // severity 2, content deadline null
-  game.fireFault('F-101', 'POW');   // severity 1
-  assert.equal(game.findFault('POW', 'F-201').deadline_s, game.cfg.deadline_default_s['2']);
-  assert.equal(game.findFault('POW', 'F-101').deadline_s, null, 'incidents have no deadline by default');
-  game.fireFault('F-302', 'WTR');   // content deadline 480 wins
-  assert.equal(game.findFault('WTR', 'F-302').deadline_s, 480);
-});
-
-test('at the deadline the fault EXPIRES once, takes its penalty, and stays solvable', () => {
-  const game = running();
-  game.fireFault('F-201', 'POW');
-  const fault = game.findFault('POW', 'F-201');
-  fault.deadline_remaining_s = 2;
-  const before = game.state.sectors.POW.integrity;
-  game.tick(3000);
-  assert.equal(fault.expired, true);
-  assert.equal(fault.status, 'EXPIRED');
-  const decayed = (fault.decay_per_min * 3) / 60;
-  assert.ok(Math.abs(game.state.sectors.POW.integrity - (before - decayed - fault.integrity_penalty)) < 0.01,
-    'penalty applied on top of continuous decay');
-  game.tick(3000);
-  assert.equal(logEvents(game, 'deadline_expired').length, 1, 'penalty applies once');
-  const res = submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-04-340', workers_assigned: 2 });
-  assert.equal(res.accepted, true, 'still solvable after expiry (configurable)');
-});
-
-test('with expired_faults_remain_solvable off the fault FAILS at the deadline', () => {
-  const game = running();
-  game.patchConfig({ expired_faults_remain_solvable: false });
-  game.fireFault('F-201', 'POW');
-  game.findFault('POW', 'F-201').deadline_remaining_s = 1;
-  game.tick(2000);
-  assert.equal(game.findFault('POW', 'F-201'), null);
-  assert.equal(game.state.sectors.POW.faults[0].status, 'FAILED');
-});
+// -- faults: decay is the only clock ------------------------------------------------
 
 test('opening a card and submitting both count as the first action', () => {
   const game = running();
@@ -138,17 +98,214 @@ test('opening a card and submitting both count as the first action', () => {
   assert.equal(logEvents(game, 'fault_opened').length, 1, 'opened once');
 });
 
-test('brownout shortens new deadlines and runs fault timers faster', () => {
+test('brownout holds workers back and adds its own bleed to an open fault', () => {
   const game = running();
   game.setStatus('POW', 'BROWNOUT');
   game.fireFault('F-201', 'POW');
   const f = game.findFault('POW', 'F-201');
-  const mult = game.cfg.brownout_effects.fault_timer_multiplier;
-  assert.equal(f.deadline_s, Math.round(480 * mult));
-  const before = f.deadline_remaining_s;
-  game.tick(3000);
-  assert.ok(Math.abs((before - f.deadline_remaining_s) - 3 / mult) < 0.01, 'timer runs at 1/multiplier');
+  assert.equal('deadline_s' in f, false);
   assert.equal(game.availableWorkers(game.state.sectors.POW), 8 - game.cfg.brownout_effects.worker_penalty);
+  const before = game.state.sectors.POW.integrity;
+  game.tick(60000);
+  assert.ok(before - game.state.sectors.POW.integrity >= 1.5 - 0.05, 'the fault stopped bleeding in brownout');
+});
+
+// -- faults: decay is the only clock ------------------------------------------------
+//
+// There is no deadline. A fault has no countdown, no expiry, no penalty at a
+// moment in time; it bleeds the sector's health at its decay rate until it is
+// solved. The screen tells the team WHAT is wrong; the binder tells them HOW.
+
+const DEADLINE_KEYS = ['deadline', 'deadline_s', 'deadline_remaining_s', 'deadline_at', 'time_remaining', 'time_limit',
+  'integrity_penalty', 'expired', 'expired_at', 'warned_30'];
+const DEADLINE_EVENTS = ['deadline_expired', 'fault_failed', 'deadline_started', 'deadline_warning', 'fault_timeout', 'deadline_reset'];
+const SECTOR_HTML = fs.readFileSync(path.join(__dirname, '..', 'public', 'sector', 'index.html'), 'utf8');
+const SECTOR_JS = fs.readFileSync(path.join(__dirname, '..', 'public', 'sector', 'sector.js'), 'utf8');
+const SECTOR_CSS = fs.readFileSync(path.join(__dirname, '..', 'public', 'sector', 'sector.css'), 'utf8');
+
+test('a fired fault carries no deadline fields, and F-302 / F-304 / F-404 have no countdown', () => {
+  const game = running();
+  for (const [code, sector] of [['F-201', 'POW'], ['F-302', 'WTR'], ['F-304', 'TRN'], ['F-404', 'TRN']]) {
+    game.fireFault(code, sector);
+    const f = game.findFault(sector, code);
+    for (const k of DEADLINE_KEYS) assert.equal(k in f, false, `${code} carries ${k}`);
+    assert.ok(f.decay_per_min > 0, `${code} has no decay`);
+  }
+  // the content's old deadline_s on the three special faults is inert
+  const content = loadContent().faults.faults;
+  assert.equal(content.find((f) => f.code === 'F-302').deadline_s, 480, 'the content still says 480 — and the engine ignores it');
+  game.tick(15 * 60 * 1000);   // long past every old limit
+  for (const [code, sector] of [['F-302', 'WTR'], ['F-304', 'TRN'], ['F-404', 'TRN']]) {
+    const f = game.findFault(sector, code);
+    assert.ok(f && !f.resolved, `${code} was closed by a clock`);
+    assert.equal(f.status, 'ACTIVE');
+  }
+  for (const ev of DEADLINE_EVENTS) assert.equal(logEvents(game, ev).length, 0, `${ev} was logged`);
+  assert.equal(logEvents(game, 'fault_fired').every((e) => !('deadline_s' in e)), true, 'fault_fired still logs a deadline');
+});
+
+test('decay bleeds the owner every second, stacks across faults, and stops the moment a fault is solved', () => {
+  const game = running();
+  game.fireFault('F-201', 'POW');            // 1.5 / min
+  game.fireFault('F-202', 'POW');            // 1.0 / min
+  const before = game.state.sectors.POW.integrity;
+  game.tick(60000);
+  assert.ok(Math.abs(game.state.sectors.POW.integrity - (before - 2.5)) < 0.01, 'two faults did not stack');
+  const res = submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-04-340', workers_assigned: 2 });
+  assert.equal(res.accepted, true);
+  const after = game.state.sectors.POW.integrity;
+  game.tick(60000);
+  assert.ok(Math.abs(game.state.sectors.POW.integrity - (after - 1.0)) < 0.01, 'the solved fault kept bleeding');
+  game.pauseFault('POW', 'F-202', true);
+  const paused = game.state.sectors.POW.integrity;
+  game.tick(60000);
+  assert.equal(game.state.sectors.POW.integrity, paused, 'a paused fault still bled');
+});
+
+test('the tick never expires, penalises or fails a fault, however long it runs', () => {
+  const game = running();
+  game.fireFault('F-101', 'POW');            // an incident: 0.8 / min, no old deadline
+  game.fireFault('F-302', 'WTR');            // 3.0 / min, old 8:00 limit
+  const pow = game.state.sectors.POW.integrity;
+  const wtr = game.state.sectors.WTR.integrity;
+  game.tick(9 * 60 * 1000);
+  assert.ok(Math.abs(game.state.sectors.POW.integrity - (pow - 0.8 * 9)) < 0.05, 'POW lost more than decay');
+  assert.ok(Math.abs(game.state.sectors.WTR.integrity - (wtr - 3.0 * 9)) < 0.05, 'WTR lost more than decay: a hidden penalty');
+  assert.equal(game.findFault('WTR', 'F-302').status, 'ACTIVE');
+  assert.equal(game.state.sectors.WTR.faults.some((f) => f.status === 'FAILED' || f.status === 'EXPIRED'), false);
+  assert.equal(logEvents(game, 'deadline_expired').length + logEvents(game, 'fault_failed').length, 0);
+});
+
+test('a saved run from the deadline era loads with its clocks dead and its faults still open', () => {
+  const game = running();
+  game.fireFault('F-302', 'WTR');
+  const snap = JSON.parse(JSON.stringify(game.serialise()));
+  const f = snap.state.sectors.WTR.faults[0];
+  Object.assign(f, { deadline_s: 480, deadline_remaining_s: 3, integrity_penalty: 15, expired: false, warned_30: false });
+  snap.state.sectors.POW.faults.push({ ...f, id: 'F-legacy', code: 'F-201', deadline_remaining_s: 0, expired: true, expired_at: 'x', status: 'EXPIRED', resolved: false });
+  const back = newGame();
+  assert.equal(back.restore(snap), true);
+  const wtr = back.findFault('WTR', 'F-302');
+  const pow = back.findFault('POW', 'F-201');
+  for (const k of DEADLINE_KEYS) { assert.equal(k in wtr, false, `restored fault carries ${k}`); assert.equal(k in pow, false, `legacy fault carries ${k}`); }
+  assert.equal(pow.status, 'ACTIVE', 'a legacy EXPIRED-but-open fault is simply open');
+  const integrity = back.state.sectors.WTR.integrity;
+  back.tick(10000);
+  assert.ok(back.state.sectors.WTR.integrity > integrity - 1, 'a legacy clock fired a penalty');
+  for (const ev of DEADLINE_EVENTS) assert.equal(logEvents(back, ev).length, 0);
+  // and the snapshot the new engine writes has nothing to migrate
+  const fresh = JSON.parse(JSON.stringify(back.serialise()));
+  for (const k of DEADLINE_KEYS) assert.equal(k in fresh.state.sectors.WTR.faults[0], false, `new snapshot writes ${k}`);
+});
+
+test('the sector is told what is wrong and what it pays — never crew, materials, procedure or where to look', () => {
+  const game = running();
+  game.patchConfig({ card_shows_dependency: true });   // even with the old hint switch on
+  game.fireFault('F-201', 'POW');                       // flavour: "…; needs reservoir rating from WTR."
+  const f = forSector(game, 'POW').sectors.POW.faults[0];
+  for (const k of ['crew_required', 'resources_required', 'procedure', 'spec_refs', 'valid_codes', 'binder', 'table', ...DEADLINE_KEYS]) {
+    assert.equal(k in f, false, `the sector frame carries ${k}`);
+  }
+  assert.equal(f.flavour, 'Turbine coolant pressure collapsing.', 'the dependency half leaked');
+  assert.ok(!/WTR|reservoir rating|Appendix|binder|procedure/i.test(f.flavour));
+  assert.equal(typeof f.decay_per_min, 'number');
+  assert.equal(f.reward.text, '+2 WATER');
+  assert.equal(typeof f.attempts, 'number');
+  // the facilitator still sees the whole line
+  const c = forControl(game).sectors.POW.faults[0];
+  assert.equal(c.crew_required, 2);
+  assert.deepEqual(c.resources_required, { parts: 2, water: 1 });
+  assert.ok(/WTR/.test(c.flavour));
+});
+
+test('refusals name the problem and never the answer', () => {
+  const game = running();
+  game.patchConfig({ resolve_requires_resources: true });
+  game.fireFault('F-201', 'POW');                       // crew 2; parts 2, water 1
+  const crew = submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-04-340', workers_assigned: 1 });
+  assert.equal(crew.accepted, false);
+  assert.equal(crew.reason, 'insufficient_crew');
+  for (const k of ['crew_required', 'workforce_active', 'short', 'needed', 'missing']) assert.equal(k in crew, false, `crew refusal carries ${k}`);
+  const many = submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-04-340', workers_assigned: 99 });
+  assert.equal(many.reason, 'invalid_workers');
+  game.setInventory('POW', { parts: 0 });
+  const mats = submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-04-340', workers_assigned: 2 });
+  assert.equal(mats.reason, 'insufficient_resources');
+  for (const k of ['short', 'crew_required', 'resources_required']) assert.equal(k in mats, false, `materials refusal carries ${k}`);
+  game.setInventory('POW', { parts: 3 });
+  const wrong = submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-04-999', workers_assigned: 2 });
+  assert.equal(wrong.reason, 'invalid_code');
+  for (const k of ['valid_codes', 'procedure', 'hint']) assert.equal(k in wrong, false);
+  // the debrief still gets the numbers, in the log only
+  const logged = logEvents(game, 'submit').find((e) => e.reason === 'insufficient_crew');
+  assert.equal(logged.crew_required, 2);
+  assert.equal(logged.workforce_active, 8);
+  // and the screen's words for them
+  for (const word of ['RESOLUTION REJECTED', 'INSUFFICIENT CREW', 'MATERIALS NOT READY', 'WORKER ASSIGNMENT INVALID']) {
+    assert.ok(SECTOR_JS.includes(word), `the screen lacks "${word}"`);
+  }
+  assert.ok(!/needs \$\{v\.crew_required\}|Insufficient resources: \$\{/.test(SECTOR_JS), 'the screen still prints the numbers');
+});
+
+test('the reward is unchanged by the removal: previewed before, paid once after', () => {
+  const game = running();
+  game.fireFault('F-302', 'WTR');
+  assert.equal(forSector(game, 'WTR').sectors.WTR.faults[0].reward.text, '+2 POWER · +5 SECTOR HEALTH');
+  const power = game.state.sectors.WTR.inventory.power;
+  game.setIntegrity('WTR', 60);
+  const def = loadContent().faults.faults.find((x) => x.code === 'F-302');
+  const res = submitCode(game, { sector: 'WTR', fault_code: 'F-302', code: def.valid_codes[0], workers_assigned: def.crew_required });
+  assert.equal(res.accepted, true);
+  assert.equal(res.reward.applied, true);
+  assert.equal(game.state.sectors.WTR.inventory.power, power - ((def.resources_required || {}).power || 0) + 2);
+  assert.equal(game.state.sectors.WTR.integrity, 60 + game.cfg.resolve_recovery + 5);
+  assert.equal(logEvents(game, 'fault_reward_applied').length, 1);
+});
+
+test('the wall and the facilitator get no deadline either; the wall ranks faults by severity then age', () => {
+  const game = running();
+  game.fireFault('F-101', 'POW');   // sev 1
+  game.fireFault('F-201', 'POW');   // sev 2
+  const w = forBigscreen(game).sectors.POW.top_fault;
+  assert.equal(w.code, 'F-201');
+  for (const k of DEADLINE_KEYS) assert.equal(k in w, false, `the wall's fault carries ${k}`);
+  const c = forControl(game).sectors.POW.faults[0];
+  for (const k of DEADLINE_KEYS) assert.equal(k in c, false, `the facilitator's fault carries ${k}`);
+  assert.equal('deadline_default_s' in game.cfg, false, 'the scenario still carries deadline defaults');
+  assert.equal('deadline_penalty' in game.cfg, false);
+  assert.equal('expired_faults_remain_solvable' in game.cfg, false);
+});
+
+test('the fault screen has one expanded card, compact rows, a status row and one action area — and nothing about deadlines or the answer', () => {
+  // one card, one console: several faults are rows that swap the card, never stacked cards
+  assert.equal((SECTOR_HTML.match(/id="card"/g) || []).length, 1);
+  assert.equal((SECTOR_HTML.match(/id="code-input"/g) || []).length, 1);
+  assert.ok(/id="fault-list"/.test(SECTOR_HTML));
+  // nothing about deadlines, in markup, script or style
+  for (const bad of ['card-deadline', 'card-time', 'card-penalty', 'NO DEADLINE', 'DEADLINE', 'Time remaining', 'card-hints', 'card-meta',
+    'FAULT INDEX', 'TECHNICAL OPERATIONS BINDER', 'CREW REQUIRED', 'SPEND']) {
+    assert.equal(SECTOR_HTML.includes(bad), false, `markup still has "${bad}"`);
+    assert.equal(SECTOR_JS.includes(bad), false, `script still has "${bad}"`);
+  }
+  for (const bad of ['deadline', 'card-time', 'card-clock', 'card-penalty', 'card-hints', 'card-meta', 'fr-dl']) {
+    assert.equal(SECTOR_CSS.includes(bad), false, `style still has "${bad}"`);
+  }
+  // the status row holds severity, decay and reward only; the action area the four controls
+  const status = SECTOR_HTML.match(/<div class="card-status">([\s\S]*?)<\/div>\s*<!--/);
+  assert.ok(status, 'no status row');
+  assert.deepEqual((status[1].match(/id="([^"]+)"/g) || []).map((m) => m.slice(4, -1)), ['card-sev', 'card-decay', 'card-reward', 'card-reward-text']);
+  const console_ = SECTOR_HTML.match(/<div class="console" id="console">([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/);
+  assert.ok(console_, 'no action area');
+  assert.deepEqual((console_[1].match(/id="([^"]+)"/g) || []).map((m) => m.slice(4, -1)), ['code-input', 'workers-select', 'submit-btn', 'console-msg', 'card-attempts']);
+  // the code and title appear once each in the card
+  const card = SECTOR_HTML.match(/<div class="panel card" id="card" hidden>([\s\S]*?)<\/section>/)[1];
+  assert.equal((card.match(/id="card-code"/g) || []).length, 1);
+  assert.equal((card.match(/id="card-name"/g) || []).length, 1);
+  assert.equal((card.match(/id="card-sev"/g) || []).length, 1);
+  // the decay chip reads the way the spec wants
+  assert.ok(/DECAY −\$\{[^}]+\} HEALTH \/ MIN/.test(SECTOR_JS), 'decay is not printed as DECAY −rate HEALTH / MIN');
+  // a fresh selection assigns one worker, not the answer
+  assert.ok(!/Number\(f\.crew_required\)/.test(SECTOR_JS), 'the worker selector still defaults to the required crew');
 });
 
 // -- the city cycle ------------------------------------------------------------------
@@ -1791,7 +1948,7 @@ test('configuration patches apply live and survive a snapshot', () => {
   game.patchConfig({ critical_below: 50, brownout_effects: { production_multiplier: 0.25 } });
   assert.equal(game.cfg.critical_below, 50);
   assert.equal(game.cfg.brownout_effects.production_multiplier, 0.25);
-  assert.equal(game.cfg.brownout_effects.fault_timer_multiplier, 0.75, 'deep merge keeps siblings');
+  assert.equal(game.cfg.brownout_effects.upkeep_delivery_multiplier, 0.5, 'deep merge keeps siblings');
   game.setIntegrity('POW', 45);
   assert.equal(game.state.sectors.POW.status, 'CRITICAL');
 
@@ -1898,7 +2055,6 @@ test('the debrief folds the log into per-round figures and a Round 3 vs Aftersho
   game.callCouncil();
   game.tick(120000);
   game.submitContinuityOrder(['POW', 'MED', 'WTR', 'TRN', 'COM', 'AGR']);
-  game.findFault('WTR', 'F-302').deadline_remaining_s = 1;
   game.tick(2000);
 
   game.setPhase('DEBRIEF_1');
@@ -1912,7 +2068,7 @@ test('the debrief folds the log into per-round figures and a Round 3 vs Aftersho
   const r3 = d.rounds.R3;
   assert.equal(r3.faults.fired, 2);
   assert.equal(r3.faults.resolved, 1);
-  assert.equal(r3.faults.expired, 1);
+  assert.equal(r3.faults.expired, 0, 'nothing expires any more');
   assert.equal(r3.faults.cross_sector, 2);
   assert.equal(r3.console.invalid_code, 1);
   const f301 = r3.faults.list.find((f) => f.code === 'F-301');
@@ -2012,16 +2168,16 @@ test('core output at start and round lengths come from the scenario', () => {
   assert.equal(game.roundConfig().length_s, 300, 'the next START of R2 would use it');
 });
 
-test('per-fault overrides: deadline, expiry penalty and extra accepted codes; the content answer stays', () => {
+test('per-fault overrides: extra accepted codes; the content answer stays; an old deadline override is ignored', () => {
   const game = running();
-  assert.equal(game.setFaultOverride('F-999', { deadline_s: 10 }).ok, false);
+  assert.equal(game.setFaultOverride('F-999', { extra_valid_codes: ['X'] }).ok, false);
 
   game.setFaultOverride('F-201', { deadline_s: 100, integrity_penalty: 3, extra_valid_codes: ['p-04-777', ''] });
   const { fault } = game.fireFault('F-201', 'POW');
-  assert.equal(fault.deadline_s, 100);
-  assert.equal(fault.integrity_penalty, 3);
+  assert.equal('deadline_s' in fault, false, 'an old deadline override put a clock on the fault');
+  assert.equal(forControl(game).config.fault_overrides['F-201'].deadline_s, undefined, 'the deadline override was kept');
+  assert.equal(forControl(game).config.fault_overrides['F-201'].integrity_penalty, undefined, 'the penalty override was kept');
   assert.ok(fault.valid_codes.includes('P-04-340') && fault.valid_codes.includes('P-04-777'));
-  assert.equal(forControl(game).config.fault_overrides['F-201'].deadline_s, 100);
   assert.ok(!JSON.stringify(forSector(game, 'POW')).includes('P-04-777'), 'an extra code is still an answer key');
 
   const r = submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-04-777', workers_assigned: 2 });
@@ -2030,8 +2186,6 @@ test('per-fault overrides: deadline, expiry penalty and extra accepted codes; th
   game.setFaultOverride('F-201', null);
   assert.equal(forControl(game).config.fault_overrides['F-201'], undefined);
   const again = game.fireFault('F-201', 'POW').fault;
-  assert.equal(again.deadline_s, 480, 'back to the severity default');
-  assert.equal(again.integrity_penalty, 10);
   assert.deepEqual([...again.valid_codes].sort(), ['P-04-290', 'P-04-340']);
   assert.equal(logEvents(game, 'fault_override').length, 2, 'both the override and its removal are logged');
 });

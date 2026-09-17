@@ -107,16 +107,6 @@ function cardCell(f) {
     children: [new TextRun({ text: cardFlavour(f), font: "Arial", size: 18, color: "3A3A3A" })],
   }));
 
-  // deadline warning where one exists
-  if (f.deadline_s) {
-    const mm = String(Math.floor(f.deadline_s / 60)).padStart(2, "0");
-    const ss = String(f.deadline_s % 60).padStart(2, "0");
-    kids.push(new Paragraph({
-      spacing: { after: 120 },
-      shading: { type: ShadingType.CLEAR, fill: "FFE8E8", color: "auto" },
-      children: [new TextRun({ text: `  TIME LIMIT ${mm}:${ss} FROM ISSUE  `, font: "Arial", size: 18, bold: true, color: "B00000" })],
-    }));
-  }
 
   // instruction footer — identical on every card, including the false alarm
   kids.push(new Paragraph({
@@ -207,7 +197,6 @@ for (const f of deck) {
   const note = [
     f.facilitator_notes || "",
     (f.injures_workforce && !/INJUR/i.test(f.facilitator_notes || "")) ? `INJURES ${f.injures_workforce} WORKFORCE → tokens to MED` : "",
-    f.deadline_s ? `Deadline ${Math.floor(f.deadline_s / 60)}:${String(f.deadline_s % 60).padStart(2, "0")}` : "",
   ].filter(Boolean).join(" · ");
 
   const flag = f.false_alarm || (f.valid_codes.length > 1);

@@ -8,7 +8,6 @@
     "cycle_length_s": 120,
     "council_clock_s": 90,
     "round_length_s": { "R0": 300, "R1": 480, "R2": 600, "R3": 600, "R4": 480 },
-    "deadline_default_s": { "1": null, "2": 180, "3": 120 },
     "alert_full_screen_s": 5,
     "core_start_output": 100
   },

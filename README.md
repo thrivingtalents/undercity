@@ -137,9 +137,9 @@ npm start                                            # http://localhost:3000/adm
 2. **Faults.** Admin fires one from the picker (one click), a preset ("ROUND 2
    WAVE A", several faults with delays) or the round's **timeline**. The fault
    appears on that sector's screen with its countdown, and as the wall's
-   headline fault for that sector. The team looks the code up in the physical
-   binder, gathers resources and cross-sector spec values, and enters the
-   resolution code. Wrong code → attempt recorded; three consecutive wrong
+   The card says what is wrong, how fast it bleeds and what it pays — never
+   the crew, the materials, the procedure or where to look; the team finds
+   those in the physical binder and enters the resolution code. Wrong code → attempt recorded; three consecutive wrong
    codes → console locked 20 s (server-controlled). Right code → +5 integrity,
    the procedure's resources leave the digital stock, the wall credits the
    sector, and the fault pays its **reward** (`lib/fault-rewards.json`: one per
