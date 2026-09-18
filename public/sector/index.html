@@ -69,13 +69,6 @@
 
     <!-- LEFT: resources & upkeep -->
     <section class="col col-left">
-      <!-- A request waiting on our answer outranks the reference readouts. -->
-      <div class="panel block inbox-block" id="inbox-panel" hidden>
-        <h2 class="ptitle">INBOUND REQUESTS <span class="count" id="inbox-count">0</span></h2>
-        <div class="inbox" id="inbox"></div>
-        <div class="msg" id="inbox-msg" hidden></div>
-      </div>
-
       <div class="panel block injured-block" id="injured-panel" hidden>
         <h2 class="ptitle">INJURED WORKERS <span class="count" id="injured-count">0</span></h2>
         <div class="injured-line">
@@ -113,32 +106,59 @@
         <div class="upkeep-row"><span class="label">Status</span><b class="uk-status" id="upkeep-status" data-status="">—</b></div>
       </div>
 
+      <!--
+        REQUEST asks another table for stock. TRANSFER proposes a movement of
+        our own. Neither moves anything: Transport's approval does. Above the
+        line: act. Below it: only what still needs attention; the rest folds
+        into HISTORY.
+      -->
       <div class="panel block transfers-block">
-        <h2 class="ptitle">RESOURCES IN &amp; OUT</h2>
-        <div class="tf-tabs" id="tf-tabs">
-          <button type="button" data-mode="request" class="on">REQUEST RESOURCE</button>
-          <button type="button" data-mode="transfer">TRANSFER RESOURCE</button>
+        <h2 class="ptitle">RESOURCE REQUESTS &amp; TRANSFERS</h2>
+        <div class="tf-tabs" id="tf-tabs" role="tablist">
+          <button type="button" data-mode="request" class="on" role="tab" aria-selected="true">REQUEST RESOURCE</button>
+          <button type="button" data-mode="transfer" role="tab" aria-selected="false">TRANSFER RESOURCE</button>
         </div>
         <form class="transfer-form" id="transfer-form" autocomplete="off">
-          <div class="tf-row">
+          <label class="tf-field">
             <span class="tf-label" id="tf-label">REQUEST FROM</span>
             <select id="tf-sector" aria-label="Other sector"></select>
-          </div>
+          </label>
           <div class="tf-row">
-            <select id="tf-res" aria-label="Resource">
-              <option value="power">⚡ POWER</option>
-              <option value="water">💧 WATER</option>
-              <option value="parts">🔧 PARTS</option>
-              <option value="med">⚕ MEDICAL</option>
-              <option value="workers">👤 WORKERS</option>
-            </select>
-            <select id="tf-amt" aria-label="Amount"></select>
-            <button type="submit" id="tf-submit">SEND REQUEST</button>
+            <label class="tf-field grow">
+              <span class="tf-label" id="tf-res-label">RESOURCE</span>
+              <select id="tf-res" aria-label="Resource">
+                <option value="power">⚡ POWER</option>
+                <option value="water">💧 WATER</option>
+                <option value="parts">🔧 PARTS</option>
+                <option value="med">⚕ MEDICAL</option>
+                <option value="workers">👤 WORKERS</option>
+              </select>
+            </label>
+            <label class="tf-field">
+              <span class="tf-label" id="tf-amt-label">QTY</span>
+              <select id="tf-amt" aria-label="Quantity"></select>
+            </label>
           </div>
-          <div class="tf-hint" id="tf-hint">Asks another sector for stock. Nothing moves until they fulfil it and Transport approves.</div>
+          <button type="submit" class="primary wide" id="tf-submit">SEND REQUEST</button>
+          <div class="tf-hint" id="tf-hint">Ask another sector for stock. No resources move until a transfer is created and TRN approves it.</div>
         </form>
         <div class="msg" id="transfer-msg" hidden></div>
-        <div class="transfers" id="transfers"><div class="empty" id="transfers-empty">Nothing in or out yet.</div></div>
+
+        <div class="mv-head">
+          <span class="sub-title">ACTIVE <span class="count" id="mv-active-count">0</span></span>
+          <div class="mv-filters" id="mv-filters" role="group" aria-label="Filter">
+            <button type="button" data-filter="ALL" class="on">ALL</button>
+            <button type="button" data-filter="INCOMING">INCOMING</button>
+            <button type="button" data-filter="OUTGOING">OUTGOING</button>
+          </div>
+        </div>
+        <div class="transfers" id="transfers"></div>
+
+        <div class="mv-history-head">
+          <span class="sub-title">HISTORY <span class="count dim" id="mv-history-count">0</span></span>
+          <button type="button" class="ghost mv-history-toggle" id="mv-history-toggle" aria-expanded="false">VIEW HISTORY</button>
+        </div>
+        <div class="transfers history" id="history" hidden></div>
       </div>
     </section>
 

@@ -2213,6 +2213,174 @@ test('a queue of six stays six independent items, and a decline is its own reduc
   assert.equal(game.declineTransfer(ids[0], { by: 'POW' }).reason, 'approval_trn_only');
 });
 
+// -- v12: RESOURCE REQUESTS & TRANSFERS — one card per movement -----------------------
+//
+// The same requests and transfers, projected for one table: labelled in the
+// room's words, split into ACTIVE and HISTORY, a fulfilled request folded
+// into its transfer. The rules underneath do not move.
+
+test('a fulfilled request folds into its linked transfer: one ACTIVE card, the request in HISTORY, nothing moved', () => {
+  const game = running();
+  const before = { pow: game.state.sectors.POW.inventory.power, med: game.state.sectors.MED.inventory.power };
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' });
+  let mv = forSector(game, 'MED').movement;
+  assert.equal(mv.active.length, 1);
+  assert.equal(mv.active[0].kind, 'request'); assert.equal(mv.active[0].label, 'WAITING FOR SUPPLIER');
+  assert.equal(mv.active[0].direction, 'OUTGOING'); assert.equal(mv.active[0].can_withdraw, true);
+  assert.deepEqual([game.state.sectors.POW.inventory.power, game.state.sectors.MED.inventory.power], [before.pow, before.med], 'a request moved stock');
+
+  const f = game.fulfillRequest(r.request.id, { by: 'POW' });
+  assert.equal(f.ok, true);
+  assert.equal(f.transfer.request_id, r.request.id); assert.equal(game.findRequest(r.request.id).transfer_id, f.transfer.id, 'linked both ways');
+  assert.equal(f.transfer.status, 'PENDING_TRN_APPROVAL', 'fulfilment is consent, not approval');
+  assert.equal(game.stampsUsed(), 0, 'fulfilment spent no Transport allowance');
+  assert.deepEqual([game.state.sectors.POW.inventory.power, game.state.sectors.MED.inventory.power], [before.pow, before.med], 'fulfilment moved stock');
+
+  for (const code of ['MED', 'POW']) {
+    mv = forSector(game, code).movement;
+    assert.equal(mv.active.length, 1, `${code}: the request and its transfer are two active cards`);
+    assert.equal(mv.active[0].id, f.transfer.id); assert.equal(mv.active[0].label, 'WAITING FOR TRN');
+    assert.equal(mv.active[0].linked_id, r.request.id);
+    const hist = mv.history.find((c) => c.id === r.request.id);
+    assert.ok(hist, `${code}: the request left the audit trail`);
+    assert.equal(hist.label, 'SUPPLIER ACCEPTED'); assert.equal(hist.linked_id, f.transfer.id); assert.equal(hist.active, false);
+  }
+  assert.equal(forSector(game, 'MED').movement.active[0].direction, 'INCOMING');
+  assert.equal(forSector(game, 'POW').movement.active[0].direction, 'OUTGOING');
+
+  // Only Transport finishes it.
+  assert.equal(game.approveTransfer(f.transfer.id, { by: 'MED' }).reason, 'approval_trn_only');
+  assert.equal(game.approveTransfer(f.transfer.id, { by: 'POW' }).reason, 'approval_trn_only');
+  game.confirmChit(f.transfer.id, true, { by: 'TRN' });
+  assert.equal(game.approveTransfer(f.transfer.id, { by: 'TRN' }).ok, true);
+  assert.equal(game.state.sectors.MED.inventory.power, before.med + 1);
+  mv = forSector(game, 'MED').movement;
+  assert.equal(mv.active.length, 0, 'a delivered transfer is not active');
+  assert.equal(mv.history[0].id, f.transfer.id); assert.equal(mv.history[0].label, 'DELIVERED');
+});
+
+test('direction is relative to the table looking: the same four movements from MED and from POW', () => {
+  const game = running();
+  game.setInventory('MED', { med: 5 });
+  const a = game.requestTransfer({ from: 'WTR', to: 'MED', resource: 'water', amount: 1, by: 'MED' }).request;   // MED asks WTR
+  const b = game.requestTransfer({ from: 'MED', to: 'POW', resource: 'med', amount: 1, by: 'POW' }).request;     // POW asks MED
+  const c = game.createTransfer({ from: 'POW', to: 'MED', resource: 'water', amount: 1, by: 'POW' }).transfer;  // POW sends MED
+  const d = game.createTransfer({ from: 'MED', to: 'POW', resource: 'med', amount: 1, by: 'MED' }).transfer;    // MED sends POW
+  const med = Object.fromEntries(forSector(game, 'MED').movement.active.map((x) => [x.id, x]));
+  assert.equal(med[a.id].direction, 'OUTGOING'); assert.equal(med[a.id].label, 'WAITING FOR SUPPLIER');
+  assert.equal(med[b.id].direction, 'INCOMING'); assert.equal(med[b.id].label, 'ACTION REQUIRED'); assert.equal(med[b.id].action_required, true); assert.equal(med[b.id].can_fulfill, true);
+  assert.equal(med[c.id].direction, 'INCOMING'); assert.equal(med[c.id].label, 'WAITING FOR TRN');
+  assert.equal(med[d.id].direction, 'OUTGOING');
+  const pow = Object.fromEntries(forSector(game, 'POW').movement.active.map((x) => [x.id, x]));
+  assert.equal(pow[a.id], undefined, "POW is not party to MED's ask of WTR");
+  assert.equal(pow[b.id].direction, 'OUTGOING'); assert.equal(pow[b.id].label, 'WAITING FOR SUPPLIER'); assert.equal(pow[b.id].action_required, false);
+  assert.equal(pow[c.id].direction, 'OUTGOING'); assert.equal(pow[d.id].direction, 'INCOMING');
+  const wtr = forSector(game, 'WTR').movement.active;
+  assert.equal(wtr.length, 1); assert.equal(wtr[0].direction, 'INCOMING'); assert.equal(wtr[0].action_required, true);
+});
+
+test('ACTIVE is oldest first and only the unresolved; HISTORY is newest first, bounded, and keeps every kind of ending', () => {
+  const game = running();
+  game.setInventory('POW', { power: 30, parts: 30 });
+  const stamp = (rec, iso) => { rec.requested_at = iso; rec.created_at = iso; rec.updated_at = iso; };
+  const r1 = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' }).request; stamp(r1, '2026-09-18T02:00:00.000Z');
+  const t1 = game.createTransfer({ from: 'POW', to: 'MED', resource: 'parts', amount: 1, by: 'POW' }).transfer;  stamp(t1, '2026-09-18T02:00:05.000Z');
+  const r2 = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'parts', amount: 1, by: 'MED' }).request; stamp(r2, '2026-09-18T02:00:09.000Z');
+  let mv = forSector(game, 'MED').movement;
+  assert.deepEqual(mv.active.map((c) => c.id), [r1.id, t1.id, r2.id], 'oldest first');
+  assert.deepEqual(forSector(game, 'MED').movement.active.map((c) => c.id), [r1.id, t1.id, r2.id], 'a reprojection (refresh) keeps it');
+
+  game.declineRequest(r2.id, { by: 'POW' });                           // DECLINED
+  game.confirmChit(t1.id, true, { by: 'TRN' }); game.approveTransfer(t1.id, { by: 'TRN' });   // DELIVERED
+  const f = game.fulfillRequest(r1.id, { by: 'POW' });                 // SUPPLIER ACCEPTED + a new active transfer
+  game.declineTransfer(f.transfer.id, { by: 'TRN' });                  // TRN DECLINED
+  const r3 = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' }).request;
+  game.cancelRequest(r3.id, { by: 'MED' });                             // CANCELLED
+  mv = forSector(game, 'MED').movement;
+  assert.equal(mv.active.length, 0, 'nothing unresolved is left');
+  const labels = Object.fromEntries(mv.history.map((c) => [c.id, c.label]));
+  assert.equal(labels[r2.id], 'DECLINED'); assert.equal(labels[t1.id], 'DELIVERED'); assert.equal(labels[r1.id], 'SUPPLIER ACCEPTED');
+  assert.equal(labels[f.transfer.id], 'TRN DECLINED'); assert.equal(labels[r3.id], 'CANCELLED');
+  const times = mv.history.map((c) => Date.parse(c.updated_at));
+  assert.ok(times.every((t, i) => i === 0 || t <= times[i - 1]), 'newest first');
+  assert.equal(mv.history[0].id, r3.id, 'the last thing that happened is on top');
+
+  // a long history stays bounded, and never crowds ACTIVE
+  for (let i = 0; i < 25; i += 1) {
+    const x = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' }).request;
+    game.declineRequest(x.id, { by: 'POW' });
+  }
+  const live = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' }).request;
+  mv = forSector(game, 'MED').movement;
+  assert.equal(mv.history.length, 20); assert.ok(mv.history_total >= 30);
+  assert.deepEqual(mv.active.map((c) => c.id), [live.id]);
+});
+
+test('a short supplier cannot fulfil: no transfer, no stock touched, the request stays active and says so', () => {
+  const game = running();
+  game.setInventory('WTR', { water: 1 });
+  const r = game.requestTransfer({ from: 'WTR', to: 'AGR', resource: 'water', amount: 2, by: 'AGR' }).request;
+  const card = forSector(game, 'WTR').movement.active.find((c) => c.id === r.id);
+  assert.equal(card.action_required, true); assert.equal(card.can_fulfill, false, 'the card would let a short supplier press FULFILL');
+  const f = game.fulfillRequest(r.id, { by: 'WTR' });
+  assert.equal(f.ok, false); assert.equal(f.reason, 'insufficient_stock_accept');
+  assert.equal(game.state.transfers.length, 0, 'a partial transfer was created');
+  assert.equal(game.state.sectors.WTR.inventory.water, 1); assert.equal(game.state.sectors.AGR.inventory.water, 3);
+  assert.equal(game.findRequest(r.id).status, 'REQUESTED');
+  assert.equal(forSector(game, 'WTR').movement.active[0].id, r.id, 'the request left ACTIVE');
+  assert.equal(forSector(game, 'AGR').movement.active[0].label, 'WAITING FOR SUPPLIER');
+  assert.equal(forSector(game, 'AGR').movement.active[0].can_fulfill, false, 'the requester was told about the supplier stock');
+});
+
+test('worker and resource movements render alike, and a restart keeps statuses, links and order without duplicates', () => {
+  const game = running();
+  const w = game.createTransfer({ from: 'POW', to: 'MED', resource: 'workers', amount: 2, by: 'POW' }).transfer;
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'parts', amount: 1, by: 'MED' }).request;
+  const f = game.fulfillRequest(r.id, { by: 'POW' });
+  let mv = forSector(game, 'MED').movement;
+  const wc = mv.active.find((c) => c.id === w.id);
+  assert.equal(wc.resource, 'workers'); assert.equal(wc.amount, 2); assert.equal(wc.kind, 'transfer'); assert.equal(wc.label, 'WAITING FOR TRN');
+  assert.deepEqual(mv.active.map((c) => c.id), [w.id, f.transfer.id]);
+  const again = newGame({ runId: 'movement-restore' });
+  again.restore(JSON.parse(JSON.stringify(game.serialise())));
+  const back = forSector(again, 'MED').movement;
+  assert.deepEqual(back.active.map((c) => c.id), [w.id, f.transfer.id], 'a restart changed the active cards');
+  assert.equal(new Set(back.active.map((c) => c.id)).size, back.active.length, 'duplicates');
+  assert.ok(!back.active.some((c) => c.id === r.id), 'the fulfilled request came back to ACTIVE');
+  assert.equal(back.history.find((c) => c.id === r.id).linked_id, f.transfer.id);
+  assert.equal(again.findRequest(r.id).status, 'TRANSFER_CREATED');
+  assert.equal(again.stampsUsed(), 0);
+});
+
+test('the panel markup: RESOURCE REQUESTS & TRANSFERS, two forms, ACTIVE with filters, HISTORY folded, no inbox, no old words', () => {
+  const html = SECTOR_INDEX; const js = SECTOR_SCRIPT;
+  assert.ok(/RESOURCE REQUESTS &amp; TRANSFERS/.test(html), 'panel title');
+  assert.ok(!/RESOURCES IN &amp; OUT/.test(html) && !/id="inbox-panel"/.test(html) && !/INBOUND REQUESTS/.test(html), 'the old panel or the inbox is still there');
+  assert.ok(/data-mode="request"/.test(html) && /data-mode="transfer"/.test(html));
+  assert.ok(/Ask another sector for stock\. No resources move until a transfer is created and TRN approves it\./.test(html));
+  assert.ok(/'SEND TO'/.test(js) && /'CREATE TRANSFER'/.test(js) && /Creates a proposed movement\. TRN must approve before stock or workers move\./.test(js), 'the transfer form wording');
+  assert.ok(/'RESOURCE \/ WORKER'/.test(js) && /'QUANTITY'/.test(js));
+  assert.ok(/id="mv-active-count"/.test(html) && /data-filter="ALL"/.test(html) && /data-filter="INCOMING"/.test(html) && /data-filter="OUTGOING"/.test(html));
+  assert.ok(/id="mv-history-count"/.test(html) && /VIEW HISTORY/.test(html) && /id="history" hidden/.test(html), 'history is not folded by default');
+  assert.ok(/let historyOpen = false/.test(js) && /let movementFilter = 'ALL'/.test(js));
+  assert.ok(/NO ACTIVE REQUESTS OR TRANSFERS/.test(js) && /New activity will appear here/.test(js));
+  assert.ok(/class="mv-id"/.test(js) && /class="mv-route"/.test(js) && /class="mv-item"/.test(js) && /class="mv-status"/.test(js), 'a card lacks id, route, item or status');
+  assert.ok(/requested from/.test(js), 'a request card does not say who asked whom');
+  assert.ok(/data-fulfill/.test(js) && /data-decline/.test(js) && /data-withdraw/.test(js));
+  assert.ok(/'WORKER' : 'WORKERS'/.test(js));
+  for (const bad of ['AWAITING TRANSPORT', 'FULFILLED — AWAITING', 'renderInbox', 'function statusLine', 'function paperLine', 'WAITING ${U.mmss', 'q-wait clock']) {
+    assert.ok(!js.includes(bad), `sector.js still carries ${bad}`);
+  }
+  assert.ok(!/Waiting \d|elapsedText\(c\./.test(js.slice(js.indexOf('function movementCard'), js.indexOf('function renderTransfers'))), 'the movement card shows a waiting time');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'sector', 'sector.css'), 'utf8');
+  assert.ok(/\.mv-id \{[^}]*font-size: 9px/.test(css), 'the id is not small');
+  assert.ok(/\.mv-item \{[^}]*font-size: 18px/.test(css), 'the item is not the biggest thing on the card');
+  assert.ok(/\.mv-status\[data-label="DECLINED"\]::before/.test(css) && /\.mv-status\[data-label="DELIVERED"\]::before/.test(css), 'status relies on colour alone');
+  assert.ok(/\.transfers \{[^}]*overflow-y: auto/.test(css), 'the list does not scroll');
+  assert.ok(/focus-visible/.test(css));
+  assert.ok(!/\.inbox-block|\.ib-btns/.test(css), 'inbox styles remain');
+});
+
 // -- council and the Continuity Order ------------------------------------------------
 
 test('CALL COUNCIL reaches every projection with a running 5:00 clock', () => {

@@ -35,9 +35,9 @@
   RES.workers = { key: 'workers', glyph: '👤', name: 'WORKERS' };
 
   const TRANSFER_WORD = {
-    REQUESTED: 'REQUESTED', TRANSFER_CREATED: 'TRANSFER RAISED',
-    DECLINED_BY_SUPPLIER: 'DECLINED', PENDING_TRN_APPROVAL: 'AWAITING TRANSPORT',
-    APPROVED: 'APPROVED', DELIVERED: 'DELIVERED', DECLINED_BY_TRN: 'DECLINED BY TRANSPORT',
+    REQUESTED: 'WAITING FOR SUPPLIER', TRANSFER_CREATED: 'SUPPLIER ACCEPTED',
+    DECLINED_BY_SUPPLIER: 'DECLINED', PENDING_TRN_APPROVAL: 'WAITING FOR TRN',
+    APPROVED: 'APPROVED BY TRN', DELIVERED: 'DELIVERED', DECLINED_BY_TRN: 'TRN DECLINED',
     CANCELLED: 'CANCELLED', EXPIRED: 'EXPIRED',
     WAITING_FOR_MED: 'WAITING FOR MEDICAL', HEALED: 'HEALED', DECLINED_BY_MED: 'DECLINED BY MEDICAL',
   };
@@ -62,11 +62,14 @@
   const localLock = new Map(); // fault code -> performance.now() when a client-side lock ends
   const faultRows = new Map(); // fault code -> list row element
   const cityRows = new Map();  // sector code -> feed row element
-  const transferRows = new Map(); // transfer id -> row element
+  const transferRows = new Map(); // (unused since v12; kept for the healing rows' pattern)
+  let movementFilter = 'ALL';     // ALL | INCOMING | OUTGOING — resets to ALL on reload
+  let historyOpen = false;        // HISTORY is folded by default
+  let movementActing = null;      // card id the last FULFILL / DECLINE / WITHDRAW was sent for
   const queueRows = new Map();    // transfer id -> queue card element
   let queueConfirm = null;        // { id, kind: 'approve' | 'decline' } — the one card asking "are you sure?"
   let queueActing = null;         // transfer id the last APPROVE / DECLINE / CHIT was sent for; its card shows the reply
-  const inboxSeen = new Set();    // inbound request ids we have already rung for
+  const inboxSeen = new Set();    // incoming request ids we have already rung for
   const queueSeen = new Set();    // approval-queue ids (TRN) already rung for
   const healSeen = new Set();     // healing-queue ids (MED) already rung for
   let requestBannerUntil = 0;     // when the arrival banner retires
@@ -190,6 +193,10 @@
     for (const b of $('tf-tabs').querySelectorAll('button')) {
       b.addEventListener('click', () => setFormMode(b.dataset.mode));
     }
+    for (const b of $('mv-filters').querySelectorAll('button')) {
+      b.addEventListener('click', () => { movementFilter = b.dataset.filter; renderTransfers(); });
+    }
+    $('mv-history-toggle').addEventListener('click', () => { historyOpen = !historyOpen; renderTransfers(); });
     $('btn-heal-request').addEventListener('click', requestHealing);
     $('bc-publish').addEventListener('click', publishAnnouncement);
     $('bc-clear').addEventListener('click', clearAnnouncement);
@@ -273,19 +280,22 @@
       : { type: 'transfer_request', from: other, to: SECTOR, resource, amount });
   }
 
-  function updateTransfer(id, status) {
+  function withdrawRequest(id) {
     pendingTransferAction = 'transfer';
-    socket.send({ type: 'transfer_update', id, status });
+    movementActing = id;
+    socket.send({ type: 'request_cancel', id });
   }
 
   /** Supplier consent: raises a transfer. Not approval — that is Transport's. */
   function fulfillRequest(id) {
-    pendingTransferAction = 'inbox';
+    pendingTransferAction = 'transfer';
+    movementActing = id;
     socket.send({ type: 'request_fulfill', id });
   }
 
   function declineRequest(id) {
-    pendingTransferAction = 'inbox';
+    pendingTransferAction = 'transfer';
+    movementActing = id;
     socket.send({ type: 'request_decline', id });
   }
 
@@ -422,7 +432,7 @@
 
   function handleTransferResult(msg) {
     const target = {
-      stamp: 'queue-msg', inbox: 'inbox-msg', heal: 'heal-msg', healing: 'healing-msg',
+      stamp: 'queue-msg', heal: 'heal-msg', healing: 'healing-msg',
       broadcast: 'broadcast-msg', agr: 'agr-msg', output: 'output-msg',
     }[pendingTransferAction] || 'transfer-msg';
     pendingTransferAction = null;
@@ -456,6 +466,28 @@
       const stays = !(msg.ok && (msg.action === 'approve' || msg.action === 'decline'));
       if (stays && el) { flashCard(el, word, msg.ok ? 'ok' : 'bad'); return; }
       transientMsg(target, word, msg.ok ? 'ok' : 'bad', msg.ok ? 4000 : 6000);
+      return;
+    }
+    if (target === 'transfer-msg' && msg.type === 'transfer_result') {
+      // A refusal lands on the card it was about; a success goes on the panel,
+      // because the card it was about is usually gone with the next frame.
+      const card = movementActing && $('transfers').querySelector(`[data-id="${movementActing}"]`);
+      movementActing = null;
+      if (!msg.ok) {
+        const word = `REFUSED — ${transferReason(msg)}`;
+        const el = card && card.querySelector('.mv-msg');
+        if (el) { flashCard(el, word, 'bad'); return; }
+        transientMsg(target, word, 'bad');
+        return;
+      }
+      const t = msg.transfer || msg.request || {};
+      const word = msg.action === 'request' ? `${t.id} SENT — WAITING FOR SUPPLIER`
+        : msg.action === 'create' ? `${t.id} CREATED — WAITING FOR TRN`
+          : msg.action === 'fulfill' ? `REQUEST ACCEPTED — ${(msg.transfer || {}).id || 'TRANSFER'} WAITING FOR TRN`
+            : msg.action === 'decline_request' ? 'REQUEST DECLINED'
+              : msg.action === 'cancel_request' ? 'REQUEST WITHDRAWN'
+                : `${t.id ? `${t.id} ` : ''}${TRANSFER_WORD[t.status] || 'RECORDED'}`;
+      transientMsg(target, word, 'ok', 5000);
       return;
     }
     if (msg.ok) {
@@ -501,7 +533,6 @@
     renderResources();
     renderUpkeep();
     renderOutput();
-    renderInbox();
     renderInjured();
     renderTransfers();
     renderFaultList();
@@ -702,119 +733,93 @@
     for (const b of $('tf-tabs').querySelectorAll('button')) {
       b.classList.toggle('on', b.dataset.mode === formMode);
     }
+    for (const b of $('tf-tabs').querySelectorAll('button')) b.setAttribute('aria-selected', b.dataset.mode === formMode ? 'true' : 'false');
     const offering = formMode === 'transfer';
-    setText($('tf-label'), offering ? 'TRANSFER TO' : 'REQUEST FROM');
-    setText($('tf-submit'), offering ? 'SEND FOR TRN APPROVAL' : 'SEND REQUEST');
+    setText($('tf-label'), offering ? 'SEND TO' : 'REQUEST FROM');
+    setText($('tf-res-label'), offering ? 'RESOURCE / WORKER' : 'RESOURCE');
+    setText($('tf-amt-label'), offering ? 'QUANTITY' : 'QTY');
+    setText($('tf-submit'), offering ? 'CREATE TRANSFER' : 'SEND REQUEST');
     setText($('tf-hint'), offering
-      ? 'Offers our own stock. Nothing moves until Transport approves it.'
-      : 'Asks another sector for stock. Nothing moves until they fulfil it and Transport approves.');
+      ? 'Creates a proposed movement. TRN must approve before stock or workers move. To answer a request, use FULFILL on its card — that links the transfer.'
+      : 'Ask another sector for stock. No resources move until a transfer is created and TRN approves it.');
   }
 
-  /** What this piece of paper is waiting on, in the words the room uses. */
-  function statusLine(t) {
-    switch (t.status) {
-      case 'REQUESTED':            return `REQUESTED — WAITING FOR ${sectorLabel(t.supplier || t.from)}`;
-      case 'TRANSFER_CREATED':     return 'FULFILLED — AWAITING TRANSPORT';
-      case 'DECLINED_BY_SUPPLIER': return `DECLINED BY ${sectorLabel(t.supplier || t.from)}`;
-      case 'PENDING_TRN_APPROVAL': return 'AWAITING TRANSPORT APPROVAL';
-      case 'APPROVED':             return 'APPROVED BY TRANSPORT';
-      case 'DELIVERED':            return 'DELIVERED';
-      case 'DECLINED_BY_TRN':      return 'DECLINED BY TRANSPORT';
-      case 'CANCELLED':            return 'CANCELLED';
-      case 'EXPIRED':              return `EXPIRED AT END OF ${t.round_created || 'THE ROUND'}`;
-      default:                     return TRANSFER_WORD[t.status] || t.status;
+
+  // -- RESOURCE REQUESTS & TRANSFERS: one card per movement ------------------
+
+  /** "⚡ 1 POWER", "👤 2 WORKERS": the icon always with its word. */
+  function movementItem(c) {
+    const r = RES[c.resource] || { glyph: '', name: String(c.resource || '').toUpperCase() };
+    const n = Number(c.amount) || 0;
+    const name = c.resource === 'workers' ? (n === 1 ? 'WORKER' : 'WORKERS') : r.name;
+    return `${r.glyph} ${n} ${name}`;
+  }
+
+  /** A transfer is a route; a request is who asked whom. */
+  function movementRoute(c) {
+    return c.kind === 'request' ? `${c.to} requested from ${c.from}` : `${c.from} → ${c.to}`;
+  }
+
+  function movementCard(c, { history = false } = {}) {
+    const btns = [];
+    if (!history && c.action_required) {
+      btns.push(`<button type="button" class="primary" data-fulfill="${esc(c.id)}"${c.can_fulfill ? '' : ' disabled title="Not enough stock to fulfil"'}>FULFILL</button>`);
+      btns.push(`<button type="button" class="secondary" data-decline="${esc(c.id)}">DECLINE</button>`);
     }
+    if (!history && c.can_withdraw) btns.push(`<button type="button" class="ghost" data-withdraw="${esc(c.id)}">WITHDRAW</button>`);
+    const linked = c.linked_id ? `<div class="mv-link">Linked to ${esc(c.linked_id)}</div>` : '';
+    const short = !history && c.action_required && !c.can_fulfill ? '<div class="mv-short">NOT ENOUGH STOCK TO FULFIL</div>' : '';
+    return `<article class="mv-card mv-${c.kind} dir-${c.direction}${c.action_required && !history ? ' act' : ''}" data-id="${esc(c.id)}" data-status="${esc(c.status)}">
+        <div class="mv-top"><span class="mv-id">${esc(c.id)}</span><span class="mv-dir">${c.direction}${c.kind === 'request' ? ' REQUEST' : ' TRANSFER'}</span></div>
+        <div class="mv-route">${esc(movementRoute(c))}</div>
+        <div class="mv-item">${esc(movementItem(c))}</div>
+        <div class="mv-status" data-label="${esc(c.label)}">${esc(c.label)}</div>
+        ${short}${linked}
+        ${btns.length ? `<div class="mv-btns">${btns.join('')}</div>` : ''}
+        <div class="mv-msg" hidden></div>
+      </article>`;
   }
 
-  function paperLine(t) {
-    const a = t.supplier || t.from;
-    const b = t.requester || t.to;
-    return `${a} → ${b} · ${t.amount} ${resName(t.resource)} · ${statusLine(t)}`;
+  function bindMovement(host) {
+    for (const b of host.querySelectorAll('[data-fulfill]')) b.addEventListener('click', () => fulfillRequest(b.dataset.fulfill));
+    for (const b of host.querySelectorAll('[data-decline]')) b.addEventListener('click', () => declineRequest(b.dataset.decline));
+    for (const b of host.querySelectorAll('[data-withdraw]')) b.addEventListener('click', () => withdrawRequest(b.dataset.withdraw));
   }
 
-  /**
-   * INBOUND REQUESTS — the supplier's decision. Another table has asked us for
-   * stock; only we can answer. FULFIL raises a transfer for Transport to
-   * approve; it is not approval itself.
-   */
-  function renderInbox() {
-    const rules = state.transfer_rules || {};
-    const list = (state.requests || []).filter((r) => r.supplier === SECTOR && r.status === 'REQUESTED');
-    show($('inbox-panel'), list.length > 0);
-    setText($('inbox-count'), String(list.length));
-
-    const host = $('inbox');
-    const html = list.map((t) => {
-      const have = ourStock(t.resource);
-      const short = rules.enforce_supplier_stock !== false && have < t.amount;
-      return `<div class="inbound${short ? ' short' : ''}" data-id="${esc(t.id)}">
-          <div class="ib-title">NEW RESOURCE REQUEST</div>
-          <div class="ib-msg">${esc(sectorLabel(t.requester))} IS REQUESTING <b>${esc(t.amount)} ${esc(resName(t.resource))}</b></div>
-          <div class="ib-stock">CURRENT STOCK: <b>${have} ${esc(resName(t.resource))}</b>${short ? ' — NOT ENOUGH TO FULFIL' : ''}</div>
-          <div class="ib-btns">
-            <button type="button" class="primary" data-fulfill="${esc(t.id)}"${short ? ' disabled' : ''}>FULFIL</button>
-            <button type="button" class="ghost" data-decline="${esc(t.id)}">DECLINE</button>
-          </div>
-        </div>`;
-    }).join('');
-    if (host.dataset.sig !== html) {
-      host.dataset.sig = html;
-      host.innerHTML = html;
-      for (const b of host.querySelectorAll('[data-fulfill]')) b.addEventListener('click', () => fulfillRequest(b.dataset.fulfill));
-      for (const b of host.querySelectorAll('[data-decline]')) b.addEventListener('click', () => declineRequest(b.dataset.decline));
-    }
-
-    const fresh = list.filter((t) => !inboxSeen.has(t.id));
-    for (const t of list) inboxSeen.add(t.id);
-    for (const id of [...inboxSeen]) if (!list.some((t) => t.id === id)) inboxSeen.delete(id);
-    if (fresh.length) {
-      const t = fresh[0];
-      notifyArrival(`NEW RESOURCE REQUEST — ${sectorLabel(t.requester)} REQUESTS ${t.amount} ${resName(t.resource)}`);
-    }
-  }
-
-  /** Our own paperwork: what we asked for, and what is moving in or out. */
+  /** ACTIVE: only what still needs attention, oldest first. HISTORY: folded, newest first. */
   function renderTransfers() {
+    const mv = state.movement || { active: [], history: [], history_total: 0 };
+    const active = mv.active.filter((c) => movementFilter === 'ALL' || c.direction === movementFilter);
+    setText($('mv-active-count'), String(mv.active.length));
+    for (const b of $('mv-filters').querySelectorAll('button')) b.classList.toggle('on', b.dataset.filter === movementFilter);
+
     const host = $('transfers');
-    // Requests waiting on US are the inbox's business, not this ledger's.
-    const requests = (state.requests || []).filter((r) => !(r.supplier === SECTOR && r.status === 'REQUESTED'));
-    const list = [...requests, ...(state.transfers || [])]
-      .sort((a, b) => Date.parse(b.requested_at || 0) - Date.parse(a.requested_at || 0));
-    const seen = new Set();
-    list.forEach((t, i) => {
-      seen.add(t.id);
-      let row = transferRows.get(t.id);
-      if (!row) {
-        row = document.createElement('div');
-        row.className = 'transfer';
-        row.dataset.id = t.id;
-        transferRows.set(t.id, row);
-      }
-      // Rebuild the row's controls only when the status changes.
-      if (row.dataset.status !== t.status) {
-        row.dataset.status = t.status;
-        row.className = `transfer st-${t.status}`;
-        // Withdraw our own ask while it is still unanswered.
-        const mineToWithdraw = t.status === 'REQUESTED' && t.requester === SECTOR;
-        const btns = mineToWithdraw
-          ? [`<button type="button" class="ghost" data-s="CANCELLED">WITHDRAW</button>`] : [];
-        row.innerHTML =
-          `<div class="t-line"><span class="t-id">${esc(t.id)}</span> <span class="t-text">${esc(paperLine(t))}</span></div>` +
-          (btns.length ? `<div class="t-btns">${btns.join('')}</div>` : '');
-        for (const b of row.querySelectorAll('button')) {
-          b.addEventListener('click', () => updateTransfer(t.id, b.dataset.s));
-        }
-      } else {
-        setText(row.querySelector('.t-text'), paperLine(t));
-      }
-      if (host.children[i] !== row) host.insertBefore(row, host.children[i] || null);
-    });
-    for (const [id, row] of transferRows) {
-      if (!seen.has(id)) { row.remove(); transferRows.delete(id); }
+    const html = active.length
+      ? active.map((c) => movementCard(c)).join('')
+      : `<div class="empty"><b>${mv.active.length ? 'NOTHING ' + movementFilter : 'NO ACTIVE REQUESTS OR TRANSFERS'}</b><br>New activity will appear here.</div>`;
+    if (host.dataset.sig !== html) { host.dataset.sig = html; host.innerHTML = html; bindMovement(host); }
+
+    setText($('mv-history-count'), String(mv.history_total));
+    const toggle = $('mv-history-toggle');
+    setText(toggle, historyOpen ? 'HIDE HISTORY' : 'VIEW HISTORY');
+    toggle.setAttribute('aria-expanded', historyOpen ? 'true' : 'false');
+    toggle.disabled = !mv.history_total;
+    const hist = $('history');
+    show(hist, historyOpen && mv.history_total > 0);
+    if (historyOpen) {
+      const hh = mv.history.map((c) => movementCard(c, { history: true })).join('') || '<div class="empty">Nothing yet.</div>';
+      if (hist.dataset.sig !== hh) { hist.dataset.sig = hh; hist.innerHTML = hh; }
     }
-    const empty = $('transfers-empty');
-    show(empty, list.length === 0);
-    if (list.length === 0 && empty.parentNode !== host) host.appendChild(empty);
+
+    // A new ask for OUR stock rings once, as it always did.
+    const asks = mv.active.filter((c) => c.action_required);
+    const fresh = asks.filter((c) => !inboxSeen.has(c.id));
+    for (const c of asks) inboxSeen.add(c.id);
+    for (const id of [...inboxSeen]) if (!asks.some((c) => c.id === id)) inboxSeen.delete(id);
+    if (fresh.length) {
+      const c = fresh[0];
+      notifyArrival(`NEW RESOURCE REQUEST — ${sectorLabel(c.to)} REQUESTS ${c.amount} ${resName(c.resource)}`);
+    }
 
     // The other five sectors, for both forms.
     const sel = $('tf-sector');

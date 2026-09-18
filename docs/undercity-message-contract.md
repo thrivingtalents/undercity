@@ -339,7 +339,21 @@ ALL), and:
   supplier/requester, resource, amount, status, updated_at }`. What is moving
   and between whom, never what anyone holds. Empty when
   `show_completed_transfer_on_wall` is off.
-- **Every sector** — `requests[]` and `transfers[]` it is party to, its own
+- **Every sector** — `requests[]` and `transfers[]` it is party to, and since
+  2026-09-18 `movement { active[], history[], history_total }`: the same
+  paperwork as one card per movement, labelled and sorted for that table.
+  Each card: `{ kind: request|transfer, id, from, to, resource, amount,
+  status, label, direction: INCOMING|OUTGOING, active, action_required,
+  can_fulfill, can_withdraw, linked_id, at, updated_at }`. Labels: request
+  `REQUESTED` → WAITING FOR SUPPLIER (ACTION REQUIRED when this table is the
+  supplier), `TRANSFER_CREATED` → SUPPLIER ACCEPTED (never active — its
+  linked transfer is the card), `DECLINED_BY_SUPPLIER` → DECLINED; transfer
+  `PENDING_TRN_APPROVAL` → WAITING FOR TRN, `DELIVERED` → DELIVERED,
+  `DECLINED_BY_TRN` → TRN DECLINED, `APPROVED` → APPROVED BY TRN;
+  `CANCELLED` / `EXPIRED` as themselves. `active[]` is oldest first;
+  `history[]` newest first, at most 20 (`history_total` counts them all).
+  `can_fulfill` is computed from the table's own stock and nothing else.
+  The engine's status names are unchanged. Its own
   `healing[]`, `unclaimed_injured`, and `transfer_rules { require_supplier_acceptance,
   require_physical_transfer_chit, notify_supplier_with_sound,
   enforce_supplier_stock, approver: "TRN", healer: "MED" }`, so a screen can
