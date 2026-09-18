@@ -22,6 +22,7 @@ test('F-201 accepts BOTH seeded codes — the discrepancy must never be punished
 
 test('F-201 resolution stops decay and applies recovery', () => {
   const game = newGame();
+  game.patchConfig({ fault_rewards_enabled: false });   // the +5 recovery alone, not the reward's health
   game.fireFault('F-201', 'POW');
   game.setIntegrity('POW', 60);
   submit(game);
@@ -184,32 +185,27 @@ test('with deduct_resources_on_resolve off, resolve is a declaration only (contr
     'the server must not touch inventory on resolve when the switch is off');
 });
 
-test('a short team is only refused when resolve_requires_resources is on', () => {
+test('a short tray is refused by default (v17); the shortfall never reaches the console, only the debrief', () => {
   const game = newGame();
   game.fireFault('F-201', 'POW');
   game.setInventory('POW', { power: 0, water: 0, parts: 0, med: 0 });
-  assert.equal(submit(game).accepted, true, 'default: the argument stays in the room');
-
-  const strict = newGame();
-  strict.patchConfig({ resolve_requires_resources: true });
-  strict.fireFault('F-201', 'POW');
-  strict.setInventory('POW', { power: 0, water: 0, parts: 0, med: 0 });
-  const res = submit(strict);
+  const res = submit(game);
   assert.equal(res.reason, 'insufficient_resources');
   assert.equal(res.short, undefined, 'the shortfall is for the binder to reveal, never the console');
-  const lines = strict.log.readAll().trim().split(String.fromCharCode(10)).filter((l) => l.includes('insufficient_resources'));
+  const lines = game.log.readAll().trim().split(String.fromCharCode(10)).filter((l) => l.includes('insufficient_resources'));
   const logged = JSON.parse(lines[lines.length - 1]);
   assert.deepEqual(logged.short, { parts: 2, water: 1 }, 'the debrief still has it');
-  const fault = strict.state.sectors.POW.faults[0];
+  const fault = game.state.sectors.POW.faults[0];
   assert.equal(fault.attempts, 0, 'a resource refusal is not a code guess');
+  assert.equal(fault.resolved, false);
 });
 
-test('a fault can be resolved even with inventory the team does not have', () => {
+test('with resolve_requires_resources off (paper trays), a repair is a declaration again', () => {
   const game = newGame();
+  game.patchConfig({ resolve_requires_resources: false, fault_rewards_enabled: false });
   game.fireFault('F-201', 'POW');
   game.setInventory('POW', { power: 0, water: 0, parts: 0, med: 0 });
-  assert.equal(submit(game).accepted, true,
-    'enforcement would push the argument onto the screen, off the transcript');
+  assert.equal(submit(game).accepted, true, 'the switch is the scenario\'s to throw');
 });
 
 test('every submission is logged, accepted and rejected alike', () => {

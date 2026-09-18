@@ -986,6 +986,12 @@ function handleSector(client, entry, msg) {
       return broadcast(entry);
     }
 
+    /** A choosing reward: the table names its target. Only its own fault, only while the choice is open. */
+    case 'reward_choose': {
+      send(client.ws, { type: 'reward_result', ...game.chooseRewardTarget(mine, msg.fault_id, msg.target || null, { by: mine }) });
+      return broadcast(entry);
+    }
+
     /** ROUND OUTPUT: POW and WTR generate their own stock, once a round. Nobody else has a line. */
     case 'generate_output': {
       send(client.ws, { type: 'output_result', ...game.generateOutput(mine, { by: mine }) });
@@ -1024,7 +1030,10 @@ function handleControl(client, entry, msg) {
     case 'fire_preset':
       reply({ type: 'fire_result', ...game.firePreset(msg.preset_id) });
       return ok();
-    case 'clear_fault':      game.clearFault(msg.sector, msg.fault_code, msg.reason); return ok();
+    case 'clear_fault':      game.clearFault(msg.sector, msg.fault_code, msg.reason, { withReward: !!msg.with_reward }); return ok();
+    case 'reward_choose':
+      reply({ type: 'reward_result', ...game.chooseRewardTarget(String(msg.sector || '').toUpperCase(), msg.fault_id, msg.target || null, { by: 'facilitator' }) });
+      return ok();
     case 'accelerate_fault': game.accelerateFault(msg.sector, msg.fault_code, msg.decay_per_min); return ok();
     case 'pause_fault':      game.pauseFault(msg.sector, msg.fault_code, msg.paused); return ok();
     case 'runbook_mark': {

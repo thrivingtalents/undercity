@@ -164,6 +164,13 @@
 
     <!-- CENTRE: active faults -->
     <section class="col col-centre">
+      <!-- A repair's reward that waits for this table's choice of target. -->
+      <div class="panel block choose-block" id="reward-choose" hidden>
+        <h2 class="ptitle">CHOOSE YOUR REWARD TARGET</h2>
+        <div class="choose-list" id="reward-choose-list"></div>
+        <div class="msg" id="reward-msg" hidden></div>
+      </div>
+
       <div class="panel faults-panel">
         <h2 class="ptitle">ACTIVE FAULTS <span class="count" id="fault-count">0</span></h2>
         <div class="fault-list" id="fault-list"></div>
@@ -185,7 +192,15 @@
         <div class="card-status">
           <span class="chip chip-sev" id="card-sev">▲ INCIDENT</span>
           <span class="chip chip-decay" id="card-decay">DECAY −0 HEALTH / MIN</span>
-          <span class="chip chip-reward" id="card-reward" hidden>REWARD <b id="card-reward-text"></b></span>
+          <span class="chip chip-reward" id="card-reward" hidden>REWARD · <b id="card-reward-text"></b></span>
+        </div>
+        <!-- REPAIR READINESS: whether the tray is ready and crew is on it. Never which materials — that is the binder's. -->
+        <div class="readiness" id="readiness">
+          <span class="rd-title">REPAIR READINESS</span>
+          <span class="rd-item" id="rd-materials" data-ok="">MATERIALS <b id="rd-materials-word">—</b></span>
+          <span class="rd-item" id="rd-workers" data-ok="">WORKERS <b id="rd-workers-word">—</b></span>
+          <span class="rd-hint" id="rd-hint" hidden>CHECK YOUR BINDER FOR REPAIR REQUIREMENTS</span>
+          <span class="rd-training" id="rd-training" hidden></span>
         </div>
         <!-- the one action area -->
         <div class="console" id="console">
@@ -198,7 +213,7 @@
               <span class="label">Workers assigned</span>
               <select id="workers-select"></select>
             </label>
-            <button class="primary" id="submit-btn" type="button">SUBMIT</button>
+            <button class="primary" id="submit-btn" type="button">SUBMIT REPAIR</button>
           </div>
           <div class="console-foot">
             <span class="console-msg" id="console-msg"></span>

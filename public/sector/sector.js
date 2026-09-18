@@ -94,6 +94,7 @@
         el.hidden = false;
       }
       if (msg.type === 'submit_result') handleResult(msg);
+      if (msg.type === 'reward_result') handleRewardResult(msg);
       if (['transfer_result', 'heal_result', 'broadcast_result', 'agr_result', 'output_result'].includes(msg.type)) handleTransferResult(msg);
       if (msg.type === 'sting') U.playSting(msg.sound);
     },
@@ -350,8 +351,9 @@
       consecutive.delete(msg.fault_code);
       localLock.delete(msg.fault_code);
       if (consoleFor === msg.fault_code) $('code-input').value = '';
-      const reward = msg.reward && msg.reward.applied && msg.reward.text ? `  ·  REWARD CLAIMED: ${msg.reward.text}` : '';
-      const text = `${msg.fault_code}  FAULT RESOLVED  +${Number(msg.recovery) || 0} INTEGRITY` + reward;
+      const r = msg.reward || {};
+      const reward = r.applied ? `  ·  REWARD: ${r.result_text || r.text}` : r.pending ? '  ·  REWARD: CHOOSE YOUR TARGET BELOW' : '';
+      const text = `${msg.fault_code}  FAULT RESOLVED  +${Number(msg.recovery) || 0} HEALTH` + reward;
       const banner = $('banner-result');
       banner.textContent = text;
       banner.hidden = false;
@@ -537,6 +539,7 @@
     renderTransfers();
     renderFaultList();
     renderCard();
+    renderRewardChoices();
     renderCity();
     renderNotice();
     renderEffects();
@@ -1160,6 +1163,7 @@
     show($('card-reward'), !!(f.reward && f.reward.text) && !f.resolved);
     if (f.reward && f.reward.text) setText($('card-reward-text'), f.reward.text);
     setText($('card-attempts'), `ATTEMPTS ${Number(f.attempts) || 0}`);
+    renderReadiness(f);
 
     // Console: switch drafts only when the selected fault changes.
     const input = $('code-input');
@@ -1186,8 +1190,79 @@
     updateConsole(f);
   }
 
+  /**
+   * REPAIR READINESS — the tray is ready or it is not; crew is on the card or
+   * not. The exact materials and minimum crew stay in the binder, unless the
+   * scenario is in training mode and the frame carries them.
+   */
+  function renderReadiness(f) {
+    const ready = f.materials_ready !== false;
+    const m = $('rd-materials');
+    m.dataset.ok = ready ? 'yes' : 'no';
+    setText($('rd-materials-word'), ready ? '✓ READY' : '⚠ NOT READY');
+    const assigned = Number($('workers-select').value || 0) > 0;
+    const w = $('rd-workers');
+    w.dataset.ok = assigned ? 'yes' : 'no';
+    setText($('rd-workers-word'), assigned ? '✓ ASSIGNED' : '⚠ NONE ASSIGNED');
+    show($('rd-hint'), !ready);
+    const tr = $('rd-training');
+    if (f.requirements) {
+      const mats = Object.entries(f.requirements.materials || {}).map(([k, v]) => `${v} ${resName(k)}`).join(', ') || 'none';
+      setText(tr, `TRAINING MODE · CREW ${f.requirements.crew} · MATERIALS ${mats}`);
+    }
+    show(tr, !!f.requirements);
+  }
+
+  // -- a choosing reward: the table names its target ----------------------------
+
+  function handleRewardResult(msg) {
+    if (msg.ok) transientMsg('reward-msg', `REWARD APPLIED — ${msg.result_text || msg.text || ''}`, 'ok', 6000);
+    else transientMsg('reward-msg', String(msg.reason || 'REFUSED').toUpperCase().replace(/_/g, ' '), 'bad');
+  }
+
+  function renderRewardChoices() {
+    const list = mine.reward_choices || [];
+    show($('reward-choose'), list.length > 0);
+    if (!list.length) return;
+    const html = list.map((c) => {
+      const r = c.reward || {};
+      const opts = (r.options || []).map((o) => r.choose === 'fault'
+        ? `<button type="button" data-pick-fault="${esc(c.id)}" data-target="${esc(o.id)}">${esc(o.code)} · ${esc(o.sector)}<span class="sub">${esc(o.name)} · −${o.decay_per_min}/min</span></button>`
+        : `<button type="button" data-pick-sector="${esc(c.id)}" data-target="${esc(o.sector)}">${U.SECTOR_GLYPH[o.sector] || ''} ${esc(o.sector)}<span class="sub">${o.integrity}% HEALTH</span></button>`).join('');
+      const multi = r.choose === 'sectors';
+      return `<div class="choose-card" data-id="${esc(c.id)}">
+          <div class="choose-head"><b>${esc(c.code)}</b> ${esc(c.name)} — <span class="choose-reward">${esc(r.text || '')}</span></div>
+          <div class="choose-opts">${opts}</div>
+          ${multi ? `<div class="row"><button type="button" class="primary" data-confirm-sectors="${esc(c.id)}">CONFIRM SELECTION</button><span class="hint">Pick up to two, then confirm.</span></div>` : ''}
+        </div>`;
+    }).join('');
+    const host = $('reward-choose-list');
+    if (host.dataset.sig === html) return;
+    host.dataset.sig = html;
+    host.innerHTML = html;
+    for (const b of host.querySelectorAll('[data-pick-fault]')) b.addEventListener('click', () => socket.send({ type: 'reward_choose', fault_id: b.dataset.pickFault, target: { fault: b.dataset.target } }));
+    for (const b of host.querySelectorAll('[data-pick-sector]')) {
+      const card = b.closest('.choose-card');
+      const multi = !!card.querySelector('[data-confirm-sectors]');
+      b.addEventListener('click', () => {
+        if (!multi) { socket.send({ type: 'reward_choose', fault_id: b.dataset.pickSector, target: { sector: b.dataset.target } }); return; }
+        b.classList.toggle('on');
+        if (card.querySelectorAll('[data-pick-sector].on').length > 2) b.classList.remove('on');
+      });
+    }
+    for (const b of host.querySelectorAll('[data-confirm-sectors]')) {
+      b.addEventListener('click', () => {
+        const card = b.closest('.choose-card');
+        const sectors = [...card.querySelectorAll('[data-pick-sector].on')].map((x) => x.dataset.target);
+        if (!sectors.length) { transientMsg('reward-msg', 'PICK AT LEAST ONE SECTOR', 'bad'); return; }
+        socket.send({ type: 'reward_choose', fault_id: b.dataset.confirmSectors, target: { sectors } });
+      });
+    }
+  }
+
   /** Lockout / verdict text and enabled state. Called per frame and per tick. */
   function updateConsole(f) {
+    if ($('rd-workers').dataset.ok !== (Number($('workers-select').value || 0) > 0 ? 'yes' : 'no')) renderReadiness(f);
     const lock = lockRemaining(f);
     const dark = statusWord(mine) === 'DARK';
     const disabled = lock > 0 || dark || !!state.paused;
@@ -1221,7 +1296,7 @@
           case 'invalid_code':           text = 'RESOLUTION REJECTED'; break;
           case 'insufficient_crew':      text = 'INSUFFICIENT CREW'; break;
           case 'invalid_workers':        text = 'WORKER ASSIGNMENT INVALID'; break;
-          case 'insufficient_resources': text = 'MATERIALS NOT READY'; break;
+          case 'insufficient_resources': text = 'MATERIALS NOT READY — CHECK YOUR BINDER'; break;
           // Driven by an empty valid_codes array, never by the fault code (§3).
           case 'no_procedure':  text = 'NO MATCHING PROCEDURE — VERIFY THIS ALERT'; break;
           case 'sector_dark':   text = 'SECTOR IS DARK'; break;

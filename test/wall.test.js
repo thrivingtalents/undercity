@@ -186,6 +186,7 @@ test("nothing in the world moves COM's board: a stock edit, a transfer, a fault 
   const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 });
   assert.equal(game.approveTransfer(t.id, { by: 'TRN' }).ok, true);
   same('a TRN-approved transfer');
+  game.patchConfig({ fault_reward_overrides: { 'F-002': { archetype: 'LOCAL_RECOVERY_5' } } });   // v17: a reward that pays at once, not one that waits for the table's pick
   resolveFault(game, 'F-002');
   assert.equal(logEvents(game, 'fault_reward_applied').length, 1, 'the reward did not pay');
   same('a fault resolution and its reward');

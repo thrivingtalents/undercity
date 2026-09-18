@@ -1,0 +1,85 @@
+{
+  "_comment": "Fault rewards, v17 (2026-09-18). A fault's crew and materials live in content/faults.json — the binder. This file holds the reward side: which tier each fault draws from, what each archetype does, and the weighted pool per tier. RVU is a balance figure for the debrief and never reaches a player. resource_units is what an archetype adds to the city's stock and is what the scarcity guardrail counts.",
+  "resource_return_ratio": 0.35,
+  "resource_return_bootstrap": 1,
+  "draw_cap": 0.45,
+  "tiers": {
+    "F-001": 1, "F-101": 2, "F-102": 1, "F-201": 3, "F-202": 3, "F-301": 4, "F-401": 4,
+    "F-002": 1, "F-103": 1, "F-104": 2, "F-203": 3, "F-204": 3, "F-302": 4, "F-403": 3,
+    "F-003": 1, "F-105": 2, "F-205": 3, "F-206": 3, "F-303": 4, "F-402": 4,
+    "F-004": 1, "F-106": 1, "F-207": 4, "F-208": 3, "F-304": 4, "F-404": 3,
+    "F-005": 1, "F-107": 1, "F-209": 3, "F-210": 2, "F-305": 3,
+    "F-006": 1, "F-108": 1, "F-211": 3, "F-212": 2, "F-306": 4
+  },
+  "archetypes": {
+    "LOCAL_RECOVERY_5":        { "label": "LOCAL RECOVERY",        "preview": "+5 HEALTH",                                        "owner": 5,  "rvu": 1, "resource_units": 0 },
+    "LOCAL_RECOVERY_10":       { "label": "LOCAL RECOVERY",        "preview": "+10 HEALTH",                                       "owner": 10, "rvu": 2, "resource_units": 0 },
+    "LOCAL_RECOVERY_15":       { "label": "LOCAL RECOVERY",        "preview": "+15 HEALTH",                                       "owner": 15, "rvu": 3, "resource_units": 0 },
+    "LOCAL_RECOVERY_20":       { "label": "LOCAL RECOVERY",        "preview": "+20 HEALTH",                                       "owner": 20, "rvu": 4, "resource_units": 0 },
+    "MUTUAL_AID_5":            { "label": "MUTUAL AID",            "preview": "CHOOSE ANOTHER SECTOR: +5 HEALTH",                 "other": 5,  "choose": "sector",  "rvu": 1, "resource_units": 0 },
+    "SHARED_RECOVERY_5_5":     { "label": "SHARED RECOVERY",       "preview": "+5 HEALTH · CHOOSE ANOTHER SECTOR: +5 HEALTH",     "owner": 5,  "other": 5,  "choose": "sector", "rvu": 2, "resource_units": 0 },
+    "MUTUAL_RECOVERY_10_5":    { "label": "MUTUAL RECOVERY",       "preview": "+10 HEALTH · CHOOSE ANOTHER SECTOR: +5 HEALTH",    "owner": 10, "other": 5,  "choose": "sector", "rvu": 3, "resource_units": 0 },
+    "ALLIANCE_RECOVERY_10_10": { "label": "ALLIANCE RECOVERY",     "preview": "+10 HEALTH · CHOOSE ANOTHER SECTOR: +10 HEALTH",   "owner": 10, "other": 10, "choose": "sector", "rvu": 4, "resource_units": 0 },
+    "LOWEST_HEALTH_5":         { "label": "LOWEST-HEALTH RELIEF",  "preview": "LOWEST-HEALTH SECTOR: +5 HEALTH",                  "lowest": 5,  "rvu": 1, "resource_units": 0 },
+    "LOWEST_HEALTH_10":        { "label": "LOWEST-HEALTH RELIEF",  "preview": "LOWEST-HEALTH SECTOR: +10 HEALTH",                 "lowest": 10, "rvu": 2, "resource_units": 0 },
+    "CITY_RELIEF_3X5":         { "label": "CITY RELIEF",           "preview": "3 LOWEST-HEALTH SECTORS: +5 HEALTH EACH",          "lowest_n": 3, "each": 5, "rvu": 3, "resource_units": 0 },
+    "CITY_RECOVERY_2X10":      { "label": "CITY RECOVERY",         "preview": "CHOOSE UP TO 2 OTHER SECTORS: +10 HEALTH EACH",    "others": 2, "each": 10, "choose": "sectors", "rvu": 4, "resource_units": 0 },
+    "TRN_REINFORCEMENT":       { "label": "TRN REINFORCEMENT",     "preview": "+1 APPROVAL THIS ROUND",                           "capacity": "trn_capacity", "rvu": 2, "resource_units": 0 },
+    "TRN_REINFORCEMENT_PLUS":  { "label": "TRN REINFORCEMENT",     "preview": "+1 APPROVAL THIS ROUND · +{bonus} HEALTH",         "capacity": "trn_capacity", "owner_from_pool": true, "rvu": 2, "resource_units": 0 },
+    "MED_REINFORCEMENT":       { "label": "MED REINFORCEMENT",     "preview": "+1 HEAL THIS ROUND",                               "capacity": "med_capacity", "rvu": 2, "resource_units": 0 },
+    "MED_REINFORCEMENT_PLUS":  { "label": "MED REINFORCEMENT",     "preview": "+1 HEAL THIS ROUND · +{bonus} HEALTH",             "capacity": "med_capacity", "owner_from_pool": true, "rvu": 2, "resource_units": 0 },
+    "TEMPORARY_CREW_1":        { "label": "TEMPORARY CREW",        "preview": "CHOOSE A SECTOR: +1 WORKER UNTIL ROUND END",       "crew": 1, "choose": "sector", "self_ok": true, "rvu": 2, "resource_units": 0 },
+    "TEMPORARY_CREW_2_SECTORS": { "label": "TEMPORARY CREW",       "preview": "CHOOSE UP TO 2 SECTORS: +1 WORKER EACH UNTIL ROUND END", "crew": 1, "others": 2, "choose": "sectors", "self_ok": true, "rvu": 4, "resource_units": 0 },
+    "FAULT_STABILISATION":     { "label": "FAULT STABILISATION",   "preview": "CHOOSE ANOTHER FAULT: HALVE ITS DECAY UNTIL ROUND END", "stabilise": 0.5, "choose": "fault", "rvu": 2, "resource_units": 0 },
+    "EMERGENCY_STABILISATION": { "label": "EMERGENCY STABILISATION", "preview": "CHOOSE ANOTHER FAULT: PAUSE ITS DECAY UNTIL ROUND END", "stabilise": 0, "choose": "fault", "rvu": 3, "resource_units": 0 },
+    "SUPPLY_FIND_1":           { "label": "SUPPLY FIND",           "preview": "+1 SCARCE RESOURCE",                               "supply": 1, "rvu": 1, "resource_units": 1 },
+    "SUPPLY_CACHE_1_PLUS_HEALTH": { "label": "SUPPLY CACHE",       "preview": "+1 SCARCE RESOURCE · +5 HEALTH",                   "supply": 1, "owner": 5, "rvu": 2, "resource_units": 1 },
+    "SUPPLY_CACHE_2_PLUS_HEALTH": { "label": "SUPPLY CACHE",       "preview": "+2 SCARCE RESOURCES · +5 HEALTH",                  "supply": 2, "owner": 5, "rvu": 3, "resource_units": 2 },
+    "MAJOR_SUPPLY_CACHE_3_PLUS_HEALTH": { "label": "MAJOR SUPPLY CACHE", "preview": "+3 SCARCE RESOURCES · +5 HEALTH",           "supply": 3, "owner": 5, "rvu": 4, "resource_units": 3 },
+    "SALVAGE_1":               { "label": "SALVAGE",               "preview": "1 REPAIR MATERIAL REFUNDED",                       "salvage": 1, "rvu": 1, "resource_units": 1 },
+    "SALVAGE_1_PLUS_HEALTH_5": { "label": "SALVAGE",               "preview": "1 REPAIR MATERIAL REFUNDED · +5 HEALTH",           "salvage": 1, "owner": 5,  "rvu": 2, "resource_units": 1 },
+    "SALVAGE_1_PLUS_HEALTH_10": { "label": "SALVAGE",              "preview": "1 REPAIR MATERIAL REFUNDED · +10 HEALTH",          "salvage": 1, "owner": 10, "rvu": 3, "resource_units": 1 },
+    "SALVAGE_UP_TO_2_PLUS_HEALTH_10": { "label": "SALVAGE",        "preview": "UP TO 2 REPAIR MATERIALS REFUNDED · +10 HEALTH",   "salvage": 2, "owner": 10, "rvu": 4, "resource_units": 2 }
+  },
+  "pools": {
+    "1": [
+      { "reward": "LOCAL_RECOVERY_5", "weight": 35 },
+      { "reward": "MUTUAL_AID_5", "weight": 20 },
+      { "reward": "LOWEST_HEALTH_5", "weight": 10 },
+      { "reward": "SUPPLY_FIND_1", "weight": 20 },
+      { "reward": "SALVAGE_1", "weight": 15 }
+    ],
+    "2": [
+      { "reward": "LOCAL_RECOVERY_10", "weight": 20 },
+      { "reward": "SHARED_RECOVERY_5_5", "weight": 15 },
+      { "reward": "LOWEST_HEALTH_10", "weight": 10 },
+      { "reward": "TRN_REINFORCEMENT", "weight": 10 },
+      { "reward": "MED_REINFORCEMENT", "weight": 10 },
+      { "reward": "TEMPORARY_CREW_1", "weight": 10 },
+      { "reward": "SUPPLY_CACHE_1_PLUS_HEALTH", "weight": 15 },
+      { "reward": "SALVAGE_1_PLUS_HEALTH_5", "weight": 10 }
+    ],
+    "3": [
+      { "reward": "LOCAL_RECOVERY_15", "weight": 15 },
+      { "reward": "MUTUAL_RECOVERY_10_5", "weight": 15 },
+      { "reward": "CITY_RELIEF_3X5", "weight": 15 },
+      { "reward": "TRN_REINFORCEMENT_PLUS", "weight": 10, "owner_health_bonus": 5 },
+      { "reward": "MED_REINFORCEMENT_PLUS", "weight": 10, "owner_health_bonus": 5 },
+      { "reward": "TEMPORARY_CREW_1", "weight": 10 },
+      { "reward": "FAULT_STABILISATION", "weight": 10 },
+      { "reward": "SUPPLY_CACHE_2_PLUS_HEALTH", "weight": 10 },
+      { "reward": "SALVAGE_1_PLUS_HEALTH_10", "weight": 5 }
+    ],
+    "4": [
+      { "reward": "LOCAL_RECOVERY_20", "weight": 10 },
+      { "reward": "ALLIANCE_RECOVERY_10_10", "weight": 15 },
+      { "reward": "CITY_RECOVERY_2X10", "weight": 15 },
+      { "reward": "TRN_REINFORCEMENT_PLUS", "weight": 10, "owner_health_bonus": 10 },
+      { "reward": "MED_REINFORCEMENT_PLUS", "weight": 10, "owner_health_bonus": 10 },
+      { "reward": "TEMPORARY_CREW_2_SECTORS", "weight": 10 },
+      { "reward": "EMERGENCY_STABILISATION", "weight": 10 },
+      { "reward": "MAJOR_SUPPLY_CACHE_3_PLUS_HEALTH", "weight": 10 },
+      { "reward": "SALVAGE_UP_TO_2_PLUS_HEALTH_10", "weight": 10 }
+    ]
+  }
+}

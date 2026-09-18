@@ -612,3 +612,63 @@ admin-scoped ticker line (`kind: "override"`) on the facilitator's feed
 — never on a table or the wall. The debrief counts overrides per round and
 lists them on its timeline. Routine scenario events (a fault, an injury, a
 brownout, an announcement) are not overrides and stay as they were.
+
+### 8.9 Binder materials and smart-random rewards (v17, 2026-09-18)
+
+A repair is crew + materials + the code, committed at once. `submit_code`
+now runs: fault active → sector not DARK → console not locked → crew valid
+and at least the binder's minimum → every binder material in the sector's
+REAL tray → the code → one commit that re-checks crew and tray, deducts
+every material together, marks the fault resolved exactly once, then pays
+the reward. Refusals consume nothing: `invalid_workers`,
+`insufficient_crew`, `insufficient_resources` (no numbers to the table —
+the binder has them; the log gets `short` and `required`), `invalid_code`
+(the only one that counts as an attempt and towards the 20 s lock),
+`no_procedure` (a ghost), `unknown_fault` (also a second submit racing a
+commit). The switches: `resolve_requires_resources` (now on in every
+built-in scenario) checks the tray; `deduct_resources_on_resolve` takes it;
+with `auto_economy` off the trays are paper and both are moot.
+
+Own faults add `materials_ready` (a boolean from the real tray — never the
+recipe) and, only when `training_mode` is on, `requirements { crew,
+materials }`. The sector frame adds `reward_choices[]` for a repair whose
+reward waits for the table's pick.
+
+Rewards: `lib/reward-pools.json` gives every fault a tier (1–4) and every
+tier a weighted pool of archetypes; `lib/rewards.js` deals ONE reward per
+fault instance when it fires (seed `run_id|instance|tier`), filtered by the
+session's `active_sectors` (a scenario list; null = all six), by what the
+city can use (someone else alive for mutual rewards, Transport or Medical
+active for their bonuses, another fault for stabilisation) and by the
+scarcity guardrail: stock created by rewards ≤ max(1, floor(0.35 × material
+units consumed by repairs)). Over budget, a stock reward falls back to a
+non-stock one from the tier (`fault_reward_budget_fallback`); a ghost
+(F-210) never rolls stock or salvage. Health is points, capped at 100,
+never reviving DARK. `TRN_REINFORCEMENT` / `MED_REINFORCEMENT` add a
+round-scoped `trn_capacity` / `med_capacity` effect; temporary crew a
+round-scoped `extra_workers`; stabilisation a round-scoped
+`fault_stabilised { target: instance, multiplier 0.5 | 0 }` that the tick
+applies to that fault's decay. Supply caches draw from the real stock of
+live active sectors (lower average → likelier, no type above 45%, distinct
+types in a multi-unit cache). The claim key is
+`faultReward:{run_id}:{instance}`; the instance's `reward` carries
+`archetype, tier, label, preview, choose, seed, pending?, result?`.
+
+```json
+{ "type": "reward_choose", "fault_id": "F-0007", "target": { "sector": "MED" } }         // a sector, from the options
+{ "type": "reward_choose", "fault_id": "F-0007", "target": { "sectors": ["MED", "AGR"] } } // up to two
+{ "type": "reward_choose", "fault_id": "F-0007", "target": { "fault": "F-0004" } }        // another fault instance
+```
+
+Reply `reward_result { ok, result_text, … }` or `reward_target_required` /
+`reward_invalid_target` / `no_choice_pending`. A choice not made by the
+round change is settled to the lowest-health sector or fastest-decaying
+fault (`fault_reward_default_target`). The facilitator's `clear_fault` pays
+nothing unless `with_reward: true`, which is logged as an override. Log
+events: `repair_completed` (instance, fault, sector, round, crew_assigned,
+materials_consumed, material_units, reward_archetype, reward_result,
+reward_targets, resource_reward_units_generated) and `fault_reward_applied`
+(archetype, tier, rvu, resources_added, health per sector, effects,
+targets, resource_units_generated, budget). The control frame adds
+`reward_budget { consumed, generated, max, remaining }` and
+`active_sectors`.

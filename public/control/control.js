@@ -394,6 +394,7 @@
     const reason = $('modal-reason').value.trim();
     if (reason.length < 3) { $('modal-reason').focus(); toast('A short reason is required'); return; }
     const msg = { type: 'admin_override', action: pendingOverride.action, payload: pendingOverride.payload, reason };
+    if (pendingOverride.action === 'clear_fault' && $('ovr-pay')) msg.payload = { ...msg.payload, with_reward: $('ovr-pay').checked };
     if (pendingOverride.action === 'reset_run') {
       const typed = ($('rs-typed') ? $('rs-typed').value : '').trim().toUpperCase();
       if (typed !== 'RESET') { toast('Type RESET to confirm'); $('rs-typed').focus(); return; }
@@ -671,7 +672,7 @@
     if (out) out.addEventListener('click', () => askOverride({ title: 'GENERATE OUTPUT FOR TABLE', target, diff: [['ROUND OUTPUT', 'NOT GENERATED', `+${esc(invLine(s.round_output.amount))}`]], action: 'generate_output', payload: { sector: code } }));
     on('[data-ovr-clear]', (b) => {
       const f = live.find((x) => x.code === b.dataset.ovrClear);
-      askOverride({ title: 'FORCE RESOLVE FAULT', target: `${f.code} · ${f.name} @ ${code}`, diff: [['FAULT', 'ACTIVE', 'CLEARED']], extra: '<div class="hint">Clears the fault without the code. Pays its reward only if the scenario allows a facilitator clear to pay.</div>', action: 'clear_fault', payload: { sector: code, fault_code: f.code, reason: 'facilitator cleared' } });
+      askOverride({ title: 'FORCE RESOLVE FAULT', target: `${f.code} · ${f.name} @ ${code}`, diff: [['FAULT', 'ACTIVE', 'CLEARED'], ['MATERIALS', 'in the tray', 'not consumed'], ['REWARD', f.reward ? f.reward.text : '—', 'NONE unless ticked']], extra: '<label class="modal-field"><input type="checkbox" id="ovr-pay"> ALSO PAY THE FAULT\'S REWARD (logged as an override)</label>', action: 'clear_fault', payload: { sector: code, fault_code: f.code, reason: 'facilitator cleared' } });
     });
     on('[data-ovr-fast]', (b) => {
       const f = live.find((x) => x.code === b.dataset.ovrFast);
@@ -714,6 +715,8 @@
     for (const s of Object.values(state.sectors)) for (const f of s.faults) if (!f.resolved) live.push({ ...f, sector: s.code });
     $('fv-active-n').textContent = String(live.length);
     $('fv-sched-n').textContent = String((state.scheduled || []).length);
+    const rb = state.reward_budget || {};
+    $('fault-budget').textContent = `MATERIALS CONSUMED BY REPAIRS ${rb.consumed ?? 0} · REWARD RESOURCES GENERATED ${rb.generated ?? 0} / ${rb.max ?? 1} ALLOWED · ACTIVE SECTORS ${(state.active_sectors || []).join(' ')}`;
     const html = live.length ? `<div class="fa-head"><span></span><span>SECTOR</span><span>FAULT</span><span>DECAY</span><span>STATUS</span><span>REWARD</span><span><button class="ghost tiny" id="fa-debug">${faultDebug ? 'HIDE DEBUG DETAILS' : 'VIEW DEBUG DETAILS'}</button></span></div>`
       + live.map((f) => `<div class="fa-row${f.locked_until_s > 0 ? ' locked' : ''}" data-id="${esc(f.id)}">
           <span class="hint">${esc(f.id)}</span><span><b>${esc(f.sector)}</b></span><span><b>${esc(f.code)}</b> ${esc(f.name)}</span>

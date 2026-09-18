@@ -209,7 +209,9 @@ test('the sector is told what is wrong and what it pays — never crew, material
   assert.equal(f.flavour, 'Turbine coolant pressure collapsing.', 'the dependency half leaked');
   assert.ok(!/WTR|reservoir rating|Appendix|binder|procedure/i.test(f.flavour));
   assert.equal(typeof f.decay_per_min, 'number');
-  assert.equal(f.reward.text, '+2 WATER');
+  const dealt = game.state.sectors.POW.faults[0].reward;
+  assert.ok(f.reward.text.startsWith(`${dealt.label} · `), 'the preview is the reward this instance was dealt');
+  assert.ok(!/PARTS REQUIRED|CREW|MATERIAL/i.test(f.reward.text));
   assert.equal(typeof f.attempts, 'number');
   // the facilitator still sees the whole line
   const c = forControl(game).sectors.POW.faults[0];
@@ -249,17 +251,17 @@ test('refusals name the problem and never the answer', () => {
 
 test('the reward is unchanged by the removal: previewed before, paid once after', () => {
   const game = running();
-  game.fireFault('F-302', 'WTR');
-  assert.equal(forSector(game, 'WTR').sectors.WTR.faults[0].reward.text, '+2 POWER · +5 SECTOR HEALTH');
-  const power = game.state.sectors.WTR.inventory.power;
+  game.fireFault('F-002', 'WTR');
+  const inst = game.state.sectors.WTR.faults[0];
+  const view = forSector(game, 'WTR').sectors.WTR.faults[0].reward;
+  assert.ok(view && view.text.startsWith(inst.reward.label), 'no preview before completion');
+  const def = loadContent().faults.faults.find((f) => f.code === 'F-002');
   game.setIntegrity('WTR', 60);
-  const def = loadContent().faults.faults.find((x) => x.code === 'F-302');
-  const res = submitCode(game, { sector: 'WTR', fault_code: 'F-302', code: def.valid_codes[0], workers_assigned: def.crew_required });
+  game.setInventory('WTR', { parts: 1 });
+  const res = submitCode(game, { sector: 'WTR', fault_code: 'F-002', code: def.valid_codes[0], workers_assigned: def.crew_required });
   assert.equal(res.accepted, true);
-  assert.equal(res.reward.applied, true);
-  assert.equal(game.state.sectors.WTR.inventory.power, power - ((def.resources_required || {}).power || 0) + 2);
-  assert.equal(game.state.sectors.WTR.integrity, 60 + game.cfg.resolve_recovery + 5);
-  assert.equal(logEvents(game, 'fault_reward_applied').length, 1);
+  assert.ok(res.reward.applied || res.reward.pending, 'the reward was neither paid nor offered');
+  assert.equal(logEvents(game, 'fault_reward_applied').length + logEvents(game, 'fault_reward_pending').length, 1);
 });
 
 test('the wall and the facilitator get no deadline either; the wall ranks faults by severity then age', () => {
@@ -1502,283 +1504,6 @@ test('the debrief keeps COM edits, announcements, AGR offers, activations, refus
   assert.ok(d.agr.list.some((x) => x.kind === 'activated' && x.before && x.after));
 });
 
-// -- fault rewards -----------------------------------------------------------------------
-//
-// Every fault pays once, to its owner, only when the authoritative path
-// finishes it. The table is data; these tests hold it to the spec's budget.
-
-const REWARD_TABLE = require('../lib/fault-rewards.json');
-const REWARD_IDS = ['F-001', 'F-002', 'F-003', 'F-004', 'F-005', 'F-006',
-  'F-101', 'F-102', 'F-103', 'F-104', 'F-105', 'F-106', 'F-107', 'F-108',
-  'F-201', 'F-202', 'F-203', 'F-204', 'F-205', 'F-206', 'F-207', 'F-208', 'F-209', 'F-210', 'F-211', 'F-212',
-  'F-301', 'F-302', 'F-303', 'F-304', 'F-305', 'F-306',
-  'F-401', 'F-402', 'F-403', 'F-404'];
-
-/** Fire a fault and resolve it with its own first valid code and crew. */
-function resolveFault(game, code) {
-  const def = loadContent().faults.faults.find((f) => f.code === code);
-  const fired = game.fireFault(code, def.sector);
-  assert.equal(fired.ok, true, `${code} did not fire: ${fired.reason}`);
-  const res = submitCode(game, { sector: def.sector, fault_code: code, code: def.valid_codes[0], workers_assigned: def.crew_required });
-  assert.equal(res.accepted, true, `${code} was not accepted: ${res.reason}`);
-  return res;
-}
-const inventoriesOf = (game) => JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(game.state.sectors).map(([c, s]) => [c, s.inventory]))));
-
-test('all 36 faults have exactly one reward, and no fault appears twice', () => {
-  const ids = Object.keys(REWARD_TABLE.rewards);
-  assert.equal(ids.length, 36);
-  assert.deepEqual([...ids].sort(), [...REWARD_IDS].sort());
-  assert.equal(new Set(ids).size, 36, 'a fault id appears twice');
-  const content = loadContent().faults.faults.map((f) => f.code).sort();
-  assert.deepEqual(content, [...REWARD_IDS].sort(), 'the table and the content disagree on which faults exist');
-  const game = running();
-  for (const id of REWARD_IDS) {
-    const r = game.faultReward(id);
-    assert.ok(r, `${id} has no reward`);
-    assert.ok(r.rvu > 0, `${id} has no value`);
-    assert.ok(r.health >= 0 && Object.values(r.resources).every((v) => v > 0), `${id} has a negative reward`);
-    assert.equal(r.rvu, Object.values(r.resources).reduce((a, b) => a + b, 0) + r.health / 5, `${id}: units do not match its effects`);
-  }
-});
-
-test('phase counts are 6/8/12/6/4 and phase reward totals are 12/8/18/18/12', () => {
-  const content = loadContent().faults.faults;
-  const counts = {}; const totals = {};
-  for (const [id, r] of Object.entries(REWARD_TABLE.rewards)) {
-    const def = content.find((f) => f.code === id);
-    assert.equal(REWARD_TABLE.phase_of_round[def.round], r.phase, `${id}: phase ${r.phase} does not match round ${def.round}`);
-    assert.equal(def.sector, r.owner, `${id}: owner ${r.owner} does not match the content's ${def.sector}`);
-    counts[r.phase] = (counts[r.phase] || 0) + 1;
-    totals[r.phase] = (totals[r.phase] || 0) + r.rvu;
-  }
-  assert.deepEqual(counts, { ORIENTATION: 6, SHIFT_1: 8, SHIFT_2: 12, SHIFT_3: 6, AFTERSHOCK: 4 });
-  assert.deepEqual(totals, { ORIENTATION: 12, SHIFT_1: 8, SHIFT_2: 18, SHIFT_3: 18, AFTERSHOCK: 12 });
-  assert.deepEqual(REWARD_TABLE.phase_budgets, totals);
-});
-
-test('F-002 pays WTR exactly +2 power, once', () => {
-  const game = running();
-  const before = game.state.sectors.WTR.inventory.power;
-  const res = resolveFault(game, 'F-002');
-  assert.equal(res.reward.applied, true);
-  assert.deepEqual(res.reward.resources, { power: 2 });
-  assert.equal(res.reward.health, 0);
-  assert.equal(res.reward.text, '+2 POWER');
-  // the procedure cost one part; the reward added two power
-  assert.equal(game.state.sectors.WTR.inventory.power, before + 2);
-  assert.equal(game.state.rewards_claimed['F-002'].key, `faultReward:${game.state.run_id}:F-002`);
-  assert.equal(logEvents(game, 'fault_reward_applied').length, 1);
-});
-
-test('opening, crew, a wrong code and a failed attempt pay nothing', () => {
-  const game = running();
-  const before = inventoriesOf(game);
-  game.fireFault('F-002', 'WTR');
-  game.openFault('WTR', 'F-002');
-  const wrong = submitCode(game, { sector: 'WTR', fault_code: 'F-002', code: 'P-01-000', workers_assigned: 1 });
-  assert.equal(wrong.accepted, false);
-  assert.equal(wrong.reward, undefined);
-  const noCrew = submitCode(game, { sector: 'WTR', fault_code: 'F-002', code: 'P-01-617', workers_assigned: 0 });
-  assert.equal(noCrew.accepted, false);
-  assert.deepEqual(inventoriesOf(game), before, 'something moved before an accepted code');
-  assert.equal(Object.keys(game.state.rewards_claimed).length, 0);
-  assert.equal(logEvents(game, 'fault_reward_applied').length, 0);
-  // the second, correct attempt pays — once
-  const ok = submitCode(game, { sector: 'WTR', fault_code: 'F-002', code: 'P-01-617', workers_assigned: 1 });
-  assert.equal(ok.accepted, true);
-  assert.equal(ok.reward.applied, true);
-});
-
-test('a fault fired again later cannot pay a second time; the duplicate is logged', () => {
-  const game = running();
-  resolveFault(game, 'F-002');
-  const after = game.state.sectors.WTR.inventory.power;
-  const again = resolveFault(game, 'F-002');          // the facilitator re-fired it
-  assert.equal(again.accepted, true, 'resolving it again is still allowed');
-  assert.equal(again.reward.applied, false);
-  assert.equal(again.reward.reason, 'duplicate');
-  assert.equal(game.state.sectors.WTR.inventory.power, after, 'paid twice');
-  assert.equal(logEvents(game, 'fault_reward_applied').length, 1);
-  assert.equal(logEvents(game, 'fault_reward_duplicate_blocked').length, 1);
-  // the claim survives a snapshot, so a restart cannot pay it either
-  const back = newGame();
-  back.restore(JSON.parse(JSON.stringify(game.serialise())));
-  assert.ok(back.state.rewards_claimed['F-002']);
-  assert.equal(back.applyFaultReward('WTR', { code: 'F-002' }).reason, 'duplicate');
-});
-
-test('WTR resolving F-203 gets +2 power and no other sector changes', () => {
-  const game = running();
-  const before = inventoriesOf(game);
-  const def = loadContent().faults.faults.find((f) => f.code === 'F-203');
-  resolveFault(game, 'F-203');
-  const after = inventoriesOf(game);
-  for (const code of Object.keys(before)) {
-    if (code === 'WTR') continue;
-    assert.deepEqual(after[code], before[code], `${code} changed`);
-  }
-  // WTR: the procedure's cost left, the reward arrived
-  const expected = { ...before.WTR };
-  for (const [k, v] of Object.entries(def.resources_required || {})) expected[k] = Math.max(0, expected[k] - v);
-  expected.power += 2;
-  assert.deepEqual(after.WTR, expected);
-});
-
-test('rewarded resources still need Transport to leave the sector', () => {
-  const game = running();
-  resolveFault(game, 'F-002');
-  const t = game.createTransfer({ from: 'WTR', to: 'POW', resource: 'power', amount: 2, by: 'WTR' });
-  assert.equal(t.transfer.status, 'PENDING_TRN_APPROVAL');
-  assert.equal(game.approveTransfer(t.transfer.id, { by: 'WTR' }).reason, 'approval_trn_only');
-  const powBefore = game.state.sectors.POW.inventory.power;
-  game.confirmChit(t.transfer.id, true, { by: 'TRN' });
-  assert.equal(game.approveTransfer(t.transfer.id, { by: 'TRN' }).ok, true);
-  assert.equal(game.state.sectors.POW.inventory.power, powBefore + 2);
-});
-
-test('F-202 caps POW health at 100 and discards the overflow', () => {
-  const game = running();
-  game.setIntegrity('POW', 92);
-  const res = resolveFault(game, 'F-202');
-  assert.equal(game.state.sectors.POW.integrity, 100, 'went past 100');
-  assert.equal(res.reward.health_after, 100);
-  // the reward itself paid only what fitted after the base recovery
-  assert.ok(res.reward.health <= 5 && res.reward.health >= 0);
-  const log = logEvents(game, 'fault_reward_applied')[0];
-  assert.equal(log.health_requested, 5);
-  assert.equal(log.health_after, 100);
-});
-
-test('a health reward never revives a sector at 0 / DARK', () => {
-  const game = running();
-  game.setIntegrity('AGR', 0);
-  assert.equal(game.state.sectors.AGR.status, 'DARK');
-  // F-210 is AGR's ghost fault: its completion is the facilitator's clear, which pays
-  game.fireFault('F-210', 'AGR');
-  assert.equal(game.clearFault('AGR', 'F-210', 'COM confirmed the ghost'), true);
-  const log = logEvents(game, 'fault_reward_applied').find((e) => e.fault === 'F-210');
-  assert.ok(log, 'the ghost clear did not pay');
-  assert.equal(log.via, 'false_alarm_clear');
-  assert.equal(log.health_after, 0, 'the reward revived a dark sector');
-  assert.equal(game.state.sectors.AGR.integrity, 0);
-  assert.equal(game.state.sectors.AGR.status, 'DARK');
-  // …and at the reducer, for any fault with a health reward
-  game.setIntegrity('POW', 0);
-  const r = game.applyFaultReward('POW', { code: 'F-202', id: 'x' }, { via: 'resolve', by: 'POW' });
-  assert.equal(r.applied, true);
-  assert.equal(r.health, 0);
-  assert.equal(game.state.sectors.POW.integrity, 0);
-});
-
-test('F-301 is mixed: +2 water and +5 health, applied exactly once', () => {
-  const game = running();
-  game.setIntegrity('POW', 60);
-  const water = game.state.sectors.POW.inventory.water;
-  const def = loadContent().faults.faults.find((f) => f.code === 'F-301');
-  const res = resolveFault(game, 'F-301');
-  assert.deepEqual(res.reward.resources, { water: 2 });
-  assert.equal(res.reward.health, 5);
-  const cost = (def.resources_required || {}).water || 0;
-  assert.equal(game.state.sectors.POW.inventory.water, water - cost + 2);
-  assert.equal(game.state.sectors.POW.integrity, 60 + game.cfg.resolve_recovery + 5);
-  assert.equal(logEvents(game, 'fault_reward_applied').length, 1);
-  assert.equal(res.reward.text, '+2 WATER · +5 SECTOR HEALTH');
-});
-
-test("a reward never touches COM's board", () => {
-  const game = running();
-  game.setBroadcastRow('WTR', { power: 3 }, { by: 'COM' });
-  resolveFault(game, 'F-002');
-  assert.ok(game.state.sectors.WTR.inventory.power >= 5, 'the real stock did not rise');
-  assert.equal(forBigscreen(game).broadcast.rows.WTR.power, 3, 'the board followed the stock');
-});
-
-test('a reward never heals an injured worker, approves a transfer, or plays a card', () => {
-  const game = running();
-  game.injure('WTR', 1);
-  const t = game.createTransfer({ from: 'POW', to: 'WTR', resource: 'parts', amount: 1, by: 'POW' });
-  const hand = [...game.state.agr.offered];
-  resolveFault(game, 'F-002');
-  assert.equal(game.state.sectors.WTR.workforce.injured, 1, 'a reward healed a worker');
-  assert.equal(game.findTransfer(t.transfer.id).status, 'PENDING_TRN_APPROVAL', 'a reward approved a transfer');
-  assert.deepEqual(game.state.agr.offered, hand);
-  assert.equal(game.state.agr.used, false, 'a reward played a card');
-  assert.equal(game.stampsUsed(), 0);
-  assert.equal(game.medHealsUsed(), 0);
-});
-
-test('facilitator force-resolve pays nothing by default, and is logged as an override when enabled', () => {
-  const game = running();
-  const before = inventoriesOf(game);
-  game.fireFault('F-002', 'WTR');
-  game.clearFault('WTR', 'F-002', 'troubleshooting');
-  assert.deepEqual(inventoriesOf(game), before, 'a force-resolve paid');
-  assert.equal(logEvents(game, 'fault_reward_applied').length, 0);
-  assert.equal(logEvents(game, 'fault_reward_force_resolve_skipped').length, 1);
-  assert.equal(game.state.rewards_claimed['F-002'], undefined, 'the claim was spent for nothing');
-
-  game.patchConfig({ reward_on_facilitator_force_resolve: true });
-  game.fireFault('F-002', 'WTR');
-  game.clearFault('WTR', 'F-002', 'troubleshooting');
-  assert.equal(game.state.sectors.WTR.inventory.power, before.WTR.power + 2);
-  const log = logEvents(game, 'fault_reward_applied')[0];
-  assert.equal(log.facilitator_override, true);
-  assert.equal(logEvents(game, 'fault_reward_admin_override').length, 1);
-});
-
-test('every successful reward writes exactly one applied event, with the fields the debrief needs', () => {
-  const game = running();
-  for (const code of ['F-001', 'F-002', 'F-003']) resolveFault(game, code);
-  const events = logEvents(game, 'fault_reward_applied');
-  assert.equal(events.length, 3);
-  assert.deepEqual(events.map((e) => e.fault), ['F-001', 'F-002', 'F-003']);
-  for (const e of events) {
-    for (const k of ['t', 'round', 'run_id', 'phase', 'fault', 'sector', 'reward_type', 'resources_added', 'health_before', 'health_after', 'rvu', 'reward_claimed', 'facilitator_override', 'key']) {
-      assert.ok(k in e, `${e.fault} lacks ${k}`);
-    }
-    assert.equal(e.reward_claimed, true);
-    assert.equal(e.phase, 'ORIENTATION');
-  }
-  const d = analyse(game.log.readAll(), { runId: 'test-run' }).rounds.R2;
-  assert.equal(d.rewards.applied, 3);
-  assert.equal(d.rewards.rvu, 6);
-  assert.deepEqual(d.rewards.resources, { water: 2, power: 2, parts: 2 });
-});
-
-test('the sector screen is told the reward before completion, and that it was claimed after; the preview can be switched off', () => {
-  const game = running();
-  game.fireFault('F-002', 'WTR');
-  let f = forSector(game, 'WTR').sectors.WTR.faults.find((x) => x.code === 'F-002');
-  assert.deepEqual(f.reward, { resources: { power: 2 }, health: 0, text: '+2 POWER' });
-  assert.equal(f.reward_claimed, false);
-  assert.equal(JSON.stringify(f).includes('rvu'), false, 'units leaked to a player');
-  const ok = submitCode(game, { sector: 'WTR', fault_code: 'F-002', code: 'P-01-617', workers_assigned: 1 });
-  assert.equal(ok.accepted, true);
-  const sec = forSector(game, 'WTR').sectors.WTR;
-  f = Object.values(sec).flatMap((v) => (Array.isArray(v) ? v : [])).find((x) => x && x.code === 'F-002');
-  assert.ok(f, 'the resolved fault left every list the sector is sent');
-  assert.equal(f.reward_claimed, true);
-  game.patchConfig({ show_fault_reward_preview: false });
-  game.fireFault('F-103', 'WTR');
-  f = forSector(game, 'WTR').sectors.WTR.faults.find((x) => x.code === 'F-103');
-  assert.equal(f.reward, null);
-  assert.ok(forControl(game).rewards_claimed['F-002']);
-});
-
-test('a scenario override changes one reward without touching the table; disabling rewards pays nothing', () => {
-  const game = running();
-  game.patchConfig({ fault_reward_overrides: { 'F-002': { resources: { power: 3 }, rvu: 3 } } });
-  assert.deepEqual(game.faultReward('F-002').resources, { power: 3 });
-  assert.deepEqual(REWARD_TABLE.rewards['F-002'].resources, { power: 2 }, 'the data file was mutated');
-  game.patchConfig({ fault_reward_overrides: {}, fault_rewards_enabled: false });
-  const before = game.state.sectors.WTR.inventory.power;
-  const res = resolveFault(game, 'F-002');
-  assert.equal(res.reward.applied, false);
-  assert.equal(res.reward.reason, 'disabled');
-  assert.equal(game.state.sectors.WTR.inventory.power, before);
-});
-
 // -- v9: the city board lives on the wall ---------------------------------------------
 //
 // A table's console is local truth. The city's reported figures are COM's to
@@ -2563,6 +2288,426 @@ test('the console markup: attention, observational cards, drawer, overrides, fau
   assert.ok(/data-sub="overrides"/.test(html), 'no ADMIN OVERRIDES destination');
 });
 
+// -- v17: binder materials, smart-random rewards, the scarcity guardrail ---------------
+//
+// A repair is crew + materials + the code, committed at once; a wrong code,
+// short crew or a short tray consumes nothing. Every instance is dealt one
+// reward when it fires, never twice; the stock rewards create is budgeted
+// against the material repairs consume.
+
+const rewardsMod = require('../lib/rewards');
+const V17 = require('C:/Users/faixe/Downloads/UNDERCITY_claude_fault_materials_smart_rewards_v17.json');
+const MATRIX = Object.entries(V17.binder_fault_matrix).flatMap(([sector, list]) => list.map((m) => ({ ...m, sector })));
+const NORMAL = MATRIX.filter((m) => m.fault_id !== 'F-210');
+
+/** Stock the tray with exactly the binder materials, plus what is asked. */
+function stock(game, code, materials, extra = {}) {
+  game.setInventory(code, { power: 0, water: 0, parts: 0, med: 0, ...materials, ...extra });
+}
+const inventoriesOf = (game) => JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(game.state.sectors).map(([c, s]) => [c, s.inventory]))));
+const withoutCode = (game, code) => Object.fromEntries(Object.entries(inventoriesOf(game)).filter(([c]) => c !== code));
+
+test('every normal fault carries exactly the binder crew and materials, on the definition and on the fired instance', () => {
+  const content = loadContent().faults.faults;
+  const game = running();
+  for (const m of NORMAL) {
+    const def = content.find((f) => f.code === m.fault_id);
+    assert.ok(def, `${m.fault_id} missing`);
+    assert.equal(def.sector, m.sector); assert.equal(def.crew_required, m.crew, `${m.fault_id} crew`);
+    assert.deepEqual(def.resources_required, m.materials, `${m.fault_id} materials`);
+    assert.equal(rewardsMod.tierOf(game, m.fault_id), m.reward_tier, `${m.fault_id} tier`);
+    const fired = game.fireFault(m.fault_id, m.sector);
+    assert.equal(fired.ok, true, `${m.fault_id} did not fire`);
+    const inst = game.state.sectors[m.sector].faults.find((f) => f.code === m.fault_id && !f.resolved);
+    assert.equal(inst.crew_required, m.crew); assert.deepEqual(inst.resources_required, m.materials);
+    assert.ok(inst.reward && inst.reward.archetype && inst.reward.tier === m.reward_tier, `${m.fault_id} was not dealt a reward`);
+  }
+  assert.equal(MATRIX.length, 36);
+});
+
+test('parameterised: every normal fault refuses a short tray, short crew and a wrong code without consuming, and consumes exactly its materials once on success', () => {
+  const content = loadContent().faults.faults;
+  for (const m of NORMAL) {
+    const game = running();
+    const def = content.find((f) => f.code === m.fault_id);
+    game.fireFault(m.fault_id, m.sector);
+    const args = (over) => ({ sector: m.sector, fault_code: m.fault_id, code: def.valid_codes[0], workers_assigned: m.crew, ...over });
+    // short by one unit of the first material
+    const [firstMat] = Object.keys(m.materials);
+    stock(game, m.sector, m.materials, { [firstMat]: m.materials[firstMat] - 1 });
+    let before = inventoriesOf(game);
+    let r = submitCode(game, args({}));
+    assert.equal(r.reason, 'insufficient_resources', `${m.fault_id}: a short tray was accepted`);
+    assert.equal(r.short, undefined, 'the shortfall never reaches the console');
+    assert.deepEqual(inventoriesOf(game), before, `${m.fault_id}: a refusal consumed something`);
+    assert.equal(game.state.sectors[m.sector].faults[0].attempts, 0, `${m.fault_id}: short materials counted as an attempt`);
+    // ready tray, short crew
+    stock(game, m.sector, m.materials);
+    before = inventoriesOf(game);
+    r = submitCode(game, args({ workers_assigned: m.crew - 1 }));
+    assert.equal(r.reason, m.crew - 1 < 0 ? 'invalid_workers' : 'insufficient_crew', `${m.fault_id}: short crew was accepted`);
+    assert.deepEqual(inventoriesOf(game), before);
+    assert.equal(game.state.sectors[m.sector].faults[0].attempts, 0, `${m.fault_id}: short crew counted as an attempt`);
+    // wrong code
+    r = submitCode(game, args({ code: 'P-00-000' }));
+    assert.equal(r.reason, 'invalid_code');
+    assert.deepEqual(inventoriesOf(game), before, `${m.fault_id}: a wrong code consumed materials`);
+    assert.equal(game.state.sectors[m.sector].faults[0].attempts, 1);
+    assert.equal(Object.keys(game.state.rewards_claimed).length, 0, `${m.fault_id}: a refusal paid`);
+    // success: every material leaves at once, exactly once
+    const consumedBefore = game.state.repair_material_units_consumed;
+    r = submitCode(game, args({}));
+    assert.equal(r.accepted, true, `${m.fault_id}: ${r.reason}`);
+    assert.deepEqual(r.consumed, m.materials, `${m.fault_id}: consumed ${JSON.stringify(r.consumed)}`);
+    const tray = game.state.sectors[m.sector].inventory;
+    const reward = game.state.rewards_claimed[game.state.sectors[m.sector].faults[0].id];
+    for (const [k, v] of Object.entries(m.materials)) {
+      const refunded = reward && reward.resources ? (reward.resources[k] || 0) : 0;
+      assert.equal(tray[k], 0 + refunded, `${m.fault_id}: ${k} left ${tray[k]}`);
+    }
+    assert.equal(game.state.repair_material_units_consumed, consumedBefore + Object.values(m.materials).reduce((a, b) => a + b, 0));
+    const again = submitCode(game, args({}));
+    assert.equal(again.reason, 'unknown_fault', `${m.fault_id}: resolved twice`);
+  }
+});
+
+test('F-210 invents nothing: no crew, no materials, no code; only the facilitator clears it, and it never pays stock', () => {
+  const def = loadContent().faults.faults.find((f) => f.code === 'F-210');
+  assert.equal(def.crew_required, 0); assert.deepEqual(def.resources_required, {}); assert.deepEqual(def.valid_codes, []); assert.equal(def.false_alarm, true);
+  const game = running();
+  game.fireFault('F-210', 'AGR');
+  const inst = game.state.sectors.AGR.faults[0];
+  assert.equal(inst.reward.tier, 2);
+  assert.ok(!/SUPPLY|SALVAGE/.test(inst.reward.archetype), `a ghost rolled ${inst.reward.archetype}`);
+  for (let i = 0; i < 40; i += 1) {
+    const g = newGame({ runId: `ghost-${i}` }); g.setPhase('ROUND_2'); g.clock('start');
+    g.fireFault('F-210', 'AGR');
+    const a = g.state.sectors.AGR.faults[0].reward.archetype;
+    assert.ok(!/SUPPLY|SALVAGE/.test(a), `run ${i}: a ghost rolled ${a}`);
+    assert.equal(rewardsMod.POOLS.archetypes[a].resource_units, 0);
+  }
+  const before = inventoriesOf(game);
+  assert.equal(submitCode(game, { sector: 'AGR', fault_code: 'F-210', code: 'P-99-999', workers_assigned: 1 }).reason, 'no_procedure');
+  assert.deepEqual(inventoriesOf(game), before);
+  assert.equal(game.clearFault('AGR', 'F-210', 'COM confirmed the ghost'), true);
+  const claim = game.state.rewards_claimed[inst.id];
+  assert.ok(claim && claim.via === 'false_alarm_clear', 'the ghost clear did not pay');
+  assert.equal(claim.resource_units_generated, 0);
+});
+
+test('F-302, F-304 and F-404 carry no deadline, and no fault carries one', () => {
+  const game = running();
+  for (const [code, sector] of [['F-302', 'WTR'], ['F-304', 'TRN'], ['F-404', 'TRN']]) {
+    game.fireFault(code, sector);
+    const f = game.state.sectors[sector].faults.find((x) => x.code === code);
+    for (const k of ['deadline', 'deadline_s', 'deadline_remaining_s', 'deadline_at', 'expired', 'integrity_penalty']) assert.equal(k in f, false, `${code} has ${k}`);
+    const own = forSector(game, sector).sectors[sector].faults.find((x) => x.code === code);
+    assert.equal('deadline_s' in own, false);
+    assert.ok(typeof f.decay_per_min === 'number');
+  }
+});
+
+test('two submissions for the same fault cannot double-spend: the second finds no active fault, the tray was charged once', () => {
+  const game = running();
+  game.fireFault('F-201', 'POW');
+  stock(game, 'POW', { parts: 2, water: 1 }, { parts: 4, water: 2 });
+  const a = submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-04-340', workers_assigned: 2 });
+  const b = submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-04-340', workers_assigned: 2 });
+  assert.equal(a.accepted, true); assert.equal(b.accepted, false); assert.equal(b.reason, 'unknown_fault');
+  const claim = game.state.rewards_claimed[game.state.sectors.POW.faults[0].id];
+  const refund = claim.resources || {};
+  assert.equal(game.state.sectors.POW.inventory.parts, 4 - 2 + (refund.parts || 0));
+  assert.equal(game.state.sectors.POW.inventory.water, 2 - 1 + (refund.water || 0));
+  assert.equal(logEvents(game, 'repair_completed').length, 1);
+  assert.equal(logEvents(game, 'fault_reward_applied').length + logEvents(game, 'fault_reward_pending').length, 1);
+  assert.equal(game.state.repair_material_units_consumed, 3);
+});
+
+test('a reward is dealt once when the fault fires, persists through reprojection, failed attempts and a restart, and is previewed before completion', () => {
+  const game = running();
+  game.fireFault('F-201', 'POW');
+  const inst = game.state.sectors.POW.faults[0];
+  const dealt = { ...inst.reward };
+  assert.ok(dealt.archetype && dealt.assigned_at && dealt.seed);
+  assert.equal(dealt.tier, 3);
+  for (let i = 0; i < 5; i += 1) {
+    const view = forSector(game, 'POW').sectors.POW.faults[0].reward;
+    assert.equal(view.archetype, dealt.archetype, 'a reprojection rerolled');
+    assert.equal(view.claimed, false);
+    assert.ok(view.text.startsWith(`${dealt.label} · `), 'no preview');
+    assert.equal(JSON.stringify(view).includes('rvu'), false, 'units leaked to a player');
+  }
+  submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-00-000', workers_assigned: 2 });
+  submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-04-340', workers_assigned: 1 });
+  assert.equal(inst.reward.archetype, dealt.archetype, 'a failed attempt rerolled');
+  const again = newGame({ runId: 'reward-restore' });
+  again.restore(JSON.parse(JSON.stringify(game.serialise())));
+  assert.equal(again.state.sectors.POW.faults[0].reward.archetype, dealt.archetype, 'a restart rerolled');
+  assert.equal(again.state.sectors.POW.faults[0].reward.seed, dealt.seed);
+  // the same fault in another run may draw differently — it is random, not fixed
+  const seen = new Set();
+  for (let i = 0; i < 30; i += 1) { const g = newGame({ runId: `r-${i}` }); g.setPhase('ROUND_2'); g.clock('start'); g.fireFault('F-201', 'POW'); seen.add(g.state.sectors.POW.faults[0].reward.archetype); }
+  assert.ok(seen.size >= 3, `F-201 always rolls the same: ${[...seen]}`);
+  assert.ok([...seen].every((a) => rewardsMod.POOLS.pools['3'].some((p) => p.reward === a)), 'a tier-3 fault rolled outside its pool');
+});
+
+test('the reward is paid only after the materials are gone, exactly once, and a cache cannot fund its own repair', () => {
+  const game = running();
+  game.patchConfig({ fault_reward_overrides: { 'F-001': { archetype: 'SUPPLY_FIND_1' } } });
+  game.fireFault('F-001', 'POW');                                    // needs 1 parts
+  stock(game, 'POW', { parts: 1 });
+  const inst = game.state.sectors.POW.faults[0];
+  assert.equal(inst.reward.archetype, 'SUPPLY_FIND_1');
+  const r = submitCode(game, { sector: 'POW', fault_code: 'F-001', code: loadContent().faults.faults.find((f) => f.code === 'F-001').valid_codes[0], workers_assigned: 1 });
+  assert.equal(r.accepted, true); assert.deepEqual(r.consumed, { parts: 1 });
+  assert.equal(r.reward.applied, true); assert.equal(r.reward.resource_units_generated, 1);
+  const log = logEvents(game, 'fault_reward_applied')[0];
+  assert.ok(Object.values(r.reward.resources).reduce((a, b) => a + b, 0) === 1);
+  assert.equal(game.state.fault_reward_resource_units_generated, 1);
+  assert.equal(game.state.rewards_claimed[inst.id].key, `faultReward:${game.state.run_id}:${inst.id}`);
+  assert.equal(game.applyFaultReward('POW', inst, { via: 'resolve' }).reason, 'duplicate');
+  assert.equal(logEvents(game, 'fault_reward_applied').length, 1);
+  // a second instance of the same code is its own reward, dealt and paid on its own
+  game.fireFault('F-001', 'POW');
+  const second = game.state.sectors.POW.faults.find((f) => !f.resolved);
+  assert.notEqual(second.id, inst.id); assert.ok(second.reward);
+  assert.equal(log.instance, inst.id);
+});
+
+test('facilitator force-resolve pays nothing by default; with the explicit override it pays and is logged as one', () => {
+  const game = running();
+  game.fireFault('F-201', 'POW');
+  const inst = game.state.sectors.POW.faults[0];
+  assert.equal(game.clearFault('POW', 'F-201', 'facilitator cleared'), true);
+  assert.equal(game.state.rewards_claimed[inst.id], undefined);
+  assert.equal(logEvents(game, 'fault_reward_force_resolve_skipped').length, 1);
+  const g2 = running();
+  g2.fireFault('F-201', 'POW');
+  const inst2 = g2.state.sectors.POW.faults[0];
+  assert.equal(g2.clearFault('POW', 'F-201', 'facilitator cleared', { withReward: true }), true);
+  assert.ok(g2.state.rewards_claimed[inst2.id] || inst2.reward.pending, 'the explicit override did not pay');
+  if (g2.state.rewards_claimed[inst2.id]) assert.equal(logEvents(g2, 'fault_reward_admin_override').length, 1);
+});
+
+test('health rewards use points, cap at 100 and never revive DARK; TRN and MED bonuses widen the allowance for the round and do nothing by themselves', () => {
+  const game = running();
+  game.patchConfig({ fault_reward_overrides: { 'F-001': { archetype: 'LOCAL_RECOVERY_20' }, 'F-002': { archetype: 'TRN_REINFORCEMENT' }, 'F-003': { archetype: 'MED_REINFORCEMENT' } } });
+  game.setIntegrity('POW', 95);
+  game.fireFault('F-001', 'POW'); stock(game, 'POW', { parts: 1 });
+  submitCode(game, { sector: 'POW', fault_code: 'F-001', code: loadContent().faults.faults.find((f) => f.code === 'F-001').valid_codes[0], workers_assigned: 1 });
+  assert.equal(game.state.sectors.POW.integrity, 100, 'went past 100');
+  // DARK
+  game.setIntegrity('AGR', 0);
+  const dark = game.state.sectors.AGR;
+  assert.equal(dark.status, 'DARK');
+  assert.equal(rewardsMod.healSector(game, dark, 20), 0, 'a DARK sector was revived'); assert.equal(dark.integrity, 0); assert.equal(dark.status, 'DARK');
+  // TRN
+  game.setInventory('WTR', { parts: 1, power: 9 });
+  const cap = game.trnCapacity();
+  const pending = readyTransfer(game, { from: 'WTR', to: 'MED', resource: 'power', amount: 1 });
+  game.fireFault('F-002', 'WTR');
+  submitCode(game, { sector: 'WTR', fault_code: 'F-002', code: loadContent().faults.faults.find((f) => f.code === 'F-002').valid_codes[0], workers_assigned: 1 });
+  assert.equal(game.trnCapacity(), cap + 1, 'TRN did not gain an approval');
+  assert.equal(game.findTransfer(pending.id).status, 'PENDING_TRN_APPROVAL', 'the reward approved a transfer');
+  assert.equal(game.stampsUsed(), 0);
+  // MED
+  game.injure('POW', 1);
+  const h = game.requestHealing('POW', { by: 'POW' }).healing;
+  const medCap = game.medCapacity();
+  game.setInventory('MED', { med: 1 });
+  game.fireFault('F-003', 'MED');
+  submitCode(game, { sector: 'MED', fault_code: 'F-003', code: loadContent().faults.faults.find((f) => f.code === 'F-003').valid_codes[0], workers_assigned: 1 });
+  assert.equal(game.medCapacity(), medCap + 1, 'MED did not gain a heal');
+  assert.equal(game.findHealing(h.id).status, 'WAITING_FOR_MED', 'the reward healed somebody');
+  assert.equal(game.state.sectors.POW.workforce.injured, 1);
+  // the round ends; the bonuses end with it
+  game.state.round_clock.started = false;
+  game.setRound('R3');
+  assert.equal(game.trnCapacity(), cap); assert.equal(game.medCapacity(), medCap);
+});
+
+test('a 3-sector session never rolls Medical, Agriculture or Comms rewards, and never targets an inactive sector', () => {
+  const g = newGame({ runId: 'three' }); g.setPhase('ROUND_2'); g.clock('start');
+  g.patchConfig({ active_sectors: ['POW', 'WTR', 'TRN'] });
+  assert.deepEqual(rewardsMod.activeSectors(g), ['POW', 'WTR', 'TRN']);
+  for (let tier = 1; tier <= 4; tier += 1) {
+    g.fireFault('F-201', 'POW');
+    const f = g.state.sectors.POW.faults.find((x) => !x.resolved);
+    const el = rewardsMod.eligible(g, 'POW', f, tier);
+    assert.ok(!el.some((e) => /MED_/.test(e.reward)), `tier ${tier} offers MED: ${el.map((e) => e.reward)}`);
+    assert.ok(el.some((e) => /LOCAL_RECOVERY|MUTUAL|SHARED|ALLIANCE|LOWEST|CITY/.test(e.reward)), 'no health reward left');
+    g.clearFault('POW', 'F-201', 'reset');
+  }
+  const opts = rewardsMod.choiceOptions(g, 'POW', { id: 'x', reward: {} }, { archetype: 'MUTUAL_AID_5', choose: 'sector' });
+  assert.deepEqual(opts.map((o) => o.sector).sort(), ['TRN', 'WTR']);
+  // the same engine with all six
+  const six = running();
+  assert.equal(rewardsMod.activeSectors(six).length, 6);
+  six.injure('POW', 1); six.requestHealing('POW', { by: 'POW' });
+  six.fireFault('F-101', 'POW');
+  const el6 = rewardsMod.eligible(six, 'POW', six.state.sectors.POW.faults[0], 2);
+  assert.ok(el6.some((e) => e.reward === 'MED_REINFORCEMENT'), 'six sectors: MED is eligible');
+});
+
+test('the scarcity guardrail: at most ~35% of consumed materials come back, with a bootstrap of one; over budget, a stock reward falls back to a non-stock one', () => {
+  const game = running();
+  assert.deepEqual(rewardsMod.budget(game), { consumed: 0, generated: 0, max: 1, remaining: 1 });
+  game.patchConfig({ fault_reward_overrides: { 'F-001': { archetype: 'SUPPLY_FIND_1' }, 'F-002': { archetype: 'SUPPLY_CACHE_2_PLUS_HEALTH' } } });
+  const code = (id) => loadContent().faults.faults.find((f) => f.code === id).valid_codes[0];
+  game.fireFault('F-001', 'POW'); stock(game, 'POW', { parts: 1 });
+  submitCode(game, { sector: 'POW', fault_code: 'F-001', code: code('F-001'), workers_assigned: 1 });
+  assert.equal(game.state.fault_reward_resource_units_generated, 1, 'the bootstrap unit was paid');
+  assert.deepEqual(rewardsMod.budget(game), { consumed: 1, generated: 1, max: 1, remaining: 0 });
+  // the next stock reward is over budget: dealt as a fallback at fire time, from non-stock effects
+  game.fireFault('F-002', 'WTR'); stock(game, 'WTR', { parts: 1 });
+  const inst = game.state.sectors.WTR.faults[0];
+  assert.equal(inst.reward.archetype, 'SUPPLY_CACHE_2_PLUS_HEALTH', 'the override deals the archetype');
+  const r = submitCode(game, { sector: 'WTR', fault_code: 'F-002', code: code('F-002'), workers_assigned: 1 });
+  assert.equal(r.accepted, true);
+  assert.equal(logEvents(game, 'fault_reward_budget_fallback').length, 1, 'no fallback happened');
+  assert.notEqual(inst.reward.archetype, 'SUPPLY_CACHE_2_PLUS_HEALTH');
+  assert.equal(rewardsMod.POOLS.archetypes[inst.reward.archetype].resource_units, 0);
+  assert.equal(game.state.fault_reward_resource_units_generated, 1, 'stock was created over budget');
+  assert.equal(inst.reward.fallback_from, 'SUPPLY_CACHE_2_PLUS_HEALTH');
+  // eligibility hides stock rewards when the budget is spent
+  game.fireFault('F-201', 'POW');
+  const el = rewardsMod.eligible(game, 'POW', game.state.sectors.POW.faults.find((f) => !f.resolved), 3);
+  assert.ok(!el.some((e) => rewardsMod.POOLS.archetypes[e.reward].resource_units > 0), 'a stock reward is still eligible over budget');
+  // upkeep and transfers never widen it
+  game.cycleControl('process');
+  assert.deepEqual(rewardsMod.budget(game), { consumed: 2, generated: 1, max: 1, remaining: 0 }, 'upkeep changed the budget');
+});
+
+test('the scarcity draw reads real active-sector stock, caps any resource near 45%, prefers distinct types, and ignores COM\'s board', () => {
+  const game = running();
+  game.setBroadcastRow('POW', { power: 0, water: 0, med: 0, parts: 0 }, { by: 'COM' });
+  for (const c of Object.keys(game.state.sectors)) game.setInventory(c, { power: 9, water: 9, parts: 0, med: 9 });
+  const w = rewardsMod.scarcityWeights(game);
+  assert.ok(Math.abs(Object.values(w).reduce((a, b) => a + b, 0) - 1) < 1e-6);
+  assert.ok(w.parts > w.power && w.parts > w.water && w.parts > w.med, 'the scarce resource is not the likeliest');
+  assert.ok(w.parts <= 0.45 + 1e-6, `parts at ${w.parts}`);
+  assert.ok(w.power > 0.1, 'a plentiful resource still has a real chance');
+  let partsDraws = 0;
+  for (let i = 0; i < 400; i += 1) { const [r] = rewardsMod.drawResources(game, 1, rewardsMod.rng(i)); if (r === 'parts') partsDraws += 1; }
+  assert.ok(partsDraws > 120 && partsDraws < 220, `parts drawn ${partsDraws}/400`);
+  const three = rewardsMod.drawResources(game, 3, rewardsMod.rng(7));
+  assert.equal(new Set(three).size, 3, 'a 3-cache repeated a type');
+  game.patchConfig({ active_sectors: ['POW', 'WTR', 'TRN'] });
+  game.setInventory('MED', { parts: 99 });
+  const w3 = rewardsMod.scarcityWeights(game);
+  assert.ok(w3.parts > w3.power, 'an inactive sector\'s stock counted');
+});
+
+test('a stabilisation reward halves or pauses another fault\'s decay until the round ends, never resolves it, never changes its reward', () => {
+  const game = running();
+  game.patchConfig({ fault_reward_overrides: { 'F-001': { archetype: 'FAULT_STABILISATION' }, 'F-002': { archetype: 'EMERGENCY_STABILISATION' } } });
+  game.fireFault('F-201', 'POW');                                     // decays 1.5/min
+  const target = game.state.sectors.POW.faults[0];
+  const targetReward = target.reward.archetype;
+  game.fireFault('F-001', 'POW'); stock(game, 'POW', { parts: 1 });
+  const r = submitCode(game, { sector: 'POW', fault_code: 'F-001', code: loadContent().faults.faults.find((f) => f.code === 'F-001').valid_codes[0], workers_assigned: 1 });
+  assert.equal(r.reward.pending, true, 'the choice was not offered');
+  assert.deepEqual(r.reward.options.map((o) => o.id), [target.id]);
+  assert.equal(forSector(game, 'POW').sectors.POW.reward_choices.length, 1, 'the screen was not asked');
+  const chosen = game.chooseRewardTarget('POW', game.state.sectors.POW.faults.find((f) => f.code === 'F-001').id, { fault: target.id }, { by: 'POW' });
+  assert.equal(chosen.ok, true);
+  assert.equal(game.decayMultiplier(target), 0.5);
+  const before = game.state.sectors.POW.integrity;
+  game.tick(60000);
+  assert.ok(Math.abs((before - game.state.sectors.POW.integrity) - 0.75) < 0.01, `bled ${before - game.state.sectors.POW.integrity} in a minute`);
+  assert.equal(target.resolved, false); assert.equal(target.reward.archetype, targetReward);
+  assert.equal(chosen.text.startsWith('FAULT STABILISATION'), true);
+  game.state.round_clock.started = false;
+  game.setRound('R3');
+  assert.equal(game.decayMultiplier(target), 1, 'the modifier outlived the round');
+  assert.equal(target.resolved, false);
+  // pause
+  game.fireFault('F-002', 'WTR'); stock(game, 'WTR', { parts: 1 });
+  submitCode(game, { sector: 'WTR', fault_code: 'F-002', code: loadContent().faults.faults.find((f) => f.code === 'F-002').valid_codes[0], workers_assigned: 1 });
+  game.chooseRewardTarget('WTR', game.state.sectors.WTR.faults[0].id, { fault: target.id }, { by: 'WTR' });
+  assert.equal(game.decayMultiplier(target), 0);
+  const h = game.state.sectors.POW.integrity; game.tick(60000);
+  assert.equal(game.state.sectors.POW.integrity, h, 'a paused fault still bled');
+  // a choice never made is settled at the round change, to the target that needs it most
+  game.fireFault('F-004', 'TRN'); game.patchConfig({ fault_reward_overrides: { 'F-004': { archetype: 'MUTUAL_AID_5' } } });
+  game.clearFault('TRN', 'F-004', 'x');
+});
+
+test('a choosing reward: the table picks another sector, an invalid pick is refused, and an unmade choice defaults at the round change', () => {
+  const game = running();
+  game.patchConfig({ fault_reward_overrides: { 'F-001': { archetype: 'MUTUAL_AID_5' }, 'F-002': { archetype: 'SHARED_RECOVERY_5_5' } } });
+  game.setIntegrity('AGR', 40); game.setIntegrity('MED', 80);
+  game.fireFault('F-001', 'POW'); stock(game, 'POW', { parts: 1 });
+  const r = submitCode(game, { sector: 'POW', fault_code: 'F-001', code: loadContent().faults.faults.find((f) => f.code === 'F-001').valid_codes[0], workers_assigned: 1 });
+  assert.equal(r.reward.pending, true);
+  const id = game.state.sectors.POW.faults[0].id;
+  assert.equal(game.chooseRewardTarget('POW', id, { sector: 'POW' }, { by: 'POW' }).reason, 'reward_invalid_target', 'chose itself');
+  assert.equal(game.chooseRewardTarget('WTR', id, { sector: 'MED' }, { by: 'WTR' }).reason, 'unknown_fault', 'another table chose');
+  const ok = game.chooseRewardTarget('POW', id, { sector: 'MED' }, { by: 'POW' });
+  assert.equal(ok.ok, true); assert.equal(game.state.sectors.MED.integrity, 85);
+  assert.equal(game.chooseRewardTarget('POW', id, { sector: 'MED' }, { by: 'POW' }).reason, 'no_choice_pending', 'chose twice');
+  assert.equal(logEvents(game, 'fault_reward_applied').length, 1);
+  // unmade: defaults to the lowest-health other sector at the round change
+  game.fireFault('F-002', 'WTR'); stock(game, 'WTR', { parts: 1 });
+  submitCode(game, { sector: 'WTR', fault_code: 'F-002', code: loadContent().faults.faults.find((f) => f.code === 'F-002').valid_codes[0], workers_assigned: 1 });
+  const wtrBefore = game.state.sectors.WTR.integrity;
+  game.state.round_clock.started = false;
+  game.setRound('R3');
+  assert.equal(logEvents(game, 'fault_reward_default_target')[0].target.sector, 'AGR');
+  assert.equal(game.state.sectors.AGR.integrity, 45);
+  assert.equal(game.state.sectors.WTR.integrity, Math.min(100, wtrBefore + 5), 'the owner half was paid too');
+  assert.equal(game.state.sectors.WTR.faults[0].reward.pending, undefined);
+});
+
+test("rewards never touch COM's board, and stock rewards still need Transport to leave", () => {
+  const game = running();
+  game.setBroadcastRow('POW', { power: 1, water: 1, med: 1, parts: 1 }, { by: 'COM' });
+  game.patchConfig({ fault_reward_overrides: { 'F-001': { archetype: 'SUPPLY_FIND_1' } } });
+  game.fireFault('F-001', 'POW'); stock(game, 'POW', { parts: 1 });
+  submitCode(game, { sector: 'POW', fault_code: 'F-001', code: loadContent().faults.faults.find((f) => f.code === 'F-001').valid_codes[0], workers_assigned: 1 });
+  assert.deepEqual(forBigscreen(game).broadcast.rows.POW, { ...forBigscreen(game).broadcast.rows.POW, power: 1, water: 1, med: 1, parts: 1 });
+  const inv = game.state.sectors.POW.inventory;
+  const [res] = Object.entries(inv).find(([, v]) => v > 0);
+  const t = game.createTransfer({ from: 'POW', to: 'MED', resource: res, amount: 1, by: 'POW' });
+  assert.equal(t.transfer.status, 'PENDING_TRN_APPROVAL');
+  assert.equal(game.approveTransfer(t.transfer.id, { by: 'POW' }).reason, 'approval_trn_only');
+});
+
+test('the console: readiness without the recipe, SUBMIT REPAIR, and training mode shows the recipe without changing the rule', () => {
+  const html = SECTOR_INDEX; const js = SECTOR_SCRIPT;
+  assert.ok(/REPAIR READINESS/.test(html) && /id="rd-materials"/.test(html) && /id="rd-workers"/.test(html));
+  assert.ok(/CHECK YOUR BINDER FOR REPAIR REQUIREMENTS/.test(html));
+  assert.ok(/id="submit-btn"[^>]*>SUBMIT REPAIR</.test(html));
+  assert.ok(/'✓ READY' : '⚠ NOT READY'/.test(js) && /'✓ ASSIGNED'/.test(js));
+  assert.ok(/id="reward-choose"/.test(html) && /type: 'reward_choose'/.test(js));
+  const game = running();
+  game.fireFault('F-201', 'POW');
+  let f = forSector(game, 'POW').sectors.POW.faults[0];
+  assert.equal(f.materials_ready, true);
+  assert.equal(f.resources_required, undefined, 'the recipe is on the table'); assert.equal(f.crew_required, undefined); assert.equal(f.requirements, undefined);
+  game.setInventory('POW', { parts: 1 });
+  f = forSector(game, 'POW').sectors.POW.faults[0];
+  assert.equal(f.materials_ready, false);
+  assert.ok(!JSON.stringify(forSector(game, 'POW')).includes('"resources_required"'), 'the recipe leaked');
+  game.patchConfig({ training_mode: true });
+  f = forSector(game, 'POW').sectors.POW.faults[0];
+  assert.deepEqual(f.requirements, { crew: 2, materials: { parts: 2, water: 1 } });
+  assert.equal(submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-04-340', workers_assigned: 2 }).reason, 'insufficient_resources', 'training mode changed the rule');
+  assert.ok(forControl(game).sectors.POW.faults[0].crew_required === 2, 'the facilitator still sees it');
+});
+
+test('the debrief folds repairs and rewards: materials consumed, archetypes, units generated, fallbacks', () => {
+  const game = running();
+  game.patchConfig({ fault_reward_overrides: { 'F-001': { archetype: 'LOCAL_RECOVERY_5' } } });
+  game.fireFault('F-001', 'POW'); stock(game, 'POW', { parts: 1 });
+  submitCode(game, { sector: 'POW', fault_code: 'F-001', code: loadContent().faults.faults.find((f) => f.code === 'F-001').valid_codes[0], workers_assigned: 1 });
+  const d = analyse(game.log.readAll(), { runId: 'test-run' }).rounds.R2;
+  assert.equal(d.repairs.count, 1); assert.equal(d.repairs.material_units, 1); assert.deepEqual(d.repairs.materials, { parts: 1 });
+  assert.equal(d.rewards.applied, 1); assert.equal(d.rewards.archetypes.LOCAL_RECOVERY_5, 1); assert.equal(d.rewards.resource_units_generated, 0);
+  const ev = logEvents(game, 'repair_completed')[0];
+  for (const k of ['instance', 'fault', 'sector', 'round', 'crew_assigned', 'materials_consumed', 'resolution_success', 'reward_archetype', 'reward_result', 'reward_targets', 'resource_reward_units_generated']) assert.ok(k in ev, `repair log lacks ${k}`);
+});
+
 // -- council and the Continuity Order ------------------------------------------------
 
 test('CALL COUNCIL reaches every projection with a running 5:00 clock', () => {
@@ -2879,6 +3024,7 @@ test('the debrief folds the log into per-round figures and a Round 3 vs Aftersho
   game.clock('start');
   game.fireFault('F-401', 'POW');
   game.tick(10000);
+  game.setInventory('POW', { power: 2, parts: 1 });           // the binder's materials for F-401 (v17)
   submitCode(game, { sector: 'POW', fault_code: 'F-401', code: 'P-07-243-534', workers_assigned: 2 });
 
   const d = analyse(game.log.readAll(), { runId: 'test-run' });
