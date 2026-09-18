@@ -414,7 +414,9 @@ test('city stability: automatic formula reacts to damage; manual mode holds a nu
   game.setStability({ mode: 'manual', value: 55 });
   game.tick(1000);
   assert.equal(game.state.city_stability, 55);
-  assert.equal(forBigscreen(game).city_stability, 55);
+  assert.equal(forControl(game).city_stability, 55, 'the facilitator sees the score');
+  assert.equal(forBigscreen(game).city_stability, undefined, 'the wall is not sent an aggregate city figure');
+  assert.equal(forSector(game, 'POW').city_stability, undefined, 'nor is a laptop');
 });
 
 // -- requests, transfers, TRN approval and MED healing --------------------------------
@@ -2765,13 +2767,13 @@ test('analytics durations are computed from the log timestamps', () => {
 test('the status word follows the scenario thresholds and every projection carries it', () => {
   const game = running();
   assert.equal(forSector(game, 'WTR').sectors.POW.status_word, 'STABLE', 'the delayed view names a word too');
-  game.setIntegrity('POW', 65);
+  game.setIntegrity('POW', 75);
   assert.equal(forSector(game, 'POW').sectors.POW.status_word, 'STABLE');
-  game.patchConfig({ degraded_below: 70 });
+  game.patchConfig({ degraded_below: 80 });
   assert.equal(forSector(game, 'POW').sectors.POW.status_word, 'DEGRADED');
   assert.equal(forBigscreen(game).sectors.POW.status_word, 'DEGRADED');
   assert.equal(forControl(game).sectors.POW.status_word, 'DEGRADED');
-  game.patchConfig({ critical_below: 66 });
+  game.patchConfig({ critical_below: 76 });
   assert.equal(game.state.sectors.POW.status, 'CRITICAL', 'a live threshold change re-evaluates status at once');
   assert.equal(forBigscreen(game).sectors.POW.status_word, 'CRITICAL');
   game.setStatus('POW', 'BROWNOUT');
@@ -2902,7 +2904,7 @@ test('the session registry opens a session on its chosen scenario; RESET RUN WIT
   const again = registry.get(row.code);
   assert.equal(again.game.state.run_id, 'reg-2');
   assert.equal(again.game.cfg.council_clock_s, 240, 'live edits survive the restart');
-  assert.equal(again.game.cfg.degraded_below, 60, 'fresh defaults fill the gaps');
+  assert.equal(again.game.cfg.degraded_below, 70, 'fresh defaults fill the gaps');
   registry.evict(row.code);
   store.close();
   fs.rmSync(dir, { recursive: true, force: true });

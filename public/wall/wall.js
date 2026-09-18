@@ -1,19 +1,25 @@
 'use strict';
 /**
- * CITY WALL — the command centre view of HAVEN-9.
+ * CITY WALL — the participant Big Screen of HAVEN-9. Display-only.
  *
- * Four bands, top to bottom: the command bar (round, CORE, NEXT ROUND),
- * ONE priority event, the city beside its six health monitors, and the last
- * four things that happened. The city is the hero: the illustration in
+ * Four bands, top to bottom: the command bar (phase, CURRENT ROUND, CORE
+ * STABILITY, NEXT ROUND IN, LIVE), an alert strip drawn only while something
+ * needs the room, the city beside its six health monitors, and COM's city
+ * broadcast. The city is the hero: the illustration in
  * public/wall/art/haven9-map.png with everything alive drawn over it in an
  * SVG that uses the artwork's own pixel grid (1672×941), so each overlay is
  * traced straight from the painting — a live label on each callout, a state
- * tint on each district's footprint, a fault badge on the rock, a route that
- * lights only while a transfer moves, and a Core that glows with its output.
+ * tint on each district's footprint, a state word under the label when a
+ * district is CRITICAL, DARK or in BROWNOUT, a fault badge on the rock, a
+ * route that lights only while a transfer moves, and a Core that glows with
+ * its stability.
  *
- * Every value is the server's. Presentation states — a card's health word,
- * the banner's one event, a timer's urgency, a route's phase — are DERIVED
- * from the frame on the way to the screen, never stored as a second truth.
+ * Every value is the server's: sector health and its status word, the round
+ * and its clock, core stability, the COM board with its round stamp, open
+ * transfers. Presentation — a card's state, the alerts and their order, the
+ * freshness line, a route's phase — is DERIVED on the way to the screen by
+ * /shared/bigscreen.js, which the tests run too. Nothing here is stored as a
+ * second truth, and nothing here reads real inventory.
  *
  * Rendering split:
  *   buildMap() / buildCards()  once
@@ -22,6 +28,7 @@
  */
 (function wall() {
   const U = window.Undercity;
+  const B = window.UndercityBigscreen;
   const $ = (id) => document.getElementById(id);
   const NS = 'http://www.w3.org/2000/svg';
   const XLINK = 'http://www.w3.org/1999/xlink';
@@ -34,8 +41,6 @@
   const ROUTE_S = 2.6;           // a packet's journey along its route
   const SWEEP_S = 1.4;           // the confirmation sweep at the destination
   const FADE_S = 1.2;            // a cancelled route fading out
-  const TICKER_MAX = 4;
-  const CORE_INSUFFICIENT = 60;  // the same line the Council text already draws
   const ART = '/assets/wall/art';
   const MAP = { w: 1672, h: 941, src: `${ART}/haven9-map.png` };
   const DEBUG = /[?&]debug/.test(location.search);
@@ -66,12 +71,9 @@
       footprint: [[1096, 592], [1210, 462], [1600, 472], [1656, 602], [1560, 766], [1260, 792], [1128, 700]],
       label: { x: 1530, y: 493, w: 254 }, badge: { x: 1530, y: 438 } },
   };
-  const PANEL_ORDER = ['POW', 'WTR', 'MED', 'TRN', 'AGR', 'COM'];   // fixed: the room learns where each one lives
+  const PANEL_ORDER = B.SECTOR_ORDER;                                // fixed: the room learns where each one lives
   const BUILD_ORDER = ['WTR', 'POW', 'COM', 'MED', 'TRN', 'AGR'];   // paint order on the map
   const CORE = { x: 836, y: 398, r: 96, label: { x: 855, y: 295, w: 300 }, tunnel7: [[838, 548], [838, 612]] };
-  const ROUND_LABEL = { R0: 'ORIENTATION', R1: 'ROUND 1', R2: 'ROUND 2', R3: 'ROUND 3', R4: 'AFTERSHOCK' };
-  const STATE_WORD = { stable: 'STABLE', warning: 'WARNING', critical: 'CRITICAL', brownout: 'BROWNOUT', dark: 'DARK' };
-  const RES_NAME = { power: 'POWER', water: 'WATER', parts: 'PARTS', med: 'MEDICAL', workers: 'WORKERS' };
 
   let frame = null;
   let frameAt = 0;
@@ -80,21 +82,20 @@
   let alertRenderedId = null;
   let shockUntil = 0;
   let cycleFlashUntil = 0;
-  let bannerKey = null;
+  let broadcastKey = null;
   let booted = false;             // the first frame paints without entry animations
   const districtEls = {};
   const cardEls = {};
+  const chipEls = new Map();       // alert key -> element
   const routeEls = new Map();      // transfer id -> { g, path, packet, phase }
-  const prevHealth = {};           // sector -> health state last frame
-  const derivedLines = [];         // WARNING / RESTORED transitions the server does not ticker
 
   U.connect({
     hello: { type: 'hello', role: 'bigscreen', session: CTX.session, token: null },
     onState: (next) => { frame = next; frameAt = performance.now(); render(); },
     onMessage: (msg) => { if (msg.type === 'sting') U.playSting(msg.sound); },
     onStatus: (status) => {
-      $('conn').dataset.status = status;
-      $('conn-text').textContent = status === 'down' ? 'RECONNECTING' : status === 'stale' ? 'DELAYED' : 'LIVE';
+      $('live').dataset.status = status;
+      setText($('live-text'), status === 'down' ? 'RECONNECTING' : status === 'stale' ? 'DELAYED' : 'LIVE');
     },
   });
 
@@ -106,29 +107,14 @@
 
   // -- small helpers ----------------------------------------------------------------
 
-  const clamp = (v) => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+  const clamp = B.clamp;
   function setText(node, text) { if (node && node.textContent !== text) node.textContent = text; }
   function show(node, on) { if (node && node.hidden === !!on) node.hidden = !on; }
   function sectorName(code) {
     const s = frame && frame.sectors && frame.sectors[code];
     return String((s && s.name) || (DISTRICTS[code] && DISTRICTS[code].name) || code).toUpperCase();
   }
-  const resName = (k) => RES_NAME[k] || String(k || '').toUpperCase();
   const inCouncil = () => !!(frame && ((frame.council && frame.council.active) || frame.mode === 'COUNCIL'));
-
-  /**
-   * A sector's health state, from the server's status word so the wall never
-   * disagrees with a laptop. The band below STABLE is printed as WARNING here.
-   */
-  function healthState(s) {
-    if (!s) return 'stable';
-    const w = String(s.status_word || s.status || '').toUpperCase();
-    if (s.status === 'DARK' || w === 'DARK' || Number(s.integrity) <= 0) return 'dark';
-    if (s.status === 'BROWNOUT' || w === 'BROWNOUT') return 'brownout';
-    if (s.status === 'CRITICAL' || w === 'CRITICAL') return 'critical';
-    if (w === 'DEGRADED' || w === 'WARNING') return 'warning';
-    return 'stable';
-  }
   function alertAge() {
     if (!frame || !frame.alert) return 0;
     return (Number(frame.alert.age_s) || 0) + (performance.now() - frameAt) / 1000;
@@ -155,10 +141,6 @@
     for (const [px, py] of pts) { x += px; y += py; }
     return [x / pts.length, y / pts.length];
   }
-  const hhmm = (iso) => {
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? '--:--' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  };
 
   // -- SVG helpers ------------------------------------------------------------------
 
@@ -205,6 +187,15 @@
     return g;
   }
 
+  /** The state word under a label — CRITICAL, DARK or BROWNOUT — so the map never relies on colour alone. */
+  function stateTag({ x, y }) {
+    const w = 170; const h = 32;
+    const g = el('g', { class: 'state-tag', transform: `translate(${x},${y + 46})` });
+    g.appendChild(el('rect', { x: -w / 2, y: -h / 2, width: w, height: h, rx: 6 }));
+    g.appendChild(text('', 0, 7, 'state-text'));
+    return g;
+  }
+
   function buildDistrict(code) {
     const d = DISTRICTS[code];
     const g = el('g', { class: 'district', id: `d-${code}`, 'data-sector': code, 'data-state': 'stable' });
@@ -217,6 +208,7 @@
     g.appendChild(el('polygon', { class: 'd-edge', points: pts }));
     g.appendChild(el('g', { class: 'badges' }));
     g.appendChild(pill(code, d.label, d.name));
+    g.appendChild(stateTag(d.label));
     if (DEBUG) g.appendChild(el('circle', { cx: d.badge.x, cy: d.badge.y, r: 6, fill: '#0ff' }));
     return g;
   }
@@ -248,7 +240,11 @@
     svg.appendChild(el('g', { id: 'routes' }));   // transfers draw on top of everything
   }
 
-  /** Six monitors in a fixed order. Built once; the frame only changes their text and state. */
+  /**
+   * Six monitors in a fixed order. Built once; the frame only changes their
+   * text and state. Code, name, HEALTH %, the status word, what COM reported
+   * (or NO REPORT), and how fresh that report is — nothing to press.
+   */
   function buildCards() {
     const host = $('h-cards');
     for (const code of PANEL_ORDER) {
@@ -261,11 +257,10 @@
       card.innerHTML =
         `<img class="shc-icon" src="${ART}/icon-${code}.png" alt="">` +
         `<div class="shc-id"><b class="shc-code">${code}</b><span class="shc-name">${d.name}</span></div>` +
-        `<div class="shc-int"><b class="shc-pct">--</b><small>%</small></div>` +
-        `<div class="shc-status"><i class="shc-dot"></i><span class="shc-word">—</span></div>` +
-        `<div class="shc-flags"><span class="f f-fault" hidden></span><span class="f f-req" hidden>REQUEST</span>` +
-        `<span class="f f-trn" hidden>TRANSFER</span><span class="f f-inj" hidden></span></div>` +
-        `<div class="shc-rep"><span class="rep-vals"></span><i class="rep-fresh"></i></div>`;
+        '<div class="shc-health"><span class="k">HEALTH</span><span class="shc-num"><b class="shc-pct">--</b><small>%</small></span></div>' +
+        '<div class="shc-status"><i class="shc-dot"></i><span class="shc-word">—</span></div>' +
+        '<div class="shc-rep"><span class="k">REPORTED</span><span class="rep-vals"></span><b class="rep-none" hidden>NO REPORT</b></div>' +
+        '<div class="shc-fresh" data-fresh="NOT UPDATED">NOT UPDATED</div>';
       host.appendChild(card);
       cardEls[code] = card;
     }
@@ -280,22 +275,26 @@
     renderCore();
     renderCards();
     renderMovement();
-    renderBanner();
+    renderAlerts();
+    renderBroadcast();
     renderModes();
-    renderAlert();
+    renderAlertTakeover();
     renderDebrief();
     renderPaused();
     renderCycle();
-    renderTicker();
     tick();
     booted = true;
   }
 
   function renderHud() {
-    const label = frame.mode === 'DEBRIEF' ? 'DEBRIEF' : (ROUND_LABEL[frame.round] || frame.round || '');
-    setText($('phase-name'), label);
+    const phase = frame.mode === 'DEBRIEF' ? 'DEBRIEF'
+      : frame.mode === 'BRIEFING' ? 'BRIEFING'
+        : String(frame.round_name || frame.round || '').toUpperCase();
+    setText($('phase-name'), phase);
+    const n = Number(frame.round_number);
+    setText($('round-number'), Number.isFinite(n) ? String(n) : '--');
     setStat('hud-core', 'core-output', frame.core_output);
-    setText($('time-label'), inCouncil() ? 'COUNCIL' : 'NEXT ROUND');
+    setText($('time-label'), inCouncil() ? 'COUNCIL ENDS IN' : 'NEXT ROUND IN');
     show($('tag-blackout'), !!(frame.blackout && frame.blackout.active));
     show($('tag-breather'), !!frame.breather);
     show($('tag-sensors'), !!frame.telemetry_degraded);
@@ -306,54 +305,38 @@
     if ($(id).className !== cls) $(id).className = cls;
   }
 
-  /** District state and the one fault indicator; WARNING / RESTORED lines derived here. */
+  /** District state, its word when it is not fine, and the one fault indicator. */
   function renderDistricts() {
     for (const code of BUILD_ORDER) {
       const g = districtEls[code];
       const s = frame.sectors && frame.sectors[code];
       if (!g || !s) continue;
       if (s.colour) g.style.setProperty('--accent', s.colour);
-      const state = healthState(s);
+      const state = B.healthState(s);
       if (g.dataset.state !== state) g.dataset.state = state;
+      setText(g.querySelector('.state-text'), state === 'stable' || state === 'degraded' ? '' : B.STATE_WORD[state]);
       const unresolved = Number(s.unresolved_faults) || 0;
       g.classList.toggle('has-fault', unresolved > 0);
-      renderFaultBadge(g, DISTRICTS[code].badge, code, s.top_fault || null, unresolved);
-
-      const before = prevHealth[code];
-      if (before && before !== state) {
-        if (state === 'warning' && before === 'stable') {
-          derivedLines.push({ t: frame.server_time, key: `w|${code}|${frame.server_time}`, cls: 'warn', text: `${code} ENTERED WARNING` });
-        } else if (state === 'stable' && (before === 'warning' || before === 'critical')) {
-          derivedLines.push({ t: frame.server_time, key: `r|${code}|${frame.server_time}`, cls: 'ok', text: `${code} RESTORED TO ${clamp(s.integrity)}%` });
-        }
-      }
-      prevHealth[code] = state;
+      renderFaultBadge(g, DISTRICTS[code].badge, s.top_fault || null, unresolved);
     }
-    while (derivedLines.length > 20) derivedLines.shift();
   }
 
-  /** One badge on the rock while a fault is open: its clock, or its code, or how many. */
-  function renderFaultBadge(g, anchor, code, tf, unresolved) {
+  /** One badge on the rock while a fault is open: its code, or how many. Never the fix. */
+  function renderFaultBadge(g, anchor, tf, unresolved) {
     const host = g.querySelector('.badges');
     let spec = null;
     if (tf) {
-      spec = {
-        cls: Number(tf.severity) >= 3 ? 'badge b-crisis' : 'badge',
-        text: `⚠ ${tf.code}`,
-        clock: null,
-        extra: unresolved > 1 ? ` ×${unresolved}` : '',
-      };
+      spec = { cls: Number(tf.severity) >= 3 ? 'badge b-crisis' : 'badge', text: `⚠ ${tf.code}${unresolved > 1 ? ` ×${unresolved}` : ''}` };
     } else if (unresolved > 0) {
-      spec = { cls: 'badge', text: `⚠ ×${unresolved}`, clock: null, extra: '' };
+      spec = { cls: 'badge', text: `⚠ ×${unresolved}` };
     }
-    const sig = spec ? `${spec.cls}|${spec.text}|${spec.extra}|${spec.clock || ''}` : '';
+    const sig = spec ? `${spec.cls}|${spec.text}` : '';
     if (host.dataset.sig === sig) return;
     host.dataset.sig = sig;
     host.innerHTML = '';
     if (!spec) return;
     const badge = el('g', { class: spec.cls, transform: `translate(${anchor.x},${anchor.y})` });
-    const t = text(`${spec.text}${spec.extra}`, 0, 8, 'badge-text');
-    if (spec.clock) { t.dataset.clock = spec.clock; t.dataset.extra = spec.extra; }
+    const t = text(spec.text, 0, 8, 'badge-text');
     const rect = el('rect', { x: -60, y: -17, width: 120, height: 34, rx: 8 });
     badge.appendChild(rect);
     badge.appendChild(t);
@@ -366,9 +349,9 @@
   function renderCore() {
     const band = coreBand(Number(frame.core_output) || 0);
     if ($('wall').dataset.core !== band) $('wall').dataset.core = band;
-    // A fall in core output is an event the room should feel, not read.
+    // A fall in core stability is an event the room should feel, not read.
     const core = Number(frame.core_output);
-    if (prevCore !== null && core < prevCore && (prevCore - core >= 10 || core <= 60)) {
+    if (prevCore !== null && core < prevCore && (prevCore - core >= 10 || core <= B.CORE_INSUFFICIENT)) {
       setText($('shock-value'), `${core}%`);
       shockUntil = performance.now() + SHOCK_MS;
       show($('core-shock'), true);
@@ -378,10 +361,12 @@
     $('map').classList.toggle('breach', breach);
   }
 
-  /** The six monitors: integrity, word, indicator, small flags, and what COM reported. */
+  /**
+   * The six monitors: HEALTH %, the status word, what COM reported and how
+   * old that is — a round, never a clock. The card and the district share
+   * one state, decided once in B.healthState.
+   */
   function renderCards() {
-    const requests = frame.requests || [];
-    const transfers = frame.transfers || [];
     const rows = (frame.broadcast && frame.broadcast.rows) || {};
     for (const code of PANEL_ORDER) {
       const card = cardEls[code];
@@ -389,51 +374,27 @@
       if (!card || !s) continue;
       if (s.colour) card.style.setProperty('--accent', s.colour);
       setText(card.querySelector('.shc-name'), sectorName(code));
-      const state = healthState(s);
+      const state = B.healthState(s);
       if (card.dataset.state !== state) card.dataset.state = state;
       setText(card.querySelector('.shc-pct'), String(clamp(s.integrity)));
-      setText(card.querySelector('.shc-word'), STATE_WORD[state]);
+      setText(card.querySelector('.shc-word'), B.STATE_WORD[state]);
 
-      // flags: only what is true
-      const tf = s.top_fault || null;
-      const fault = card.querySelector('.f-fault');
-      const unresolved = Number(s.unresolved_faults) || 0;
-      show(fault, unresolved > 0);
-      if (unresolved > 0) {
-        fault.classList.toggle('crisis', !!(tf && Number(tf.severity) >= 3));
-        const more = unresolved > 1 ? ` ×${unresolved}` : '';
-        const sig = `${tf ? tf.code : ''}|${more}`;
-        if (fault.dataset.sig !== sig) {
-          fault.dataset.sig = sig;
-          fault.textContent = `⚠ ${tf ? tf.code : ''}${more}`.replace(/\s+/g, ' ');
-        }
-      }
-      show(card.querySelector('.f-req'), requests.some((r) => r.status === 'REQUESTED' && r.requester === code));
-      show(card.querySelector('.f-trn'), transfers.some((t) => ['PENDING_TRN_APPROVAL', 'APPROVED'].includes(t.status)
-        && (t.from === code || t.to === code || code === 'TRN')));
-      const injured = s.workforce ? Number(s.workforce.injured) || 0 : 0;
-      const inj = card.querySelector('.f-inj');
-      show(inj, injured > 0);
-      if (injured > 0) setText(inj, `⚕ ${injured}`);
-
-      // what COM last reported, and how old that is — a round, never a clock
-      const row = rows[code];
+      const rep = B.reportLine(rows[code]);
       const vals = card.querySelector('.rep-vals');
-      const fresh = card.querySelector('.rep-fresh');
-      if (row) {
-        const html = ['power', 'water', 'med', 'parts']
-          .map((k) => `${U.GLYPH[k]}<b>${row[k] === null || row[k] === undefined ? '—' : row[k]}</b>`).join(' ');
+      show(vals, !rep.none);
+      show(card.querySelector('.rep-none'), rep.none);
+      if (!rep.none) {
+        const html = rep.values.map((v) => `<span class="rv"><i>${v.glyph}</i><b>${U.escapeHtml(v.value)}</b></span>`).join('');
         if (vals.dataset.sig !== html) { vals.dataset.sig = html; vals.innerHTML = html; }
-        const word = row.freshness === 'NOT UPDATED' ? 'NO REPORT' : `R${row.round_number} ${row.freshness}`;
-        setText(fresh, word);
-        fresh.dataset.fresh = row.freshness;
-      } else {
-        show(card.querySelector('.shc-rep'), false);
       }
+      const fresh = B.freshnessLine(rows[code]);
+      const fe = card.querySelector('.shc-fresh');
+      setText(fe, fresh.text);
+      if (fe.dataset.fresh !== fresh.level) fe.dataset.fresh = fresh.level;
     }
   }
 
-  // -- movement: requests pulse, Transport waits, a delivery travels ------------------
+  // -- movement: a delivery travels its route once TRN has approved it --------------
 
   function routePoints(from, to) {
     const c = (code) => centroid(DISTRICTS[code].footprint);
@@ -472,11 +433,9 @@
   function renderMovement() {
     const host = $('routes');
     const transfers = frame.transfers || [];
-    const requests = frame.requests || [];
     const seen = new Set();
     const lit = new Set();
     const sweeping = new Set();
-    let trnPending = false;
 
     for (const t of transfers) {
       const phase = routePhase(t);
@@ -511,123 +470,70 @@
         }
         if (phase !== 'moving' && r.packet) { r.packet.remove(); r.packet = null; }
       }
-      if (phase === 'pending') trnPending = true;
       if (phase === 'moving') { lit.add(t.from); lit.add('TRN'); lit.add(t.to); }
       if (phase === 'sweep') { sweeping.add(t.to); lit.add(t.to); }
     }
     for (const [id, r] of routeEls) {
       if (!seen.has(id)) { r.g.remove(); routeEls.delete(id); }
     }
-
-    // the districts and cards echo it
-    const asked = new Set();
-    for (const rq of requests) if (rq.status === 'REQUESTED') { asked.add(rq.requester); asked.add(rq.supplier); }
+    // the districts and cards echo a delivery, briefly
     for (const code of PANEL_ORDER) {
-      const g = districtEls[code];
-      const card = cardEls[code];
-      g.classList.toggle('req', asked.has(code));
-      g.classList.toggle('trn-pending', code === 'TRN' && trnPending);
-      g.classList.toggle('sweep', sweeping.has(code));
-      card.classList.toggle('lit', lit.has(code) || asked.has(code));
-      card.classList.toggle('sweep', sweeping.has(code));
+      districtEls[code].classList.toggle('sweep', sweeping.has(code));
+      cardEls[code].classList.toggle('lit', lit.has(code));
+      cardEls[code].classList.toggle('sweep', sweeping.has(code));
     }
   }
 
-  // -- the one priority event ------------------------------------------------------
+  // -- the alert strip: only while something needs the room --------------------------
 
-  /**
-   * The single most important thing happening, in the spec's order: a timed
-   * emergency, a DARK sector, a CRITICAL sector, core insufficiency, the
-   * Council, a resource request, a transfer waiting on Transport, a fault,
-   * COM's broadcast — else the city is fine.
-   */
-  function priorityEvent() {
-    const f = frame;
-    const sec = (code) => f.sectors && f.sectors[code];
-    const faults = PANEL_ORDER.map((code) => ({ code, tf: sec(code) && sec(code).top_fault })).filter((x) => x.tf);
-
-    if (f.alert) {
-      return { key: `alert:${f.alert.id}`, level: 1, accent: 'red', sev: 'MAJOR EMERGENCY',
-        head: String(f.alert.title || ''), route: String(f.alert.subtitle || ''), clock: f.alert.big ? { kind: 'text', text: f.alert.big } : null };
-    }    const dark = PANEL_ORDER.find((c) => healthState(sec(c)) === 'dark');
-    if (dark) {
-      return { key: `dark:${dark}`, level: 2, accent: 'red', sev: 'SECTOR OFFLINE',
-        head: `${sectorName(dark)} IS DARK`, route: 'INTEGRITY AT ZERO', clock: null, sector: dark };
+  function renderAlerts() {
+    const chips = B.buildAlerts(frame);
+    const host = $('alerts');
+    const keys = new Set(chips.map((c) => c.key));
+    for (const [key, node] of chipEls) {
+      if (!keys.has(key)) { node.remove(); chipEls.delete(key); }
     }
-    const crit = PANEL_ORDER.filter((c) => healthState(sec(c)) === 'critical').sort((a, b) => sec(a).integrity - sec(b).integrity)[0];
-    if (crit) {
-      return { key: `crit:${crit}`, level: 3, accent: 'red', sev: 'SECTOR CRITICAL',
-        head: `${sectorName(crit)} CRITICAL`, route: `INTEGRITY ${clamp(sec(crit).integrity)}%`, clock: null, sector: crit };
-    }
-    if (Number(f.core_output) <= CORE_INSUFFICIENT) {
-      return { key: 'core', level: 4, accent: 'amber', sev: 'CORE INSUFFICIENCY DETECTED',
-        head: `CORE OUTPUT ${f.core_output}%`, route: 'CAPACITY INSUFFICIENT — SECTORS MUST ENTER BROWNOUT', clock: null };
-    }
-    if (inCouncil()) {
-      const c = f.council || {};
-      const order = f.continuity_order && Array.isArray(f.continuity_order.order) ? f.continuity_order : null;
-      const route = order
-        ? `CONTINUITY ORDER: ${order.order.join(' › ')}${order.brownout && order.brownout.length ? ` · BROWNOUT ${order.brownout.join(' ')}` : ''}`
-        : (Number(f.core_output) <= CORE_INSUFFICIENT ? 'CORE CAPACITY INSUFFICIENT — 2 SECTORS MUST ENTER BROWNOUT' : 'CHIEFS + LIAISONS REPORT TO CENTRAL COUNCIL');
-      return { key: `council:${c.count || 0}:${c.no_order ? 'no' : ''}:${order ? 'o' : ''}`, level: 5, accent: 'purple', sev: 'CENTRAL COUNCIL',
-        head: c.no_order ? 'NO CONTINUITY ORDER RECEIVED' : 'COUNCIL CONVENED', route, clock: { kind: 'council' } };
-    }
-    const req = (f.requests || []).find((r) => r.status === 'REQUESTED');
-    if (req) {
-      return { key: `req:${req.id}`, level: 6, accent: 'amber', sev: 'RESOURCE REQUEST',
-        head: `${sectorName(req.requester)} NEEDS ${req.amount} ${resName(req.resource)}`,
-        route: `${req.supplier} → TRN → ${req.requester}`, clock: null, sector: req.requester };
-    }
-    const moving = (f.transfers || []).find((t) => routePhase(t) === 'moving' || routePhase(t) === 'sweep');
-    if (moving) {
-      return { key: `move:${moving.id}`, level: 7, accent: 'green', sev: 'TRANSFER IN PROGRESS',
-        head: `${moving.amount} ${resName(moving.resource)} · ${sectorName(moving.from)} → ${sectorName(moving.to)}`,
-        route: `${moving.from} → TRN → ${moving.to}`, clock: null };
-    }
-    const pending = (f.transfers || []).find((t) => t.status === 'PENDING_TRN_APPROVAL');
-    if (pending) {
-      return { key: `pend:${pending.id}`, level: 7, accent: 'grey', sev: 'TRANSFER WAITING FOR TRANSPORT',
-        head: `${pending.amount} ${resName(pending.resource)} · ${sectorName(pending.from)} → ${sectorName(pending.to)}`,
-        route: `${pending.from} → TRN → ${pending.to}`, clock: null };
-    }
-    const major = faults.sort((a, b) => Number(b.tf.severity) - Number(a.tf.severity))[0];
-    if (major) {
-      const sev = Number(major.tf.severity) || 1;
-      return { key: `fault:${major.code}:${major.tf.code}`, level: 8, accent: sev >= 3 ? 'red' : 'amber', sev: U.severityName(sev),
-        head: `${sectorName(major.code)} · ${major.tf.code} ${String(major.tf.name || '').toUpperCase()}`,
-        route: 'RESOLUTION REQUIRED',
-        clock: null,
-        sector: major.code };
-    }
-    const a = f.broadcast && f.broadcast.announcement;
-    if (a) {
-      return { key: `bc:${a.round}:${a.headline}:${a.message}`, level: 9, accent: 'amber', sev: `CITY BROADCAST · ROUND ${a.round_number} ${a.freshness}`,
-        head: String(a.headline || a.message || ''), route: a.headline ? String(a.message || '') : '', clock: null };
-    }
-    return { key: 'normal', level: 10, accent: 'green', sev: 'STATUS', head: 'CITY OPERATIONS NORMAL', route: 'ALL SECTORS REPORTING', clock: null };
-  }
-
-  let bannerClock = null;
-  function renderBanner() {
-    const ev = priorityEvent();
-    const banner = $('banner');
-    if (banner.dataset.accent !== ev.accent) banner.dataset.accent = ev.accent;
-    if (banner.dataset.level !== String(ev.level)) banner.dataset.level = String(ev.level);
-    setText($('b-sev'), ev.sev);
-    setText($('b-head'), ev.head);
-    setText($('b-route'), ev.route || '');
-    bannerClock = ev.clock || null;
-    const c = $('b-clock');
-    if (!bannerClock) { show(c, false); }
-    else if (bannerClock.kind === 'text') { setText(c, bannerClock.text); c.className = `b-clock clock ${bannerClock.cls || ''}`.trim(); show(c, true); }
-    else show(c, true);
-    if (ev.key !== bannerKey) {
-      bannerKey = ev.key;
-      if (booted) {
-        banner.classList.remove('swap');
-        void banner.offsetWidth;
-        banner.classList.add('swap');
+    chips.forEach((c, i) => {
+      let node = chipEls.get(c.key);
+      if (!node) {
+        node = document.createElement('div');
+        node.className = `chip ${c.kind}${booted ? ' enter' : ''}`;
+        node.dataset.accent = c.accent;
+        node.innerHTML = '<b class="c-head"></b><span class="c-detail"></span>';
+        chipEls.set(c.key, node);
       }
+      setText(node.querySelector('.c-head'), c.head);
+      setText(node.querySelector('.c-detail'), c.detail || '');
+      if (host.children[i] !== node) host.insertBefore(node, host.children[i] || null);
+    });
+    show(host, chips.length > 0);
+    $('wall').classList.toggle('has-alerts', chips.length > 0);
+  }
+
+  // -- the city broadcast: COM's announcement, or the fact that there is none --------
+
+  function renderBroadcast() {
+    const a = frame.broadcast && frame.broadcast.announcement;
+    const live = !!(a && (a.headline || a.message));
+    const key = live ? `${a.round}|${a.headline}|${a.message}` : 'none';
+    const bc = $('broadcast');
+    if (key !== broadcastKey) {
+      broadcastKey = key;
+      if (booted && live) {          // one entrance, then it stays still
+        bc.classList.remove('enter');
+        void bc.offsetWidth;
+        bc.classList.add('enter');
+      }
+    }
+    if (bc.dataset.state !== (live ? 'live' : 'none')) bc.dataset.state = live ? 'live' : 'none';
+    if (live) {
+      setText($('bc-head'), String(a.headline || a.message));
+      setText($('bc-msg'), a.headline ? String(a.message || '') : '');
+      setText($('bc-by'), `— COMMS & SENSORS · ROUND ${a.round_number} · ${a.freshness}`);
+    } else {
+      setText($('bc-head'), 'NO ACTIVE CITY BROADCAST');
+      setText($('bc-msg'), '');
+      setText($('bc-by'), '');
     }
   }
 
@@ -635,10 +541,10 @@
   function renderModes() {
     const w = $('wall');
     w.classList.toggle('council', inCouncil() && !frame.debrief);
-    w.classList.toggle('core-low', Number(frame.core_output) <= CORE_INSUFFICIENT);
+    w.classList.toggle('core-low', Number(frame.core_output) <= B.CORE_INSUFFICIENT);
   }
 
-  function renderAlert() {
+  function renderAlertTakeover() {
     const a = frame.alert;
     if (!a) { show($('alert-full'), false); alertRenderedId = null; return; }
     if (a.id !== alertRenderedId) {
@@ -680,93 +586,6 @@
     if (Number.isFinite(n)) prevCycle = n;
   }
 
-  // -- the ticker: the last four things worth knowing ---------------------------------
-
-  /** Turn a feed line into a short, readable event — or nothing. */
-  function tickerLine(e) {
-    const t = String(e.text || '');
-    let m;
-    switch (e.kind) {
-      case 'fault':
-        if ((m = t.match(/^(\w{3}) fault detected: (F-\d+)/))) return { cls: 'bad', text: `${m[1]} ${m[2]} DETECTED` };
-        return { cls: 'bad', text: t.toUpperCase() };
-      case 'resolve':
-        if ((m = t.match(/^(\w{3}) resolved (F-\d+)/))) return { cls: 'ok', text: `${m[1]} ${m[2]} RESOLVED` };
-        return { cls: 'ok', text: t.toUpperCase() };
-      case 'clear':
-        if ((m = t.match(/^(\w{3}) (F-\d+) cleared/))) return { cls: 'ok', text: `${m[1]} ${m[2]} CLEARED` };
-        return null;      case 'status':
-        if ((m = t.match(/^(\w{3}) CRITICAL$/))) return { cls: 'bad', text: `${m[1]} ENTERED CRITICAL` };
-        if ((m = t.match(/^(\w{3}) IS DARK$/))) return { cls: 'bad', text: `${m[1]} WENT DARK` };
-        if ((m = t.match(/^(\w{3}) → (\w+)$/))) {
-          if (m[2] === 'ACTIVE') return { cls: 'ok', text: `${m[1]} RESTORED` };
-          if (m[2] === 'DARK') return { cls: 'bad', text: `${m[1]} WENT DARK` };
-          if (m[2] === 'BROWNOUT') return { cls: 'warn', text: `${m[1]} BROWNOUT` };
-          return { cls: 'warn', text: `${m[1]} ${m[2]}` };
-        }
-        return { cls: 'warn', text: t.toUpperCase() };
-      case 'transfer':
-        if ((m = t.match(/^TRN approved (\w{3}) → (\w{3}): (\d+) (\w+)/))) return { cls: 'ok', text: `${m[1]} → ${m[2]} ${m[3]} ${resName(m[4])} DELIVERED` };
-        if ((m = t.match(/^Delivered (\w{3}) → (\w{3}): (\d+) (\w+)/))) return { cls: 'ok', text: `${m[1]} → ${m[2]} ${m[3]} ${resName(m[4])} DELIVERED` };
-        return null;   // asks, fulfilments and refusals are the banner's business, not history
-      case 'core':
-        if ((m = t.match(/^CORE OUTPUT (\d+)%/))) return { cls: 'warn', text: `CORE OUTPUT ${m[1]}%` };
-        return { cls: 'warn', text: t.toUpperCase() };
-      case 'cycle':
-        if ((m = t.match(/^(R\d+) UPKEEP PROCESSED/))) return { cls: 'info', text: `${m[1]} UPKEEP PROCESSED` };
-        if ((m = t.match(/^(\w{3}) missed upkeep/))) return { cls: 'warn', text: `${m[1]} MISSED UPKEEP` };
-        return null;
-      case 'council':
-        if (/SUMMONED/i.test(t)) return { cls: 'council', text: 'COUNCIL CONVENED' };
-        if (/NO CONTINUITY/i.test(t)) return { cls: 'bad', text: 'NO CONTINUITY ORDER RECEIVED' };
-        if (/ENDED/i.test(t)) return { cls: 'council', text: 'COUNCIL CONCLUDED' };
-        return { cls: 'council', text: t.toUpperCase() };
-      case 'order':
-        return { cls: 'council', text: 'CONTINUITY ORDER ACCEPTED' };
-      case 'blackout':
-        return { cls: 'bad', text: t.toUpperCase() };
-      case 'event':
-        return { cls: 'warn', text: t.toUpperCase() };
-      case 'announce':
-        if ((m = t.match(/^COM: (.*)$/))) return { cls: 'info', text: `BROADCAST · ${m[1].toUpperCase()}` };
-        if ((m = t.match(/^AGR intervention: (.*)$/))) return { cls: 'info', text: `AGR INTERVENTION · ${m[1].toUpperCase()}` };
-        return { cls: 'info', text: t.toUpperCase() };
-      case 'phase':
-        return { cls: 'info', text: t.toUpperCase() };
-      default:
-        return null;   // pause, round, breather, injury: the bands already say it
-    }
-  }
-
-  const tickerRows = new Map();   // key -> element
-  function renderTicker() {
-    const feed = Array.isArray(frame.ticker) ? frame.ticker : (frame.feed || []);
-    const lines = [];
-    for (const e of feed) {
-      const line = tickerLine(e);
-      if (line) lines.push({ key: `${e.t}|${e.kind}|${e.text}`, t: e.t, ...line });
-    }
-    for (const d of derivedLines) lines.push(d);
-    lines.sort((a, b) => Date.parse(b.t) - Date.parse(a.t));
-    const keep = lines.slice(0, TICKER_MAX);
-    const host = $('ticker');
-    const keys = new Set(keep.map((l) => l.key));
-    for (const [key, node] of tickerRows) {
-      if (!keys.has(key)) { node.remove(); tickerRows.delete(key); }
-    }
-    keep.forEach((l, i) => {
-      let node = tickerRows.get(l.key);
-      if (!node) {
-        node = document.createElement('div');
-        node.className = `tk ${l.cls || ''}${booted ? ' enter' : ''}`.trim();
-        node.innerHTML = `<time>${hhmm(l.t)}</time><span></span>`;
-        node.querySelector('span').textContent = l.text;
-        tickerRows.set(l.key, node);
-      }
-      if (host.children[i] !== node) host.insertBefore(node, host.children[i] || null);
-    });
-  }
-
   // -- the 250 ms tick: clocks and timed overlays ------------------------------------
 
   function tick() {
@@ -779,7 +598,7 @@
     const clockObj = council ? frame.council_clock : frame.round_clock;
     const secs = U.countdown(clockObj, frozen);
     const running = !!(clockObj && clockObj.running) && !frozen;
-    setText($('cycle-clock'), U.mmss(secs));
+    setText($('round-clock'), U.mmss(secs));
     const urgency = !running ? '' : secs <= 10 ? ' final' : secs <= 60 ? ' danger' : secs <= 120 ? ' warn' : '';
     const cls = `hud-stat hud-time${council ? ' council' : ''}${urgency}`;
     const hud = $('hud-time');
@@ -794,15 +613,6 @@
       if (fc.textContent !== digit) { fc.textContent = digit; fc.hidden = true; void fc.offsetWidth; }
       fc.hidden = false;
     } else if (!fc.hidden) { fc.hidden = true; fc.textContent = ''; }
-
-    // The banner's clock: the council countdown.
-    if (bannerClock && bannerClock.kind !== 'text') {
-      const c = $('b-clock');
-      if (bannerClock.kind === 'council') {
-        const cc = U.countdown(frame.council_clock, frozen);
-        setText(c, U.mmss(cc));
-        c.className = `b-clock clock${cc < 30 ? ' danger' : cc < 60 ? ' warn' : ''}`;      }
-    }
 
     // Overlays and routes with a life of their own.
     if (!$('core-shock').hidden && now >= shockUntil) show($('core-shock'), false);

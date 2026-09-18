@@ -271,7 +271,7 @@ The Admin page prompts for the token if the URL does not carry one.
   "cycle": { "number": 3, "length_s": 420, "remaining_s": 267, "running": false },   // legacy timer; see §8.7
   "paused": false, "breather": false, "frozen": false,
   "core_output": 83, "core_integrity": 83,
-  "city_stability": 71, "stability_mode": "auto",
+  "city_stability": 71, "stability_mode": "auto",   // control frame ONLY — no participant frame carries an aggregate city figure (v15)
   "council": { "active": false, "count": 1, "order_submitted": false, "no_order": false, "started_at": null },
   "continuity_order": { "order": ["POW","MED","WTR","TRN","COM","AGR"], "brownout": ["COM","AGR"], "t": "…" },
   "blackout": { "active": false, "current": [] },
@@ -374,14 +374,29 @@ signed chit and TRN's rubber stamp remain the physical truth.
 
 ### 8.4 Wall frame
 
-Per sector: `integrity status brownout dark workforce{active injured available
-total} unresolved_faults`, plus `inventory` when `wall_shows_inventory` and
-`top_fault { code name severity deadline_remaining_s expired }` when
-`wall_shows_faults`. Both vanish while COM is DARK and
-`com_dark_hides_wall_detail` is on (`telemetry_degraded: true`). `feed[]` is
-the ticker filtered to public kinds, newest first, capped at `wall_feed_max`.
+Per sector: `integrity status status_word brownout dark workforce{active
+injured available total} unresolved_faults`, plus `top_fault { code name
+severity deadline_remaining_s expired }` when `wall_shows_faults`, which
+vanishes while COM is DARK and `com_dark_hides_wall_detail` is on
+(`telemetry_degraded: true`). `broadcast` is COM's board (`rows{}` with a
+`round_number` and a `freshness` word per sector, and the `announcement`);
+`requests[]` and `transfers[]` are the open movement (§8.7). `feed[]` is the
+ticker filtered to public kinds, newest first, capped at `wall_feed_max`.
 `debrief` carries the Round 3 vs Aftershock comparison once the facilitator
-turns `wall_debrief` on. Never: an answer key, a procedure, a flavour line.
+turns `wall_debrief` on. Never: real `inventory`, `city_stability` or any
+aggregate city figure, an answer key, a procedure, a flavour line.
+
+**Big Screen contract v15 (2026-09-18).** The wall is display-only and prints:
+CURRENT ROUND (`round_number`), CORE STABILITY (`core_output`), NEXT ROUND IN
+(`round_clock`, the council clock while the Council sits), LIVE; an alert
+strip only while something needs the room — the facilitator's `alert`, DARK
+sectors, CRITICAL sectors with their health, core ≤ 60, the Council, transfers
+`PENDING_TRN_APPROVAL` (one `FROM → TO` route and item, or a count), a
+facilitator announcement under 120 s old; six sector cards (HEALTH %, the
+server's status word, COM's reported row in POWER · WATER · MEDICAL · PARTS
+order or NO REPORT, `UPDATED ROUND n · CURRENT|STALE|OUTDATED` or NOT UPDATED);
+and the CITY BROADCAST area (`broadcast.announcement`, else NO ACTIVE CITY
+BROADCAST). The rules are in `public/shared/bigscreen.js` and are tested.
 
 ### 8.5 Control frame
 

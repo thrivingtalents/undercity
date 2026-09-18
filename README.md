@@ -29,7 +29,7 @@ control extension). Where the two differ, **the contract wins**.
 
 | Screen | Who | LAN URL | What it does |
 |---|---|---|---|
-| **Wall** | projector, whole room | `/wall` | The city command centre, in four bands: a command bar (round · CORE · NEXT CYCLE, the timer going amber under 2:00, red under 1:00, pulsing in the last ten seconds); ONE priority event (a timed emergency, a DARK sector, a CRITICAL sector, core insufficiency, the Council, a resource request, a transfer waiting on Transport, a fault, COM's broadcast — in that order — with its own countdown); the full HAVEN-9 illustration (`Asset/Map reference`, prepared into `public/wall/art` by `node tools/prepare-wall-art.js`) with live labels, state tints, one fault badge per district, transfer routes that light only while something moves, and a Core that glows with its output; six fixed-order SECTOR HEALTH monitors beside it (icon, code, name, integrity, STABLE / WARNING / CRITICAL / BROWNOUT / DARK, small flags for a fault, a request, a transfer, injuries, and what COM last reported with a round-based freshness word); and the last four events. Council keeps the city visible; a cycle boundary flashes for 3.5 s. Nothing says "no active faults"; nothing shows a hidden code |
+| **Wall** | projector, whole room | `/wall` | The participant Big Screen (contract v15), display-only, in four bands: a command bar (phase · CURRENT ROUND · CORE STABILITY · NEXT ROUND IN · LIVE, the timer going amber under 2:00, red under 1:00, pulsing in the last ten seconds); an alert strip drawn only while something needs the room (the facilitator's emergency, DARK sectors, CRITICAL sectors with their health, core insufficiency, the Council, transfers waiting for TRN — one FROM → TO route and item, or a count — then a recent facilitator announcement, in that order); the full HAVEN-9 illustration (`Asset/Map reference`, prepared into `public/wall/art` by `node tools/prepare-wall-art.js`) with live labels, state tints, a CRITICAL / DARK / BROWNOUT word under the label, one fault badge per district, transfer routes that light only while something moves, and a Core that glows with its stability; six fixed-order SECTOR HEALTH cards beside it (icon, code, name, HEALTH %, STABLE / DEGRADED / CRITICAL / BROWNOUT / DARK, what COM reported or NO REPORT, and UPDATED ROUND n · CURRENT / STALE / OUTDATED or NOT UPDATED); and COM's CITY BROADCAST, readable from the back of the room, or NO ACTIVE CITY BROADCAST. STABLE and DEGRADED never move; only CRITICAL breathes. Nothing to press; never real inventory, an aggregate city score, an answer key or a procedure |
 | **Sector** | the Systems Lead | `/sector/POW` … `/sector/COM` | What's wrong · how long · what we have · what to enter. Fault list → open card → resolution console with 3-strike 20 s lockout. All six get RESOURCE REQUESTS & TRANSFERS — REQUEST RESOURCE / TRANSFER RESOURCE on top, then ACTIVE (one card per movement, oldest first, ALL / INCOMING / OUTGOING, FULFILL or DECLINE on a request for our stock) and a folded HISTORY — and an injured-worker panel that asks Medical for healing. TRN alone gets the resource approval queue with APPROVE; MED alone gets the healing queue with HEAL; COM gets City Intelligence and CITY BROADCAST CONTROL (the only editable big screen); AGR gets its three intervention cards. The city's reported board lives on the wall, not on the laptops: a table sees only a CITY ANNOUNCEMENT UPDATED nudge |
 | **Admin** | the facilitator | `/admin?token=haven9` | Phase/master timer, seven always-visible quick actions, 2×3 sector control grid, pressure panel (faults · timeline · events · council · core · transfers · settings · debrief), live log, observation pad |
 
@@ -447,12 +447,13 @@ a sector must not know is never put in its frame.
 | `sector` | full | integrity + status only, **60 s stale** | own transfers, own announcements, own effects |
 | `sector` = COM | full | as above **+ foreign fault codes and names, live** | CITY INTELLIGENCE (UNKNOWN under brownout/blackout) |
 | `sector` = TRN | full | as above | TRANSFER QUEUE + capacity + STAMP |
-| `wall` | — | integrity, status, workers, stock summary, worst fault + countdown, public feed | none of it while COM is DARK; **never** an answer key, procedure or flavour line |
+| `wall` | — | integrity, status word, workers, COM's reported board, worst fault, open movement, public feed | fault detail hidden while COM is DARK; **never** real inventory, an aggregate city figure, an answer key, procedure or flavour line |
 | `control` | everything, live | everything, live | `valid_codes`, config, timeline, transfers, debrief |
 
-The wall's stock summary and headline fault are switches
-(`wall_shows_inventory`, `wall_shows_faults`) so the original "bars only"
-projector is one setting away. A sector's screen says only *consult your
+The wall's headline fault is a switch (`wall_shows_faults`) so a "bars only"
+projector is one setting away; real inventory never reaches the wall at all,
+and neither does the city stability score (Big Screen contract v15, kept for
+Admin only). A sector's screen says only *consult your
 binder*; the dependency half of every flavour line is cut server-side, exactly
 as the printed card cuts it.
 

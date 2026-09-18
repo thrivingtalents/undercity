@@ -113,7 +113,7 @@ test('the wall names the worst fault and the stock, never the fix', () => {
   assert.equal(pow.top_fault.name, 'Coolant loop failure');
   assert.equal(pow.top_fault.flavour, undefined, 'no flavour, no dependency clause');
   assert.equal(pow.top_fault.crew_required, undefined);
-  assert.ok(pow.inventory, 'resource summary is on by default (spec §7)');
+  assert.equal(pow.inventory, undefined, 'the wall is never sent real inventory (Big Screen v15)');
   assert.equal(typeof pow.unresolved_faults, 'number');
   const json = JSON.stringify(payload);
   assert.ok(!json.includes('valid_codes'));
@@ -122,15 +122,15 @@ test('the wall names the worst fault and the stock, never the fix', () => {
   assert.ok(payload.feed && payload.telemetry, 'feed and telemetry are public');
 });
 
-test('wall fault detail and inventory are switches, and COM going dark hides both', () => {
+test('wall fault detail is a switch, COM going dark hides it, and no setting puts inventory on the wall', () => {
   const game = loaded();
-  game.patchConfig({ wall_shows_inventory: false, wall_shows_faults: false });
+  game.patchConfig({ wall_shows_faults: false, wall_shows_inventory: true });
   let payload = forBigscreen(game);
   assert.equal(payload.sectors.POW.top_fault, undefined);
-  assert.equal(payload.sectors.POW.inventory, undefined);
+  assert.equal(payload.sectors.POW.inventory, undefined, 'the old switch is gone: real stock never reaches the wall');
   assert.equal(typeof payload.sectors.POW.unresolved_faults, 'number', 'counts always');
 
-  game.patchConfig({ wall_shows_inventory: true, wall_shows_faults: true });
+  game.patchConfig({ wall_shows_faults: true });
   game.setStatus('COM', 'DARK');
   payload = forBigscreen(game);
   assert.equal(payload.telemetry_degraded, true);

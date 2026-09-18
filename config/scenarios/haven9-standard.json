@@ -10,7 +10,7 @@
     "delay_window_s": 60,
 
     "critical_below": 30,
-    "degraded_below": 60,
+    "degraded_below": 70,
     "dark_at": 0,
     "core_start_output": 100,
     "round_length_s": { "R0": 900, "R1": 1200, "R2": 1800, "R3": 1800, "R4": 1500 },
@@ -76,7 +76,6 @@
     },
     "com_dark_hides_wall_detail": true,
 
-    "wall_shows_inventory": true,
     "wall_shows_faults": true,
     "wall_feed_max": 7,
 

@@ -10,47 +10,44 @@
 </head>
 <body>
 <!--
-  The city command centre, in four bands: the command bar, ONE priority
-  event, the city beside its six health monitors, and the last four things
-  that happened. Every value comes from the server's frame; nothing here is
-  computed for looks.
+  The participant Big Screen. Display-only: there is no button here and
+  nothing to type. Four bands — the command bar, an alert strip drawn only
+  while something needs the room, the city beside its six health monitors,
+  and COM's city broadcast. Every value comes from the server's frame; the
+  formatting rules are shared with the tests in /shared/bigscreen.js.
 -->
 <div class="wall" id="wall" data-core="healthy">
 
-  <!-- 1. COMMAND BAR: identity, round, the two numbers -->
+  <!-- 1. COMMAND BAR: identity and phase, CURRENT ROUND, CORE STABILITY, NEXT ROUND IN, LIVE -->
   <header class="hud">
     <div class="hud-brand">
       <h1>HAVEN-9</h1>
       <span class="hud-phase" id="phase-name">—</span>
     </div>
     <div class="hud-stats">
-      <div class="hud-stat" id="hud-core"><span class="k">CORE</span><b><span id="core-output">--</span><small>%</small></b></div>
-      <div class="hud-stat hud-time" id="hud-time"><span class="k" id="time-label">NEXT ROUND</span><b class="clock" id="cycle-clock">--:--</b></div>
+      <div class="hud-stat" id="hud-round"><span class="k">CURRENT ROUND</span><b id="round-number">--</b></div>
+      <div class="hud-stat" id="hud-core"><span class="k">CORE STABILITY</span><b><span id="core-output">--</span><small>%</small></b></div>
+      <div class="hud-stat hud-time" id="hud-time"><span class="k" id="time-label">NEXT ROUND IN</span><b class="clock" id="round-clock">--:--</b></div>
     </div>
-    <div class="hud-tags">
-      <span class="tag tag-blackout" id="tag-blackout" hidden>ROLLING BLACKOUT</span>
-      <span class="tag tag-breather" id="tag-breather" hidden>BREATHER</span>
-      <span class="tag tag-sensors" id="tag-sensors" hidden>SENSORS OFFLINE</span>
+    <div class="hud-right">
+      <div class="hud-tags">
+        <span class="tag tag-blackout" id="tag-blackout" hidden>ROLLING BLACKOUT</span>
+        <span class="tag tag-breather" id="tag-breather" hidden>BREATHER</span>
+        <span class="tag tag-sensors" id="tag-sensors" hidden>SENSORS OFFLINE</span>
+      </div>
+      <div class="live" id="live" data-status="down"><span class="dot"></span><span class="live-text" id="live-text">CONNECTING</span></div>
     </div>
   </header>
 
-  <!-- 2. PRIORITY EVENT: the one thing that matters most right now -->
-  <section class="banner" id="banner" data-accent="green" data-level="10">
-    <div class="b-light"></div>
-    <div class="b-text">
-      <span class="b-sev" id="b-sev">STATUS</span>
-      <b class="b-head" id="b-head">CITY OPERATIONS NORMAL</b>
-      <span class="b-route" id="b-route"></span>
-    </div>
-    <b class="b-clock clock" id="b-clock" hidden></b>
-  </section>
+  <!-- 2. ALERT STRIP: only while something needs the room; critical sectors before transfers -->
+  <section class="alerts" id="alerts" hidden></section>
 
   <!-- 3. THE CITY and its six monitors -->
   <main class="main">
     <section class="city" id="city">
       <svg id="map" viewBox="0 0 1672 941" preserveAspectRatio="xMidYMid meet" role="img" aria-label="HAVEN-9 underground city"></svg>
       <div class="final-count" id="final-count" hidden></div>
-      <!-- the cycle boundary, for 3.5 seconds -->
+      <!-- the round's upkeep pass, for 3.5 seconds -->
       <div class="cycle-flash" id="cycle-flash" hidden>
         <b id="cycle-flash-title"></b>
         <span id="cycle-flash-sub"></span>
@@ -63,8 +60,15 @@
     </aside>
   </main>
 
-  <!-- 4. RECENT EVENTS: the last four things worth knowing -->
-  <footer class="ticker" id="ticker"></footer>
+  <!-- 4. CITY BROADCAST: what COM told the city, readable from the back of the room -->
+  <footer class="broadcast" id="broadcast" data-state="none">
+    <div class="bc-tag">📡 CITY BROADCAST</div>
+    <div class="bc-body">
+      <b class="bc-head" id="bc-head">NO ACTIVE CITY BROADCAST</b>
+      <span class="bc-msg" id="bc-msg"></span>
+    </div>
+    <div class="bc-by" id="bc-by"></div>
+  </footer>
 
   <!-- takeovers: the city stays faintly visible behind each -->
   <div class="takeover alert" id="alert-full" hidden>
@@ -79,7 +83,7 @@
   <div class="takeover shock" id="core-shock" hidden>
     <div class="t-inner">
       <div class="t-tag">GEOTHERMAL CORE</div>
-      <div class="t-title">CORE OUTPUT FALLING</div>
+      <div class="t-title">CORE STABILITY FALLING</div>
       <div class="t-big" id="shock-value">--%</div>
     </div>
   </div>
@@ -104,12 +108,10 @@
 
   <!-- corner chrome -->
   <div class="sound-hint" id="sound-hint">CLICK ANYWHERE TO ENABLE SOUND</div>
-  <div class="conn" id="conn" data-status="down">
-    <span class="dot"></span><span class="text" id="conn-text">CONNECTING</span>
-  </div>
 
 </div>
 <script src="/shared/ws.js"></script>
+<script src="/shared/bigscreen.js"></script>
 <script src="/assets/wall/wall.js"></script>
 </body>
 </html>
