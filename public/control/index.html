@@ -20,9 +20,16 @@
   </form>
 </div>
 
+<!--
+  THE FACILITATOR'S COMMAND CENTRE (v16): UNDERSTAND → DECIDE → INTERVENE.
+  The top bar says where the session is and carries only what is pressed
+  repeatedly. OVERVIEW is the default and stays readable; EVENTS runs the
+  scenario; CITY SYSTEMS inspects authoritative state; DEBRIEF looks back.
+  Direct changes to authoritative state live one level deeper, ask for a
+  reason, and are logged as ADMIN OVERRIDE events.
+-->
 <div class="shell" id="shell">
 
-  <!-- MASTER CONTROL -->
   <header class="topbar">
     <div class="tb-ident">
       <h1>UNDERCITY <span class="sub">ADMIN</span></h1>
@@ -30,101 +37,154 @@
       <span class="scenario" id="scenario-name">—</span>
     </div>
 
-    <div class="tb-phase">
+    <div class="tb-stat tb-phase">
       <span class="label">PHASE</span>
       <b id="phase-name">—</b>
       <span class="pill" id="mode-pill">—</span>
       <span class="pill breather hidden" id="breather-pill">BREATHER</span>
-      <span class="pill paused hidden" id="paused-pill">PAUSED</span>
     </div>
 
-    <div class="tb-clock">
-      <span class="label">MASTER TIME</span>
+    <div class="tb-stat">
+      <span class="label">ROUND</span>
+      <b id="round-value">—</b>
+    </div>
+
+    <div class="tb-stat tb-clock">
+      <span class="label">MASTER TIME <em id="clock-note"></em></span>
       <b id="master-clock">--:--</b>
+    </div>
+
+    <div class="tb-stat">
+      <span class="label">CORE</span>
+      <b id="core-value">—</b>
     </div>
 
     <div class="tb-buttons">
       <button id="btn-start" class="primary">START</button>
       <button id="btn-pause">PAUSE</button>
-      <button id="btn-end-phase">END PHASE</button>
-      <button id="btn-next-phase">NEXT PHASE ›</button>
-      <select id="phase-select" title="Jump to a phase"></select>
-    </div>
-
-    <div class="tb-figures">
-      <div class="fig"><span class="label">CORE</span><b id="core-value">—</b></div>
-      <div class="fig"><span class="label">CITY</span><b id="city-value">—</b></div>
-      <div class="fig"><span class="label">UPKEEP IN</span><b id="cycle-clock">--:--</b></div>
-      <div class="fig"><span class="label">COUNCIL</span><b id="council-clock">--:--</b></div>
+      <button id="btn-next-phase" class="primary">NEXT PHASE ›</button>
+      <button id="btn-end-phase" class="ghost" title="Stop the round clock at 00:00. The phase does not change; NEXT PHASE does that.">STOP CLOCK</button>
     </div>
 
     <div class="tb-right">
-      <button id="btn-sound" title="Wall + sector sound">🔊</button>
-      <button id="btn-urls" title="Addresses for the room">URLS</button>
-      <button id="btn-snapshot">SNAPSHOT</button>
-      <button id="btn-export">EXPORT LOG</button>
-      <button id="btn-reset" class="danger">RESET</button>
       <div class="conn" id="conn" data-status="down">
         <span class="dot"></span><span class="text" id="conn-text">CONNECTING</span>
       </div>
+      <span class="pill paused hidden" id="paused-pill">PAUSED</span>
+      <button id="btn-more" title="Audio, room URLs, snapshot, export, settings, dangerous actions">•••</button>
     </div>
   </header>
 
-  <!-- QUICK ACTIONS — always visible (spec §46) -->
-  <nav class="quick" id="quick">
-    <button data-quick="fault" class="q-fault">TRIGGER FAULT</button>
-    <button data-quick="core">CORE −10%</button>
-    <button data-quick="injure">INJURE WORKER</button>
-    <button data-quick="council" class="q-council">CALL COUNCIL</button>
-    <button data-quick="brownout">BROWNOUT</button>
-    <button data-quick="announce">ANNOUNCEMENT</button>
-    <button data-quick="alert">ALERT</button>
-    <button data-quick="pause" id="quick-pause">PAUSE</button>
-  </nav>
-
-  <!-- QUICK PICKER (one popover for every quick action) -->
-  <div class="picker hidden" id="picker">
-    <div class="picker-head">
-      <b id="picker-title">—</b>
-      <button id="picker-close">✕</button>
-    </div>
-    <div class="picker-body" id="picker-body"></div>
+  <!-- MORE menu: the things a facilitator does once a session -->
+  <div class="menu hidden" id="more">
+    <button id="btn-sound">🔊 AUDIO</button>
+    <button id="btn-urls">ROOM URLS</button>
+    <button id="btn-snapshot">SNAPSHOT</button>
+    <button id="btn-export">EXPORT LOG</button>
+    <button id="btn-settings">SETTINGS</button>
+    <div class="menu-sep">DANGEROUS ACTIONS</div>
+    <button id="btn-reset" class="danger">RESET SESSION…</button>
   </div>
 
-  <main class="main">
+  <!-- PRIMARY NAVIGATION: four destinations -->
+  <nav class="primary" id="nav">
+    <button data-view="overview" class="on">OVERVIEW</button>
+    <button data-view="events">EVENTS</button>
+    <button data-view="systems">CITY SYSTEMS</button>
+    <button data-view="debrief">DEBRIEF</button>
+    <span class="crumb hidden" id="crumb"></span>
+  </nav>
 
-    <!-- SECTOR CONTROL GRID -->
-    <section class="grid-wrap panel">
-      <h2 class="col-title">SECTOR CONTROL</h2>
-      <div class="sector-grid" id="sectors"></div>
+  <main class="views">
+
+    <!-- ================= OVERVIEW ================= -->
+    <section class="view on" id="view-overview">
+      <div class="progress" id="progress"></div>
+
+      <div class="quick-groups">
+        <div class="qg">
+          <span class="qg-title">SESSION</span>
+          <button data-quick="council" class="q-council">CALL COUNCIL</button>
+          <button data-quick="breather" id="btn-breather">BREATHER</button>
+        </div>
+        <div class="qg">
+          <span class="qg-title">CITY EVENTS</span>
+          <button data-quick="fault" class="q-fault">TRIGGER FAULT</button>
+          <button data-quick="injure">INJURE WORKER</button>
+          <button data-quick="brownout">BROWNOUT</button>
+        </div>
+        <div class="qg">
+          <span class="qg-title">COMMUNICATION</span>
+          <button data-quick="announce">ANNOUNCEMENT</button>
+          <button data-quick="alert">ALERT</button>
+        </div>
+      </div>
+
+      <section class="panel attention" id="attention-panel">
+        <h2 class="col-title">NEEDS ATTENTION <span class="count" id="attn-count">0</span></h2>
+        <div class="attn-list" id="attention"></div>
+        <button class="ghost attn-more hidden" id="attn-more">SHOW ALL</button>
+      </section>
+
+      <section class="panel grid-wrap">
+        <h2 class="col-title">SECTORS <span class="hint">real inventory · HEALTH is the authoritative value</span></h2>
+        <div class="sector-grid" id="sectors"></div>
+      </section>
+
+      <section class="summaries" id="summaries">
+        <div class="panel sum" data-go="events:faults"><h3>ACTIVE FAULTS</h3><div class="sum-body" id="sum-faults"></div><button class="ghost">OPEN</button></div>
+        <div class="panel sum" data-go="systems:transfers"><h3>TRANSFERS</h3><div class="sum-body" id="sum-transfers"></div><button class="ghost">OPEN</button></div>
+        <div class="panel sum" data-go="systems:workforce"><h3>WORKFORCE · MED</h3><div class="sum-body" id="sum-workforce"></div><button class="ghost">OPEN</button></div>
+        <div class="panel sum" data-go="systems:com"><h3>COM REPORTS</h3><div class="sum-body" id="sum-com"></div><button class="ghost">OPEN</button></div>
+        <div class="panel sum" data-go="systems:agr"><h3>AGR</h3><div class="sum-body" id="sum-agr"></div><button class="ghost">OPEN</button></div>
+      </section>
+
+      <div class="bottom-row">
+        <section class="panel recent">
+          <h2 class="col-title">RECENT ACTIVITY <button class="ghost tiny" id="btn-expand-log">EXPAND LOG</button></h2>
+          <div class="feed" id="recent"></div>
+        </section>
+        <section class="panel obs">
+          <h2 class="col-title">OBSERVATION PAD <span class="hint">tag first, type later</span></h2>
+          <div class="obs-sectors" id="obs-sectors"></div>
+          <div class="obs-tags" id="obs-tags"></div>
+          <div class="row">
+            <input type="text" id="obs-note" placeholder="note… (Enter to log)" autocomplete="off">
+            <button id="btn-observe" class="primary">LOG OBSERVATION</button>
+          </div>
+        </section>
+      </div>
     </section>
 
-    <!-- PRESSURE PANEL -->
-    <section class="pressure panel">
-      <nav class="tabs" id="tabs">
-        <button data-tab="faults" class="on">FAULTS</button>
-        <button data-tab="timeline">TIMELINE</button>
-        <button data-tab="pressure">PRESSURE</button>
-        <button data-tab="council">COUNCIL</button>
-        <button data-tab="core">CORE</button>
-        <button data-tab="transfers">TRANSFERS</button>
-        <button data-tab="comagr">COM · AGR</button>
-        <button data-tab="settings">SETTINGS</button>
-        <button data-tab="debrief">DEBRIEF</button>
+    <!-- ================= EVENTS ================= -->
+    <section class="view" id="view-events">
+      <nav class="subnav" data-for="events">
+        <button data-sub="faults" class="on">FAULTS</button>
+        <button data-sub="timeline">TIMELINE</button>
+        <button data-sub="pressure">PRESSURE</button>
+        <button data-sub="council">COUNCIL</button>
       </nav>
 
-      <!-- FAULTS -->
-      <div class="tab on" id="tab-faults">
-        <div class="block">
-          <span class="label">Presets <em>— several faults with delays</em></span>
-          <div class="presets" id="fault-presets"></div>
+      <div class="sub on panel" id="sub-faults">
+        <h2 class="col-title">FAULT CONTROL
+          <span class="seg" id="fault-views">
+            <button data-fv="active" class="on">ACTIVE <b id="fv-active-n">0</b></button>
+            <button data-fv="scheduled">SCHEDULED <b id="fv-sched-n">0</b></button>
+            <button data-fv="library">LIBRARY</button>
+          </span>
+        </h2>
+        <div class="fv on" id="fv-active"><div class="faults-active" id="faults-active"></div></div>
+        <div class="fv" id="fv-scheduled">
+          <div class="block">
+            <span class="label">Preset waves <em>— preview, then fire</em></span>
+            <div class="presets" id="fault-presets"></div>
+          </div>
+          <div class="block">
+            <span class="label">Scheduled</span>
+            <div class="scheduled" id="scheduled"><div class="hint">Nothing queued.</div></div>
+          </div>
         </div>
-        <div class="block">
-          <span class="label">Scheduled</span>
-          <div class="scheduled" id="scheduled"><div class="hint">Nothing queued.</div></div>
-        </div>
-        <div class="block grow">
-          <span class="label">Fault library <em>— one click fires</em></span>
+        <div class="fv" id="fv-library">
           <div class="filters">
             <select id="f-round"><option value="">all rounds</option></select>
             <select id="f-sector"><option value="">all sectors</option></select>
@@ -132,14 +192,13 @@
               <option value="">all sev</option><option value="1">▲</option>
               <option value="2">▲▲</option><option value="3">▲▲▲</option>
             </select>
-            <input type="text" id="f-text" placeholder="code or name…" autocomplete="off">
+            <input type="text" id="f-text" placeholder="search code or title…" autocomplete="off">
           </div>
           <div class="injects" id="injects"></div>
         </div>
       </div>
 
-      <!-- TIMELINE -->
-      <div class="tab" id="tab-timeline">
+      <div class="sub panel" id="sub-timeline">
         <div class="tl-head">
           <span class="label">Round script</span>
           <b id="tl-round">—</b>
@@ -149,8 +208,7 @@
         <div class="timeline" id="timeline"></div>
       </div>
 
-      <!-- PRESSURE -->
-      <div class="tab" id="tab-pressure">
+      <div class="sub panel" id="sub-pressure">
         <div class="block">
           <span class="label">Pressure dial</span>
           <div class="dial" id="dial">
@@ -160,11 +218,11 @@
             <button data-dial="cancel_supply">CANCEL SUPPLY</button>
             <button data-dial="transport_gridlock">TRANSPORT DELAY</button>
             <button data-dial="communication_blackout">COMMS FAILURE</button>
-            <button data-dial="core">CORE −10%</button>
             <button data-dial="council">CALL COUNCIL</button>
             <button data-dial="blackout" class="danger-ish">ROLLING BLACKOUT</button>
             <button data-dial="biological_breach" class="danger-ish">BIOLOGICAL BREACH</button>
           </div>
+          <div class="hint">CORE −10% is a direct state change: CITY SYSTEMS › CORE, logged as an override.</div>
         </div>
         <div class="block">
           <span class="label">Event presets <em>— configurable in the scenario</em></span>
@@ -197,14 +255,12 @@
             <button data-sting="klaxon">KLAXON</button>
             <button data-sting="chime">CHIME</button>
             <button data-sting="silence">SILENCE</button>
-            <button id="btn-breather">BREATHER OFF</button>
           </div>
           <div class="hint">R0 klaxon is the audio join key — fire it once, on the record.</div>
         </div>
       </div>
 
-      <!-- COUNCIL -->
-      <div class="tab" id="tab-council">
+      <div class="sub panel" id="sub-council">
         <div class="council-status" id="council-status"></div>
         <div class="row">
           <button id="btn-call-council" class="primary">CALL COUNCIL</button>
@@ -241,35 +297,114 @@
           <div id="last-order" class="hint">None yet.</div>
         </div>
       </div>
+    </section>
 
-      <!-- CORE -->
-      <div class="tab" id="tab-core">
+    <!-- ================= CITY SYSTEMS ================= -->
+    <section class="view" id="view-systems">
+      <nav class="subnav" data-for="systems">
+        <button data-sub="transfers" class="on">TRANSFERS</button>
+        <button data-sub="workforce">WORKFORCE · MED</button>
+        <button data-sub="com">COM</button>
+        <button data-sub="agr">AGR</button>
+        <button data-sub="core">CORE</button>
+        <button data-sub="overrides" class="warn">ADMIN OVERRIDES</button>
+      </nav>
+
+      <div class="sub on panel" id="sub-transfers">
+        <h2 class="col-title">TRANSFERS <span class="hint">logistics, not Transport's console</span></h2>
+        <div class="stat-row" id="tr-summary"></div>
         <div class="block">
-          <span class="label">Core output</span>
-          <div class="core-presets" id="core-presets"></div>
-          <div class="row">
-            <button data-core-delta="-5">−5</button>
-            <button data-core-delta="5">+5</button>
-            <input type="number" id="core-input" min="0" max="100" class="short">
-            <button id="btn-core-set">SET</button>
-          </div>
+          <span class="label">Pending TRN approvals</span>
+          <div class="transfers" id="transfers"></div>
         </div>
         <div class="block">
-          <span class="label">City stability</span>
-          <div class="row">
-            <select id="stab-mode"><option value="auto">AUTOMATIC</option><option value="manual">MANUAL</option></select>
-            <input type="number" id="stab-value" min="0" max="100" class="short">
-            <button id="btn-stab-set">SET</button>
-            <span class="hint" id="stab-hint"></span>
-          </div>
+          <span class="label">Requests waiting for a supplier</span>
+          <div class="transfers" id="requests"></div>
         </div>
+        <details class="override-box" id="tr-override">
+          <summary>ADMIN OVERRIDE <span class="hint">force, decline, cancel, raise — every action asks for a reason and is logged</span></summary>
+          <div class="row">
+            <span class="label">Raise for a table</span>
+            <select id="tr-from"></select><span>→</span><select id="tr-to"></select>
+            <select id="tr-res">
+              <option value="power">power</option><option value="water">water</option>
+              <option value="parts">parts</option><option value="med">med</option>
+              <option value="workers">workers</option>
+            </select>
+            <input type="number" id="tr-amt" value="1" min="1" max="9" class="short">
+            <button id="btn-tr-add">REQUEST</button>
+            <button id="btn-tr-direct">RAISE TRANSFER</button>
+          </div>
+          <div class="row">
+            <button id="btn-reset-stamps">RESET TRN APPROVALS</button>
+            <button id="btn-expire-transfers" class="danger">EXPIRE ALL PENDING</button>
+          </div>
+          <div class="transfers" id="transfers-ovr"></div>
+          <div class="transfers" id="requests-ovr"></div>
+        </details>
+      </div>
+
+      <div class="sub panel" id="sub-workforce">
+        <h2 class="col-title">WORKFORCE · MED</h2>
+        <div class="stat-row" id="wf-summary"></div>
+        <div class="wf-table" id="wf-table"></div>
+        <div class="block">
+          <span class="label">Injured workers <em>— with Medical, or not yet put forward</em></span>
+          <div class="transfers" id="healing"></div>
+        </div>
+        <details class="override-box" id="wf-override">
+          <summary>ADMIN OVERRIDE <span class="hint">force a heal, decline, recover by hand, reset the allowance</span></summary>
+          <div class="row">
+            <button id="btn-reset-heals">RESET MED HEALS</button>
+            <button id="btn-recover-pick">RECOVER 1 WORKER…</button>
+          </div>
+          <div class="transfers" id="healing-ovr"></div>
+        </details>
+      </div>
+
+      <div class="sub panel" id="sub-com">
+        <h2 class="col-title">COM · INFORMATION ACCURACY <span class="hint">real vs reported — never auto-corrected</span></h2>
+        <div class="stat-row" id="com-summary"></div>
+        <div class="com-table" id="com-table"></div>
+        <div class="hint" id="ca-ann-now">—</div>
+        <details class="override-box" id="com-override">
+          <summary>ADMIN OVERRIDE <span class="hint">write COM's board or announcement for it — logged as a facilitator override</span></summary>
+          <div class="hint" id="ca-round">—</div>
+          <div class="ca-rows" id="ca-rows"></div>
+          <div class="row">
+            <input type="text" id="ca-head" maxlength="40" placeholder="Headline (40)">
+            <input type="text" id="ca-msg" maxlength="160" placeholder="Message (160)">
+            <button id="btn-ca-publish">PUBLISH</button>
+            <button id="btn-ca-clear">CLEAR</button>
+          </div>
+        </details>
+      </div>
+
+      <div class="sub panel" id="sub-agr">
+        <h2 class="col-title">AGR · INTERVENTIONS</h2>
+        <div class="stat-row" id="agr-summary"></div>
+        <div class="transfers" id="ca-offer"></div>
+        <details class="override-box" id="agr-override">
+          <summary>ADMIN OVERRIDE <span class="hint">reroll the hand or force a card — reason required, logged</span></summary>
+          <div class="row">
+            <button id="btn-agr-reroll" class="danger">REROLL HAND</button>
+            <span class="label">Force target</span>
+            <select id="ca-target-sector"></select>
+            <select id="ca-target-res"><option value="power">power</option><option value="water">water</option><option value="med">med</option><option value="parts">parts</option></select>
+          </div>
+          <div class="transfers" id="ca-offer-ovr"></div>
+          <div class="block">
+            <span class="label">Card pool <em>— untick a card to keep it out of the draw</em></span>
+            <div class="ca-pools" id="ca-pool"></div>
+          </div>
+        </details>
+      </div>
+
+      <div class="sub panel" id="sub-core">
+        <h2 class="col-title">CORE</h2>
+        <div class="stat-row" id="core-summary"></div>
         <div class="block">
           <span class="label">Round upkeep <em>— charged when a played round ends</em></span>
-          <div class="row">
-            <b id="cycle-clock-2">--:--</b>
-            <span id="cycle-number" class="hint"></span>
-            <button data-cycle="process" class="primary">PROCESS UPKEEP NOW</button>
-          </div>
           <div class="cycle-summary" id="cycle-summary"><div class="hint">No upkeep pass yet.</div></div>
         </div>
         <div class="block">
@@ -285,99 +420,113 @@
           <span class="label">COM intelligence <em>— what Comms can see</em></span>
           <div class="intel" id="intel"></div>
         </div>
+        <details class="override-box" id="core-override">
+          <summary>ADMIN OVERRIDE <span class="hint">core output, an off-schedule upkeep pass, the legacy stability score</span></summary>
+          <div class="block">
+            <span class="label">Core output</span>
+            <div class="core-presets" id="core-presets"></div>
+            <div class="row">
+              <button data-core-delta="-10">−10</button>
+              <button data-core-delta="-5">−5</button>
+              <button data-core-delta="5">+5</button>
+              <input type="number" id="core-input" min="0" max="100" class="short">
+              <button id="btn-core-set">SET</button>
+            </div>
+          </div>
+          <div class="row">
+            <button data-cycle="process" class="danger">PROCESS UPKEEP NOW</button>
+          </div>
+          <div class="block">
+            <span class="label">City stability score <em>— a legacy facilitator instrument; shown nowhere else</em></span>
+            <div class="row">
+              <select id="stab-mode"><option value="auto">AUTOMATIC</option><option value="manual">MANUAL</option></select>
+              <input type="number" id="stab-value" min="0" max="100" class="short">
+              <button id="btn-stab-set">SET</button>
+              <span class="hint" id="stab-hint"></span>
+            </div>
+          </div>
+        </details>
       </div>
 
-      <!-- TRANSFERS -->
-      <div class="tab" id="tab-transfers">
+      <div class="sub panel" id="sub-overrides">
+        <h2 class="col-title">ADMIN OVERRIDES <span class="hint">direct changes to authoritative state — every one shows current → proposed, asks why, and is logged</span></h2>
+        <div class="ovr-index">
+          <div class="ovr-card"><h3>SECTOR</h3><p>Health, inventory, workers, force DARK, force-resolve a fault, generate a table's output.</p><div class="ovr-pick" id="ovr-sectors"></div></div>
+          <div class="ovr-card"><h3>CAPACITY</h3><p>Reset the round allowances.</p><button id="ovr-reset-stamps">RESET TRN APPROVALS</button><button id="ovr-reset-heals">RESET MED HEALS</button></div>
+          <div class="ovr-card"><h3>CORE</h3><p>Core output, an upkeep pass, the stability score.</p><button data-go="systems:core">OPEN CORE</button></div>
+          <div class="ovr-card"><h3>TRANSFERS · HEALING</h3><p>Force an approval or a heal, decline, cancel.</p><button data-go="systems:transfers">OPEN TRANSFERS</button><button data-go="systems:workforce">OPEN WORKFORCE</button></div>
+          <div class="ovr-card"><h3>AGR · COM</h3><p>Reroll or force a card; write the board.</p><button data-go="systems:agr">OPEN AGR</button><button data-go="systems:com">OPEN COM</button></div>
+          <div class="ovr-card danger"><h3>DANGEROUS</h3><p>Wipe the run and start again.</p><button id="ovr-reset-session" class="danger">RESET SESSION…</button></div>
+        </div>
+        <div class="block">
+          <span class="label">Override log <em>— this run</em></span>
+          <div class="feed" id="override-log"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= DEBRIEF ================= -->
+    <section class="view" id="view-debrief">
+      <nav class="subnav" data-for="debrief">
+        <button data-sub="observations" class="on">OBSERVATIONS</button>
+        <button data-sub="log">EVENT LOG</button>
+        <button data-sub="overrides">OVERRIDE LOG</button>
+        <button data-sub="analysis">ANALYSIS &amp; EXPORT</button>
+      </nav>
+
+      <div class="sub on panel obs" id="sub-observations">
+        <h2 class="col-title">OBSERVATION PAD <span class="hint">eyes on the room</span></h2>
+        <div class="obs-sectors" id="obs2-sectors"></div>
+        <div class="obs-tags" id="obs2-tags"></div>
         <div class="row">
-          <span class="label">TRN approvals</span>
-          <b id="trn-cap">—</b>
-          <button id="btn-reset-stamps">RESET</button>
-          <span class="label">MED heals</span>
-          <b id="med-cap">—</b>
-          <button id="btn-reset-heals">RESET</button>
-          <button id="btn-expire-transfers" class="danger">EXPIRE PENDING</button>
-        </div>
-        <div class="hint">Used / allowed. A round change resets both by itself. Only TRN approves a transfer, only MED heals; the buttons below are your override and are logged as one.</div>
-        <div class="block">
-          <span class="label">Record a transfer</span>
-          <div class="row">
-            <select id="tr-from"></select>
-            <span>→</span>
-            <select id="tr-to"></select>
-            <select id="tr-res">
-              <option value="power">power</option><option value="water">water</option>
-              <option value="parts">parts</option><option value="med">med</option>
-              <option value="workers">workers</option>
-            </select>
-            <input type="number" id="tr-amt" value="1" min="1" max="9" class="short">
-            <button id="btn-tr-add">REQUEST</button>
-            <button id="btn-tr-direct">RAISE TRANSFER</button>
-          </div>
-          <div class="hint">REQUEST asks the left sector for stock; RAISE TRANSFER offers it, straight into Transport's queue.</div>
+          <input type="text" id="obs2-note" placeholder="note… (Enter to log)" autocomplete="off">
+          <button id="btn-observe2" class="primary">LOG OBSERVATION</button>
         </div>
         <div class="block">
-          <span class="label">Requests <em>— waiting on a supplier</em></span>
-          <div class="transfers" id="requests"></div>
-        </div>
-        <div class="block">
-          <span class="label">Transfers <em>— waiting on Transport</em></span>
-          <div class="transfers" id="transfers"></div>
-        </div>
-        <div class="block">
-          <span class="label">Healing <em>— waiting on Medical</em></span>
-          <div class="transfers" id="healing"></div>
+          <span class="label">Logged this run</span>
+          <div class="feed" id="obs-list"></div>
         </div>
       </div>
 
-      <!-- SETTINGS -->
-      <!-- COM's public board and AGR's dealt hand. Everything here is an override. -->
-      <div class="tab" id="tab-comagr">
-        <div class="block">
-          <span class="label">City broadcast <em>— COM's public board. Saving here overrides COM and is logged.</em></span>
-          <div class="hint" id="ca-round">—</div>
-          <div class="ca-rows" id="ca-rows"></div>
-        </div>
-        <div class="block">
-          <span class="label">Priority announcement</span>
-          <div class="hint" id="ca-ann-now">—</div>
-          <div class="row">
-            <input type="text" id="ca-head" maxlength="40" placeholder="Headline (40)">
-            <input type="text" id="ca-msg" maxlength="160" placeholder="Message (160)">
-            <button id="btn-ca-publish">PUBLISH</button>
-            <button id="btn-ca-clear">CLEAR</button>
-          </div>
-        </div>
-        <div class="block">
-          <span class="label">AGR interventions <em>— this round's hand. Dealt once per round; a reroll is an override.</em></span>
-          <div class="row">
-            <b id="ca-agr-round">—</b>
-            <button id="btn-agr-reroll" class="danger">REROLL HAND</button>
-            <span class="label">Force target</span>
-            <select id="ca-target-sector"></select>
-            <select id="ca-target-res"><option value="power">power</option><option value="water">water</option><option value="med">med</option><option value="parts">parts</option></select>
-          </div>
-          <div class="transfers" id="ca-offer"></div>
-        </div>
-        <div class="block">
-          <span class="label">Card pool <em>— untick a card to keep it out of the draw</em></span>
-          <div class="ca-pools" id="ca-pool"></div>
-        </div>
+      <div class="sub panel" id="sub-log">
+        <h2 class="col-title">EVENT LOG
+          <span class="seg" id="log-filters">
+            <button data-lf="ALL" class="on">ALL</button><button data-lf="FAULTS">FAULTS</button><button data-lf="TRANSFERS">TRANSFERS</button>
+            <button data-lf="RESOURCES">RESOURCES</button><button data-lf="WORKERS">WORKERS</button><button data-lf="ADMIN">ADMIN</button>
+          </span>
+        </h2>
+        <div class="feed tall" id="log"></div>
       </div>
 
-      <div class="tab" id="tab-settings">
+      <div class="sub panel" id="sub-overrides-log">
+        <h2 class="col-title">ADMIN OVERRIDE LOG</h2>
+        <div class="feed tall" id="override-log-2"></div>
+      </div>
+
+      <div class="sub panel" id="sub-analysis">
+        <div class="row">
+          <button id="btn-debrief-refresh" class="primary">REFRESH</button>
+          <button id="btn-wall-debrief">SHOW ON WALL</button>
+          <button id="btn-export-2">EXPORT LOG</button>
+          <span class="hint" id="debrief-hint"></span>
+        </div>
+        <div class="debrief" id="debrief"><div class="hint">Press REFRESH to fold the run log into numbers.</div></div>
+      </div>
+    </section>
+
+    <!-- ================= SETTINGS (from the ••• menu) ================= -->
+    <section class="view" id="view-settings">
+      <div class="sub on panel">
+        <h2 class="col-title">SETTINGS <button class="ghost tiny" data-go="overview">← OVERVIEW</button></h2>
         <div class="block">
           <span class="label">Scenario</span>
           <div class="row">
             <b id="settings-scenario">—</b>
-            <select id="scenario-select"></select>
-            <button id="btn-load-scenario" class="danger">RESET RUN WITH SCENARIO</button>
-          </div>
-          <div class="row">
             <input type="text" id="save-name" placeholder="save current configuration as…" autocomplete="off">
             <button id="btn-save-scenario" class="primary">SAVE AS SCENARIO</button>
             <span class="hint" id="save-hint"></span>
           </div>
+          <div class="hint">To start a run on another scenario: ••• › RESET SESSION.</div>
         </div>
         <div class="hint">Nothing here is playtested. Every field applies live to this run; SAVE to keep it.</div>
         <div class="settings" id="settings"></div>
@@ -396,36 +545,44 @@
           <div class="fault-overrides" id="fault-overrides"></div>
         </div>
       </div>
-
-      <!-- DEBRIEF -->
-      <div class="tab" id="tab-debrief">
-        <div class="row">
-          <button id="btn-debrief-refresh" class="primary">REFRESH</button>
-          <button id="btn-wall-debrief">SHOW ON WALL</button>
-          <button id="btn-export-2">EXPORT LOG</button>
-          <span class="hint" id="debrief-hint"></span>
-        </div>
-        <div class="debrief" id="debrief"><div class="hint">Press REFRESH to fold the run log into numbers.</div></div>
-      </div>
     </section>
   </main>
 
-  <!-- LIVE LOG + OBSERVATION PAD -->
-  <footer class="bottom">
-    <section class="feed-wrap panel">
-      <h2 class="col-title">LIVE EVENT LOG</h2>
-      <div class="feed" id="feed"></div>
-    </section>
-    <section class="obs panel">
-      <h2 class="col-title">OBSERVATION PAD <span class="hint">eyes on the room — tag first, type later</span></h2>
-      <div class="obs-sectors" id="obs-sectors"></div>
-      <div class="obs-tags" id="obs-tags"></div>
-      <div class="row">
-        <input type="text" id="obs-note" placeholder="note… (Enter to log)" autocomplete="off">
-        <button id="btn-observe" class="primary">LOG</button>
+  <!-- SECTOR DRAWER: one level deeper -->
+  <aside class="drawer hidden" id="drawer">
+    <div class="drawer-head">
+      <b id="drawer-title">—</b>
+      <span class="hint" id="drawer-sub"></span>
+      <button id="drawer-close">✕ CLOSE</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </aside>
+
+  <!-- PICKER popover (quick actions, fault trigger, previews) -->
+  <div class="picker hidden" id="picker">
+    <div class="picker-head">
+      <b id="picker-title">—</b>
+      <button id="picker-close">✕</button>
+    </div>
+    <div class="picker-body" id="picker-body"></div>
+  </div>
+
+  <!-- OVERRIDE confirmation -->
+  <div class="modal-wrap hidden" id="modal">
+    <form class="modal panel" id="modal-form">
+      <h2 id="modal-title">CONFIRM OVERRIDE</h2>
+      <div class="modal-target" id="modal-target"></div>
+      <table class="modal-diff" id="modal-diff"></table>
+      <div class="modal-extra" id="modal-extra"></div>
+      <label class="modal-reason">REASON <span class="hint">required — goes in the audit log</span>
+        <input type="text" id="modal-reason" maxlength="140" placeholder="why this is being done" autocomplete="off">
+      </label>
+      <div class="row modal-btns">
+        <button type="button" id="modal-cancel">CANCEL</button>
+        <button type="submit" id="modal-confirm" class="danger">CONFIRM OVERRIDE</button>
       </div>
-    </section>
-  </footer>
+    </form>
+  </div>
 
   <!-- URLS popover -->
   <div class="picker hidden" id="urls">

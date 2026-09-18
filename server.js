@@ -37,6 +37,7 @@ const { makeAuth, hashPassword, verifyPassword } = require('./lib/auth');
 const { SessionRegistry } = require('./lib/sessions');
 const { ScenarioLibrary } = require('./lib/config');
 const { analyse } = require('./lib/analytics');
+const override = require('./lib/override');
 const { Kit } = require('./lib/kit');
 const { inspectStorage, reportStorage } = require('./lib/storage');
 const { zip } = require('./lib/zip');
@@ -1208,6 +1209,31 @@ function handleControl(client, entry, msg) {
       game.ticker('obs', `${msg.tag || 'NOTE'}${msg.sector ? ' ' + msg.sector : ''}: ${msg.note || ''}`, { scope: 'admin' });
       reply({ type: 'observe_ack', t: new Date().toISOString() });
       return ok();
+
+    /**
+     * ADMIN OVERRIDE (v16): the facilitator's hand on authoritative state,
+     * made deliberate. The inner intent goes through this same handler with
+     * the same rules; the wrapper adds a required reason, a before/after
+     * reading of the target, and one admin_override audit event.
+     */
+    case 'admin_override': {
+      const check = override.validate(msg);
+      if (!check.ok) return reply({ type: 'override_result', ok: false, reason: check.reason, action: msg.action });
+      const inner = { ...(msg.payload || {}), type: check.action };
+      const before = override.snapshot(game, check.action, inner);
+      if (check.action === 'reset_run') {
+        const after = { run_id: inner.run_id || entry.row.run_id, scenario_id: inner.scenario_id || game.state.scenario_id };
+        override.record(entry.log, game, { action: check.action, payload: inner, reason: check.reason, before, after });
+        registry.resetRun(entry.code, { runId: inner.run_id, scenarioId: inner.scenario_id || null });
+        reply({ type: 'override_result', ok: true, action: check.action, target: 'RUN', before, after });
+        return ok();
+      }
+      handleControl(client, entry, inner);
+      const after = override.snapshot(game, check.action, inner);
+      const rec = override.record(entry.log, game, { action: check.action, payload: inner, reason: check.reason, before, after });
+      reply({ type: 'override_result', ok: true, action: check.action, target: rec.target, before, after, reason: rec.reason });
+      return ok();
+    }
 
     // -- run control
     case 'reset_run': {

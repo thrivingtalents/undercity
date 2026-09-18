@@ -577,3 +577,38 @@ Sector screens no longer render the City Feed (COM alone keeps it — its
 sensors are its product) or an Announcements panel; a facilitator notice
 addressed to one table shows as a banner there, and city-wide announcements
 are read on the wall.
+
+### 8.8 The facilitator's command centre (Admin v16, 2026-09-18)
+
+The control frame adds `needs_attention[]` — `{ priority, kind, text,
+target { view, tab?, sector? }, sector? }`, derived only from state the
+engine already keeps, in this order: a DARK sector, a CRITICAL sector, a
+next-round upkeep shortfall, Transport's allowance exhausted with transfers
+waiting, Medical's allowance exhausted with injured waiting, COM reports
+OUTDATED / NOT UPDATED (from R1), then the existing warnings (no Continuity
+Order, a rolling blackout, timeline cues READY, core ≤ 60). Each control
+sector adds `upkeep_status`, `upkeep_short` and `round_output` (§8.7).
+
+```json
+{ "type": "admin_override", "action": "adjust_integrity",
+  "payload": { "sector": "POW", "delta": -10 }, "reason": "binder misprint, compensating" }
+{ "type": "admin_override", "action": "reset_run", "confirm_text": "RESET",
+  "payload": { "run_id": "2026-09-18-c2", "scenario_id": "haven9-standard" }, "reason": "second cohort" }
+```
+
+An ADMIN OVERRIDE is the facilitator's hand on authoritative state made
+deliberate. `action` is one of the existing facilitator intents listed in
+`lib/override.js` (health, inventory, workers, status, faults, core,
+allowances, transfers, healing, AGR, COM's board, config, the run); the
+inner intent runs through the same handler with the same rules. The wrapper
+requires a `reason` (≤ 140 chars; `reason_required`), refuses an unknown
+action (`unknown_action`), and for `reset_run` requires
+`confirm_text: "RESET"` (`typed_confirmation_required`). It reads the
+target before and after, replies `override_result { ok, action, target,
+before, after, reason }`, writes one `admin_override` log event
+`{ actor: "facilitator", action, target, reason, payload, before, after }`
+with the run's round/phase context and timestamp, and puts one
+admin-scoped ticker line (`kind: "override"`) on the facilitator's feed
+— never on a table or the wall. The debrief counts overrides per round and
+lists them on its timeline. Routine scenario events (a fault, an injury, a
+brownout, an announcement) are not overrides and stay as they were.

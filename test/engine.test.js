@@ -2383,6 +2383,186 @@ test('the panel markup: RESOURCE REQUESTS & TRANSFERS, two forms, ACTIVE with fi
   assert.ok(!/\.inbox-block|\.ib-btns/.test(css), 'inbox styles remain');
 });
 
+// -- v16: the facilitator's command centre --------------------------------------------
+//
+// UNDERSTAND → DECIDE → INTERVENE. The frame tells the facilitator where to
+// look; the console shows one thing per place; a hand on authoritative state
+// asks why and is written down. No gameplay rule moves.
+
+const CONTROL_INDEX = fs.readFileSync(path.join(__dirname, '..', 'public', 'control', 'index.html'), 'utf8');
+const CONTROL_SCRIPT = fs.readFileSync(path.join(__dirname, '..', 'public', 'control', 'control.js'), 'utf8');
+const override = require('../lib/override');
+
+test('the live console and the session launcher are different files, and the launcher is untouched by v16', () => {
+  assert.ok(/id="view-overview"/.test(CONTROL_INDEX), 'public/control is the live console');
+  const launcher = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin', 'index.html'), 'utf8');
+  assert.ok(/login-view|list-view/.test(launcher), 'public/admin is the launcher');
+  assert.ok(!/NEEDS ATTENTION|admin_override/.test(launcher));
+  const launcherJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'admin', 'admin.js'), 'utf8');
+  assert.ok(!/admin_override|needs_attention/.test(launcherJs));
+});
+
+test('NEEDS ATTENTION is derived from authoritative state, in priority order, each item naming its problem and its place', () => {
+  const game = running();
+  let att = forControl(game).needs_attention;
+  assert.deepEqual(att.filter((a) => a.priority <= 4), [], 'a fresh round has nothing urgent');
+  assert.deepEqual(att.map((a) => a.kind), ['com'], 'only COM, who has reported nothing this round');
+  game.setIntegrity('AGR', 27);                                  // CRITICAL
+  game.setInventory('WTR', { power: 1 });                       // upkeep needs 2 power
+  game.setInventory('POW', { power: 10 });
+  const ids = [];
+  for (let i = 0; i < 4; i += 1) ids.push(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
+  for (let i = 0; i < 3; i += 1) game.approveTransfer(ids[i], { by: 'TRN' });   // 3/3 used, one waiting
+  for (const c of ['MED', 'TRN', 'AGR']) { game.injure(c, 1); game.healWorker(game.requestHealing(c, { by: c }).healing.id, { by: 'MED' }); }
+  game.injure('POW', 1); game.requestHealing('POW', { by: 'POW' });           // heals exhausted, one waiting
+  game.setStatus('COM', 'DARK');
+  att = forControl(game).needs_attention;
+  const kinds = att.map((a) => a.kind);
+  assert.deepEqual(kinds.slice(0, 5), ['dark', 'critical', 'upkeep', 'trn', 'med'], JSON.stringify(att.map((a) => a.text)));
+  assert.ok(att.some((a) => a.kind === 'com'), 'COM reports are NOT UPDATED in R2');
+  const byKind = Object.fromEntries(att.map((a) => [a.kind, a]));
+  assert.equal(byKind.dark.text, 'COM · DARK'); assert.deepEqual(byKind.dark.target, { view: 'overview', sector: 'COM' });
+  assert.equal(byKind.critical.text, 'AGR · 27% HEALTH · CRITICAL'); assert.equal(byKind.critical.sector, 'AGR');
+  assert.equal(byKind.upkeep.text, 'WTR · NEXT ROUND UPKEEP SHORTFALL · MISSING 1 POWER');
+  assert.equal(byKind.trn.text, 'TRN · 3/3 APPROVALS USED · 1 TRANSFER WAITING'); assert.deepEqual(byKind.trn.target, { view: 'systems', tab: 'transfers' });
+  assert.ok(/^MED · 3\/3 HEALS USED · 1 INJURED WAITING$/.test(byKind.med.text)); assert.deepEqual(byKind.med.target, { view: 'systems', tab: 'workforce' });
+  assert.deepEqual(byKind.com.target, { view: 'systems', tab: 'com' });
+  assert.ok(att.every((a) => a.priority >= 0 && a.text && a.target), 'no generic alert');
+  assert.ok(!att.some((a) => /something needs attention/i.test(a.text)));
+});
+
+test("the facilitator's sector cards carry the real inventory, readiness and each role's round capability", () => {
+  const game = running();
+  const f = forControl(game);
+  const pow = f.sectors.POW;
+  assert.deepEqual(pow.inventory, game.state.sectors.POW.inventory, 'real, authoritative stock');
+  assert.equal(pow.upkeep_status, 'READY'); assert.deepEqual(pow.upkeep_short, {});
+  assert.equal(pow.round_output.used, false); assert.deepEqual(pow.round_output.amount, { power: 3 });
+  assert.deepEqual(f.sectors.WTR.round_output.amount, { water: 3 });
+  for (const c of ['MED', 'TRN', 'AGR', 'COM']) assert.equal(f.sectors[c].round_output, null, `${c} has no output line`);
+  game.setBroadcastRow('POW', { power: 9 }, { by: 'COM' });
+  assert.equal(forControl(game).sectors.POW.inventory.power, 3, "COM's report never replaces real inventory");
+  assert.equal(forControl(game).broadcast.rows.POW.power, 9, 'and the report is carried separately');
+  game.generateOutput('POW', { by: 'POW' });
+  assert.equal(forControl(game).sectors.POW.round_output.used, true);
+  assert.equal(forControl(game).healing_capacity.capacity, 3); assert.equal(forControl(game).transfer_capacity.capacity, 3);
+  assert.equal(forControl(game).agr.used, false); assert.equal(forControl(game).agr.offered.length, 3);
+});
+
+test('an ADMIN OVERRIDE needs a reason, reads the target before and after, and writes one audit event with actor, time, target, before, after, reason', () => {
+  const game = running();
+  assert.equal(override.validate({ action: 'adjust_integrity' }).reason, 'reason_required');
+  assert.equal(override.validate({ action: 'adjust_integrity', reason: '   ' }).reason, 'reason_required');
+  assert.equal(override.validate({ action: 'not_a_thing', reason: 'x' }).reason, 'unknown_action');
+  assert.equal(override.validate({ action: 'reset_run', reason: 'x' }).reason, 'typed_confirmation_required');
+  assert.equal(override.validate({ action: 'reset_run', reason: 'x', confirm_text: 'reset' }).ok, true, 'typed RESET, any case');
+  assert.equal(override.validate({ action: 'adjust_integrity', reason: 'a'.repeat(200) }).reason, 'reason_too_long');
+  const ok = override.validate({ action: 'adjust_integrity', reason: 'binder misprint, compensating' });
+  assert.equal(ok.ok, true);
+
+  const before = override.snapshot(game, 'adjust_integrity', { sector: 'POW' });
+  assert.equal(before.integrity, 100); assert.equal(before.status_word, 'STABLE');
+  game.adjustIntegrity('POW', -10);                                   // the same reducer the server dispatches
+  const after = override.snapshot(game, 'adjust_integrity', { sector: 'POW' });
+  assert.equal(after.integrity, 90);
+  const written = [];
+  const fakeLog = { write: (ev, fields) => { const e = { t: new Date().toISOString(), ev, round: game.state.round, phase: game.state.phase, ...fields }; written.push(e); return e; } };
+  const rec = override.record(fakeLog, game, { action: 'adjust_integrity', payload: { sector: 'POW', delta: -10 }, reason: ok.reason, before, after });
+  assert.equal(written.length, 1);
+  const e = written[0];
+  assert.equal(e.ev, 'admin_override'); assert.equal(e.actor, 'facilitator'); assert.ok(e.t);
+  assert.equal(e.target, 'POW'); assert.equal(e.before.integrity, 100); assert.equal(e.after.integrity, 90);
+  assert.equal(e.reason, 'binder misprint, compensating'); assert.equal(e.round, 'R2'); assert.equal(e.phase, 'ROUND_2');
+  assert.equal(rec.target, 'POW');
+  assert.ok(game.state.ticker.some((t) => t.kind === 'override' && /OVERRIDE ADJUST INTEGRITY · POW — binder misprint/.test(t.text)), 'the override is on the admin ticker');
+  assert.ok(forControl(game).ticker.some((t) => t.kind === 'override'));
+  assert.ok(!forSector(game, 'POW').ticker.some((t) => t.kind === 'override'), 'never on a table');
+  assert.ok(!forBigscreen(game).feed.some((t) => t.kind === 'override'), 'never on the wall');
+});
+
+test('override snapshots name every target kind, and the debrief counts overrides on its timeline', () => {
+  const game = running();
+  game.setInventory('POW', { power: 9 });
+  const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 });
+  game.fireFault('F-201', 'POW');
+  game.injure('AGR', 1);
+  const h = game.requestHealing('AGR', { by: 'AGR' }).healing;
+  assert.equal(override.targetName(game, 'clear_fault', { sector: 'POW', fault_code: 'F-201' }), 'F-201 @ POW');
+  assert.equal(override.snapshot(game, 'clear_fault', { sector: 'POW', fault_code: 'F-201' }).status, 'ACTIVE');
+  assert.equal(override.snapshot(game, 'transfer_approve', { id: t.id }).status, 'PENDING_TRN_APPROVAL');
+  assert.equal(override.snapshot(game, 'heal_worker', { id: h.id }).status, 'WAITING_FOR_MED');
+  assert.equal(override.snapshot(game, 'reset_stamps', {}).trn_used, 0);
+  assert.equal(override.snapshot(game, 'set_core_output', {}).core_output, 100);
+  assert.equal(override.snapshot(game, 'agr_reroll', {}).offered.length, 3);
+  assert.equal(override.snapshot(game, 'reset_run', {}).run_id, 'test-run');
+  assert.equal(override.targetName(game, 'reset_run', {}), 'RUN test-run');
+  assert.equal(override.snapshot(game, 'set_config', { patch: { council_clock_s: 1 } }).council_clock_s, game.cfg.council_clock_s);
+  assert.equal(override.snapshot(game, 'adjust_integrity', { sector: 'XXX' }), null, 'an unknown sector is null, not a crash');
+
+  const lines = [
+    { t: '2026-09-18T03:00:00.000Z', ev: 'run_reset', run_id: 'r', round: 'R2', phase: 'ROUND_2' },
+    { t: '2026-09-18T03:01:00.000Z', ev: 'admin_override', round: 'R2', phase: 'ROUND_2', actor: 'facilitator', action: 'adjust_integrity', target: 'POW', reason: 'test', before: { integrity: 100 }, after: { integrity: 90 } },
+  ].map((l) => JSON.stringify(l)).join('\n');
+  const d = analyse(lines, { runId: 'r' });
+  assert.equal(d.rounds.R2.overrides, 1);
+  assert.ok(d.timeline.some((e) => e.kind === 'override' && /OVERRIDE ADJUST INTEGRITY · POW — test/.test(e.text)));
+});
+
+test('an observation carries phase, round and time, and reaches the facilitator alone', () => {
+  const game = running();
+  game.log.write('observe', { sector: 'POW', tag: 'DOMINANCE', note: 'chief talks over liaison' });
+  const ev = logEvents(game, 'observe')[0];
+  assert.equal(ev.round, 'R2'); assert.equal(ev.phase, 'ROUND_2'); assert.ok(ev.t); assert.equal(ev.tag, 'DOMINANCE');
+});
+
+test('the console markup: four destinations, OVERVIEW first, one PAUSE, no city figure, phase and round shown, STOP CLOCK ≠ NEXT PHASE', () => {
+  const html = CONTROL_INDEX; const js = CONTROL_SCRIPT;
+  const primary = [...html.matchAll(/<nav class="primary"[\s\S]*?<\/nav>/g)][0][0];
+  assert.deepEqual([...primary.matchAll(/data-view="([a-z]+)"/g)].map((m) => m[1]), ['overview', 'events', 'systems', 'debrief']);
+  assert.ok(/data-view="overview" class="on"/.test(html) && /id="view-overview"[^>]*class="view on"|class="view on" id="view-overview"/.test(html), 'OVERVIEW is not the default');
+  assert.equal((html.match(/id="btn-pause"/g) || []).length, 1);
+  assert.ok(!/quick-pause|data-quick="pause"/.test(html) && !/data-quick="pause"/.test(js), 'a second PAUSE remains');
+  assert.ok(!/id="city-value"|>CITY<|CITY HEALTH/.test(html), 'a city figure is on the console');
+  assert.ok(!/city-value|city_stability/.test(js.slice(0, js.indexOf('function renderCore'))), 'the overview reads the city score');
+  assert.ok(/id="phase-name"/.test(html) && /id="round-value"/.test(html) && /id="master-clock"/.test(html));
+  assert.ok(/round_number/.test(js), 'the round number is not printed');
+  assert.ok(/id="btn-end-phase"[^>]*>STOP CLOCK/.test(html) && /id="btn-next-phase"/.test(html));
+  assert.ok(/action: 'end' \}/.test(js) && /type: 'next_phase'/.test(js), 'stop-clock and next-phase are different intents');
+  assert.ok(!/ADVANCE ROUND|set_round/.test(js), 'no invented round action');
+  assert.ok(/id="btn-reset"/.test(html) && /id="more"/.test(html) && !/class="tb-right">[\s\S]*?id="btn-reset"/.test(html.split('id="more"')[0]), 'RESET is still on the top bar');
+  assert.ok(/id="rs-typed"/.test(js) && /typed !== 'RESET'/.test(js) && /confirm_text/.test(js), 'RESET does not ask for the typed word');
+  assert.ok(/id="progress"/.test(html) && /state\.phases/.test(js), 'no session progress from the configured phases');
+});
+
+test('the console markup: attention, observational cards, drawer, overrides, faults default ACTIVE, compact log, pad', () => {
+  const html = CONTROL_INDEX; const js = CONTROL_SCRIPT;
+  assert.ok(/id="attention"/.test(html) && /NO CRITICAL ISSUES/.test(js) && /needs_attention/.test(js));
+  assert.ok(/a\.target\.sector\) \{ go\('overview'\); openSector\(a\.target\.sector\)/.test(js), 'an attention item does not open its sector');
+  const cards = js.slice(js.indexOf('function renderSectors'), js.indexOf('// -- the sector drawer'));
+  for (const bad of ['data-int=', 'data-inv=', 'data-wf=', 'data-inj=', 'data-fault=', 'data-injure=', 'data-brown=', 'data-dark=', 'data-slider', 'INT<']) {
+    assert.ok(!cards.includes(bad), `the default card still carries ${bad}`);
+  }
+  assert.ok(/OPEN SECTOR/.test(cards) && /REAL INVENTORY/.test(cards) && /HEALTH/.test(cards) && /NEXT UPKEEP/.test(cards) && /upkeep_short/.test(cards));
+  assert.ok(!/−10 INT|\+10 INT/.test(js) && /−10 HEALTH/.test(js) && /\+10 HEALTH/.test(js), 'INT abbreviations remain');
+  assert.ok(/function renderDrawer/.test(js) && /CURRENT STATE/.test(js) && /COM REPORTED/.test(js) && /ACTIVE FAULTS/.test(js) && /ROUND CAPABILITY/.test(js) && /ADMIN ACTIONS/.test(js));
+  assert.ok(/VIEW DEBUG DETAILS/.test(js) && /faultDebug \? `<div class="dr-debug">answer/.test(js), 'the answer key is not behind a debug toggle');
+  assert.ok(/function askOverride/.test(js) && /type: 'admin_override'/.test(js) && /reason\.length < 3/.test(js), 'an override sends without a reason');
+  for (const action of ['adjust_integrity', 'set_integrity', 'adjust_inventory', 'adjust_workforce', 'recover_worker', "value: to } })", 'clear_fault', 'set_core_output', 'reset_stamps', 'reset_heals', 'transfer_approve', 'heal_worker', 'agr_reroll', 'agr_activate', 'reset_run']) {
+    assert.ok(js.includes(action), `${action} is not an override path`);
+  }
+  assert.ok(!/send\(\{ type: 'adjust_integrity'|send\(\{ type: 'set_integrity'|send\(\{ type: 'adjust_inventory'|send\(\{ type: 'adjust_core'|send\(\{ type: 'transfer_approve'|send\(\{ type: 'heal_worker'|send\(\{ type: 'agr_reroll'|send\(\{ type: 'reset_run'/.test(js), 'a direct mutation bypasses the override wrapper');
+  assert.ok(/let faultView = 'active'/.test(js) && /data-fv="active" class="on"/.test(html));
+  assert.ok(/function confirmTrigger/.test(js) && /function previewPreset/.test(js) && /FIRE WAVE/.test(js));
+  assert.ok(/data-quick="fault"/.test(html) && /data-quick="injure"/.test(html) && /data-quick="brownout"/.test(html) && /data-quick="announce"/.test(html) && /data-quick="alert"/.test(html) && /data-quick="council"/.test(html), 'a routine event trigger is gone');
+  assert.ok(!/data-quick="core"/.test(html), 'CORE −10% is still a quick action');
+  assert.ok(/state\.ticker\.slice\(0, 5\)/.test(js) && /id="btn-expand-log"/.test(html) && /data-lf="ADMIN"/.test(html));
+  assert.ok(/id="obs-note"/.test(html) && /id="obs2-note"/.test(html) && /type: 'observe'/.test(js));
+  assert.ok(/id="drawer"/.test(html) && /override-box/.test(html));
+  const subnavs = [...html.matchAll(/<nav class="subnav" data-for="([a-z]+)">([\s\S]*?)<\/nav>/g)];
+  assert.deepEqual(subnavs.map((m) => m[1]), ['events', 'systems', 'debrief']);
+  assert.ok(/data-sub="overrides"/.test(html), 'no ADMIN OVERRIDES destination');
+});
+
 // -- council and the Continuity Order ------------------------------------------------
 
 test('CALL COUNCIL reaches every projection with a running 5:00 clock', () => {
