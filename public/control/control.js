@@ -716,7 +716,7 @@
     $('fv-active-n').textContent = String(live.length);
     $('fv-sched-n').textContent = String((state.scheduled || []).length);
     const rb = state.reward_budget || {};
-    $('fault-budget').textContent = `MATERIALS CONSUMED BY REPAIRS ${rb.consumed ?? 0} · REWARD RESOURCES GENERATED ${rb.generated ?? 0} / ${rb.max ?? 1} ALLOWED · ACTIVE SECTORS ${(state.active_sectors || []).join(' ')}`;
+    $('fault-budget').textContent = `MATERIALS ISSUED ${rb.issued ?? 0} · CONSUMED ${rb.consumed ?? 0} · REWARD STOCK RESERVED ${rb.reserved ?? 0} + GENERATED ${rb.generated ?? 0} / ${rb.max ?? 1} ALLOWED · ACTIVE SECTORS ${(state.active_sectors || []).join(' ')}`;
     const html = live.length ? `<div class="fa-head"><span></span><span>SECTOR</span><span>FAULT</span><span>DECAY</span><span>STATUS</span><span>REWARD</span><span><button class="ghost tiny" id="fa-debug">${faultDebug ? 'HIDE DEBUG DETAILS' : 'VIEW DEBUG DETAILS'}</button></span></div>`
       + live.map((f) => `<div class="fa-row${f.locked_until_s > 0 ? ' locked' : ''}" data-id="${esc(f.id)}">
           <span class="hint">${esc(f.id)}</span><span><b>${esc(f.sector)}</b></span><span><b>${esc(f.code)}</b> ${esc(f.name)}</span>

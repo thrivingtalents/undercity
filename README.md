@@ -153,10 +153,14 @@ npm start                                            # http://localhost:3000/adm
    ghost fault, which has no code, is its real completion and does pay.
    Since v17 a repair is crew + the binder's materials + the code, committed
    at once from the real tray (a refusal consumes nothing; the console says
-   MATERIALS NOT READY, never which), and every fault instance is dealt one
-   smart-random reward from its tier when it fires — mostly health, capacity
-   and support; stock rewards are budgeted to ~35% of the material repairs
-   consume, and adapt to the session's active sectors. Deadline reached → `EXPIRED`, an integrity penalty by severity, and
+   MATERIALS NOT READY, never which). Since v17.3 every fault instance is
+   dealt one EXACT reward when it fires — sized by its own case (materials,
+   crew, dependencies, severity → an RVU target and band), drawn then and
+   shown verbatim on the card ("+1 PARTS · +5 SECTOR HEALTH"), never
+   rerolled; mostly health, capacity and support. Stock rewards are capped
+   per fault at half its material cost and across the run at ~35% of the
+   material issued, reserved at fire, and adapt to the session's active
+   sectors. Deadline reached → `EXPIRED`, an integrity penalty by severity, and
    the fault stays solvable (all configurable).
 3. **Round upkeep.** One clock: the round's. POW and WTR generate their own
    output by pressing **GENERATE** once a round (+3, straight into their real

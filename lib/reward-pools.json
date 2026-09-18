@@ -1,85 +1,1172 @@
 {
-  "_comment": "Fault rewards, v17 (2026-09-18). A fault's crew and materials live in content/faults.json — the binder. This file holds the reward side: which tier each fault draws from, what each archetype does, and the weighted pool per tier. RVU is a balance figure for the debrief and never reaches a player. resource_units is what an archetype adds to the city's stock and is what the scarcity guardrail counts.",
+  "_comment": "Fault rewards, v17.3 (2026-09-18). Crew and materials live in content/faults.json — the binder. This file holds the balance side: one record per fault (difficulty, RVU target and band, case profile, resource caps — copied from the v17.3 balance table, never retyped), the archetype catalogue with its RVU and category, and the case-profile weights. RVU is a balance figure for the debrief and never reaches a player. resource_units is what an archetype adds to the city's stock and is what both scarcity caps count.",
+  "version": "17.3",
+  "material_weights": {
+    "power": 1,
+    "water": 1,
+    "parts": 1.25,
+    "med": 1.5
+  },
+  "crew_weight_per_extra_worker": 0.5,
+  "dependency_weight": 0.75,
+  "severity_bonus": {
+    "1": 0,
+    "2": 0.5,
+    "3": 1
+  },
+  "target_factor": 0.65,
+  "target_weighting": {
+    "full": 0.7,
+    "minus_one": 0.3
+  },
   "resource_return_ratio": 0.35,
   "resource_return_bootstrap": 1,
+  "per_fault_refund_ratio": 0.5,
+  "per_fault_refund_max": 2,
   "draw_cap": 0.45,
-  "tiers": {
-    "F-001": 1, "F-101": 2, "F-102": 1, "F-201": 3, "F-202": 3, "F-301": 4, "F-401": 4,
-    "F-002": 1, "F-103": 1, "F-104": 2, "F-203": 3, "F-204": 3, "F-302": 4, "F-403": 3,
-    "F-003": 1, "F-105": 2, "F-205": 3, "F-206": 3, "F-303": 4, "F-402": 4,
-    "F-004": 1, "F-106": 1, "F-207": 4, "F-208": 3, "F-304": 4, "F-404": 3,
-    "F-005": 1, "F-107": 1, "F-209": 3, "F-210": 2, "F-305": 3,
-    "F-006": 1, "F-108": 1, "F-211": 3, "F-212": 2, "F-306": 4
+  "stabilisation_s": {
+    "HALVE": 90,
+    "PAUSE": 60
+  },
+  "wanted_capacity_weight": 1.5,
+  "profiles": {
+    "BASIC_LOCAL": {
+      "local": 0.6,
+      "capacity": 0.2,
+      "cross": 0.2,
+      "resource": 0,
+      "note": "local_health_or_small_support 0.8 = local 0.6 + capacity 0.2"
+    },
+    "STANDARD_LOCAL": {
+      "local": 0.4,
+      "capacity": 0.15,
+      "cross": 0.25,
+      "resource": 0.2,
+      "note": "local_health_or_support 0.55 = local 0.4 + capacity 0.15"
+    },
+    "COORDINATED_REPAIR": {
+      "local": 0.3,
+      "cross": 0.45,
+      "capacity": 0.15,
+      "resource": 0.1
+    },
+    "HEAVY_COORDINATED": {
+      "local": 0.25,
+      "cross": 0.35,
+      "capacity": 0.2,
+      "resource": 0.2
+    },
+    "CRITICAL_INTERDEPENDENT": {
+      "local": 0.2,
+      "cross": 0.4,
+      "capacity": 0.25,
+      "resource": 0.15
+    },
+    "SPECIAL_VERIFICATION": {
+      "local": 0.45,
+      "cross": 0.35,
+      "capacity": 0.2,
+      "resource": 0
+    }
+  },
+  "faults": {
+    "F-001": {
+      "sector": "POW",
+      "title": "Panel self-test failure",
+      "repair_type": "STANDARD",
+      "severity_level": 1,
+      "material_units": 1,
+      "weighted_material_burden": 1.25,
+      "minimum_crew": 1,
+      "external_information_dependencies": [],
+      "difficulty_score": 1.25,
+      "reward_tier": 1,
+      "reward_target_rvu": 1,
+      "allowed_reward_rvu": [
+        1,
+        1
+      ],
+      "case_profile": "BASIC_LOCAL",
+      "max_resource_units_in_single_reward": 0,
+      "resource_reward_probability_cap": 0
+    },
+    "F-101": {
+      "sector": "POW",
+      "title": "Breaker cascade trip",
+      "repair_type": "STANDARD",
+      "severity_level": 1,
+      "material_units": 2,
+      "weighted_material_burden": 2.25,
+      "minimum_crew": 1,
+      "external_information_dependencies": [],
+      "difficulty_score": 2.25,
+      "reward_tier": 2,
+      "reward_target_rvu": 2,
+      "allowed_reward_rvu": [
+        2,
+        2
+      ],
+      "case_profile": "STANDARD_LOCAL",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.2
+    },
+    "F-102": {
+      "sector": "POW",
+      "title": "Turbine bearing whine",
+      "repair_type": "STANDARD",
+      "severity_level": 1,
+      "material_units": 1,
+      "weighted_material_burden": 1.25,
+      "minimum_crew": 2,
+      "external_information_dependencies": [],
+      "difficulty_score": 1.75,
+      "reward_tier": 1,
+      "reward_target_rvu": 2,
+      "allowed_reward_rvu": [
+        2,
+        2
+      ],
+      "case_profile": "BASIC_LOCAL",
+      "max_resource_units_in_single_reward": 0,
+      "resource_reward_probability_cap": 0
+    },
+    "F-201": {
+      "sector": "POW",
+      "title": "Coolant loop failure",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 3,
+      "weighted_material_burden": 3.5,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "WTR"
+      ],
+      "difficulty_score": 5.25,
+      "reward_tier": 3,
+      "reward_target_rvu": 4,
+      "allowed_reward_rvu": [
+        3,
+        4
+      ],
+      "case_profile": "HEAVY_COORDINATED",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.3
+    },
+    "F-202": {
+      "sector": "POW",
+      "title": "Grid harmonic surge",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 2,
+      "weighted_material_burden": 2.25,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "WTR"
+      ],
+      "difficulty_score": 4,
+      "reward_tier": 3,
+      "reward_target_rvu": 3,
+      "allowed_reward_rvu": [
+        2,
+        3
+      ],
+      "case_profile": "COORDINATED_REPAIR",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.25
+    },
+    "F-301": {
+      "sector": "POW",
+      "title": "Core coupling misalignment",
+      "repair_type": "STANDARD",
+      "severity_level": 3,
+      "material_units": 5,
+      "weighted_material_burden": 5.75,
+      "minimum_crew": 3,
+      "external_information_dependencies": [
+        "WTR",
+        "MED"
+      ],
+      "difficulty_score": 9.25,
+      "reward_tier": 4,
+      "reward_target_rvu": 5,
+      "allowed_reward_rvu": [
+        4,
+        5
+      ],
+      "case_profile": "CRITICAL_INTERDEPENDENT",
+      "max_resource_units_in_single_reward": 2,
+      "resource_reward_probability_cap": 0.3
+    },
+    "F-401": {
+      "sector": "POW",
+      "title": "Core restart sequence fault",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 3,
+      "weighted_material_burden": 3.25,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "COM",
+        "AGR"
+      ],
+      "difficulty_score": 5.75,
+      "reward_tier": 4,
+      "reward_target_rvu": 4,
+      "allowed_reward_rvu": [
+        3,
+        4
+      ],
+      "case_profile": "HEAVY_COORDINATED",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.3
+    },
+    "F-002": {
+      "sector": "WTR",
+      "title": "Gauge recalibration",
+      "repair_type": "STANDARD",
+      "severity_level": 1,
+      "material_units": 1,
+      "weighted_material_burden": 1.25,
+      "minimum_crew": 1,
+      "external_information_dependencies": [],
+      "difficulty_score": 1.25,
+      "reward_tier": 1,
+      "reward_target_rvu": 1,
+      "allowed_reward_rvu": [
+        1,
+        1
+      ],
+      "case_profile": "BASIC_LOCAL",
+      "max_resource_units_in_single_reward": 0,
+      "resource_reward_probability_cap": 0
+    },
+    "F-103": {
+      "sector": "WTR",
+      "title": "Pump cavitation",
+      "repair_type": "STANDARD",
+      "severity_level": 1,
+      "material_units": 1,
+      "weighted_material_burden": 1,
+      "minimum_crew": 1,
+      "external_information_dependencies": [],
+      "difficulty_score": 1,
+      "reward_tier": 1,
+      "reward_target_rvu": 1,
+      "allowed_reward_rvu": [
+        1,
+        1
+      ],
+      "case_profile": "BASIC_LOCAL",
+      "max_resource_units_in_single_reward": 0,
+      "resource_reward_probability_cap": 0
+    },
+    "F-104": {
+      "sector": "WTR",
+      "title": "Filter membrane clog",
+      "repair_type": "STANDARD",
+      "severity_level": 1,
+      "material_units": 2,
+      "weighted_material_burden": 2.25,
+      "minimum_crew": 2,
+      "external_information_dependencies": [],
+      "difficulty_score": 2.75,
+      "reward_tier": 2,
+      "reward_target_rvu": 2,
+      "allowed_reward_rvu": [
+        2,
+        2
+      ],
+      "case_profile": "STANDARD_LOCAL",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.2
+    },
+    "F-203": {
+      "sector": "WTR",
+      "title": "Reclaim plant fault",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 2,
+      "weighted_material_burden": 2.5,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "MED"
+      ],
+      "difficulty_score": 4.25,
+      "reward_tier": 3,
+      "reward_target_rvu": 3,
+      "allowed_reward_rvu": [
+        2,
+        3
+      ],
+      "case_profile": "COORDINATED_REPAIR",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.25
+    },
+    "F-204": {
+      "sector": "WTR",
+      "title": "Sluice actuator jam",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 2,
+      "weighted_material_burden": 2.5,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "MED"
+      ],
+      "difficulty_score": 4.25,
+      "reward_tier": 3,
+      "reward_target_rvu": 3,
+      "allowed_reward_rvu": [
+        2,
+        3
+      ],
+      "case_profile": "COORDINATED_REPAIR",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.25
+    },
+    "F-302": {
+      "sector": "WTR",
+      "title": "Reservoir breach imminent",
+      "repair_type": "STANDARD",
+      "severity_level": 3,
+      "material_units": 3,
+      "weighted_material_burden": 3.5,
+      "minimum_crew": 3,
+      "external_information_dependencies": [
+        "MED"
+      ],
+      "difficulty_score": 6.25,
+      "reward_tier": 4,
+      "reward_target_rvu": 5,
+      "allowed_reward_rvu": [
+        4,
+        5
+      ],
+      "case_profile": "HEAVY_COORDINATED",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.3
+    },
+    "F-403": {
+      "sector": "WTR",
+      "title": "Aquifer pressure spike",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 2,
+      "weighted_material_burden": 2.5,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "TRN",
+        "POW"
+      ],
+      "difficulty_score": 5,
+      "reward_tier": 3,
+      "reward_target_rvu": 4,
+      "allowed_reward_rvu": [
+        3,
+        4
+      ],
+      "case_profile": "COORDINATED_REPAIR",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.3
+    },
+    "F-003": {
+      "sector": "MED",
+      "title": "Sterile-stock audit",
+      "repair_type": "STANDARD",
+      "severity_level": 1,
+      "material_units": 1,
+      "weighted_material_burden": 1.5,
+      "minimum_crew": 1,
+      "external_information_dependencies": [],
+      "difficulty_score": 1.5,
+      "reward_tier": 1,
+      "reward_target_rvu": 1,
+      "allowed_reward_rvu": [
+        1,
+        1
+      ],
+      "case_profile": "BASIC_LOCAL",
+      "max_resource_units_in_single_reward": 0,
+      "resource_reward_probability_cap": 0
+    },
+    "F-105": {
+      "sector": "MED",
+      "title": "HVAC contamination alert",
+      "repair_type": "STANDARD",
+      "severity_level": 1,
+      "material_units": 2,
+      "weighted_material_burden": 2,
+      "minimum_crew": 1,
+      "external_information_dependencies": [],
+      "difficulty_score": 2,
+      "reward_tier": 2,
+      "reward_target_rvu": 2,
+      "allowed_reward_rvu": [
+        2,
+        2
+      ],
+      "case_profile": "STANDARD_LOCAL",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.2
+    },
+    "F-205": {
+      "sector": "MED",
+      "title": "Cold-chain failure",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 2,
+      "weighted_material_burden": 2.5,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "TRN"
+      ],
+      "difficulty_score": 4.25,
+      "reward_tier": 3,
+      "reward_target_rvu": 3,
+      "allowed_reward_rvu": [
+        2,
+        3
+      ],
+      "case_profile": "COORDINATED_REPAIR",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.25
+    },
+    "F-206": {
+      "sector": "MED",
+      "title": "Oxygen scrubber overload",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 2,
+      "weighted_material_burden": 2.25,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "TRN"
+      ],
+      "difficulty_score": 4,
+      "reward_tier": 3,
+      "reward_target_rvu": 3,
+      "allowed_reward_rvu": [
+        2,
+        3
+      ],
+      "case_profile": "COORDINATED_REPAIR",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.25
+    },
+    "F-303": {
+      "sector": "MED",
+      "title": "Life-support brownout",
+      "repair_type": "STANDARD",
+      "severity_level": 3,
+      "material_units": 3,
+      "weighted_material_burden": 3.5,
+      "minimum_crew": 3,
+      "external_information_dependencies": [
+        "TRN",
+        "POW"
+      ],
+      "difficulty_score": 7,
+      "reward_tier": 4,
+      "reward_target_rvu": 5,
+      "allowed_reward_rvu": [
+        4,
+        5
+      ],
+      "case_profile": "CRITICAL_INTERDEPENDENT",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.3
+    },
+    "F-402": {
+      "sector": "MED",
+      "title": "Cryo-store failover",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 3,
+      "weighted_material_burden": 4,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "POW",
+        "WTR"
+      ],
+      "difficulty_score": 6.5,
+      "reward_tier": 4,
+      "reward_target_rvu": 5,
+      "allowed_reward_rvu": [
+        4,
+        5
+      ],
+      "case_profile": "HEAVY_COORDINATED",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.3
+    },
+    "F-004": {
+      "sector": "TRN",
+      "title": "Signal lamp burnout",
+      "repair_type": "STANDARD",
+      "severity_level": 1,
+      "material_units": 1,
+      "weighted_material_burden": 1.25,
+      "minimum_crew": 1,
+      "external_information_dependencies": [],
+      "difficulty_score": 1.25,
+      "reward_tier": 1,
+      "reward_target_rvu": 1,
+      "allowed_reward_rvu": [
+        1,
+        1
+      ],
+      "case_profile": "BASIC_LOCAL",
+      "max_resource_units_in_single_reward": 0,
+      "resource_reward_probability_cap": 0
+    },
+    "F-106": {
+      "sector": "TRN",
+      "title": "Track sensor drift",
+      "repair_type": "STANDARD",
+      "severity_level": 1,
+      "material_units": 1,
+      "weighted_material_burden": 1.25,
+      "minimum_crew": 1,
+      "external_information_dependencies": [],
+      "difficulty_score": 1.25,
+      "reward_tier": 1,
+      "reward_target_rvu": 1,
+      "allowed_reward_rvu": [
+        1,
+        1
+      ],
+      "case_profile": "BASIC_LOCAL",
+      "max_resource_units_in_single_reward": 0,
+      "resource_reward_probability_cap": 0
+    },
+    "F-207": {
+      "sector": "TRN",
+      "title": "Tunnel B partial collapse",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 3,
+      "weighted_material_burden": 3.5,
+      "minimum_crew": 3,
+      "external_information_dependencies": [
+        "AGR"
+      ],
+      "difficulty_score": 5.75,
+      "reward_tier": 4,
+      "reward_target_rvu": 4,
+      "allowed_reward_rvu": [
+        3,
+        4
+      ],
+      "case_profile": "HEAVY_COORDINATED",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.3
+    },
+    "F-208": {
+      "sector": "TRN",
+      "title": "Rail power flicker",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 2,
+      "weighted_material_burden": 2.25,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "AGR"
+      ],
+      "difficulty_score": 4,
+      "reward_tier": 3,
+      "reward_target_rvu": 3,
+      "allowed_reward_rvu": [
+        2,
+        3
+      ],
+      "case_profile": "COORDINATED_REPAIR",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.25
+    },
+    "F-304": {
+      "sector": "TRN",
+      "title": "Blast door failure — Sector 4",
+      "repair_type": "STANDARD",
+      "severity_level": 3,
+      "material_units": 3,
+      "weighted_material_burden": 3.5,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "AGR",
+        "COM"
+      ],
+      "difficulty_score": 6.5,
+      "reward_tier": 4,
+      "reward_target_rvu": 5,
+      "allowed_reward_rvu": [
+        4,
+        5
+      ],
+      "case_profile": "CRITICAL_INTERDEPENDENT",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.3
+    },
+    "F-404": {
+      "sector": "TRN",
+      "title": "Evacuation route rerouting",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 2,
+      "weighted_material_burden": 2.25,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "MED",
+        "COM"
+      ],
+      "difficulty_score": 4.75,
+      "reward_tier": 3,
+      "reward_target_rvu": 4,
+      "allowed_reward_rvu": [
+        3,
+        4
+      ],
+      "case_profile": "COORDINATED_REPAIR",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.3
+    },
+    "F-005": {
+      "sector": "AGR",
+      "title": "Mix-tank flush",
+      "repair_type": "STANDARD",
+      "severity_level": 1,
+      "material_units": 1,
+      "weighted_material_burden": 1,
+      "minimum_crew": 1,
+      "external_information_dependencies": [],
+      "difficulty_score": 1,
+      "reward_tier": 1,
+      "reward_target_rvu": 1,
+      "allowed_reward_rvu": [
+        1,
+        1
+      ],
+      "case_profile": "BASIC_LOCAL",
+      "max_resource_units_in_single_reward": 0,
+      "resource_reward_probability_cap": 0
+    },
+    "F-107": {
+      "sector": "AGR",
+      "title": "Nutrient pump airlock",
+      "repair_type": "STANDARD",
+      "severity_level": 1,
+      "material_units": 1,
+      "weighted_material_burden": 1,
+      "minimum_crew": 1,
+      "external_information_dependencies": [],
+      "difficulty_score": 1,
+      "reward_tier": 1,
+      "reward_target_rvu": 1,
+      "allowed_reward_rvu": [
+        1,
+        1
+      ],
+      "case_profile": "BASIC_LOCAL",
+      "max_resource_units_in_single_reward": 0,
+      "resource_reward_probability_cap": 0
+    },
+    "F-209": {
+      "sector": "AGR",
+      "title": "Grow-lamp bank failure",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 2,
+      "weighted_material_burden": 2.25,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "COM"
+      ],
+      "difficulty_score": 4,
+      "reward_tier": 3,
+      "reward_target_rvu": 3,
+      "allowed_reward_rvu": [
+        2,
+        3
+      ],
+      "case_profile": "COORDINATED_REPAIR",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.25
+    },
+    "F-210": {
+      "sector": "AGR",
+      "title": "Sensor ghost: irrigation breach",
+      "repair_type": "SPECIAL_VERIFICATION",
+      "severity_level": 2,
+      "material_units": 0,
+      "weighted_material_burden": 0,
+      "minimum_crew": null,
+      "external_information_dependencies": [
+        "COM_VERIFICATION"
+      ],
+      "difficulty_score": 2.5,
+      "reward_tier": 2,
+      "reward_target_rvu": 2,
+      "allowed_reward_rvu": [
+        2,
+        2
+      ],
+      "case_profile": "SPECIAL_VERIFICATION",
+      "max_resource_units_in_single_reward": 0,
+      "resource_reward_probability_cap": 0
+    },
+    "F-305": {
+      "sector": "AGR",
+      "title": "Hydroponic root-rot bloom",
+      "repair_type": "STANDARD",
+      "severity_level": 3,
+      "material_units": 3,
+      "weighted_material_burden": 3.5,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "COM"
+      ],
+      "difficulty_score": 5.75,
+      "reward_tier": 3,
+      "reward_target_rvu": 4,
+      "allowed_reward_rvu": [
+        3,
+        4
+      ],
+      "case_profile": "HEAVY_COORDINATED",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.3
+    },
+    "F-006": {
+      "sector": "COM",
+      "title": "Beacon check-in",
+      "repair_type": "STANDARD",
+      "severity_level": 1,
+      "material_units": 1,
+      "weighted_material_burden": 1,
+      "minimum_crew": 1,
+      "external_information_dependencies": [],
+      "difficulty_score": 1,
+      "reward_tier": 1,
+      "reward_target_rvu": 1,
+      "allowed_reward_rvu": [
+        1,
+        1
+      ],
+      "case_profile": "BASIC_LOCAL",
+      "max_resource_units_in_single_reward": 0,
+      "resource_reward_probability_cap": 0
+    },
+    "F-108": {
+      "sector": "COM",
+      "title": "Antenna array desync",
+      "repair_type": "STANDARD",
+      "severity_level": 1,
+      "material_units": 1,
+      "weighted_material_burden": 1,
+      "minimum_crew": 1,
+      "external_information_dependencies": [],
+      "difficulty_score": 1,
+      "reward_tier": 1,
+      "reward_target_rvu": 1,
+      "allowed_reward_rvu": [
+        1,
+        1
+      ],
+      "case_profile": "BASIC_LOCAL",
+      "max_resource_units_in_single_reward": 0,
+      "resource_reward_probability_cap": 0
+    },
+    "F-211": {
+      "sector": "COM",
+      "title": "Uplink power sag",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 2,
+      "weighted_material_burden": 2.25,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "POW"
+      ],
+      "difficulty_score": 4,
+      "reward_tier": 3,
+      "reward_target_rvu": 3,
+      "allowed_reward_rvu": [
+        2,
+        3
+      ],
+      "case_profile": "COORDINATED_REPAIR",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.25
+    },
+    "F-212": {
+      "sector": "COM",
+      "title": "Relay node blackout",
+      "repair_type": "STANDARD",
+      "severity_level": 2,
+      "material_units": 1,
+      "weighted_material_burden": 1,
+      "minimum_crew": 2,
+      "external_information_dependencies": [
+        "POW"
+      ],
+      "difficulty_score": 2.75,
+      "reward_tier": 2,
+      "reward_target_rvu": 2,
+      "allowed_reward_rvu": [
+        2,
+        2
+      ],
+      "case_profile": "COORDINATED_REPAIR",
+      "max_resource_units_in_single_reward": 0,
+      "resource_reward_probability_cap": 0
+    },
+    "F-306": {
+      "sector": "COM",
+      "title": "Master sensor grid collapse",
+      "repair_type": "STANDARD",
+      "severity_level": 3,
+      "material_units": 3,
+      "weighted_material_burden": 3.25,
+      "minimum_crew": 3,
+      "external_information_dependencies": [
+        "POW",
+        "TRN"
+      ],
+      "difficulty_score": 6.75,
+      "reward_tier": 4,
+      "reward_target_rvu": 5,
+      "allowed_reward_rvu": [
+        4,
+        5
+      ],
+      "case_profile": "CRITICAL_INTERDEPENDENT",
+      "max_resource_units_in_single_reward": 1,
+      "resource_reward_probability_cap": 0.3
+    }
   },
   "archetypes": {
-    "LOCAL_RECOVERY_5":        { "label": "LOCAL RECOVERY",        "preview": "+5 HEALTH",                                        "owner": 5,  "rvu": 1, "resource_units": 0 },
-    "LOCAL_RECOVERY_10":       { "label": "LOCAL RECOVERY",        "preview": "+10 HEALTH",                                       "owner": 10, "rvu": 2, "resource_units": 0 },
-    "LOCAL_RECOVERY_15":       { "label": "LOCAL RECOVERY",        "preview": "+15 HEALTH",                                       "owner": 15, "rvu": 3, "resource_units": 0 },
-    "LOCAL_RECOVERY_20":       { "label": "LOCAL RECOVERY",        "preview": "+20 HEALTH",                                       "owner": 20, "rvu": 4, "resource_units": 0 },
-    "MUTUAL_AID_5":            { "label": "MUTUAL AID",            "preview": "CHOOSE ANOTHER SECTOR: +5 HEALTH",                 "other": 5,  "choose": "sector",  "rvu": 1, "resource_units": 0 },
-    "SHARED_RECOVERY_5_5":     { "label": "SHARED RECOVERY",       "preview": "+5 HEALTH · CHOOSE ANOTHER SECTOR: +5 HEALTH",     "owner": 5,  "other": 5,  "choose": "sector", "rvu": 2, "resource_units": 0 },
-    "MUTUAL_RECOVERY_10_5":    { "label": "MUTUAL RECOVERY",       "preview": "+10 HEALTH · CHOOSE ANOTHER SECTOR: +5 HEALTH",    "owner": 10, "other": 5,  "choose": "sector", "rvu": 3, "resource_units": 0 },
-    "ALLIANCE_RECOVERY_10_10": { "label": "ALLIANCE RECOVERY",     "preview": "+10 HEALTH · CHOOSE ANOTHER SECTOR: +10 HEALTH",   "owner": 10, "other": 10, "choose": "sector", "rvu": 4, "resource_units": 0 },
-    "LOWEST_HEALTH_5":         { "label": "LOWEST-HEALTH RELIEF",  "preview": "LOWEST-HEALTH SECTOR: +5 HEALTH",                  "lowest": 5,  "rvu": 1, "resource_units": 0 },
-    "LOWEST_HEALTH_10":        { "label": "LOWEST-HEALTH RELIEF",  "preview": "LOWEST-HEALTH SECTOR: +10 HEALTH",                 "lowest": 10, "rvu": 2, "resource_units": 0 },
-    "CITY_RELIEF_3X5":         { "label": "CITY RELIEF",           "preview": "3 LOWEST-HEALTH SECTORS: +5 HEALTH EACH",          "lowest_n": 3, "each": 5, "rvu": 3, "resource_units": 0 },
-    "CITY_RECOVERY_2X10":      { "label": "CITY RECOVERY",         "preview": "CHOOSE UP TO 2 OTHER SECTORS: +10 HEALTH EACH",    "others": 2, "each": 10, "choose": "sectors", "rvu": 4, "resource_units": 0 },
-    "TRN_REINFORCEMENT":       { "label": "TRN REINFORCEMENT",     "preview": "+1 APPROVAL THIS ROUND",                           "capacity": "trn_capacity", "rvu": 2, "resource_units": 0 },
-    "TRN_REINFORCEMENT_PLUS":  { "label": "TRN REINFORCEMENT",     "preview": "+1 APPROVAL THIS ROUND · +{bonus} HEALTH",         "capacity": "trn_capacity", "owner_from_pool": true, "rvu": 2, "resource_units": 0 },
-    "MED_REINFORCEMENT":       { "label": "MED REINFORCEMENT",     "preview": "+1 HEAL THIS ROUND",                               "capacity": "med_capacity", "rvu": 2, "resource_units": 0 },
-    "MED_REINFORCEMENT_PLUS":  { "label": "MED REINFORCEMENT",     "preview": "+1 HEAL THIS ROUND · +{bonus} HEALTH",             "capacity": "med_capacity", "owner_from_pool": true, "rvu": 2, "resource_units": 0 },
-    "TEMPORARY_CREW_1":        { "label": "TEMPORARY CREW",        "preview": "CHOOSE A SECTOR: +1 WORKER UNTIL ROUND END",       "crew": 1, "choose": "sector", "self_ok": true, "rvu": 2, "resource_units": 0 },
-    "TEMPORARY_CREW_2_SECTORS": { "label": "TEMPORARY CREW",       "preview": "CHOOSE UP TO 2 SECTORS: +1 WORKER EACH UNTIL ROUND END", "crew": 1, "others": 2, "choose": "sectors", "self_ok": true, "rvu": 4, "resource_units": 0 },
-    "FAULT_STABILISATION":     { "label": "FAULT STABILISATION",   "preview": "CHOOSE ANOTHER FAULT: HALVE ITS DECAY UNTIL ROUND END", "stabilise": 0.5, "choose": "fault", "rvu": 2, "resource_units": 0 },
-    "EMERGENCY_STABILISATION": { "label": "EMERGENCY STABILISATION", "preview": "CHOOSE ANOTHER FAULT: PAUSE ITS DECAY UNTIL ROUND END", "stabilise": 0, "choose": "fault", "rvu": 3, "resource_units": 0 },
-    "SUPPLY_FIND_1":           { "label": "SUPPLY FIND",           "preview": "+1 SCARCE RESOURCE",                               "supply": 1, "rvu": 1, "resource_units": 1 },
-    "SUPPLY_CACHE_1_PLUS_HEALTH": { "label": "SUPPLY CACHE",       "preview": "+1 SCARCE RESOURCE · +5 HEALTH",                   "supply": 1, "owner": 5, "rvu": 2, "resource_units": 1 },
-    "SUPPLY_CACHE_2_PLUS_HEALTH": { "label": "SUPPLY CACHE",       "preview": "+2 SCARCE RESOURCES · +5 HEALTH",                  "supply": 2, "owner": 5, "rvu": 3, "resource_units": 2 },
-    "MAJOR_SUPPLY_CACHE_3_PLUS_HEALTH": { "label": "MAJOR SUPPLY CACHE", "preview": "+3 SCARCE RESOURCES · +5 HEALTH",           "supply": 3, "owner": 5, "rvu": 4, "resource_units": 3 },
-    "SALVAGE_1":               { "label": "SALVAGE",               "preview": "1 REPAIR MATERIAL REFUNDED",                       "salvage": 1, "rvu": 1, "resource_units": 1 },
-    "SALVAGE_1_PLUS_HEALTH_5": { "label": "SALVAGE",               "preview": "1 REPAIR MATERIAL REFUNDED · +5 HEALTH",           "salvage": 1, "owner": 5,  "rvu": 2, "resource_units": 1 },
-    "SALVAGE_1_PLUS_HEALTH_10": { "label": "SALVAGE",              "preview": "1 REPAIR MATERIAL REFUNDED · +10 HEALTH",          "salvage": 1, "owner": 10, "rvu": 3, "resource_units": 1 },
-    "SALVAGE_UP_TO_2_PLUS_HEALTH_10": { "label": "SALVAGE",        "preview": "UP TO 2 REPAIR MATERIALS REFUNDED · +10 HEALTH",   "salvage": 2, "owner": 10, "rvu": 4, "resource_units": 2 }
-  },
-  "pools": {
-    "1": [
-      { "reward": "LOCAL_RECOVERY_5", "weight": 35 },
-      { "reward": "MUTUAL_AID_5", "weight": 20 },
-      { "reward": "LOWEST_HEALTH_5", "weight": 10 },
-      { "reward": "SUPPLY_FIND_1", "weight": 20 },
-      { "reward": "SALVAGE_1", "weight": 15 }
-    ],
-    "2": [
-      { "reward": "LOCAL_RECOVERY_10", "weight": 20 },
-      { "reward": "SHARED_RECOVERY_5_5", "weight": 15 },
-      { "reward": "LOWEST_HEALTH_10", "weight": 10 },
-      { "reward": "TRN_REINFORCEMENT", "weight": 10 },
-      { "reward": "MED_REINFORCEMENT", "weight": 10 },
-      { "reward": "TEMPORARY_CREW_1", "weight": 10 },
-      { "reward": "SUPPLY_CACHE_1_PLUS_HEALTH", "weight": 15 },
-      { "reward": "SALVAGE_1_PLUS_HEALTH_5", "weight": 10 }
-    ],
-    "3": [
-      { "reward": "LOCAL_RECOVERY_15", "weight": 15 },
-      { "reward": "MUTUAL_RECOVERY_10_5", "weight": 15 },
-      { "reward": "CITY_RELIEF_3X5", "weight": 15 },
-      { "reward": "TRN_REINFORCEMENT_PLUS", "weight": 10, "owner_health_bonus": 5 },
-      { "reward": "MED_REINFORCEMENT_PLUS", "weight": 10, "owner_health_bonus": 5 },
-      { "reward": "TEMPORARY_CREW_1", "weight": 10 },
-      { "reward": "FAULT_STABILISATION", "weight": 10 },
-      { "reward": "SUPPLY_CACHE_2_PLUS_HEALTH", "weight": 10 },
-      { "reward": "SALVAGE_1_PLUS_HEALTH_10", "weight": 5 }
-    ],
-    "4": [
-      { "reward": "LOCAL_RECOVERY_20", "weight": 10 },
-      { "reward": "ALLIANCE_RECOVERY_10_10", "weight": 15 },
-      { "reward": "CITY_RECOVERY_2X10", "weight": 15 },
-      { "reward": "TRN_REINFORCEMENT_PLUS", "weight": 10, "owner_health_bonus": 10 },
-      { "reward": "MED_REINFORCEMENT_PLUS", "weight": 10, "owner_health_bonus": 10 },
-      { "reward": "TEMPORARY_CREW_2_SECTORS", "weight": 10 },
-      { "reward": "EMERGENCY_STABILISATION", "weight": 10 },
-      { "reward": "MAJOR_SUPPLY_CACHE_3_PLUS_HEALTH", "weight": 10 },
-      { "reward": "SALVAGE_UP_TO_2_PLUS_HEALTH_10", "weight": 10 }
-    ]
+    "LOCAL_RECOVERY_5": {
+      "label": "LOCAL RECOVERY",
+      "category": "local",
+      "rvu": 1,
+      "resource_units": 0,
+      "owner": 5,
+      "effect": "Fault-owning active sector +5 Health."
+    },
+    "LOCAL_RECOVERY_10": {
+      "label": "LOCAL RECOVERY",
+      "category": "local",
+      "rvu": 2,
+      "resource_units": 0,
+      "owner": 10,
+      "effect": "Fault-owning active sector +10 Health."
+    },
+    "LOCAL_RECOVERY_15": {
+      "label": "LOCAL RECOVERY",
+      "category": "local",
+      "rvu": 3,
+      "resource_units": 0,
+      "owner": 15,
+      "effect": "Fault-owning active sector +15 Health."
+    },
+    "LOCAL_RECOVERY_20": {
+      "label": "LOCAL RECOVERY",
+      "category": "local",
+      "rvu": 4,
+      "resource_units": 0,
+      "owner": 20,
+      "effect": "Fault-owning active sector +20 Health."
+    },
+    "MUTUAL_AID_5": {
+      "label": "MUTUAL AID",
+      "category": "cross",
+      "rvu": 1,
+      "resource_units": 0,
+      "other": 5,
+      "choose": "sector",
+      "effect": "Choose another non-DARK active sector: +5 Health."
+    },
+    "SHARED_RECOVERY_5_5": {
+      "label": "SHARED RECOVERY",
+      "category": "cross",
+      "rvu": 2,
+      "resource_units": 0,
+      "owner": 5,
+      "other": 5,
+      "choose": "sector",
+      "effect": "Fault owner +5 Health and choose another non-DARK active sector +5 Health."
+    },
+    "MUTUAL_RECOVERY_10_5": {
+      "label": "MUTUAL RECOVERY",
+      "category": "cross",
+      "rvu": 3,
+      "resource_units": 0,
+      "owner": 10,
+      "other": 5,
+      "choose": "sector",
+      "effect": "Fault owner +10 Health and choose another non-DARK active sector +5 Health."
+    },
+    "ALLIANCE_RECOVERY_10_10": {
+      "label": "ALLIANCE RECOVERY",
+      "category": "cross",
+      "rvu": 4,
+      "resource_units": 0,
+      "owner": 10,
+      "other": 10,
+      "choose": "sector",
+      "effect": "Fault owner +10 Health and choose another non-DARK active sector +10 Health."
+    },
+    "CRITICAL_NETWORK_RECOVERY": {
+      "label": "CRITICAL NETWORK RECOVERY",
+      "category": "cross",
+      "rvu": 5,
+      "resource_units": 0,
+      "owner": 15,
+      "other": 10,
+      "choose": "sector",
+      "effect": "Fault owner +15 Health and choose another non-DARK active sector +10 Health."
+    },
+    "LOWEST_HEALTH_5": {
+      "label": "LOWEST-HEALTH RELIEF",
+      "category": "cross",
+      "rvu": 1,
+      "resource_units": 0,
+      "lowest": 5,
+      "effect": "Lowest-Health non-DARK active sector +5 Health."
+    },
+    "LOWEST_HEALTH_10": {
+      "label": "LOWEST-HEALTH RELIEF",
+      "category": "cross",
+      "rvu": 2,
+      "resource_units": 0,
+      "lowest": 10,
+      "effect": "Lowest-Health non-DARK active sector +10 Health."
+    },
+    "CITY_RELIEF_3X5": {
+      "label": "CITY RELIEF",
+      "category": "cross",
+      "rvu": 3,
+      "resource_units": 0,
+      "lowest_n": 3,
+      "each": 5,
+      "effect": "Up to 3 lowest-Health non-DARK active sectors +5 Health each."
+    },
+    "CITY_RECOVERY_2X10": {
+      "label": "CITY RECOVERY",
+      "category": "cross",
+      "rvu": 4,
+      "resource_units": 0,
+      "others": 2,
+      "each": 10,
+      "choose": "sectors",
+      "effect": "Choose up to 2 other non-DARK active sectors: +10 Health each."
+    },
+    "TRN_REINFORCEMENT": {
+      "label": "TRN REINFORCEMENT",
+      "category": "capacity",
+      "rvu": 2,
+      "resource_units": 0,
+      "capacity": "trn_capacity",
+      "effect": "TRN gains +1 approval capacity for the current round only."
+    },
+    "TRN_REINFORCEMENT_PLUS": {
+      "label": "TRN REINFORCEMENT",
+      "category": "capacity",
+      "rvu": 3,
+      "resource_units": 0,
+      "capacity": "trn_capacity",
+      "owner": 5,
+      "note": "the +5 variant; the +10 variant is TRN_REINFORCEMENT_HEALTH_10",
+      "effect": "TRN gains +1 approval capacity this round; fault owner +5 or +10 Health as defined by tier."
+    },
+    "TRN_REINFORCEMENT_HEALTH_10": {
+      "label": "TRN REINFORCEMENT",
+      "category": "capacity",
+      "rvu": 4,
+      "resource_units": 0,
+      "capacity": "trn_capacity",
+      "owner": 10,
+      "effect": "TRN gains +1 approval capacity this round and fault owner +10 Health."
+    },
+    "TRN_REINFORCEMENT_HEALTH_15": {
+      "label": "TRN REINFORCEMENT",
+      "category": "capacity",
+      "rvu": 5,
+      "resource_units": 0,
+      "capacity": "trn_capacity",
+      "owner": 15,
+      "effect": "TRN gains +1 approval capacity this round and fault owner +15 Health."
+    },
+    "MED_REINFORCEMENT": {
+      "label": "MED REINFORCEMENT",
+      "category": "capacity",
+      "rvu": 2,
+      "resource_units": 0,
+      "capacity": "med_capacity",
+      "effect": "MED gains +1 healing capacity for the current round only."
+    },
+    "MED_REINFORCEMENT_PLUS": {
+      "label": "MED REINFORCEMENT",
+      "category": "capacity",
+      "rvu": 3,
+      "resource_units": 0,
+      "capacity": "med_capacity",
+      "owner": 5,
+      "note": "the +5 variant; the +10 variant is MED_REINFORCEMENT_HEALTH_10",
+      "effect": "MED gains +1 healing capacity this round; fault owner +5 or +10 Health as defined by tier."
+    },
+    "MED_REINFORCEMENT_HEALTH_10": {
+      "label": "MED REINFORCEMENT",
+      "category": "capacity",
+      "rvu": 4,
+      "resource_units": 0,
+      "capacity": "med_capacity",
+      "owner": 10,
+      "effect": "MED gains +1 healing capacity this round and fault owner +10 Health."
+    },
+    "MED_REINFORCEMENT_HEALTH_15": {
+      "label": "MED REINFORCEMENT",
+      "category": "capacity",
+      "rvu": 5,
+      "resource_units": 0,
+      "capacity": "med_capacity",
+      "owner": 15,
+      "effect": "MED gains +1 healing capacity this round and fault owner +15 Health."
+    },
+    "TEMPORARY_CREW_1": {
+      "label": "TEMPORARY CREW",
+      "category": "cross",
+      "rvu": 2,
+      "resource_units": 0,
+      "crew": 1,
+      "choose": "sector",
+      "self_ok": true,
+      "effect": "Choose an eligible active sector: +1 temporary available worker until round end. This does not heal an injured worker."
+    },
+    "TEMPORARY_CREW_2_SECTORS": {
+      "label": "TEMPORARY CREW",
+      "category": "cross",
+      "rvu": 4,
+      "resource_units": 0,
+      "crew": 1,
+      "others": 2,
+      "choose": "sectors",
+      "self_ok": true,
+      "effect": "Choose up to 2 eligible active sectors: each gains +1 temporary available worker until round end."
+    },
+    "FAULT_STABILISATION": {
+      "label": "FAULT STABILISATION",
+      "category": "capacity",
+      "rvu": 2,
+      "resource_units": 0,
+      "stabilise": "HALVE",
+      "choose": "fault",
+      "effect": "Choose another active unresolved fault: reduce its Health decay by 50% for 90 seconds."
+    },
+    "EMERGENCY_STABILISATION": {
+      "label": "EMERGENCY STABILISATION",
+      "category": "capacity",
+      "rvu": 3,
+      "resource_units": 0,
+      "stabilise": "PAUSE",
+      "choose": "fault",
+      "effect": "Choose another active unresolved fault: pause its Health decay for 60 seconds."
+    },
+    "SUPPLY_FIND_1": {
+      "label": "SUPPLY FIND",
+      "category": "resource",
+      "rvu": 1,
+      "resource_units": 1,
+      "supply": 1,
+      "effect": "Fault owner receives +1 scarcity-weighted resource."
+    },
+    "SUPPLY_CACHE_1_PLUS_HEALTH": {
+      "label": "SUPPLY CACHE",
+      "category": "resource",
+      "rvu": 2,
+      "resource_units": 1,
+      "supply": 1,
+      "owner": 5,
+      "effect": "Fault owner receives +1 scarcity-weighted resource and +5 Health."
+    },
+    "SUPPLY_CACHE_2_PLUS_HEALTH": {
+      "label": "SUPPLY CACHE",
+      "category": "resource",
+      "rvu": 3,
+      "resource_units": 2,
+      "supply": 2,
+      "owner": 5,
+      "effect": "Fault owner receives +2 distinct scarcity-weighted resources and +5 Health."
+    },
+    "MAJOR_SUPPLY_CACHE_3_PLUS_HEALTH": {
+      "label": "MAJOR SUPPLY CACHE",
+      "category": "resource",
+      "rvu": 4,
+      "resource_units": 3,
+      "supply": 3,
+      "owner": 5,
+      "effect": "Fault owner receives +3 distinct scarcity-weighted resources and +5 Health."
+    },
+    "SUPPLY_1_PLUS_HEALTH_15": {
+      "label": "SUPPLY CACHE",
+      "category": "resource",
+      "rvu": 4,
+      "resource_units": 1,
+      "supply": 1,
+      "owner": 15,
+      "effect": "Fault owner receives +1 scarcity-weighted resource and +15 Health."
+    },
+    "SUPPLY_1_PLUS_HEALTH_20": {
+      "label": "SUPPLY CACHE",
+      "category": "resource",
+      "rvu": 5,
+      "resource_units": 1,
+      "supply": 1,
+      "owner": 20,
+      "effect": "Fault owner receives +1 scarcity-weighted resource and +20 Health."
+    },
+    "SUPPLY_2_PLUS_HEALTH_15": {
+      "label": "SUPPLY CACHE",
+      "category": "resource",
+      "rvu": 5,
+      "resource_units": 2,
+      "supply": 2,
+      "owner": 15,
+      "effect": "Fault owner receives +2 distinct scarcity-weighted resources and +15 Health."
+    },
+    "SALVAGE_1": {
+      "label": "SALVAGE",
+      "category": "resource",
+      "rvu": 1,
+      "resource_units": 1,
+      "salvage": 1,
+      "effect": "Refund 1 unit of a material consumed by this successful repair."
+    },
+    "SALVAGE_1_PLUS_HEALTH_5": {
+      "label": "SALVAGE",
+      "category": "resource",
+      "rvu": 2,
+      "resource_units": 1,
+      "salvage": 1,
+      "owner": 5,
+      "effect": "Refund 1 consumed repair-material unit and fault owner +5 Health."
+    },
+    "SALVAGE_1_PLUS_HEALTH_10": {
+      "label": "SALVAGE",
+      "category": "resource",
+      "rvu": 3,
+      "resource_units": 1,
+      "salvage": 1,
+      "owner": 10,
+      "effect": "Refund 1 consumed repair-material unit and fault owner +10 Health."
+    },
+    "SALVAGE_UP_TO_2_PLUS_HEALTH_10": {
+      "label": "SALVAGE",
+      "category": "resource",
+      "rvu": 4,
+      "resource_units": 2,
+      "salvage": 2,
+      "owner": 10,
+      "effect": "Refund up to 2 consumed repair-material units and fault owner +10 Health."
+    }
   }
 }

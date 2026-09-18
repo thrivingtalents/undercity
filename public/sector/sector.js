@@ -352,7 +352,7 @@
       localLock.delete(msg.fault_code);
       if (consoleFor === msg.fault_code) $('code-input').value = '';
       const r = msg.reward || {};
-      const reward = r.applied ? `  ·  REWARD: ${r.result_text || r.text}` : r.pending ? '  ·  REWARD: CHOOSE YOUR TARGET BELOW' : '';
+      const reward = r.applied ? `  ·  REWARD CLAIMED: ${r.result_text || r.text}` : r.pending ? '  ·  REWARD: CHOOSE YOUR TARGET BELOW' : '';
       const text = `${msg.fault_code}  FAULT RESOLVED  +${Number(msg.recovery) || 0} HEALTH` + reward;
       const banner = $('banner-result');
       banner.textContent = text;
@@ -1162,7 +1162,8 @@
     // What it pays, before the team commits. Never the units.
     show($('card-reward'), !!(f.reward && f.reward.text) && !f.resolved);
     if (f.reward && f.reward.text) setText($('card-reward-text'), f.reward.text);
-    setText($('card-attempts'), `ATTEMPTS ${Number(f.attempts) || 0}`);
+    // The wrong-code count (v17.3): what counts towards the lock, never a short tray or crew.
+    setText($('card-attempts'), `ATTEMPTS ${Number(f.wrong_code_attempts ?? f.attempts) || 0}`);
     renderReadiness(f);
 
     // Console: switch drafts only when the selected fault changes.
@@ -1216,7 +1217,7 @@
   // -- a choosing reward: the table names its target ----------------------------
 
   function handleRewardResult(msg) {
-    if (msg.ok) transientMsg('reward-msg', `REWARD APPLIED — ${msg.result_text || msg.text || ''}`, 'ok', 6000);
+    if (msg.ok) transientMsg('reward-msg', `REWARD CLAIMED — ${msg.result_text || msg.text || ''}`, 'ok', 6000);
     else transientMsg('reward-msg', String(msg.reason || 'REFUSED').toUpperCase().replace(/_/g, ' '), 'bad');
   }
 
@@ -1301,7 +1302,7 @@
           case 'no_procedure':  text = 'NO MATCHING PROCEDURE — VERIFY THIS ALERT'; break;
           case 'sector_dark':   text = 'SECTOR IS DARK'; break;
           case 'locked':        text = 'CONSOLE LOCKED'; break;
-          case 'unknown_fault': text = 'THAT FAULT IS NOT ACTIVE HERE'; break;
+          case 'unknown_fault': text = 'FAULT NO LONGER ACTIVE'; break;
           default:              text = 'RESOLUTION REJECTED';
         }
       }
@@ -1558,7 +1559,7 @@
     const list = (mine.recently_resolved || []).slice().reverse();
     show($('resolved-block'), list.length > 0);
     // RESOLVED by the team; CLEARED by the facilitator.
-    const html = list.map((f) => `<div class="resolved-row"><span>${esc(f.code)}</span><span class="r-name">${esc(f.name)}</span><span class="r-st">${esc(f.status === 'RESOLVED' || !f.status ? 'RESOLVED' : f.status)}${f.reward_claimed ? ' · REWARD CLAIMED' : ''}</span></div>`).join('');
+    const html = list.map((f) => `<div class="resolved-row"><span>${esc(f.code)}</span><span class="r-name">${esc(f.name)}</span><span class="r-st">${esc(f.status === 'RESOLVED' || !f.status ? 'RESOLVED' : f.status)}${f.reward_claimed ? ` · REWARD CLAIMED${f.reward && f.reward.result_text ? `: ${esc(f.reward.result_text)}` : ''}` : ''}</span></div>`).join('');
     const host = $('resolved');
     if (host.innerHTML !== html) host.innerHTML = html;
   }

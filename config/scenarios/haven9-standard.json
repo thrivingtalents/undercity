@@ -63,7 +63,6 @@
     "fault_reward_overrides": {},
     "active_sectors": null,
     "training_mode": false,
-    "fault_reward_overrides": {},
     "deliver_on_stamp": true,
 
     "brownout_effects": {
