@@ -218,12 +218,14 @@
 
       <!-- TRANSPORT ONLY. The server sends this panel's data to TRN alone. -->
       <div class="panel block main-panel approval-block" id="queue-panel" hidden>
-        <h2 class="ptitle">TRANSFER APPROVALS THIS ROUND</h2>
+        <h2 class="ptitle">TRANSFER APPROVALS</h2>
+        <!-- the allowance: dots, then words -->
+        <div class="cap-dots" id="queue-dots" aria-hidden="true"></div>
         <div class="cap-big" id="queue-cap">—</div>
-        <div class="sub-title">PENDING APPROVALS</div>
+        <div class="cap-sub" id="queue-left"></div>
+        <div class="sub-title">PENDING APPROVALS <span class="count" id="queue-count">0</span></div>
         <div class="queue" id="queue"></div>
         <div class="msg" id="queue-msg" hidden></div>
-        <div class="declare-note">Only Transport approves resource movement. Confirm the signed chit, then approve.</div>
       </div>
 
       <!-- AGRICULTURE ONLY. The server deals three cards to AGR alone. -->

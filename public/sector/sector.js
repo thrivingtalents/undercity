@@ -63,7 +63,9 @@
   const faultRows = new Map(); // fault code -> list row element
   const cityRows = new Map();  // sector code -> feed row element
   const transferRows = new Map(); // transfer id -> row element
-  const queueRows = new Map();    // transfer id -> queue row element
+  const queueRows = new Map();    // transfer id -> queue card element
+  let queueConfirm = null;        // { id, kind: 'approve' | 'decline' } — the one card asking "are you sure?"
+  let queueActing = null;         // transfer id the last APPROVE / DECLINE / CHIT was sent for; its card shows the reply
   const inboxSeen = new Set();    // inbound request ids we have already rung for
   const queueSeen = new Set();    // approval-queue ids (TRN) already rung for
   const healSeen = new Set();     // healing-queue ids (MED) already rung for
@@ -290,17 +292,22 @@
   /** TRN only: the signed paper chit is in our hand. */
   function confirmChit(id, confirmed) {
     pendingTransferAction = 'stamp';
+    queueActing = id;
     socket.send({ type: 'transfer_chit', id, confirmed });
   }
 
   /** TRN only: approve the movement. This is the step that moves stock. */
   function approveTransfer(id) {
     pendingTransferAction = 'stamp';
+    queueActing = id;
+    queueConfirm = null;
     socket.send({ type: 'transfer_approve', id });
   }
 
   function declineTransfer(id) {
     pendingTransferAction = 'stamp';
+    queueActing = id;
+    queueConfirm = null;
     socket.send({ type: 'transfer_decline', id });
   }
 
@@ -435,12 +442,50 @@
       transientMsg(target, word, 'ok', 5000);
       return;
     }
+    if (target === 'queue-msg' && queueActing) {
+      // Transport's reply goes on the card it was about, in the queue's own words.
+      const card = queueRows.get(queueActing);
+      const el = card && card.querySelector('.q-msg');
+      queueActing = null;
+      const word = msg.ok
+        ? (msg.action === 'approve' ? 'TRANSFER APPROVED' : msg.action === 'decline' ? 'TRANSFER DECLINED'
+          : (msg.transfer && msg.transfer.chit_confirmed ? 'CHIT CONFIRMED' : 'CHIT WITHDRAWN'))
+        : queueRefusal(msg);
+      // A successful approve or decline removes its card with the next frame, so
+      // that word goes on the panel; a refusal or a chit toggle stays on the card.
+      const stays = !(msg.ok && (msg.action === 'approve' || msg.action === 'decline'));
+      if (stays && el) { flashCard(el, word, msg.ok ? 'ok' : 'bad'); return; }
+      transientMsg(target, word, msg.ok ? 'ok' : 'bad', msg.ok ? 4000 : 6000);
+      return;
+    }
     if (msg.ok) {
       const t = msg.transfer || msg.request || msg.healing || {};
       transientMsg(target, `${t.id ? `${t.id} ` : ''}${TRANSFER_WORD[t.status] || 'RECORDED'}`, 'ok', 4000);
     } else {
       transientMsg(target, `REFUSED — ${transferReason(msg)}`, 'bad');
     }
+  }
+
+  /** The queue's short refusals. Anything else falls back to the long form. */
+  function queueRefusal(msg) {
+    switch (msg.reason) {
+      case 'chit_required':            return 'CHIT REQUIRED BEFORE APPROVAL';
+      case 'capacity':                 return 'APPROVAL CAPACITY REACHED — NEW APPROVALS AVAILABLE NEXT ROUND';
+      case 'insufficient_stock_stamp': return 'SUPPLIER SHORT OF STOCK — NOTHING MOVED';
+      case 'expired': case 'transfer_closed': case 'already_stamped': case 'unknown_transfer':
+        return 'REQUEST NO LONGER AVAILABLE';
+      case 'sector_dark':              return 'TRANSPORT DARK — CANNOT APPROVE';
+      default:                         return `REFUSED — ${transferReason(msg)}`;
+    }
+  }
+
+  const cardTimers = new WeakMap();
+  function flashCard(el, text, cls) {
+    el.textContent = text;
+    el.className = `q-msg ${cls}`;
+    el.hidden = false;
+    clearTimeout(cardTimers.get(el));
+    cardTimers.set(el, setTimeout(() => { el.hidden = true; }, cls === 'ok' ? 4000 : 7000));
   }
 
   // -- render (per frame; keyed, never rebuilds the console) -----------------
@@ -1260,71 +1305,146 @@
    * on us, the approvals left this round, and the two gates before approval:
    * the paper chit in our hand, and the supplier still holding the goods.
    */
+  /** "Waiting 27s" / "Waiting 1m 12s": elapsed, in words — never a clock. */
+  function elapsedText(since) {
+    const t = Date.parse(since);
+    if (!Number.isFinite(t)) return '';
+    const secs = Math.max(0, Math.floor((Date.now() - t) / 1000));
+    if (secs < 60) return `Waiting ${secs}s`;
+    const m = Math.floor(secs / 60); const r = secs % 60;
+    return m < 60 ? `Waiting ${m}m ${r}s` : `Waiting ${Math.floor(m / 60)}h ${m % 60}m`;
+  }
+
+  /** "💧 1 WATER", "👤 1 WORKER" — the icon always with its word. */
+  function itemText(t) {
+    const r = RES[t.resource] || { glyph: '', name: String(t.resource || '').toUpperCase() };
+    const n = Number(t.amount) || 0;
+    const name = t.resource === 'workers' ? (n === 1 ? 'WORKER' : 'WORKERS') : r.name;
+    return `${r.glyph} ${n} ${name}`;
+  }
+
+  /** What the tray can honestly say about the paper chit. */
+  function chitWord(q, t) {
+    if (q.requires_chit === false) return { word: 'CHIT: NOT REQUIRED', state: 'off' };
+    return t.chit_confirmed ? { word: 'CHIT: READY', state: 'ready' } : { word: 'CHIT: CHECK REQUIRED', state: 'check' };
+  }
+
   function renderQueue() {
     const q = state.transfer_queue;
     show($('queue-panel'), !!q);
     if (!q) return;
-    const full = q.used >= q.capacity;
-    const left = Math.max(0, (q.remaining !== undefined ? q.remaining : q.capacity - q.used));
+    const cap = Math.max(0, Number(q.capacity) || 0);
+    const used = Math.max(0, Number(q.used) || 0);
+    const full = used >= cap;
+    const left = Math.max(0, (q.remaining !== undefined ? q.remaining : cap - used));
     const period = String(q.basis || 'round').toUpperCase();
-    setText($('queue-cap'), `${q.used} / ${q.capacity} USED · ${left} LEFT${period === 'ROUND' ? '' : ' THIS ' + period}`);
+
+    // The allowance: dots you can count, then the words.
+    const dots = Array.from({ length: cap }, (_, i) => (i < used ? '●' : '○')).join(' ');
+    setText($('queue-dots'), dots);
+    setText($('queue-cap'), `${used} OF ${cap} USED`);
+    setText($('queue-left'), full ? 'APPROVAL CAPACITY REACHED' : period === 'ROUND' ? `${left} LEFT THIS ROUND` : `${left} LEFT`);
     $('queue-cap').classList.toggle('warn', full);
+    $('queue-left').classList.toggle('warn', full);
+    $('queue-dots').classList.toggle('warn', full);
+
+    const items = q.items || [];
+    setText($('queue-count'), String(items.length));
+    if (queueConfirm && !items.some((t) => t.id === queueConfirm.id)) queueConfirm = null;
 
     const host = $('queue');
     const seen = new Set();
-    (q.items || []).forEach((t, i) => {
+    const needsChit = q.requires_chit !== false;
+    items.forEach((t, i) => {
       seen.add(t.id);
-      let row = queueRows.get(t.id);
-      if (!row) {
-        row = document.createElement('div');
-        row.className = 'q-row';
-        row.innerHTML =
-          `<span class="q-n"></span><span class="q-text"></span>` +
-          `<b class="q-wait clock"></b>` +
-          `<div class="q-btns">` +
-          `<button type="button" class="q-chit">CHIT</button>` +
-          `<button type="button" class="q-stamp">APPROVE</button>` +
-          `<button type="button" class="q-no">DECLINE</button></div>`;
-        row.querySelector('.q-chit').addEventListener('click', () => confirmChit(t.id, !row.dataset.chit || row.dataset.chit === 'no'));
-        row.querySelector('.q-stamp').addEventListener('click', () => approveTransfer(t.id));
-        row.querySelector('.q-no').addEventListener('click', () => declineTransfer(t.id));
-        queueRows.set(t.id, row);
+      let card = queueRows.get(t.id);
+      if (!card) {
+        card = document.createElement('article');
+        card.className = 'q-card';
+        card.innerHTML =
+          `<div class="q-top"><span class="q-n"></span><span class="q-route"></span><span class="q-wait"></span></div>` +
+          `<div class="q-item"></div>` +
+          `<div class="q-chit-line"><span class="q-chitword"></span><span class="q-why" hidden></span></div>` +
+          `<div class="q-actions">` +
+          `<button type="button" class="q-chit tertiary">CONFIRM CHIT</button>` +
+          `<button type="button" class="q-no secondary">DECLINE</button>` +
+          `<button type="button" class="q-stamp primary">APPROVE</button></div>` +
+          `<div class="q-confirm" hidden></div>` +
+          `<div class="q-msg" hidden></div>`;
+        card.querySelector('.q-chit').addEventListener('click', () => confirmChit(t.id, card.dataset.chit !== 'yes'));
+        card.querySelector('.q-stamp').addEventListener('click', () => { queueConfirm = { id: t.id, kind: 'approve' }; renderQueue(); });
+        card.querySelector('.q-no').addEventListener('click', () => { queueConfirm = { id: t.id, kind: 'decline' }; renderQueue(); });
+        queueRows.set(t.id, card);
       }
-      if (host.children[i] !== row) host.insertBefore(row, host.children[i] || null);
-      row.dataset.since = t.requested_at || '';
-      row.dataset.chit = t.chit_confirmed ? 'yes' : 'no';
-      setText(row.querySelector('.q-n'), `${i + 1}.`);
-      setText(row.querySelector('.q-text'),
-        `${t.from} → ${t.to} · ${t.amount} ${resName(t.resource)}${t.request_id ? ' · ON REQUEST' : ''}`);
+      if (host.children[i] !== card) host.insertBefore(card, host.children[i] || null);
+      card.dataset.since = t.created_at || t.requested_at || '';
+      card.dataset.chit = t.chit_confirmed ? 'yes' : 'no';
+      card.dataset.id = t.id;
+      // Consecutive cards on one route read as a group; each stays its own request.
+      const prev = items[i - 1];
+      const sameRoute = !!(prev && prev.from === t.from && prev.to === t.to);
+      card.classList.toggle('grouped', sameRoute);
 
-      const chitBtn = row.querySelector('.q-chit');
-      const needsChit = q.requires_chit !== false;
+      setText(card.querySelector('.q-n'), `#${String(i + 1).padStart(2, '0')}`);
+      setText(card.querySelector('.q-route'), `${t.from} → ${t.to}`);
+      setText(card.querySelector('.q-wait'), elapsedText(card.dataset.since));
+      setText(card.querySelector('.q-item'), itemText(t));
+      card.classList.toggle('workers', t.resource === 'workers');
+
+      const chit = chitWord(q, t);
+      const chitEl = card.querySelector('.q-chitword');
+      setText(chitEl, chit.word);
+      chitEl.dataset.state = chit.state;
+
+      const chitBtn = card.querySelector('.q-chit');
       show(chitBtn, needsChit);
       chitBtn.classList.toggle('on', !!t.chit_confirmed);
-      setText(chitBtn, t.chit_confirmed ? 'CHIT ✓' : 'CHIT');
-      chitBtn.title = t.chit_confirmed
-        ? 'Signed chit received — click to withdraw'
-        : 'Confirm the signed paper chit is in your hand';
+      setText(chitBtn, t.chit_confirmed ? 'CHIT ✓ IN HAND' : 'CONFIRM CHIT');
+      chitBtn.title = t.chit_confirmed ? 'The signed paper chit is in your hand — click to withdraw' : 'Confirm the signed paper chit is in your hand';
 
-      const btn = row.querySelector('.q-stamp');
+      // APPROVE, and the one reason it is off.
+      const btn = card.querySelector('.q-stamp');
       const chitMissing = needsChit && !t.chit_confirmed;
       const shortStock = t.supplier_ok === false;
-      btn.disabled = !q.can_stamp || full || chitMissing || shortStock;
-      btn.title = !q.can_stamp ? 'Transport is dark'
-        : full ? `No approvals left this ${period.toLowerCase()}`
-          : chitMissing ? 'Physical Transfer Chit not confirmed'
-            : shortStock ? 'Supplier no longer has the stock'
-              : 'Approve this transfer — stock moves now';
-      row.classList.toggle('blocked', shortStock);
+      const why = !q.can_stamp ? 'TRANSPORT DARK'
+        : full ? 'APPROVAL CAPACITY REACHED'
+          : chitMissing ? 'CHIT REQUIRED'
+            : shortStock ? 'SUPPLIER SHORT OF STOCK' : '';
+      btn.disabled = !!why;
+      btn.title = why || 'Approve this transfer — stock moves now';
+      btn.setAttribute('aria-disabled', why ? 'true' : 'false');
+      const whyEl = card.querySelector('.q-why');
+      setText(whyEl, why);
+      show(whyEl, !!why);
+      card.classList.toggle('blocked', shortStock);
+
+      // The inline "are you sure?" — short, on the card, one at a time.
+      const confirming = queueConfirm && queueConfirm.id === t.id ? queueConfirm.kind : null;
+      const box = card.querySelector('.q-confirm');
+      show(card.querySelector('.q-actions'), !confirming);
+      show(box, !!confirming);
+      if (confirming) {
+        const html = confirming === 'approve'
+          ? `<div class="q-ask">APPROVE TRANSFER?</div><div class="q-ask-route">${esc(t.from)} → ${esc(t.to)}</div><div class="q-ask-item">${esc(itemText(t))}</div>` +
+            `<div class="q-ask-btns"><button type="button" class="secondary" data-cancel>CANCEL</button><button type="button" class="primary" data-go="approve">CONFIRM APPROVAL</button></div>`
+          : `<div class="q-ask">DECLINE TRANSFER?</div>` +
+            `<div class="q-ask-btns"><button type="button" class="secondary" data-cancel>CANCEL</button><button type="button" class="danger" data-go="decline">CONFIRM DECLINE</button></div>`;
+        if (box.dataset.sig !== html) {
+          box.dataset.sig = html;
+          box.innerHTML = html;
+          box.querySelector('[data-cancel]').addEventListener('click', () => { queueConfirm = null; renderQueue(); });
+          box.querySelector('[data-go]').addEventListener('click', () => (confirming === 'approve' ? approveTransfer(t.id) : declineTransfer(t.id)));
+          box.querySelector('[data-go]').focus();
+        }
+      } else if (box.dataset.sig) { box.dataset.sig = ''; box.innerHTML = ''; }
     });
-    for (const [id, row] of queueRows) {
-      if (!seen.has(id)) { row.remove(); queueRows.delete(id); }
+    for (const [id, card] of queueRows) {
+      if (!seen.has(id)) { card.remove(); queueRows.delete(id); }
     }
     const waiting = Number(q.awaiting_acceptance) || 0;
-    const noteHtml = !q.items || !q.items.length
-      ? `<div class="empty" data-empty>Queue empty.${waiting ? ` ${waiting} request${waiting === 1 ? '' : 's'} not yet answered by a supplier.` : ''}</div>`
-      : full ? `<div class="empty warn" data-empty>NO APPROVALS LEFT THIS ${period}</div>`
-        : !q.can_stamp ? '<div class="empty warn" data-empty>TRANSPORT DARK — CANNOT APPROVE</div>' : '';
+    const noteHtml = !items.length
+      ? `<div class="empty" data-empty><b>NO PENDING APPROVALS</b><br>New transfer requests will appear here.${waiting ? ` ${waiting} request${waiting === 1 ? '' : 's'} not yet answered by a supplier.` : ''}</div>`
+      : !q.can_stamp ? '<div class="empty warn" data-empty>TRANSPORT DARK — CANNOT APPROVE</div>' : '';
     let note = host.querySelector('[data-empty]');
     if (noteHtml) {
       if (!note) { host.insertAdjacentHTML('beforeend', noteHtml); }
@@ -1332,7 +1452,6 @@
     } else if (note) note.remove();
 
     // Transport is told when something new needs it, the same as a supplier is.
-    const items = q.items || [];
     const fresh = items.filter((t) => !queueSeen.has(t.id));
     for (const t of items) queueSeen.add(t.id);
     for (const id of [...queueSeen]) if (!items.some((t) => t.id === id)) queueSeen.delete(id);
@@ -1405,12 +1524,7 @@
     }
 
     // TRN queue waiting times.
-    const now = Date.now();
-    for (const row of queueRows.values()) {
-      const since = Date.parse(row.dataset.since);
-      const wait = Number.isFinite(since) ? Math.max(0, (now - since) / 1000) : 0;
-      setText(row.querySelector('.q-wait'), `WAITING ${U.mmss(wait)}`);
-    }
+    for (const card of queueRows.values()) setText(card.querySelector('.q-wait'), elapsedText(card.dataset.since));
 
     // Effects with a running clock.
     const effects = (state.effects || []);

@@ -309,7 +309,8 @@ ALL), and:
 
 - **TRN only** — `transfer_queue { capacity, used, remaining, basis, requires_chit,
   can_stamp, awaiting_acceptance, items[] }`. `items[]` holds only transfers in
-  `PENDING_TRN_APPROVAL`; each carries `chit_confirmed` and `supplier_ok` — a
+  `PENDING_TRN_APPROVAL`, **oldest first** by `created_at` (2026-09-18); each
+  carries `chit_confirmed` and `supplier_ok` — a
   **boolean**, never the supplier's stock count, so Transport learns whether the
   chit can be honoured without learning what another table is holding.
   `awaiting_acceptance` is a count of requests no supplier has answered, and a

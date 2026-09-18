@@ -1902,7 +1902,7 @@ test('the sector screen speaks in rounds: no CYCLE label in its markup or its li
     assert.ok(!SECTOR_SCRIPT.includes(bad), `sector.js still carries ${bad}`);
   }
   for (const good of ['Next round in', 'Current round', 'NEXT ROUND UPKEEP', 'ROUND OUTPUT', 'HEALING THIS ROUND',
-    'TRANSFER APPROVALS THIS ROUND', 'INTERVENTIONS THIS ROUND', 'CITY BIG SCREEN CONTROL', 'ROUND OUTPUT ALREADY GENERATED']) {
+    'TRANSFER APPROVALS', 'INTERVENTIONS THIS ROUND', 'CITY BIG SCREEN CONTROL', 'ROUND OUTPUT ALREADY GENERATED']) {
     assert.ok(SECTOR_INDEX.includes(good), `index.html lacks ${good}`);
   }
   assert.ok(!/Core output/.test(SECTOR_INDEX), 'CORE OUTPUT is still on the generic top bar');
@@ -2061,6 +2061,156 @@ test('the role queues, the cards, the board and the faults all still work after 
   assert.equal(f.code, 'F-201');
   assert.equal(f.crew_required, undefined); assert.equal(f.resources_required, undefined);
   assert.ok(typeof f.decay_per_min === 'number');
+});
+
+// -- v11: Transport's approval queue, as cards ----------------------------------------
+//
+// Route, item, chit, one strong APPROVE. Oldest first. The rules underneath
+// do not move: the same counter, the same paper chit, the same refusals.
+
+test('the approval queue is oldest first, stable, and survives a restart in that order', () => {
+  const game = running();
+  game.setInventory('POW', { power: 9, parts: 9 });
+  const a = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 });
+  game.findTransfer(a.id).created_at = '2026-09-18T01:00:00.000Z';
+  const b = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'parts', amount: 1 });
+  game.findTransfer(b.id).created_at = '2026-09-18T01:00:05.000Z';
+  const c = readyTransfer(game, { from: 'WTR', to: 'AGR', resource: 'water', amount: 2 });
+  game.findTransfer(c.id).created_at = '2026-09-18T01:00:09.000Z';
+  const order = () => forSector(game, 'TRN').transfer_queue.items.map((t) => t.id);
+  assert.deepEqual(order(), [a.id, b.id, c.id], 'newest-first storage, oldest-first queue');
+  assert.deepEqual(game.state.transfers.map((t) => t.id).slice(0, 3), [c.id, b.id, a.id], 'storage order untouched');
+  for (let i = 0; i < 3; i += 1) assert.deepEqual(order(), [a.id, b.id, c.id], 'a reprojection (refresh) keeps the order');
+  const again = newGame({ runId: 'queue-order' });
+  again.restore(JSON.parse(JSON.stringify(game.serialise())));
+  assert.deepEqual(forSector(again, 'TRN').transfer_queue.items.map((t) => t.id), [a.id, b.id, c.id], 'a restart keeps the order');
+  assert.equal(forSector(again, 'TRN').transfer_queue.used, 0, 'and the counter');
+});
+
+test('every queue item carries route, item and quantity, for stock and for workers alike', () => {
+  const game = running();
+  const w = game.createTransfer({ from: 'POW', to: 'MED', resource: 'workers', amount: 2, by: 'POW' });
+  assert.equal(w.ok, true);
+  const r = readyTransfer(game, { from: 'WTR', to: 'AGR', resource: 'water', amount: 1 });
+  const items = forSector(game, 'TRN').transfer_queue.items;
+  for (const t of items) {
+    assert.ok(t.from && t.to && t.resource && Number(t.amount) > 0, `${t.id} lacks route or item`);
+    assert.ok(t.created_at, `${t.id} has no creation time to wait from`);
+    assert.equal(typeof t.chit_confirmed, 'boolean');
+    assert.equal(typeof t.supplier_ok, 'boolean');
+  }
+  const worker = items.find((t) => t.id === w.transfer.id);
+  assert.equal(worker.resource, 'workers'); assert.equal(worker.amount, 2); assert.equal(worker.chit_confirmed, false);
+  assert.equal(items.find((t) => t.id === r.id).chit_confirmed, true);
+});
+
+test('a worker transfer spends the same allowance as a resource transfer', () => {
+  const game = running();
+  const w = game.createTransfer({ from: 'POW', to: 'MED', resource: 'workers', amount: 1, by: 'POW' }).transfer;
+  game.confirmChit(w.id, true, { by: 'TRN' });
+  assert.equal(game.approveTransfer(w.id, { by: 'TRN' }).ok, true);
+  assert.equal(game.stampsUsed(), 1);
+  assert.equal(game.state.sectors.MED.workforce.borrowed, 1);
+  assert.equal(forSector(game, 'TRN').transfer_queue.remaining, 2);
+});
+
+test('the chit is one honest boolean: TRN says the paper is in hand, and APPROVE waits for it', () => {
+  const game = running();
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' });
+  const t = game.fulfillRequest(r.request.id, { by: 'POW' }).transfer;
+  let item = forSector(game, 'TRN').transfer_queue.items.find((x) => x.id === t.id);
+  assert.equal(item.chit_confirmed, false);
+  assert.equal(forSector(game, 'TRN').transfer_queue.requires_chit, true);
+  const refused = game.approveTransfer(t.id, { by: 'TRN' });
+  assert.equal(refused.reason, 'chit_required');
+  assert.equal(game.stampsUsed(), 0, 'the refusal spent nothing');
+  assert.equal(game.state.sectors.MED.inventory.power, 3, 'and moved nothing');
+  assert.equal(game.findTransfer(t.id).status, 'PENDING_TRN_APPROVAL', 'the request stays');
+  game.confirmChit(t.id, true, { by: 'TRN' });
+  item = forSector(game, 'TRN').transfer_queue.items.find((x) => x.id === t.id);
+  assert.equal(item.chit_confirmed, true);
+  assert.equal(game.approveTransfer(t.id, { by: 'TRN' }).ok, true);
+  assert.equal(game.stampsUsed(), 1);
+});
+
+test('a failed approval — capacity, chit, short supplier — consumes nothing and moves nothing', () => {
+  const game = running();
+  game.setInventory('POW', { power: 10 });
+  const ids = [];
+  for (let i = 0; i < 3; i += 1) ids.push(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
+  for (const id of ids) assert.equal(game.approveTransfer(id, { by: 'TRN' }).ok, true);
+  const med = game.state.sectors.MED.inventory.power;
+  const fourth = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 });
+  assert.equal(game.approveTransfer(fourth.id, { by: 'TRN' }).reason, 'capacity');
+  assert.equal(game.stampsUsed(), 3);
+  assert.equal(game.state.sectors.MED.inventory.power, med, 'capacity refusal moved nothing');
+  game.state.round_clock.started = false;             // no upkeep pass on this change
+  game.setRound('R3');
+  const short = readyTransfer(game, { from: 'WTR', to: 'AGR', resource: 'water', amount: 2 });
+  game.setInventory('WTR', { water: 1 });
+  assert.equal(forSector(game, 'TRN').transfer_queue.items.find((x) => x.id === short.id).supplier_ok, false);
+  assert.equal(game.approveTransfer(short.id, { by: 'TRN' }).reason, 'insufficient_stock_stamp');
+  assert.equal(game.stampsUsed(), 0);
+  assert.equal(game.state.sectors.AGR.inventory.water, 3, 'a short supplier moved nothing');
+  assert.equal(game.findTransfer(short.id).status, 'PENDING_TRN_APPROVAL', 'a still-valid request stays in the queue');
+  assert.equal(logEvents(game, 'transfer_refused').length, 2);
+});
+
+test('the queue markup: dots and words for capacity, cards with route / item / chit, APPROVE primary, DECLINE secondary, CHIT tertiary, confirmations, no countdown', () => {
+  const html = SECTOR_INDEX; const js = SECTOR_SCRIPT;
+  assert.ok(/id="queue-dots"/.test(html) && /id="queue-cap"/.test(html) && /id="queue-left"/.test(html), 'capacity is not dots + words');
+  assert.ok(/PENDING APPROVALS <span class="count" id="queue-count">/.test(html), 'no pending count');
+  assert.ok(!/Only Transport approves resource movement/.test(html), 'the long footer is still there');
+  assert.ok(/`\$\{used\} OF \$\{cap\} USED`/.test(js), 'capacity words');
+  assert.ok(/APPROVAL CAPACITY REACHED/.test(js) && /LEFT THIS ROUND/.test(js));
+  assert.ok(!/USED · \$\{left\} LEFT THIS \$\{period\}/.test(js), 'the dense capacity line remains');
+  assert.ok(/class="q-route"/.test(js) && /class="q-item"/.test(js) && /class="q-chitword"/.test(js), 'a card lacks route, item or chit');
+  assert.ok(/class="q-chit tertiary"/.test(js) && /class="q-no secondary"/.test(js) && /class="q-stamp primary"/.test(js), 'the action hierarchy is not marked');
+  assert.ok(!/ON REQUEST/.test(js), 'ON REQUEST is still printed');
+  assert.ok(/function elapsedText/.test(js) && /`Waiting \$\{secs\}s`/.test(js) && /`Waiting \$\{m\}m \$\{r\}s`/.test(js), 'waiting is not "Waiting 27s" / "Waiting 1m 12s"');
+  assert.ok(!/WAITING \$\{U\.mmss/.test(js) && !/class="q-wait clock"/.test(js), 'waiting is still a clock');
+  assert.ok(/'CHIT: READY'/.test(js) && /'CHIT: CHECK REQUIRED'/.test(js) && /'CHIT: NOT REQUIRED'/.test(js));
+  assert.ok(!/CHIT: INVALID|CHIT: NOT AVAILABLE/.test(js), 'a chit state the engine cannot know');
+  assert.ok(/APPROVE TRANSFER\?/.test(js) && /CONFIRM APPROVAL/.test(js) && /DECLINE TRANSFER\?/.test(js) && /CONFIRM DECLINE/.test(js), 'confirmations missing');
+  assert.ok(/'CHIT REQUIRED'/.test(js) && /'SUPPLIER SHORT OF STOCK'/.test(js) && /'TRANSPORT DARK'/.test(js), 'a disabled reason is missing');
+  assert.ok(/CHIT REQUIRED BEFORE APPROVAL/.test(js) && /REQUEST NO LONGER AVAILABLE/.test(js) && /TRANSFER APPROVED/.test(js) && /TRANSFER DECLINED/.test(js));
+  assert.ok(/`👤 \$\{n\}|\$\{r\.glyph\} \$\{n\} \$\{name\}/.test(js), 'the item line has no icon + word');
+  assert.ok(/'WORKER' : 'WORKERS'/.test(js));
+  assert.ok(/NO PENDING APPROVALS/.test(js) && /New transfer requests will appear here/.test(js));
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'sector', 'sector.css'), 'utf8');
+  assert.ok(/\.queue \{[^}]*overflow-y: auto/.test(css), 'the queue does not scroll');
+  assert.ok(/\.q-actions button \{[^}]*min-height: 34px/.test(css), 'touch targets');
+  assert.ok(/focus-visible/.test(css), 'no visible focus');
+  assert.ok(/\.q-actions \.q-stamp:disabled \{[^}]*line-through/.test(css), 'a disabled APPROVE relies on colour alone');
+});
+
+test('grouping is only a look: two same-route requests are two approvals, two chits, two ids', () => {
+  const game = running();
+  game.setInventory('POW', { power: 9, parts: 9 });
+  const a = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 });
+  const b = game.fulfillRequest(game.requestTransfer({ from: 'POW', to: 'MED', resource: 'parts', amount: 1, by: 'MED' }).request.id, { by: 'POW' }).transfer;
+  const items = forSector(game, 'TRN').transfer_queue.items;
+  assert.equal(items.length, 2);
+  assert.notEqual(items[0].id, items[1].id);
+  assert.equal(items[0].chit_confirmed, true); assert.equal(items[1].chit_confirmed, false, 'chits are not merged');
+  assert.equal(game.approveTransfer(a.id, { by: 'TRN' }).ok, true);
+  assert.equal(game.findTransfer(b.id).status, 'PENDING_TRN_APPROVAL', 'approving one did not approve the other');
+  assert.equal(game.stampsUsed(), 1, 'one approval, one stamp');
+  assert.ok(/classList\.toggle\('grouped', sameRoute\)/.test(SECTOR_SCRIPT), 'grouping is not a class on the card');
+  assert.ok(!/data-approve-group|approveGroup|approve-all/i.test(SECTOR_SCRIPT), 'a group approve exists');
+});
+
+test('a queue of six stays six independent items, and a decline is its own reducer with no side effects', () => {
+  const game = running();
+  game.setInventory('POW', { power: 9, water: 9, parts: 9 });
+  const ids = [];
+  for (const res of ['power', 'water', 'parts', 'power', 'water', 'parts']) ids.push(readyTransfer(game, { from: 'POW', to: 'AGR', resource: res, amount: 1 }).id);
+  assert.equal(forSector(game, 'TRN').transfer_queue.items.length, 6);
+  assert.equal(game.declineTransfer(ids[2], { by: 'TRN' }).ok, true);
+  assert.equal(forSector(game, 'TRN').transfer_queue.items.length, 5);
+  assert.equal(game.stampsUsed(), 0, 'a decline spends no allowance');
+  assert.equal(game.state.sectors.AGR.inventory.parts, 3, 'and moves nothing');
+  assert.equal(game.declineTransfer(ids[0], { by: 'POW' }).reason, 'approval_trn_only');
 });
 
 // -- council and the Continuity Order ------------------------------------------------
