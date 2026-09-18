@@ -2,7 +2,7 @@
 /**
  * CITY WALL — the command centre view of HAVEN-9.
  *
- * Four bands, top to bottom: the command bar (round, CITY, CORE, NEXT ROUND),
+ * Four bands, top to bottom: the command bar (round, CORE, NEXT ROUND),
  * ONE priority event, the city beside its six health monitors, and the last
  * four things that happened. The city is the hero: the illustration in
  * public/wall/art/haven9-map.png with everything alive drawn over it in an
@@ -294,7 +294,6 @@
   function renderHud() {
     const label = frame.mode === 'DEBRIEF' ? 'DEBRIEF' : (ROUND_LABEL[frame.round] || frame.round || '');
     setText($('phase-name'), label);
-    setStat('hud-city', 'stability', frame.city_stability);
     setStat('hud-core', 'core-output', frame.core_output);
     setText($('time-label'), inCouncil() ? 'COUNCIL' : 'NEXT ROUND');
     show($('tag-blackout'), !!(frame.blackout && frame.blackout.active));
