@@ -301,3 +301,81 @@ test('a full R1→R4 dry run, six sectors on one server', async (t) => {
 
   for (const c of [control, big, ...Object.values(sectors)]) c.ws.close();
 });
+
+test('v18 over the wire: a participant socket cannot touch a tray or the clock; the facilitator can, with a reason, and every screen reads one timer', async () => {
+  const control = await client({ type: 'hello', role: 'control', token: TOKEN });
+  const big = await client({ type: 'hello', role: 'bigscreen' });
+  const pow = await client({ type: 'hello', role: 'sector', sector: 'POW' });
+  const say = (msg) => control.ws.send(JSON.stringify(msg));
+  say({ type: 'reset_run', run_id: 'v18-wire', confirm: true });
+  await wait(400);
+  say({ type: 'set_phase', phase: 'ROUND_2' });
+  say({ type: 'clock', which: 'round', action: 'start' });
+  await wait(400);
+  const power0 = control.state.sectors.POW.inventory.power;
+  const remaining0 = control.state.round_clock.remaining_s;
+
+  // a participant tries every door
+  for (const m of [
+    { type: 'admin_override', action: 'resource_override', payload: { sector: 'POW', values: { power: 99 } }, reason: 'x' },
+    { type: 'resource_override', sector: 'POW', values: { power: 99 }, reason: 'x' },
+    { type: 'adjust_inventory', sector: 'POW', delta: { power: 99 } },
+    { type: 'set_inventory', sector: 'POW', inventory: { power: 99 } },
+    { type: 'clock', which: 'round', action: 'set', seconds: 1 },
+    { type: 'admin_override', action: 'timer_set', payload: { seconds: 1 }, reason: 'x' },
+  ]) pow.ws.send(JSON.stringify(m));
+  await wait(500);
+  assert.equal(control.state.sectors.POW.inventory.power, power0, 'a participant moved the tray');
+  assert.ok(control.state.round_clock.remaining_s > 100, 'a participant set the clock');
+  assert.ok(!pow.messages.some((m) => m.type === 'override_result' && m.ok), 'a participant got an override through');
+
+  // the facilitator: no reason, refused; stale run, refused; then a real one
+  control.messages.length = 0;
+  say({ type: 'admin_override', action: 'resource_override', payload: { sector: 'POW', values: { power: power0 + 2, parts: 0 } } });
+  say({ type: 'admin_override', action: 'resource_override', run_id: 'some-other-run', payload: { sector: 'POW', values: { power: power0 + 2 } }, reason: 'x' });
+  say({ type: 'admin_override', action: 'resource_override', payload: { sector: 'POW', values: { power: power0 + 2, parts: 1.5 } }, reason: 'x' });
+  await wait(400);
+  const refused = control.messages.filter((m) => m.type === 'override_result' && m.ok === false).map((m) => m.reason);
+  assert.deepEqual(refused, ['reason_required', 'stale_run', 'invalid_value']);
+  assert.equal(control.state.sectors.POW.inventory.power, power0);
+  say({ type: 'admin_override', action: 'resource_override', run_id: 'v18-wire', payload: { sector: 'POW', values: { power: power0 + 2, parts: 0 } }, reason: 'playtest correction' });
+  await wait(400);
+  const okRes = control.messages.find((m) => m.type === 'override_result' && m.ok && m.action === 'resource_override');
+  assert.ok(okRes, 'no override_result'); assert.equal(okRes.after.inventory.power, power0 + 2); assert.equal(okRes.delta.power, 2);
+  assert.equal(control.state.sectors.POW.inventory.power, power0 + 2);
+  assert.equal(pow.state.sectors.POW.inventory.power, power0 + 2, 'the sector console did not see the new tray');
+  assert.equal(pow.state.sectors.POW.inventory.parts, 0);
+  assert.equal(control.state.transfers.length, 0, 'a transfer appeared');
+  assert.notEqual(((big.state.broadcast || {}).rows || {}).POW && big.state.broadcast.rows.POW.power, power0 + 2, "COM's board followed the real tray");
+
+  // the timer, by hand, seen by everyone
+  say({ type: 'admin_override', action: 'timer_adjust', payload: { delta_s: -60 }, reason: 'running long' });
+  await wait(400);
+  const t1 = control.messages.find((m) => m.type === 'override_result' && m.ok && m.action === 'timer_adjust');
+  assert.ok(t1 && t1.before.remaining_ms - t1.after.remaining_ms >= 59000 && t1.target === 'ROUND TIMER', JSON.stringify(t1));
+  say({ type: 'admin_override', action: 'timer_set', payload: { seconds: 61 }, reason: 'restart' });
+  await wait(400);
+  assert.ok(Math.abs(control.state.round_clock.remaining_s - 61) <= 1);
+  assert.ok(Math.abs(pow.state.round_clock.remaining_s - control.state.round_clock.remaining_s) <= 1, 'the sector clock drifted');
+  assert.ok(Math.abs(big.state.round_clock.remaining_s - control.state.round_clock.remaining_s) <= 1, 'the wall clock drifted');
+  say({ type: 'pause' });
+  await wait(300);
+  const frozenAt = control.state.round_clock.remaining_s;
+  say({ type: 'admin_override', action: 'timer_set', payload: { seconds: 300 }, reason: 'edited while paused' });
+  await wait(11000);   // the server advances its clocks on a 10 s tick; a whole tick passes while paused
+  say({ type: 'announce', text: 'paused check' });
+  await wait(300);
+  assert.equal(control.state.round_clock.remaining_s, 300, 'the clock ran while paused');
+  assert.ok(frozenAt <= 61);
+  say({ type: 'resume' });
+  await wait(11000);   // one server tick after RESUME
+  say({ type: 'announce', text: 'timer check' });
+  await wait(300);
+  assert.ok(control.state.round_clock.remaining_s < 300 && control.state.round_clock.remaining_s >= 280, `resume did not continue from the edit: ${control.state.round_clock.remaining_s}`);
+  say({ type: 'admin_override', action: 'timer_reset', payload: {}, reason: 'fresh round' });
+  await wait(400);
+  assert.equal(control.state.round_clock.remaining_s, control.state.round_length_s);
+  assert.equal(control.state.round, 'R2'); assert.equal(control.state.sectors.POW.inventory.power, power0 + 2, 'reset touched the tray');
+  assert.ok(control.state.round_clock.remaining_s > 0, 'reset zeroed the clock');
+  for (const c of [control, big, pow]) c.ws.close();
+});

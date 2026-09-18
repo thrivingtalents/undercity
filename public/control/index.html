@@ -62,6 +62,7 @@
     <div class="tb-buttons">
       <button id="btn-start" class="primary">START</button>
       <button id="btn-pause">PAUSE</button>
+      <button id="btn-timer" title="Add or take minutes, set MM:SS, reset to the round default — the one round clock every screen shows">TIMER ▾</button>
       <button id="btn-next-phase" class="primary">NEXT PHASE ›</button>
       <button id="btn-end-phase" class="ghost" title="Stop the round clock at 00:00. The phase does not change; NEXT PHASE does that.">STOP CLOCK</button>
     </div>
@@ -583,6 +584,27 @@
         <button type="submit" id="modal-confirm" class="danger">CONFIRM OVERRIDE</button>
       </div>
     </form>
+  </div>
+
+  <!-- GAME TIMER popover (v18): the one authoritative round clock, adjusted by hand -->
+  <div class="picker timer-pop hidden" id="timer-pop">
+    <div class="picker-head"><b>GAME TIMER · NEXT ROUND IN</b><button id="timer-close">✕</button></div>
+    <div class="picker-body timer-body">
+      <div class="timer-big"><b id="timer-remaining">--:--</b><span id="timer-status" class="hint">—</span></div>
+      <div class="row timer-quick">
+        <button type="button" data-timer-delta="-300">−5 MIN</button><button type="button" data-timer-delta="-60">−1 MIN</button>
+        <button type="button" data-timer-delta="60">+1 MIN</button><button type="button" data-timer-delta="300">+5 MIN</button>
+      </div>
+      <div class="row timer-set">
+        <input type="text" id="timer-set-input" placeholder="MM:SS" maxlength="6" autocomplete="off">
+        <button type="button" id="timer-set">SET TIME</button>
+        <button type="button" id="timer-reset">RESET TO ROUND DEFAULT (<span id="timer-default">--:--</span>)</button>
+      </div>
+      <div class="row timer-run">
+        <button type="button" id="timer-pause">PAUSE TIMER</button>
+        <span class="hint">Timer only. Session PAUSE in the top bar freezes everything, this clock included — edit the time while paused and RESUME continues from it. 00:00 stops the clock and never moves the round; NEXT PHASE does. Every change asks why and is logged.</span>
+      </div>
+    </div>
   </div>
 
   <!-- URLS popover -->

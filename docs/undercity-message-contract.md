@@ -718,3 +718,45 @@ applied_round, admin_override, budget), `fault_reward_reservation_released`,
 materials_consumed, material_units, resolution_success, reward_archetype,
 reward_instance_id, exact_reward, reward_result, reward_targets,
 resource_reward_units_generated).
+
+### 8.10 Admin resource and timer controls (v18, 2026-09-18)
+
+Two more hands on authoritative state, both through the `admin_override`
+wrapper (reason required, before/after recorded, one `admin_override` event)
+and both facilitator-only — a sector or wall socket that sends them is
+ignored, and an override that names another `run_id` is refused
+`stale_run`.
+
+```json
+{ "type": "admin_override", "action": "resource_override", "payload": { "sector": "POW", "values": { "power": 4, "parts": 3 } }, "reason": "playtest correction" }
+{ "type": "admin_override", "action": "timer_adjust", "payload": { "delta_s": -60 }, "reason": "running long" }
+{ "type": "admin_override", "action": "timer_set",    "payload": { "seconds": 522 }, "reason": "restart after the break" }
+{ "type": "admin_override", "action": "timer_reset",  "payload": {}, "reason": "fresh round" }
+```
+
+**RESOURCE CONTROL** (OPEN SECTOR → ADMIN ACTIONS) edits a draft on the
+console; APPLY sends every changed resource as exact values in one message.
+The wrapper refuses `values_required`, `unknown_resource`, `invalid_value`
+(a fraction, a string, NaN — nothing is coerced) and `negative_value`
+before anything moves; `overrideInventory` then sets the sector's REAL tray
+in one pass and writes `admin_resource_override { sector, before, after,
+delta, reason, by, round, phase, run_id }`. It creates no request or
+transfer, spends no Transport allowance, stamps no chit, leaves COM's board
+as reported, and never undoes upkeep or repair costs already paid. The
+reply is `override_result { ok, target, before, after, delta }`.
+
+**GAME TIMER** (TIMER ▾ in the top bar) drives the one round clock every
+screen already shows (`round_clock { running, remaining_s }`, MASTER TIME on
+the admin, NEXT ROUND IN on the wall and sectors). `timer_adjust` and
+`timer_set` call the existing `clock` reducer (add / set, floored at
+00:00); `timer_reset` is the new `clock reset`: the configured length of
+the current round and nothing else. The tick only counts down while the
+clock runs and the session is not frozen, so session PAUSE freezes the
+countdown, the time may be edited while paused, and RESUME continues from
+the edited value; the timer-only PAUSE/RESUME (`clock pause | resume`)
+stays separate. 00:00 stops the clock and moves nothing — NEXT PHASE ends
+the round, as before. Every round-clock change writes `admin_timer_adjust
+{ before_remaining_ms, after_remaining_ms, delta_ms, reason }`,
+`admin_timer_reset { before_remaining_ms, default_remaining_ms, reason }` or
+`admin_timer_pause_resume { action, remaining_ms }` (also on session pause
+and resume), on top of the `clock` event.

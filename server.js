@@ -1229,12 +1229,36 @@ function handleControl(client, entry, msg) {
       const check = override.validate(msg);
       if (!check.ok) return reply({ type: 'override_result', ok: false, reason: check.reason, action: msg.action });
       const inner = { ...(msg.payload || {}), type: check.action };
+      // v18: an override aimed at a run that is no longer the one on the table is refused.
+      if (msg.run_id !== undefined && msg.run_id !== null && String(msg.run_id) !== String(game.state.run_id)) {
+        return reply({ type: 'override_result', ok: false, reason: 'stale_run', action: check.action, run_id: game.state.run_id });
+      }
       const before = override.snapshot(game, check.action, inner);
       if (check.action === 'reset_run') {
         const after = { run_id: inner.run_id || entry.row.run_id, scenario_id: inner.scenario_id || game.state.scenario_id };
         override.record(entry.log, game, { action: check.action, payload: inner, reason: check.reason, before, after });
         registry.resetRun(entry.code, { runId: inner.run_id, scenarioId: inner.scenario_id || null });
         reply({ type: 'override_result', ok: true, action: check.action, target: 'RUN', before, after });
+        return ok();
+      }
+      // v18: the tray and the round timer by hand — the reducer answers, so a
+      // refusal reaches the console as one and nothing is recorded for it.
+      if (check.action === 'resource_override') {
+        const res = game.overrideInventory(String(inner.sector || '').toUpperCase(), inner.values, { reason: check.reason });
+        if (!res.ok) return reply({ type: 'override_result', ok: false, reason: res.reason, resource: res.resource || null, action: check.action });
+        const after = override.snapshot(game, check.action, inner);
+        const rec = override.record(entry.log, game, { action: check.action, payload: inner, reason: check.reason, before, after });
+        reply({ type: 'override_result', ok: true, action: check.action, target: rec.target, before, after, delta: res.delta, reason: rec.reason });
+        return ok();
+      }
+      if (check.action === 'timer_adjust' || check.action === 'timer_set' || check.action === 'timer_reset') {
+        const res = check.action === 'timer_adjust' ? game.clock('add', inner.delta_s, 'round', { reason: check.reason })
+          : check.action === 'timer_set' ? game.clock('set', inner.seconds, 'round', { reason: check.reason })
+            : game.clock('reset', null, 'round', { reason: check.reason });
+        if (!res.ok) return reply({ type: 'override_result', ok: false, reason: res.reason, action: check.action });
+        const after = override.snapshot(game, check.action, inner);
+        const rec = override.record(entry.log, game, { action: check.action, payload: inner, reason: check.reason, before, after });
+        reply({ type: 'override_result', ok: true, action: check.action, target: rec.target, before, after, reason: rec.reason });
         return ok();
       }
       handleControl(client, entry, inner);

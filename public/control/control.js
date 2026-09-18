@@ -258,12 +258,35 @@
   });
   $('urls-close').addEventListener('click', () => $('urls').classList.add('hidden'));
 
+  // -- v18: GAME TIMER — the one round clock, adjusted by hand; every change asks why ------
+  $('btn-timer').addEventListener('click', () => { $('timer-pop').classList.toggle('hidden'); if (state) renderClocks(); });
+  $('timer-close').addEventListener('click', () => $('timer-pop').classList.add('hidden'));
+  const mmssToSeconds = (raw) => { const m = /^(\d{1,3}):([0-5]\d)$/.exec(String(raw || '').trim()); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  for (const b of document.querySelectorAll('[data-timer-delta]')) {
+    b.addEventListener('click', () => {
+      const d = Number(b.dataset.timerDelta); const now = Math.ceil(state.round_clock.remaining_s); const after = Math.max(0, now + d);
+      askOverride({ title: 'ADJUST ROUND TIMER', target: 'ROUND TIMER', diff: [['REMAINING', U.mmss(now), U.mmss(after)]], action: 'timer_adjust', payload: { delta_s: d }, confirmLabel: 'APPLY TIMER CHANGE' });
+    });
+  }
+  $('timer-set').addEventListener('click', () => {
+    const secs = mmssToSeconds($('timer-set-input').value);
+    if (secs === null) { toast('Enter the time as MM:SS (seconds 00–59)'); return; }
+    askOverride({ title: 'SET ROUND TIMER', target: 'ROUND TIMER', diff: [['REMAINING', U.mmss(Math.ceil(state.round_clock.remaining_s)), U.mmss(secs)]], action: 'timer_set', payload: { seconds: secs }, confirmLabel: 'APPLY TIMER CHANGE' });
+  });
+  $('timer-reset').addEventListener('click', () => {
+    askOverride({ title: 'RESET TIMER TO ROUND DEFAULT', target: 'ROUND TIMER', diff: [['REMAINING', U.mmss(Math.ceil(state.round_clock.remaining_s)), U.mmss(state.round_length_s)]], extra: '<div class="hint">Time only. The round, the trays, health, faults, workers, allowances, AGR and the phase do not change.</div>', action: 'timer_reset', payload: {}, confirmLabel: 'RESET TIMER' });
+  });
+  $('timer-pause').addEventListener('click', () => {
+    const rc = state.round_clock;
+    send({ type: 'clock', which: 'round', action: rc.running ? 'pause' : (rc.started && rc.remaining_s > 0 ? 'resume' : 'start') });
+  });
+
   // -- quick actions + picker -----------------------------------------------------
 
   for (const btn of document.querySelectorAll('.quick-groups button[data-quick]')) btn.addEventListener('click', () => quick(btn.dataset.quick));
   $('picker-close').addEventListener('click', closePicker);
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closePicker(); $('urls').classList.add('hidden'); closeModal(); $('more').classList.add('hidden'); }
+    if (e.key === 'Escape') { closePicker(); $('urls').classList.add('hidden'); $('timer-pop').classList.add('hidden'); closeModal(); $('more').classList.add('hidden'); }
   });
 
   function closePicker() { $('picker').classList.add('hidden'); }
@@ -561,6 +584,66 @@
   }
   $('drawer-close').addEventListener('click', () => { drawerSector = null; $('drawer').classList.add('hidden'); });
 
+  // -- v18: RESOURCE CONTROL — a staged draft of one sector's real tray ------------------
+  //
+  // +1 / −1 and SET EXACT VALUES change a draft on this screen only. Nothing
+  // moves until APPLY RESOURCE OVERRIDE, which asks why, then sets every
+  // changed resource in one authoritative update. An inactive sector is shown
+  // as such and stays locked until the facilitator says EDIT ANYWAY.
+  let resourceDraft = null;   // { sector, values, exact, unlock }
+  function draftFor(code, s) {
+    if (!resourceDraft || resourceDraft.sector !== code) resourceDraft = { sector: code, values: { ...s.inventory }, exact: false, unlock: false };
+    return resourceDraft;
+  }
+  function resourceControlHtml(code, s) {
+    const d = draftFor(code, s);
+    const inactive = Array.isArray(state.active_sectors) && state.active_sectors.length > 0 && !state.active_sectors.includes(code);
+    const locked = inactive && !d.unlock;
+    const changed = RESOURCES.filter((r) => d.values[r] !== s.inventory[r]);
+    const rows = RESOURCES.map((r) => {
+      const cur = s.inventory[r]; const v = d.values[r]; const diff = v !== cur;
+      const ctl = d.exact
+        ? `<input type="number" class="rc-exact short" data-rc-exact="${r}" min="0" step="1" value="${v}"${locked ? ' disabled' : ''}>`
+        : `<span class="rc-btns"><button type="button" data-rc="${r}" data-d="-1"${locked || v <= 0 ? ' disabled' : ''}>−1</button><button type="button" data-rc="${r}" data-d="1"${locked ? ' disabled' : ''}>+1</button></span>`;
+      return `<div class="rc-row${diff ? ' changed' : ''}"><span class="rc-name">${U.GLYPH[r]} ${RES_NAME[r]}</span><b class="rc-cur">${cur}</b>${ctl}<span class="rc-proposed">${diff ? `→ <b>${v}</b> <em>(${v - cur > 0 ? '+' : ''}${v - cur})</em>` : ''}</span></div>`;
+    }).join('');
+    return `<div class="rc" id="rc">
+        <div class="rc-head"><em>RESOURCE CONTROL · ${esc(code)}</em>${inactive ? `<span class="pill warn">INACTIVE</span><label class="rc-unlock"><input type="checkbox" id="rc-unlock"${d.unlock ? ' checked' : ''}> EDIT ANYWAY</label>` : ''}</div>
+        ${rows}
+        <div class="rc-foot">
+          <button type="button" id="rc-exact"${locked ? ' disabled' : ''}>${d.exact ? 'USE −1 / +1' : 'SET EXACT VALUES'}</button>
+          <button type="button" id="rc-cancel"${changed.length ? '' : ' disabled'}>CANCEL</button>
+          <button type="button" id="rc-apply" class="danger"${changed.length && !locked ? '' : ' disabled'}>APPLY RESOURCE OVERRIDE</button>
+          <span class="hint">staged — nothing moves until APPLY · the real tray only · no request, no transfer, no Transport stamp, no COM update</span>
+        </div>
+      </div>`;
+  }
+  function wireResourceControl(body, code, s, target) {
+    const d = draftFor(code, s);
+    const rerender = () => renderDrawer();
+    for (const b of body.querySelectorAll('[data-rc]')) b.addEventListener('click', () => { const r = b.dataset.rc; d.values[r] = Math.max(0, Number(d.values[r]) + Number(b.dataset.d)); rerender(); });
+    for (const i of body.querySelectorAll('[data-rc-exact]')) i.addEventListener('change', () => {
+      const r = i.dataset.rcExact; const raw = i.value.trim();
+      if (!/^\d+$/.test(raw)) { i.value = d.values[r]; toast(`${RES_NAME[r]}: a whole number of 0 or more`); return; }   // no blank-as-zero, no coercion
+      d.values[r] = Number(raw); rerender();
+    });
+    const unlock = body.querySelector('#rc-unlock');
+    if (unlock) unlock.addEventListener('change', () => { d.unlock = unlock.checked; rerender(); });
+    body.querySelector('#rc-exact').addEventListener('click', () => { d.exact = !d.exact; rerender(); });
+    body.querySelector('#rc-cancel').addEventListener('click', () => { d.values = { ...s.inventory }; rerender(); });
+    body.querySelector('#rc-apply').addEventListener('click', () => {
+      const values = {}; const diff = []; let total = 0; let zero = false;
+      for (const r of RESOURCES) {
+        const v = Number(d.values[r]);
+        if (!Number.isInteger(v) || v < 0) { toast(`${RES_NAME[r]}: whole numbers of 0 or more only`); return; }
+        if (v !== s.inventory[r]) { values[r] = v; diff.push([RES_NAME[r], s.inventory[r], v]); total += Math.abs(v - s.inventory[r]); if (v === 0) zero = true; }
+      }
+      if (!diff.length) return;
+      if ((zero || total >= 5) && !confirm(`${zero ? 'A resource is being set to 0. ' : ''}${total >= 5 ? `This changes ${total} units at once. ` : ''}Continue to the override?`)) return;
+      askOverride({ title: 'RESOURCE OVERRIDE', target, diff, extra: '<div class="hint">Sets the REAL tray. No request, no transfer, no Transport stamp; COM\'s board stays as reported; paid upkeep and repair costs stay paid.</div>', action: 'resource_override', payload: { sector: code, values }, confirmLabel: 'APPLY RESOURCE OVERRIDE' });
+    });
+  }
+
   function renderDrawer() {
     if (!drawerSector || !state.sectors[drawerSector]) return;
     const code = drawerSector;
@@ -613,7 +696,7 @@
             <button data-ovr-int="-10">−10 HEALTH</button><button data-ovr-int="-5">−5</button><button data-ovr-int="5">+5</button><button data-ovr-int="10">+10 HEALTH</button>
             <input type="number" id="dr-int-set" min="0" max="100" value="${Math.round(s.integrity)}" class="short"><button id="dr-int-go">SET</button>
           </div>
-          <div class="dr-ovr-row"><em>INVENTORY</em>${RESOURCES.map((r) => `<span class="stepper"><span class="n">${U.GLYPH[r]} ${r}</span><button data-ovr-inv="${r}" data-d="-1">−</button><b>${s.inventory[r]}</b><button data-ovr-inv="${r}" data-d="1">+</button></span>`).join('')}</div>
+          ${resourceControlHtml(code, s)}
           <div class="dr-ovr-row"><em>WORKERS</em>
             <span class="stepper"><span class="n">active</span><button data-ovr-wf="-1">−</button><b>${s.workforce.active}</b><button data-ovr-wf="1">+</button></span>
             <span class="stepper"><span class="n">injured</span><button data-ovr-inj="-1">−</button><b>${s.workforce.injured}</b><button data-ovr-inj="1">+</button></span>
@@ -645,10 +728,7 @@
       const v = clamp(Number(body.querySelector('#dr-int-set').value));
       askOverride({ title: 'SET HEALTH', target, diff: [['HEALTH', `${Math.round(s.integrity)}%`, `${v}%`]], action: 'set_integrity', payload: { sector: code, value: v } });
     });
-    on('[data-ovr-inv]', (b) => {
-      const r = b.dataset.ovrInv; const d = Number(b.dataset.d);
-      askOverride({ title: 'ADJUST INVENTORY', target, diff: [[RES_NAME[r], s.inventory[r], Math.max(0, s.inventory[r] + d)]], action: 'adjust_inventory', payload: { sector: code, delta: { [r]: d } } });
-    });
+    wireResourceControl(body, code, s, target);
     on('[data-ovr-wf]', (b) => {
       const d = Number(b.dataset.ovrWf);
       askOverride({ title: 'CHANGE WORKER STATE', target, diff: [['ACTIVE WORKERS', s.workforce.active, Math.max(0, s.workforce.active + d)]], action: 'adjust_workforce', payload: { sector: code, active: d, injured: 0 } });
@@ -1442,7 +1522,13 @@
     const rc = U.countdown(state.round_clock, state.frozen);
     $('master-clock').textContent = U.mmss(rc);
     $('master-clock').classList.toggle('low', rc <= 60 && state.round_clock.running);
-    $('clock-note').textContent = state.paused ? '— PAUSED' : state.round_clock.running ? '— upkeep at 00:00' : state.round_clock.started ? '— STOPPED' : '— not started';
+    // 00:00 stops the clock and moves nothing; NEXT PHASE ends the round (and charges its upkeep).
+    $('clock-note').textContent = state.paused ? '— PAUSED' : state.round_clock.running ? '— running · NEXT PHASE ends the round' : state.round_clock.started ? '— STOPPED' : '— not started';
+    // v18: the timer popover reads the same clock
+    $('timer-remaining').textContent = U.mmss(rc);
+    $('timer-status').textContent = state.paused ? 'SESSION PAUSED — clock frozen, editable' : state.round_clock.running ? 'RUNNING' : state.round_clock.started ? (rc > 0 ? 'STOPPED' : 'AT 00:00 — waiting for NEXT PHASE') : 'NOT STARTED';
+    $('timer-default').textContent = U.mmss(state.round_length_s);
+    $('timer-pause').textContent = state.round_clock.running ? 'PAUSE TIMER' : (state.round_clock.started && rc > 0 ? 'RESUME TIMER' : 'START TIMER');
     const cc = U.countdown(state.council_clock, state.frozen);
     const big = $('council-big');
     if (big) { big.textContent = U.mmss(cc); big.classList.toggle('low', cc <= 30 && state.council.active); }

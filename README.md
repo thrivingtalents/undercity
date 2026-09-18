@@ -160,7 +160,10 @@ npm start                                            # http://localhost:3000/adm
    rerolled; mostly health, capacity and support. Stock rewards are capped
    per fault at half its material cost and across the run at ~35% of the
    material issued, reserved at fire, and adapt to the session's active
-   sectors. Deadline reached → `EXPIRED`, an integrity penalty by severity, and
+   sectors. Admin v18 adds RESOURCE CONTROL in the sector drawer (a staged
+   draft, one atomic apply with a reason, the real tray only) and a GAME
+   TIMER popover on the one round clock (±1/±5 min, set MM:SS, reset to
+   the round default, timer-only pause) — 00:00 still moves nothing. Deadline reached → `EXPIRED`, an integrity penalty by severity, and
    the fault stays solvable (all configurable).
 3. **Round upkeep.** One clock: the round's. POW and WTR generate their own
    output by pressing **GENERATE** once a round (+3, straight into their real
