@@ -412,7 +412,7 @@ scenario defaults) and `scenario { id name sectors events fault_presets }`.
 ```json
 { "type": "fault_open", "fault_code": "F-201" }
 { "type": "transfer_request", "from": "POW", "to": "MED", "resource": "power", "amount": 2 }  // ASK — any sector
-{ "type": "transfer_create",  "to": "MED", "resource": "power", "amount": 2 }   // OFFER our own stock — any sector
+{ "type": "transfer_create",  "to": "MED", "resource": "power", "amount": 2 }   // REMOVED for participants (v20) — refused `direct_transfer_removed`
 { "type": "request_fulfill",  "id": "R-0007" }   // SUPPLIER only — raises a transfer; NOT approval
 { "type": "request_decline",  "id": "R-0007" }   // SUPPLIER only
 { "type": "request_cancel",   "id": "R-0007" }   // either party, while still REQUESTED
@@ -760,3 +760,57 @@ the round, as before. Every round-clock change writes `admin_timer_adjust
 `admin_timer_reset { before_remaining_ms, default_remaining_ms, reason }` or
 `admin_timer_pause_resume { action, remaining_ms }` (also on session pause
 and resume), on top of the `clock` event.
+
+### 8.11 One door: request-driven transfers (v20, 2026-09-20)
+
+A table has one way to start a movement: **ask**. The participant
+`transfer_create` intent is refused with `direct_transfer_removed` and the
+attempt is logged (`participant_transfer_refused`); the scenario key
+`allow_direct_participant_transfer` (false in every built-in scenario) puts
+the old door back for a legacy session. Nothing underneath changed: the
+transfer record, `PENDING_TRN_APPROVAL`, the chit, Transport's approval, the
+atomic movement, the audit trail and every facilitator path — including the
+`transfer_create` control intent and the `transfer_create` admin override —
+are exactly as they were.
+
+The flow is REQUEST → SUPPLIER DECISION → LINKED TRANSFER → TRN APPROVAL →
+DELIVERY. `request_fulfill` (supplier only) validates the real tray and
+raises exactly one linked transfer; a second, third or retried accept
+returns the transfer already made (`{ ok: true, duplicate: true }`) and
+never raises another. Acceptance moves no stock and spends no allowance.
+Transport alone finishes it, re-reading supplier stock at approval because
+acceptance reserved nothing: a supplier who has since spent it is refused
+`insufficient_stock_stamp`, the console says SUPPLIER STOCK CHANGED —
+REQUEST CANNOT BE DELIVERED, and neither stock nor allowance moves.
+
+**One journey, two records.** `movement` in the sector frame no longer
+carries a request card and a transfer card for the same goods. Each request
+the sector is party to becomes one journey card that keeps the REQUEST's id
+for the whole trip:
+
+```json
+{ "kind": "journey", "id": "R-0014", "request_id": "R-0014", "transfer_id": "T-0021",
+  "stage": "TRANSFER", "status": "WAITING_FOR_TRN", "label": "WAITING FOR TRN",
+  "from": "WTR", "to": "POW", "resource": "water", "amount": 2,
+  "direction": "OUTGOING", "active": true, "action_required": false,
+  "can_accept": false, "can_withdraw": false }
+```
+
+`stage` is REQUEST, TRANSFER or CLOSED; `status` is WAITING_FOR_SUPPLIER,
+WAITING_FOR_TRN, APPROVED, DELIVERED, DECLINED, TRN_DECLINED, CANCELLED or
+EXPIRED, and `label` is that in the room's words. `direction` is the
+STOCK's for the whole journey — OUTGOING for the supplier from the moment
+the ask lands — and `action_required` is what marks a card the table must
+answer. ACTIVE holds WAITING FOR SUPPLIER and WAITING FOR TRN, oldest
+first; everything else is one HISTORY row per journey, newest first,
+bounded at twenty. A transfer with no request behind it (a facilitator's,
+or one raised before v20) keeps its own card with `kind: "transfer"` and
+`legacy: true` so it can still be finished. Transport's queue items gain
+`journey_id` — the request's reference, the one both tables are holding.
+
+The console panel is titled RESOURCE REQUESTS and has one form (REQUEST
+FROM / RESOURCE / QTY / SEND REQUEST); the supplier's card carries ACCEPT
+REQUEST and DECLINE, the asking table's WITHDRAW. Workers are still asked
+for through the same form, so a loan now travels the request path too.
+There is no OFFER RESOURCE: a table that wants to help asks the other
+table to request it.

@@ -1940,172 +1940,316 @@ test('a queue of six stays six independent items, and a decline is its own reduc
   assert.equal(game.declineTransfer(ids[0], { by: 'POW' }).reason, 'approval_trn_only');
 });
 
-// -- v12: RESOURCE REQUESTS & TRANSFERS — one card per movement -----------------------
+// -- v20: RESOURCE REQUESTS — one door, one journey ------------------------------------
 //
-// The same requests and transfers, projected for one table: labelled in the
-// room's words, split into ACTIVE and HISTORY, a fulfilled request folded
-// into its transfer. The rules underneath do not move.
+// A table asks; the supplier answers; the answer raises the transfer; Transport
+// approves it. The request and the transfer are still two records with two
+// audit trails, but a table sees one card that keeps the request's reference
+// the whole way and only changes its words. Nobody pushes stock at anybody.
 
-test('a fulfilled request folds into its linked transfer: one ACTIVE card, the request in HISTORY, nothing moved', () => {
+const journeys = (game, code) => forSector(game, code).movement;
+const byId = (list) => Object.fromEntries(list.map((c) => [c.id, c]));
+const stockOf = (game) => JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(game.state.sectors).map(([c, s]) => [c, { ...s.inventory, workers: s.workforce.active }]))));
+
+test('the journey: one card from WAITING FOR SUPPLIER to WAITING FOR TRN to DELIVERED, keeping the request reference, and only TRN moves anything', () => {
   const game = running();
-  const before = { pow: game.state.sectors.POW.inventory.power, med: game.state.sectors.MED.inventory.power };
-  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' });
-  let mv = forSector(game, 'MED').movement;
-  assert.equal(mv.active.length, 1);
-  assert.equal(mv.active[0].kind, 'request'); assert.equal(mv.active[0].label, 'WAITING FOR SUPPLIER');
-  assert.equal(mv.active[0].direction, 'OUTGOING'); assert.equal(mv.active[0].can_withdraw, true);
-  assert.deepEqual([game.state.sectors.POW.inventory.power, game.state.sectors.MED.inventory.power], [before.pow, before.med], 'a request moved stock');
+  const before = stockOf(game);
+  const r = game.requestTransfer({ from: 'WTR', to: 'POW', resource: 'water', amount: 2, by: 'POW' }).request;
 
-  const f = game.fulfillRequest(r.request.id, { by: 'POW' });
-  assert.equal(f.ok, true);
-  assert.equal(f.transfer.request_id, r.request.id); assert.equal(game.findRequest(r.request.id).transfer_id, f.transfer.id, 'linked both ways');
-  assert.equal(f.transfer.status, 'PENDING_TRN_APPROVAL', 'fulfilment is consent, not approval');
-  assert.equal(game.stampsUsed(), 0, 'fulfilment spent no Transport allowance');
-  assert.deepEqual([game.state.sectors.POW.inventory.power, game.state.sectors.MED.inventory.power], [before.pow, before.med], 'fulfilment moved stock');
-
-  for (const code of ['MED', 'POW']) {
-    mv = forSector(game, code).movement;
-    assert.equal(mv.active.length, 1, `${code}: the request and its transfer are two active cards`);
-    assert.equal(mv.active[0].id, f.transfer.id); assert.equal(mv.active[0].label, 'WAITING FOR TRN');
-    assert.equal(mv.active[0].linked_id, r.request.id);
-    const hist = mv.history.find((c) => c.id === r.request.id);
-    assert.ok(hist, `${code}: the request left the audit trail`);
-    assert.equal(hist.label, 'SUPPLIER ACCEPTED'); assert.equal(hist.linked_id, f.transfer.id); assert.equal(hist.active, false);
+  // stage 1 — the ask. Nothing moved, nothing was spent, and the supplier is the one asked to act.
+  for (const code of ['POW', 'WTR']) {
+    const mv = journeys(game, code);
+    assert.equal(mv.active.length, 1, `${code}: not exactly one card`);
+    const c = mv.active[0];
+    assert.equal(c.id, r.id, `${code}: the card is not the request's reference`);
+    assert.equal(c.kind, 'journey'); assert.equal(c.stage, 'REQUEST');
+    assert.equal(c.label, 'WAITING FOR SUPPLIER'); assert.equal(c.transfer_id, null);
+    assert.equal(c.from, 'WTR'); assert.equal(c.to, 'POW'); assert.equal(c.resource, 'water'); assert.equal(c.amount, 2);
   }
-  assert.equal(forSector(game, 'MED').movement.active[0].direction, 'INCOMING');
-  assert.equal(forSector(game, 'POW').movement.active[0].direction, 'OUTGOING');
+  assert.equal(journeys(game, 'WTR').active[0].action_required, true, 'the supplier was not asked to answer');
+  assert.equal(journeys(game, 'WTR').active[0].can_accept, true);
+  assert.equal(journeys(game, 'POW').active[0].action_required, false);
+  assert.equal(journeys(game, 'POW').active[0].can_withdraw, true, 'the asking table cannot withdraw');
+  assert.equal(journeys(game, 'WTR').active[0].can_withdraw, false, 'the supplier can withdraw the ask');
+  assert.deepEqual(stockOf(game), before, 'the ask moved stock');
+  assert.equal(game.stampsUsed(), 0, 'the ask spent an approval');
+  assert.equal(game.state.transfers.length, 0, 'the ask raised a transfer');
 
-  // Only Transport finishes it.
-  assert.equal(game.approveTransfer(f.transfer.id, { by: 'MED' }).reason, 'approval_trn_only');
+  // stage 2 — the supplier accepts. Exactly one linked transfer, still nothing moved.
+  const f = game.fulfillRequest(r.id, { by: 'WTR' });
+  assert.equal(f.ok, true);
+  assert.equal(game.state.transfers.length, 1);
+  assert.equal(f.transfer.status, 'PENDING_TRN_APPROVAL');
+  assert.equal(f.transfer.request_id, r.id); assert.equal(game.findRequest(r.id).transfer_id, f.transfer.id, 'the two records are not linked both ways');
+  assert.deepEqual(stockOf(game), before, 'acceptance moved stock');
+  assert.equal(game.stampsUsed(), 0, 'acceptance spent an approval');
+  for (const code of ['POW', 'WTR']) {
+    const mv = journeys(game, code);
+    assert.equal(mv.active.length, 1, `${code}: the request and its transfer are two active cards`);
+    const c = mv.active[0];
+    assert.equal(c.id, r.id, `${code}: the reference changed mid-journey`);
+    assert.equal(c.stage, 'TRANSFER'); assert.equal(c.label, 'WAITING FOR TRN');
+    assert.equal(c.transfer_id, f.transfer.id); assert.equal(c.linked_id, f.transfer.id);
+    assert.equal(c.action_required, false); assert.equal(c.can_withdraw, false, 'a table can still walk it back from Transport');
+    assert.equal(mv.history.length, 0, `${code}: the journey is in ACTIVE and HISTORY at once`);
+  }
+  // direction is the stock's, and it does not flip when the journey moves on
+  assert.equal(journeys(game, 'WTR').active[0].direction, 'OUTGOING');
+  assert.equal(journeys(game, 'POW').active[0].direction, 'INCOMING');
+  // Transport is told which journey the chit belongs to
+  const q = forSector(game, 'TRN').transfer_queue;
+  assert.equal(q.items.length, 1); assert.equal(q.items[0].id, f.transfer.id); assert.equal(q.items[0].journey_id, r.id);
+
+  // stage 3 — only Transport finishes it, and the whole quantity moves at once.
   assert.equal(game.approveTransfer(f.transfer.id, { by: 'POW' }).reason, 'approval_trn_only');
+  assert.equal(game.approveTransfer(f.transfer.id, { by: 'WTR' }).reason, 'approval_trn_only');
+  assert.deepEqual(stockOf(game), before, 'a refused approval moved stock');
   game.confirmChit(f.transfer.id, true, { by: 'TRN' });
   assert.equal(game.approveTransfer(f.transfer.id, { by: 'TRN' }).ok, true);
-  assert.equal(game.state.sectors.MED.inventory.power, before.med + 1);
-  mv = forSector(game, 'MED').movement;
-  assert.equal(mv.active.length, 0, 'a delivered transfer is not active');
-  assert.equal(mv.history[0].id, f.transfer.id); assert.equal(mv.history[0].label, 'DELIVERED');
+  assert.equal(game.state.sectors.POW.inventory.water, before.POW.water + 2);
+  assert.equal(game.state.sectors.WTR.inventory.water, before.WTR.water - 2);
+  assert.equal(game.stampsUsed(), 1, 'the approval did not cost exactly one');
+  for (const code of ['POW', 'WTR']) {
+    const mv = journeys(game, code);
+    assert.equal(mv.active.length, 0, `${code}: a delivered journey is still active`);
+    assert.equal(mv.history.length, 1, `${code}: the journey left ${mv.history.length} history rows, not one`);
+    assert.equal(mv.history[0].id, r.id); assert.equal(mv.history[0].label, 'DELIVERED');
+    assert.equal(mv.history[0].transfer_id, f.transfer.id, 'the audit link was lost');
+  }
 });
 
-test('direction is relative to the table looking: the same four movements from MED and from POW', () => {
+test('accepting twice, or three times, still makes one transfer and delivers once', () => {
   const game = running();
-  game.setInventory('MED', { med: 5 });
-  const a = game.requestTransfer({ from: 'WTR', to: 'MED', resource: 'water', amount: 1, by: 'MED' }).request;   // MED asks WTR
-  const b = game.requestTransfer({ from: 'MED', to: 'POW', resource: 'med', amount: 1, by: 'POW' }).request;     // POW asks MED
-  const c = game.createTransfer({ from: 'POW', to: 'MED', resource: 'water', amount: 1, by: 'POW' }).transfer;  // POW sends MED
-  const d = game.createTransfer({ from: 'MED', to: 'POW', resource: 'med', amount: 1, by: 'MED' }).transfer;    // MED sends POW
-  const med = Object.fromEntries(forSector(game, 'MED').movement.active.map((x) => [x.id, x]));
-  assert.equal(med[a.id].direction, 'OUTGOING'); assert.equal(med[a.id].label, 'WAITING FOR SUPPLIER');
-  assert.equal(med[b.id].direction, 'INCOMING'); assert.equal(med[b.id].label, 'ACTION REQUIRED'); assert.equal(med[b.id].action_required, true); assert.equal(med[b.id].can_fulfill, true);
-  assert.equal(med[c.id].direction, 'INCOMING'); assert.equal(med[c.id].label, 'WAITING FOR TRN');
-  assert.equal(med[d.id].direction, 'OUTGOING');
-  const pow = Object.fromEntries(forSector(game, 'POW').movement.active.map((x) => [x.id, x]));
-  assert.equal(pow[a.id], undefined, "POW is not party to MED's ask of WTR");
-  assert.equal(pow[b.id].direction, 'OUTGOING'); assert.equal(pow[b.id].label, 'WAITING FOR SUPPLIER'); assert.equal(pow[b.id].action_required, false);
-  assert.equal(pow[c.id].direction, 'OUTGOING'); assert.equal(pow[d.id].direction, 'INCOMING');
-  const wtr = forSector(game, 'WTR').movement.active;
-  assert.equal(wtr.length, 1); assert.equal(wtr[0].direction, 'INCOMING'); assert.equal(wtr[0].action_required, true);
+  const before = stockOf(game);
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' }).request;
+  const a = game.fulfillRequest(r.id, { by: 'POW' });
+  const b = game.fulfillRequest(r.id, { by: 'POW' });
+  const c = game.fulfillRequest(r.id, { by: 'POW' });
+  assert.equal(a.ok, true); assert.equal(b.ok, true); assert.equal(c.ok, true);
+  assert.equal(b.duplicate, true); assert.equal(c.duplicate, true);
+  assert.equal(b.transfer.id, a.transfer.id); assert.equal(c.transfer.id, a.transfer.id);
+  assert.equal(game.state.transfers.length, 1, 'a retry made a second transfer');
+  assert.equal(logEvents(game, 'request_fulfilled').length, 1, 'a retry logged a second acceptance');
+  assert.equal(journeys(game, 'MED').active.length, 1);
+  assert.deepEqual(stockOf(game), before);
+  // and delivery happens once, however many times the button is pressed
+  game.confirmChit(a.transfer.id, true, { by: 'TRN' });
+  assert.equal(game.approveTransfer(a.transfer.id, { by: 'TRN' }).ok, true);
+  const after = stockOf(game);
+  assert.equal(game.approveTransfer(a.transfer.id, { by: 'TRN' }).reason, 'already_stamped');
+  assert.equal(game.approveTransfer(a.transfer.id, { by: 'TRN' }).reason, 'already_stamped');
+  assert.deepEqual(stockOf(game), after, 'a retried approval delivered twice');
+  assert.equal(game.stampsUsed(), 1, 'a retried approval spent a second allowance');
+  assert.equal(logEvents(game, 'transfer_approved').length, 1);
 });
 
-test('ACTIVE is oldest first and only the unresolved; HISTORY is newest first, bounded, and keeps every kind of ending', () => {
+test('the supplier declines: no transfer, no stock, one history row', () => {
+  const game = running();
+  const before = stockOf(game);
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' }).request;
+  assert.equal(game.declineRequest(r.id, { by: 'MED' }).reason, 'not_supplier', 'the asking table answered its own request');
+  assert.equal(game.declineRequest(r.id, { by: 'POW' }).ok, true);
+  assert.equal(game.state.transfers.length, 0, 'a decline raised a transfer');
+  assert.deepEqual(stockOf(game), before);
+  assert.equal(game.stampsUsed(), 0);
+  for (const code of ['POW', 'MED']) {
+    const mv = journeys(game, code);
+    assert.equal(mv.active.length, 0);
+    assert.equal(mv.history.length, 1); assert.equal(mv.history[0].id, r.id); assert.equal(mv.history[0].label, 'DECLINED');
+  }
+  assert.equal(game.fulfillRequest(r.id, { by: 'POW' }).reason, 'request_closed', 'a declined request could still be accepted');
+});
+
+test('Transport declines: no stock, no successful approval spent, one history row saying so', () => {
+  const game = running();
+  const before = stockOf(game);
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' }).request;
+  const f = game.fulfillRequest(r.id, { by: 'POW' });
+  assert.equal(game.declineTransfer(f.transfer.id, { by: 'POW' }).reason, 'approval_trn_only');
+  assert.equal(game.declineTransfer(f.transfer.id, { by: 'TRN' }).ok, true);
+  assert.deepEqual(stockOf(game), before);
+  assert.equal(game.stampsUsed(), 0, 'a decline spent an approval');
+  const mv = journeys(game, 'MED');
+  assert.equal(mv.active.length, 0);
+  assert.equal(mv.history.length, 1); assert.equal(mv.history[0].id, r.id); assert.equal(mv.history[0].label, 'TRN DECLINED');
+  assert.equal(mv.history[0].transfer_id, f.transfer.id);
+});
+
+test('the supplier is short: acceptance is refused and nothing is half-made; stock that drains after acceptance stops the approval instead', () => {
+  const game = running();
+  // short at acceptance
+  game.setInventory('WTR', { water: 1 });
+  const r = game.requestTransfer({ from: 'WTR', to: 'AGR', resource: 'water', amount: 2, by: 'AGR' }).request;
+  const card = journeys(game, 'WTR').active[0];
+  assert.equal(card.action_required, true); assert.equal(card.can_accept, false, 'a short supplier is offered ACCEPT');
+  const f = game.fulfillRequest(r.id, { by: 'WTR' });
+  assert.equal(f.ok, false); assert.equal(f.reason, 'insufficient_stock_accept'); assert.equal(f.have, 1); assert.equal(f.need, 2);
+  assert.equal(game.state.transfers.length, 0, 'a partial transfer was made');
+  assert.equal(game.state.sectors.WTR.inventory.water, 1);
+  assert.equal(game.findRequest(r.id).status, 'REQUESTED', 'the ask was closed by a refusal');
+  assert.equal(journeys(game, 'WTR').active[0].id, r.id, 'the journey left ACTIVE');
+
+  // enough at acceptance, gone by approval
+  game.setInventory('WTR', { water: 2 });
+  const ok = game.fulfillRequest(r.id, { by: 'WTR' });
+  assert.equal(ok.ok, true);
+  game.confirmChit(ok.transfer.id, true, { by: 'TRN' });
+  game.setInventory('WTR', { water: 0 });                       // the round's upkeep took it
+  const before = stockOf(game);
+  const res = game.approveTransfer(ok.transfer.id, { by: 'TRN' });
+  assert.equal(res.ok, false); assert.equal(res.reason, 'insufficient_stock_stamp'); assert.equal(res.need, 2);
+  assert.deepEqual(stockOf(game), before, 'a stock-changed approval moved something');
+  assert.equal(game.stampsUsed(), 0, 'a stock-changed approval spent an allowance');
+  assert.equal(game.findTransfer(ok.transfer.id).status, 'PENDING_TRN_APPROVAL', 'the transfer was closed by a refusal');
+  assert.equal(journeys(game, 'AGR').active[0].label, 'WAITING FOR TRN', 'the journey left ACTIVE');
+  // and the table is told plainly
+  assert.ok(/SUPPLIER STOCK CHANGED — REQUEST CANNOT BE DELIVERED/.test(SECTOR_SCRIPT), 'the console has no words for changed stock');
+});
+
+test('a participant can no longer raise a transfer: the sector route refuses and logs it, the facilitator and the reducer keep theirs', async () => {
+  const js = SECTOR_SCRIPT; const html = SECTOR_INDEX;
+  assert.ok(!/type: 'transfer_create'/.test(js), 'the console still sends transfer_create');
+  assert.ok(!/data-mode="transfer"/.test(html) && !/TRANSFER RESOURCE/.test(html), 'the TRANSFER RESOURCE tab is still in the markup');
+  assert.ok(!/id="tf-tabs"/.test(html) && !/setFormMode/.test(js) && !/formMode/.test(js), 'the two-form switch is still there');
+  // the server's own door, read from the source it serves
+  const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const sectorHalf = server.slice(server.indexOf('function handleSector'), server.indexOf('function handleControl'));
+  assert.ok(/direct_transfer_removed/.test(sectorHalf), 'the participant transfer route does not refuse');
+  assert.ok(/allow_direct_participant_transfer/.test(sectorHalf), 'the old door cannot be reopened by a scenario');
+  assert.ok(/participant_transfer_refused/.test(sectorHalf), 'a refused attempt is not logged');
+  // the facilitator's path and the low-level function are untouched
+  const controlHalf = server.slice(server.indexOf('function handleControl'));
+  assert.ok(/case 'transfer_create':\s*\n\s*reply\(\{ type: 'transfer_result', \.\.\.game\.createTransfer/.test(controlHalf), 'the facilitator lost transfer_create');
+  assert.ok(override.ALLOWED.transfer_create === 'capacity' && override.ALLOWED.transfer_request === 'capacity', 'the admin override lost its transfer actions');
+  assert.ok(/RAISE A TRANSFER FOR A TABLE/.test(fs.readFileSync(path.join(__dirname, '..', 'public', 'control', 'control.js'), 'utf8')), 'the console lost the admin transfer override');
+  const game = running();
+  assert.equal(game.createTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'facilitator' }).ok, true, 'the shared reducer was deleted');
+  assert.equal(game.state.sectors.POW.inventory.power, running().state.sectors.POW.inventory.power, 'raising one moved stock');
+});
+
+test('a transfer with no request behind it still works: the facilitator raises it, a table sees it, Transport finishes it', () => {
+  const game = running();
+  const t = game.createTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'facilitator' }).transfer;
+  assert.equal(t.request_id, null);
+  for (const code of ['POW', 'MED']) {
+    const mv = journeys(game, code);
+    assert.equal(mv.active.length, 1);
+    assert.equal(mv.active[0].id, t.id); assert.equal(mv.active[0].kind, 'transfer'); assert.equal(mv.active[0].legacy, true);
+    assert.equal(mv.active[0].label, 'WAITING FOR TRN'); assert.equal(mv.active[0].action_required, false);
+  }
+  assert.equal(journeys(game, 'POW').active[0].direction, 'OUTGOING');
+  assert.equal(journeys(game, 'MED').active[0].direction, 'INCOMING');
+  assert.equal(forSector(game, 'TRN').transfer_queue.items[0].journey_id, t.id, 'a legacy transfer has no reference for Transport');
+  const med = game.state.sectors.MED.inventory.power;
+  game.confirmChit(t.id, true, { by: 'TRN' });
+  assert.equal(game.approveTransfer(t.id, { by: 'TRN' }).ok, true, 'a legacy transfer can no longer be resolved');
+  assert.equal(game.state.sectors.MED.inventory.power, med + 1);
+  assert.equal(journeys(game, 'MED').history[0].id, t.id);
+  // a restart keeps it resolvable and un-duplicated
+  const again = newGame({ runId: 'v20-legacy' });
+  again.restore(JSON.parse(JSON.stringify(game.serialise())));
+  const back = journeys(again, 'MED');
+  assert.equal(back.active.length, 0); assert.equal(back.history.filter((c) => c.id === t.id).length, 1);
+});
+
+test('the chit still rules: Transport cannot approve an unstamped journey, and the physical requirement is untouched', () => {
+  const game = running();
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' }).request;
+  const f = game.fulfillRequest(r.id, { by: 'POW' });
+  assert.equal(f.transfer.chit_confirmed, false, 'acceptance signed the chit for the room');
+  const before = stockOf(game);
+  const res = game.approveTransfer(f.transfer.id, { by: 'TRN' });
+  assert.equal(res.ok, false); assert.equal(res.reason, 'chit_required');
+  assert.deepEqual(stockOf(game), before); assert.equal(game.stampsUsed(), 0);
+  assert.equal(game.confirmChit(f.transfer.id, true, { by: 'POW' }).ok, true, 'the reducer is not the chit guard');   // the router is (TRN only)
+  assert.equal(forSector(game, 'TRN').transfer_queue.requires_chit, true);
+  assert.equal(game.approveTransfer(f.transfer.id, { by: 'TRN' }).ok, true);
+});
+
+test('ACTIVE is oldest first and only the unresolved; HISTORY is newest first, bounded, one row per journey, and keeps every ending', () => {
   const game = running();
   game.setInventory('POW', { power: 30, parts: 30 });
   const stamp = (rec, iso) => { rec.requested_at = iso; rec.created_at = iso; rec.updated_at = iso; };
-  const r1 = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' }).request; stamp(r1, '2026-09-18T02:00:00.000Z');
-  const t1 = game.createTransfer({ from: 'POW', to: 'MED', resource: 'parts', amount: 1, by: 'POW' }).transfer;  stamp(t1, '2026-09-18T02:00:05.000Z');
-  const r2 = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'parts', amount: 1, by: 'MED' }).request; stamp(r2, '2026-09-18T02:00:09.000Z');
-  let mv = forSector(game, 'MED').movement;
-  assert.deepEqual(mv.active.map((c) => c.id), [r1.id, t1.id, r2.id], 'oldest first');
-  assert.deepEqual(forSector(game, 'MED').movement.active.map((c) => c.id), [r1.id, t1.id, r2.id], 'a reprojection (refresh) keeps it');
+  const r1 = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' }).request; stamp(r1, '2026-09-20T02:00:00.000Z');
+  const t1 = game.createTransfer({ from: 'POW', to: 'MED', resource: 'parts', amount: 1, by: 'facilitator' }).transfer; stamp(t1, '2026-09-20T02:00:05.000Z');
+  const r2 = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'parts', amount: 1, by: 'MED' }).request; stamp(r2, '2026-09-20T02:00:09.000Z');
+  assert.deepEqual(journeys(game, 'MED').active.map((c) => c.id), [r1.id, t1.id, r2.id], 'oldest first');
+  assert.deepEqual(journeys(game, 'MED').active.map((c) => c.id), [r1.id, t1.id, r2.id], 'a reprojection (refresh) changed the order');
 
-  game.declineRequest(r2.id, { by: 'POW' });                           // DECLINED
-  game.confirmChit(t1.id, true, { by: 'TRN' }); game.approveTransfer(t1.id, { by: 'TRN' });   // DELIVERED
-  const f = game.fulfillRequest(r1.id, { by: 'POW' });                 // SUPPLIER ACCEPTED + a new active transfer
-  game.declineTransfer(f.transfer.id, { by: 'TRN' });                  // TRN DECLINED
+  game.declineRequest(r2.id, { by: 'POW' });                                                  // DECLINED
+  game.confirmChit(t1.id, true, { by: 'TRN' }); game.approveTransfer(t1.id, { by: 'TRN' });   // DELIVERED (legacy)
+  const f = game.fulfillRequest(r1.id, { by: 'POW' });
+  game.declineTransfer(f.transfer.id, { by: 'TRN' });                                          // TRN DECLINED
   const r3 = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' }).request;
-  game.cancelRequest(r3.id, { by: 'MED' });                             // CANCELLED
-  mv = forSector(game, 'MED').movement;
+  game.cancelRequest(r3.id, { by: 'MED' });                                                    // CANCELLED
+  const mv = journeys(game, 'MED');
   assert.equal(mv.active.length, 0, 'nothing unresolved is left');
   const labels = Object.fromEntries(mv.history.map((c) => [c.id, c.label]));
-  assert.equal(labels[r2.id], 'DECLINED'); assert.equal(labels[t1.id], 'DELIVERED'); assert.equal(labels[r1.id], 'SUPPLIER ACCEPTED');
-  assert.equal(labels[f.transfer.id], 'TRN DECLINED'); assert.equal(labels[r3.id], 'CANCELLED');
+  assert.deepEqual(labels, { [r2.id]: 'DECLINED', [t1.id]: 'DELIVERED', [r1.id]: 'TRN DECLINED', [r3.id]: 'CANCELLED' });
+  assert.equal(mv.history.length, 4, 'a journey left more than one history row');
+  assert.ok(!mv.history.some((c) => c.id === f.transfer.id), 'the linked transfer is a second history row');
   const times = mv.history.map((c) => Date.parse(c.updated_at));
   assert.ok(times.every((t, i) => i === 0 || t <= times[i - 1]), 'newest first');
-  assert.equal(mv.history[0].id, r3.id, 'the last thing that happened is on top');
+  assert.equal(mv.history[0].id, r3.id, 'the last thing that happened is not on top');
 
-  // a long history stays bounded, and never crowds ACTIVE
   for (let i = 0; i < 25; i += 1) {
     const x = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' }).request;
     game.declineRequest(x.id, { by: 'POW' });
   }
   const live = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' }).request;
-  mv = forSector(game, 'MED').movement;
-  assert.equal(mv.history.length, 20); assert.ok(mv.history_total >= 30);
-  assert.deepEqual(mv.active.map((c) => c.id), [live.id]);
+  const later = journeys(game, 'MED');
+  assert.equal(later.history.length, 20); assert.ok(later.history_total >= 29);
+  assert.deepEqual(later.active.map((c) => c.id), [live.id]);
 });
 
-test('a short supplier cannot fulfil: no transfer, no stock touched, the request stays active and says so', () => {
-  const game = running();
-  game.setInventory('WTR', { water: 1 });
-  const r = game.requestTransfer({ from: 'WTR', to: 'AGR', resource: 'water', amount: 2, by: 'AGR' }).request;
-  const card = forSector(game, 'WTR').movement.active.find((c) => c.id === r.id);
-  assert.equal(card.action_required, true); assert.equal(card.can_fulfill, false, 'the card would let a short supplier press FULFILL');
-  const f = game.fulfillRequest(r.id, { by: 'WTR' });
-  assert.equal(f.ok, false); assert.equal(f.reason, 'insufficient_stock_accept');
-  assert.equal(game.state.transfers.length, 0, 'a partial transfer was created');
-  assert.equal(game.state.sectors.WTR.inventory.water, 1); assert.equal(game.state.sectors.AGR.inventory.water, 3);
-  assert.equal(game.findRequest(r.id).status, 'REQUESTED');
-  assert.equal(forSector(game, 'WTR').movement.active[0].id, r.id, 'the request left ACTIVE');
-  assert.equal(forSector(game, 'AGR').movement.active[0].label, 'WAITING FOR SUPPLIER');
-  assert.equal(forSector(game, 'AGR').movement.active[0].can_fulfill, false, 'the requester was told about the supplier stock');
-});
-
-test('worker and resource movements render alike, and a restart keeps statuses, links and order without duplicates', () => {
-  const game = running();
-  const w = game.createTransfer({ from: 'POW', to: 'MED', resource: 'workers', amount: 2, by: 'POW' }).transfer;
-  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'parts', amount: 1, by: 'MED' }).request;
-  const f = game.fulfillRequest(r.id, { by: 'POW' });
-  let mv = forSector(game, 'MED').movement;
-  const wc = mv.active.find((c) => c.id === w.id);
-  assert.equal(wc.resource, 'workers'); assert.equal(wc.amount, 2); assert.equal(wc.kind, 'transfer'); assert.equal(wc.label, 'WAITING FOR TRN');
-  assert.deepEqual(mv.active.map((c) => c.id), [w.id, f.transfer.id]);
-  const again = newGame({ runId: 'movement-restore' });
-  again.restore(JSON.parse(JSON.stringify(game.serialise())));
-  const back = forSector(again, 'MED').movement;
-  assert.deepEqual(back.active.map((c) => c.id), [w.id, f.transfer.id], 'a restart changed the active cards');
-  assert.equal(new Set(back.active.map((c) => c.id)).size, back.active.length, 'duplicates');
-  assert.ok(!back.active.some((c) => c.id === r.id), 'the fulfilled request came back to ACTIVE');
-  assert.equal(back.history.find((c) => c.id === r.id).linked_id, f.transfer.id);
-  assert.equal(again.findRequest(r.id).status, 'TRANSFER_CREATED');
-  assert.equal(again.stampsUsed(), 0);
-});
-
-test('the panel markup: RESOURCE REQUESTS & TRANSFERS, two forms, ACTIVE with filters, HISTORY folded, no inbox, no old words', () => {
+test('the panel: one REQUEST form, the filters and folded history kept, and a journey card that names its stage', () => {
   const html = SECTOR_INDEX; const js = SECTOR_SCRIPT;
-  assert.ok(/RESOURCE REQUESTS &amp; TRANSFERS/.test(html), 'panel title');
-  assert.ok(!/RESOURCES IN &amp; OUT/.test(html) && !/id="inbox-panel"/.test(html) && !/INBOUND REQUESTS/.test(html), 'the old panel or the inbox is still there');
-  assert.ok(/data-mode="request"/.test(html) && /data-mode="transfer"/.test(html));
-  assert.ok(/Ask another sector for stock\. No resources move until a transfer is created and TRN approves it\./.test(html));
-  assert.ok(/'SEND TO'/.test(js) && /'CREATE TRANSFER'/.test(js) && /Creates a proposed movement\. TRN must approve before stock or workers move\./.test(js), 'the transfer form wording');
-  assert.ok(/'RESOURCE \/ WORKER'/.test(js) && /'QUANTITY'/.test(js));
+  assert.ok(/<h2 class="ptitle">RESOURCE REQUESTS<\/h2>/.test(html), 'the panel is not titled RESOURCE REQUESTS');
+  assert.ok(/Ask another sector for resources\. If they accept, TRN must approve the transfer before anything moves\./.test(html), 'the helper text');
+  assert.ok(/id="tf-submit">SEND REQUEST</.test(html) && /REQUEST FROM/.test(html));
+  assert.ok(/id="tf-res"/.test(html) && /id="tf-amt"/.test(html));
   assert.ok(/id="mv-active-count"/.test(html) && /data-filter="ALL"/.test(html) && /data-filter="INCOMING"/.test(html) && /data-filter="OUTGOING"/.test(html));
   assert.ok(/id="mv-history-count"/.test(html) && /VIEW HISTORY/.test(html) && /id="history" hidden/.test(html), 'history is not folded by default');
   assert.ok(/let historyOpen = false/.test(js) && /let movementFilter = 'ALL'/.test(js));
-  assert.ok(/NO ACTIVE REQUESTS OR TRANSFERS/.test(js) && /New activity will appear here/.test(js));
+  assert.ok(/NO ACTIVE RESOURCE REQUESTS/.test(js) && /New requests will appear here/.test(js));
+  assert.ok(/ACCEPT REQUEST/.test(js) && /data-accept=/.test(js) && /data-decline=/.test(js) && /data-withdraw=/.test(js));
+  assert.ok(!/>FULFILL</.test(js) && !/CANNOT FULFIL/.test(js), 'the card still says FULFILL');
   assert.ok(/class="mv-id"/.test(js) && /class="mv-route"/.test(js) && /class="mv-item"/.test(js) && /class="mv-status"/.test(js), 'a card lacks id, route, item or status');
-  assert.ok(/requested from/.test(js), 'a request card does not say who asked whom');
-  assert.ok(/data-fulfill/.test(js) && /data-decline/.test(js) && /data-withdraw/.test(js));
-  assert.ok(/'WORKER' : 'WORKERS'/.test(js));
-  for (const bad of ['AWAITING TRANSPORT', 'FULFILLED — AWAITING', 'renderInbox', 'function statusLine', 'function paperLine', 'WAITING ${U.mmss', 'q-wait clock']) {
-    assert.ok(!js.includes(bad), `sector.js still carries ${bad}`);
-  }
-  assert.ok(!/Waiting \d|elapsedText\(c\./.test(js.slice(js.indexOf('function movementCard'), js.indexOf('function renderTransfers'))), 'the movement card shows a waiting time');
-  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'sector', 'sector.css'), 'utf8');
-  assert.ok(/\.mv-id \{[^}]*font-size: 9px/.test(css), 'the id is not small');
-  assert.ok(/\.mv-item \{[^}]*font-size: 18px/.test(css), 'the item is not the biggest thing on the card');
-  assert.ok(/\.mv-status\[data-label="DECLINED"\]::before/.test(css) && /\.mv-status\[data-label="DELIVERED"\]::before/.test(css), 'status relies on colour alone');
-  assert.ok(/\.transfers \{[^}]*overflow-y: auto/.test(css), 'the list does not scroll');
-  assert.ok(/focus-visible/.test(css));
-  assert.ok(!/\.inbox-block|\.ib-btns/.test(css), 'inbox styles remain');
+  assert.ok(/requests from/.test(js) && /stage-\$\{c\.stage\}/.test(js), 'the card does not show its stage');
+  assert.ok(/Transfer \$\{esc\(c\.transfer_id\)\}/.test(js), 'the card never names its linked transfer');
+  // the worker loan survives the simplification: it travels the request path now
+  assert.ok(/value="workers"/.test(html), 'workers can no longer be asked for');
+  const game = running();
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'workers', amount: 1, by: 'MED' }).request;
+  const f = game.fulfillRequest(r.id, { by: 'POW' });
+  assert.equal(f.ok, true); assert.equal(f.transfer.resource, 'workers');
+  const c = journeys(game, 'MED').active[0];
+  assert.equal(c.id, r.id); assert.equal(c.resource, 'workers'); assert.equal(c.label, 'WAITING FOR TRN');
+  const active = game.state.sectors.POW.workforce.active;
+  game.confirmChit(f.transfer.id, true, { by: 'TRN' });
+  assert.equal(game.approveTransfer(f.transfer.id, { by: 'TRN' }).ok, true);
+  assert.equal(game.state.sectors.POW.workforce.active, active - 1);
+  assert.equal(game.state.sectors.MED.workforce.borrowed, 1);
+});
+
+test('a delivered journey leaves COM\'s board, the fault rewards and the admin controls exactly where they were', () => {
+  const game = running();
+  game.setBroadcastRow('MED', { power: 9, water: 9, med: 9, parts: 9 }, { by: 'COM' });
+  const board = JSON.stringify(game.state.broadcast.rows.MED);
+  const budget = JSON.stringify(game.rewardBudget());
+  const clock = JSON.stringify(game.state.round_clock);
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'power', amount: 1, by: 'MED' }).request;
+  const f = game.fulfillRequest(r.id, { by: 'POW' });
+  game.confirmChit(f.transfer.id, true, { by: 'TRN' });
+  game.approveTransfer(f.transfer.id, { by: 'TRN' });
+  assert.equal(JSON.stringify(game.state.broadcast.rows.MED), board, "a delivery updated COM's board");
+  assert.equal(JSON.stringify(game.rewardBudget()), budget, 'a delivery moved the reward budget');
+  assert.equal(JSON.stringify(game.state.round_clock), clock, 'a delivery moved the clock');
+  assert.equal(game.medCapacity(), running().medCapacity());
+  // the facilitator's overrides still reach both records
+  assert.equal(override.ALLOWED.request_fulfill, 'request'); assert.equal(override.ALLOWED.transfer_approve, 'transfer');
+  assert.ok(override.snapshot(game, 'transfer_approve', { id: f.transfer.id }));
+  assert.ok(override.snapshot(game, 'request_fulfill', { id: r.id }));
 });
 
 // -- v16: the facilitator's command centre --------------------------------------------

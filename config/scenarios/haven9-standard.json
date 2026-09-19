@@ -43,6 +43,7 @@
     "trn_capacity_per_cycle": 3,
     "require_supplier_acceptance": true,
     "enforce_supplier_stock": true,
+    "allow_direct_participant_transfer": false,
     "insufficient_stock_behavior": "refuse",
     "expire_pending_requests_on_round_change": true,
     "expire_pending_transfers_on_round_change": true,

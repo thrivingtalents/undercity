@@ -855,11 +855,20 @@ function handleSector(client, entry, msg) {
     }
 
     /**
-     * A TRANSFER: we offer our OWN stock to another sector. Every sector may
-     * raise one, directly or by fulfilling a request. It lands in Transport's
-     * approval queue and moves nothing until Transport approves.
+     * A TRANSFER used to be a table's to raise. Since v20 it is not: a
+     * participant transfer exists only as the answer to an accepted request,
+     * so this door is shut and the attempt is logged. The reducer, the
+     * facilitator's own path and every legacy transfer are untouched, and one
+     * scenario key puts the old door back.
      */
     case 'transfer_create': {
+      if (game.cfg.allow_direct_participant_transfer !== true) {
+        entry.log.write('participant_transfer_refused', {
+          sector: mine, to: String(msg.to || '').toUpperCase(), resource: msg.resource || null,
+          amount: msg.amount ?? null, reason: 'direct_transfer_removed',
+        });
+        return send(client.ws, { type: 'transfer_result', action: 'create', ok: false, reason: 'direct_transfer_removed' });
+      }
       const to = String(msg.to || '').toUpperCase();
       const result = game.createTransfer({
         from: mine, to, resource: msg.resource, amount: msg.amount, by: mine,

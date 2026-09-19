@@ -175,8 +175,8 @@
 .transfers { overflow-y: auto; display: flex; flex-direction: column; gap: 6px; min-height: 40px; max-height: 40vh; margin-top: 6px; }
 .transfers.history { max-height: 30vh; }
 .mv-card { background: var(--steel); border: 1px solid var(--line); border-left: 3px solid var(--line); padding: 6px 8px; display: flex; flex-direction: column; gap: 3px; }
-.mv-card.mv-transfer { border-left-color: var(--amber); }
-.mv-card.mv-request { border-left-color: var(--ink-dim); }
+.mv-card.mv-transfer, .mv-card.stage-TRANSFER { border-left-color: var(--amber); }
+.mv-card.stage-REQUEST { border-left-color: var(--ink-dim); }
 .mv-card.act { border-color: var(--blue); border-left-color: var(--blue); background: #121a22; }
 .history .mv-card { opacity: 0.7; border-left-color: var(--line); }
 .mv-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
@@ -197,13 +197,14 @@
 .mv-status[data-label="DECLINED"]::before, .mv-status[data-label="TRN DECLINED"]::before { content: '✕ '; }
 .mv-status[data-label="CANCELLED"], .mv-status[data-label="EXPIRED"] { color: var(--ink-faint); }
 .mv-status[data-label="CANCELLED"]::before, .mv-status[data-label="EXPIRED"]::before { content: '— '; }
+.q-ref { font-size: 9px; letter-spacing: 0.1em; color: var(--ink-faint); }
 .mv-link { font-size: 9px; letter-spacing: 0.1em; color: var(--ink-faint); }
 .mv-short { font-size: 9.5px; letter-spacing: 0.1em; color: var(--red); font-weight: 700; }
 .mv-btns { display: flex; gap: 5px; margin-top: 3px; }
 .mv-btns button { min-height: 30px; font-size: 10px; letter-spacing: 0.12em; padding: 5px 10px; }
 .mv-btns .primary { flex: 1; }
 .mv-btns .ghost { color: var(--ink-dim); margin-left: auto; }
-.mv-btns button:focus-visible, .mv-filters button:focus-visible, .tf-tabs button:focus-visible, .mv-history-toggle:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.mv-btns button:focus-visible, .mv-filters button:focus-visible, .mv-history-toggle:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .mv-msg { font-size: 10px; letter-spacing: 0.1em; font-weight: 700; padding-top: 2px; }
 .mv-msg.bad { color: var(--red); }
 .mv-history-head { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
@@ -216,9 +217,6 @@
 .tf-label { font-size: 9px; letter-spacing: 0.18em; color: var(--ink-dim); white-space: nowrap; }
 .tf-hint { font-size: 9.5px; color: var(--ink-faint); line-height: 1.35; }
 #tf-submit { min-height: 32px; letter-spacing: 0.12em; }
-.tf-tabs { display: flex; gap: 4px; margin-bottom: 6px; }
-.tf-tabs button { flex: 1; font-size: 10px; padding: 5px 4px; letter-spacing: 0.08em; }
-.tf-tabs button.on { background: var(--sector); color: #11130a; border-color: var(--sector); font-weight: 700; }
 
 /* -- injured workers --------------------------------------------------------- */
 

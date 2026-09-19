@@ -113,11 +113,12 @@
         into HISTORY.
       -->
       <div class="panel block transfers-block">
-        <h2 class="ptitle">RESOURCE REQUESTS &amp; TRANSFERS</h2>
-        <div class="tf-tabs" id="tf-tabs" role="tablist">
-          <button type="button" data-mode="request" class="on" role="tab" aria-selected="true">REQUEST RESOURCE</button>
-          <button type="button" data-mode="transfer" role="tab" aria-selected="false">TRANSFER RESOURCE</button>
-        </div>
+        <h2 class="ptitle">RESOURCE REQUESTS</h2>
+        <!--
+          v20: one door. A table asks another sector for what it needs; if the
+          supplier accepts, the transfer raises itself and waits for Transport.
+          Nobody pushes stock at anybody.
+        -->
         <form class="transfer-form" id="transfer-form" autocomplete="off">
           <label class="tf-field">
             <span class="tf-label" id="tf-label">REQUEST FROM</span>
@@ -140,7 +141,7 @@
             </label>
           </div>
           <button type="submit" class="primary wide" id="tf-submit">SEND REQUEST</button>
-          <div class="tf-hint" id="tf-hint">Ask another sector for stock. No resources move until a transfer is created and TRN approves it.</div>
+          <div class="tf-hint" id="tf-hint">Ask another sector for resources. If they accept, TRN must approve the transfer before anything moves.</div>
         </form>
         <div class="msg" id="transfer-msg" hidden></div>
 

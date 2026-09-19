@@ -65,7 +65,7 @@
   const transferRows = new Map(); // (unused since v12; kept for the healing rows' pattern)
   let movementFilter = 'ALL';     // ALL | INCOMING | OUTGOING — resets to ALL on reload
   let historyOpen = false;        // HISTORY is folded by default
-  let movementActing = null;      // card id the last FULFILL / DECLINE / WITHDRAW was sent for
+  let movementActing = null;      // card id the last ACCEPT / DECLINE / WITHDRAW was sent for
   const queueRows = new Map();    // transfer id -> queue card element
   let queueConfirm = null;        // { id, kind: 'approve' | 'decline' } — the one card asking "are you sure?"
   let queueActing = null;         // transfer id the last APPROVE / DECLINE / CHIT was sent for; its card shows the reply
@@ -73,7 +73,6 @@
   const queueSeen = new Set();    // approval-queue ids (TRN) already rung for
   const healSeen = new Set();     // healing-queue ids (MED) already rung for
   let requestBannerUntil = 0;     // when the arrival banner retires
-  let formMode = 'request';       // 'request' (ask) or 'transfer' (offer)
   let alertSeen = null;       // { id, age, at } — age from the frame + local elapsed
   let resultBanner = null;    // { until }
   let pendingTransferAction = null; // 'transfer' | 'stamp' — routes transfer_result to a panel
@@ -191,9 +190,6 @@
     const amt = $('tf-amt');
     for (let n = 1; n <= 9; n += 1) amt.insertAdjacentHTML('beforeend', `<option value="${n}">${n}</option>`);
     $('transfer-form').addEventListener('submit', (e) => { e.preventDefault(); submitForm(); });
-    for (const b of $('tf-tabs').querySelectorAll('button')) {
-      b.addEventListener('click', () => setFormMode(b.dataset.mode));
-    }
     for (const b of $('mv-filters').querySelectorAll('button')) {
       b.addEventListener('click', () => { movementFilter = b.dataset.filter; renderTransfers(); });
     }
@@ -229,7 +225,6 @@
     window.addEventListener('pointerdown', dismiss, { once: true });
     window.addEventListener('keydown', dismiss, { once: true });
 
-    setFormMode('request');
     setInterval(tick, 250);
   }
 
@@ -265,9 +260,9 @@
   }
 
   /**
-   * REQUEST asks another sector for stock; TRANSFER offers our own. Neither
-   * moves anything: a request waits on the supplier, a transfer waits on
-   * Transport. Every sector has both.
+   * The one way a table starts a movement (v20): ask. It moves nothing and
+   * commits nobody — the supplier answers, and only then does a transfer
+   * exist for Transport to approve.
    */
   function submitForm() {
     if (!mine) return;
@@ -276,9 +271,7 @@
     const resource = $('tf-res').value;
     const amount = Number($('tf-amt').value || 1);
     pendingTransferAction = 'transfer';
-    socket.send(formMode === 'transfer'
-      ? { type: 'transfer_create', to: other, resource, amount }
-      : { type: 'transfer_request', from: other, to: SECTOR, resource, amount });
+    socket.send({ type: 'transfer_request', from: other, to: SECTOR, resource, amount });
   }
 
   function withdrawRequest(id) {
@@ -287,8 +280,8 @@
     socket.send({ type: 'request_cancel', id });
   }
 
-  /** Supplier consent: raises a transfer. Not approval — that is Transport's. */
-  function fulfillRequest(id) {
+  /** Supplier consent: raises the linked transfer. Not approval — that is Transport's. */
+  function acceptRequest(id) {
     pendingTransferAction = 'transfer';
     movementActing = id;
     socket.send({ type: 'request_fulfill', id });
@@ -388,13 +381,15 @@
     switch (msg.reason) {
       case 'capacity':
         return `TRANSPORT HAS USED ALL ${msg.capacity} STAMPS FOR THIS ${String(msg.basis || 'round').toUpperCase()}`;
-      case 'not_supplier':     return `ONLY ${msg.supplier || 'THE SUPPLYING SECTOR'} CAN FULFIL OR DECLINE THIS REQUEST`;
+      case 'not_supplier':     return `ONLY ${msg.supplier || 'THE SUPPLYING SECTOR'} CAN ACCEPT OR DECLINE THIS REQUEST`;
       case 'approval_trn_only': return 'ONLY TRANSPORT & TUNNELS CAN APPROVE RESOURCE TRANSFERS';
       case 'insufficient_stock_accept':
-        return `CANNOT FULFIL — WE HOLD ${msg.have} ${res}, THE REQUEST IS FOR ${msg.need}`;
+        return `CANNOT ACCEPT — WE HOLD ${msg.have} ${res}, THE REQUEST IS FOR ${msg.need}`;
       case 'insufficient_stock_stamp':
-        return `CANNOT APPROVE — SUPPLIER NO LONGER HAS ${msg.need} ${res}`;
-      case 'not_accepted':     return 'CANNOT APPROVE — THE SUPPLIER HAS NOT FULFILLED THIS REQUEST';
+        return 'SUPPLIER STOCK CHANGED — REQUEST CANNOT BE DELIVERED';
+      case 'direct_transfer_removed':
+        return 'SEND A REQUEST INSTEAD — THE SUPPLIER ACCEPTS, THEN TRN APPROVES';
+      case 'not_accepted':     return 'CANNOT APPROVE — THE SUPPLIER HAS NOT ACCEPTED THIS REQUEST';
       case 'chit_required':    return 'CANNOT APPROVE — PHYSICAL TRANSFER CHIT NOT CONFIRMED';
       case 'cancel_locked':    return 'ALREADY WITH TRANSPORT — ASK THE FACILITATOR TO CANCEL';
       case 'expired':          return 'THIS EXPIRED WHEN THE ROUND CHANGED';
@@ -730,25 +725,7 @@
     if (rules.notify_supplier_with_sound !== false) U.playSting('chime');
   }
 
-  /** REQUEST asks for stock; TRANSFER offers ours. Both exist on every screen. */
-  function setFormMode(mode) {
-    formMode = mode === 'transfer' ? 'transfer' : 'request';
-    for (const b of $('tf-tabs').querySelectorAll('button')) {
-      b.classList.toggle('on', b.dataset.mode === formMode);
-    }
-    for (const b of $('tf-tabs').querySelectorAll('button')) b.setAttribute('aria-selected', b.dataset.mode === formMode ? 'true' : 'false');
-    const offering = formMode === 'transfer';
-    setText($('tf-label'), offering ? 'SEND TO' : 'REQUEST FROM');
-    setText($('tf-res-label'), offering ? 'RESOURCE / WORKER' : 'RESOURCE');
-    setText($('tf-amt-label'), offering ? 'QUANTITY' : 'QTY');
-    setText($('tf-submit'), offering ? 'CREATE TRANSFER' : 'SEND REQUEST');
-    setText($('tf-hint'), offering
-      ? 'Creates a proposed movement. TRN must approve before stock or workers move. To answer a request, use FULFILL on its card — that links the transfer.'
-      : 'Ask another sector for stock. No resources move until a transfer is created and TRN approves it.');
-  }
-
-
-  // -- RESOURCE REQUESTS & TRANSFERS: one card per movement ------------------
+  // -- RESOURCE REQUESTS: one card per journey (v20) -------------------------
 
   /** "⚡ 1 POWER", "👤 2 WORKERS": the icon always with its word. */
   function movementItem(c) {
@@ -758,22 +735,27 @@
     return `${r.glyph} ${n} ${name}`;
   }
 
-  /** A transfer is a route; a request is who asked whom. */
+  /** Before the supplier answers, who asked whom; after, where the goods go. */
   function movementRoute(c) {
-    return c.kind === 'request' ? `${c.to} requested from ${c.from}` : `${c.from} → ${c.to}`;
+    return c.stage === 'REQUEST' ? `${c.to} requests from ${c.from}` : `${c.from} → ${c.to}`;
   }
 
+  /**
+   * One card for the whole journey: the request's reference the whole way,
+   * the words changing as it moves. The linked transfer is named underneath
+   * once it exists, because that is the number on the paper chit.
+   */
   function movementCard(c, { history = false } = {}) {
     const btns = [];
     if (!history && c.action_required) {
-      btns.push(`<button type="button" class="primary" data-fulfill="${esc(c.id)}"${c.can_fulfill ? '' : ' disabled title="Not enough stock to fulfil"'}>FULFILL</button>`);
+      btns.push(`<button type="button" class="primary" data-accept="${esc(c.id)}"${c.can_accept ? '' : ' disabled title="Not enough stock to send"'}>ACCEPT REQUEST</button>`);
       btns.push(`<button type="button" class="secondary" data-decline="${esc(c.id)}">DECLINE</button>`);
     }
     if (!history && c.can_withdraw) btns.push(`<button type="button" class="ghost" data-withdraw="${esc(c.id)}">WITHDRAW</button>`);
-    const linked = c.linked_id ? `<div class="mv-link">Linked to ${esc(c.linked_id)}</div>` : '';
-    const short = !history && c.action_required && !c.can_fulfill ? '<div class="mv-short">NOT ENOUGH STOCK TO FULFIL</div>' : '';
-    return `<article class="mv-card mv-${c.kind} dir-${c.direction}${c.action_required && !history ? ' act' : ''}" data-id="${esc(c.id)}" data-status="${esc(c.status)}">
-        <div class="mv-top"><span class="mv-id">${esc(c.id)}</span><span class="mv-dir">${c.direction}${c.kind === 'request' ? ' REQUEST' : ' TRANSFER'}</span></div>
+    const linked = c.transfer_id && c.transfer_id !== c.id ? `<div class="mv-link">Transfer ${esc(c.transfer_id)}${c.stage === 'TRANSFER' ? ' — chit with Transport' : ''}</div>` : '';
+    const short = !history && c.action_required && !c.can_accept ? '<div class="mv-short">NOT ENOUGH STOCK TO SEND</div>' : '';
+    return `<article class="mv-card mv-${c.kind} stage-${c.stage} dir-${c.direction}${c.action_required && !history ? ' act' : ''}" data-id="${esc(c.id)}" data-status="${esc(c.status)}">
+        <div class="mv-top"><span class="mv-id">${esc(c.id)}</span><span class="mv-dir">${c.direction}${c.action_required && !history ? ' · ACTION REQUIRED' : ''}</span></div>
         <div class="mv-route">${esc(movementRoute(c))}</div>
         <div class="mv-item">${esc(movementItem(c))}</div>
         <div class="mv-status" data-label="${esc(c.label)}">${esc(c.label)}</div>
@@ -784,7 +766,7 @@
   }
 
   function bindMovement(host) {
-    for (const b of host.querySelectorAll('[data-fulfill]')) b.addEventListener('click', () => fulfillRequest(b.dataset.fulfill));
+    for (const b of host.querySelectorAll('[data-accept]')) b.addEventListener('click', () => acceptRequest(b.dataset.accept));
     for (const b of host.querySelectorAll('[data-decline]')) b.addEventListener('click', () => declineRequest(b.dataset.decline));
     for (const b of host.querySelectorAll('[data-withdraw]')) b.addEventListener('click', () => withdrawRequest(b.dataset.withdraw));
   }
@@ -799,7 +781,7 @@
     const host = $('transfers');
     const html = active.length
       ? active.map((c) => movementCard(c)).join('')
-      : `<div class="empty"><b>${mv.active.length ? 'NOTHING ' + movementFilter : 'NO ACTIVE REQUESTS OR TRANSFERS'}</b><br>New activity will appear here.</div>`;
+      : `<div class="empty"><b>${mv.active.length ? 'NOTHING ' + movementFilter : 'NO ACTIVE RESOURCE REQUESTS'}</b><br>New requests will appear here.</div>`;
     if (host.dataset.sig !== html) { host.dataset.sig = html; host.innerHTML = html; bindMovement(host); }
 
     setText($('mv-history-count'), String(mv.history_total));
@@ -1443,7 +1425,7 @@
         card = document.createElement('article');
         card.className = 'q-card';
         card.innerHTML =
-          `<div class="q-top"><span class="q-n"></span><span class="q-route"></span><span class="q-wait"></span></div>` +
+          `<div class="q-top"><span class="q-n"></span><span class="q-route"></span><span class="q-ref"></span><span class="q-wait"></span></div>` +
           `<div class="q-item"></div>` +
           `<div class="q-chit-line"><span class="q-chitword"></span><span class="q-why" hidden></span></div>` +
           `<div class="q-actions">` +
@@ -1468,6 +1450,8 @@
 
       setText(card.querySelector('.q-n'), `#${String(i + 1).padStart(2, '0')}`);
       setText(card.querySelector('.q-route'), `${t.from} → ${t.to}`);
+      // The reference the two tables are holding: the request, not this transfer's own id.
+      setText(card.querySelector('.q-ref'), t.journey_id || t.id);
       setText(card.querySelector('.q-wait'), elapsedText(card.dataset.since));
       setText(card.querySelector('.q-item'), itemText(t));
       card.classList.toggle('workers', t.resource === 'workers');
