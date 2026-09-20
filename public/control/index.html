@@ -51,7 +51,14 @@
 
     <div class="tb-stat tb-clock">
       <span class="label">MASTER TIME <em id="clock-note"></em></span>
-      <b id="master-clock">--:--</b>
+      <!-- P0: one minute a click, right beside the clock. Admin only — no
+           participant screen carries these; the wall and the sectors show the
+           same time, read-only. -->
+      <div class="clock-row">
+        <button type="button" id="clock-minus" class="clock-step" data-clock-delta="-60" title="One minute off MASTER TIME">−</button>
+        <b id="master-clock">--:--</b>
+        <button type="button" id="clock-plus" class="clock-step" data-clock-delta="60" title="One minute on to MASTER TIME">+</button>
+      </div>
     </div>
 
     <div class="tb-stat">

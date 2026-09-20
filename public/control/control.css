@@ -57,6 +57,18 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: none;
 .tb-phase b { font-size: 15px; letter-spacing: 0.06em; }
 .tb-clock b { font-size: 30px; letter-spacing: 0.04em; color: var(--ink); }
 .tb-clock b.low { color: var(--red); }
+/* P0: [−] 15:00 [+] — the minute steps sit on the clock's own line, quiet
+   until the pointer is on them, and never push the digits around. */
+.clock-row { display: flex; align-items: center; gap: 8px; }
+.clock-step {
+  width: 26px; height: 26px; padding: 0; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 16px; line-height: 1; font-weight: 700;
+  color: var(--ink-faint); background: rgba(255,255,255,0.04);
+  border: 1px solid var(--line); border-radius: var(--r-pill);
+}
+.clock-step:hover:not(:disabled) { color: var(--ink); border-color: var(--ui-border-strong); background: rgba(255,255,255,0.09); }
+.clock-step:disabled { opacity: 0.28; cursor: default; }
 #core-value.low { color: var(--red); }
 #core-value.warn { color: #E8853A; }
 .pill { font-size: 10px; letter-spacing: 0.06em; padding: 2px 10px; border-radius: var(--r-pill); background: rgba(255,255,255,0.04); border: 1px solid var(--line); }

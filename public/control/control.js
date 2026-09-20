@@ -217,6 +217,27 @@
   $('btn-start').addEventListener('click', () => send({ type: 'clock', which: 'round', action: state && state.round_clock.remaining_s > 0 && !state.round_clock.running && state.phase !== 'SETUP' ? 'resume' : 'start' }));
   $('btn-pause').addEventListener('click', togglePause);
   function togglePause() { send({ type: state && state.paused ? 'resume' : 'pause' }); }
+
+  // -- P0: MASTER TIME by the minute, right beside the clock --------------------
+  // One click is one minute, applied at once and never below 00:00. The clock
+  // keeps whatever it was doing — running stays running, paused stays paused —
+  // and nothing else in the run moves. It still writes its own audit line, so
+  // the reason is the button itself rather than a dialog in the way.
+  for (const b of document.querySelectorAll('[data-clock-delta]')) {
+    b.addEventListener('click', () => {
+      if (!state) return;
+      const d = Number(b.dataset.clockDelta);
+      const now = Math.ceil(U.countdown(state.round_clock, state.frozen));
+      if (d < 0 && now <= 0) return;
+      send({
+        type: 'admin_override',
+        action: 'timer_adjust',
+        payload: { delta_s: d },
+        reason: `MASTER TIME ${d > 0 ? '+' : '−'}1 MIN (top bar)`,
+        run_id: state.run_id,
+      });
+    });
+  }
   $('btn-end-phase').addEventListener('click', () => {
     if (!confirm('STOP THE ROUND CLOCK at 00:00? The phase stays where it is — NEXT PHASE moves it on.')) return;
     send({ type: 'clock', which: 'round', action: 'end' });
@@ -1522,6 +1543,8 @@
     const rc = U.countdown(state.round_clock, state.frozen);
     $('master-clock').textContent = U.mmss(rc);
     $('master-clock').classList.toggle('low', rc <= 60 && state.round_clock.running);
+    // 00:00 is the floor, so the minute off goes quiet when there is none left.
+    $('clock-minus').disabled = Math.ceil(rc) <= 0;
     // 00:00 stops the clock and moves nothing; NEXT PHASE ends the round (and charges its upkeep).
     $('clock-note').textContent = state.paused ? '— PAUSED' : state.round_clock.running ? '— running · NEXT PHASE ends the round' : state.round_clock.started ? '— STOPPED' : '— not started';
     // v18: the timer popover reads the same clock
