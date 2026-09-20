@@ -73,6 +73,7 @@
       label: { x: 1530, y: 493, w: 254 }, badge: { x: 1530, y: 438 } },
   };
   const PANEL_ORDER = B.SECTOR_ORDER;                                // fixed: the room learns where each one lives
+  const IDENTITY = B.SECTOR_COLOUR;                                  // who a sector is — never how it is doing
   const BUILD_ORDER = ['WTR', 'POW', 'COM', 'MED', 'TRN', 'AGR'];   // paint order on the map
   const CORE = { x: 836, y: 398, r: 96, label: { x: 855, y: 295, w: 300 }, tunnel7: [[838, 548], [838, 612]] };
 
@@ -200,7 +201,7 @@
   function buildDistrict(code) {
     const d = DISTRICTS[code];
     const g = el('g', { class: 'district', id: `d-${code}`, 'data-sector': code, 'data-state': 'stable' });
-    g.style.setProperty('--accent', d.colour);
+    g.style.setProperty('--accent', IDENTITY[code] || d.colour);
     const pts = P(d.footprint);
     // state overlays on the artwork: greyscale copy when dark, then tint, dim, edge
     g.appendChild(image(MAP.src, { class: 'd-dark', x: 0, y: 0, width: MAP.w, height: MAP.h, 'clip-path': `url(#clip-${code})` }));
@@ -254,14 +255,14 @@
       card.className = 'shc';
       card.dataset.sector = code;
       card.dataset.state = 'stable';
-      card.style.setProperty('--accent', d.colour);
+      card.style.setProperty('--accent', IDENTITY[code] || d.colour);
+      card.dataset.report = 'none';
       card.innerHTML =
         `<img class="shc-icon" src="${ART}/icon-${code}.png" alt="">` +
         `<div class="shc-id"><b class="shc-code">${code}</b><span class="shc-name">${d.name}</span></div>` +
-        '<div class="shc-health"><span class="k">HEALTH</span><span class="shc-num"><b class="shc-pct">--</b><small>%</small></span></div>' +
+        '<div class="shc-health"><span class="k">HEALTH</span><span class="shc-num"><b class="shc-pct">—</b><small>%</small></span></div>' +
         '<div class="shc-status"><i class="shc-dot"></i><span class="shc-word">—</span></div>' +
-        '<div class="shc-rep"><span class="k">REPORTED</span><span class="rep-vals"></span><b class="rep-none" hidden>NO REPORT</b></div>' +
-        '<div class="shc-fresh" data-fresh="NOT UPDATED">NOT UPDATED</div>';
+        '<div class="shc-rep"><span class="rep-vals"></span><span class="rep-fresh" data-fresh="CURRENT"></span><b class="rep-none">AWAITING REPORT</b></div>';
       host.appendChild(card);
       cardEls[code] = card;
     }
@@ -287,23 +288,32 @@
     booted = true;
   }
 
+  /**
+   * The command bar. Round 0 is the briefing and says so — the room is not
+   * asked to read ROUND 0 — and the countdown's label names what it is
+   * counting to: the first round, the next one, or the end of a Council.
+   * The Core keeps the middle and the largest type on the bar.
+   */
   function renderHud() {
-    const phase = frame.mode === 'DEBRIEF' ? 'DEBRIEF'
-      : frame.mode === 'BRIEFING' ? 'BRIEFING'
-        : String(frame.round_name || frame.round || '').toUpperCase();
-    setText($('phase-name'), phase);
     const n = Number(frame.round_number);
-    setText($('round-number'), Number.isFinite(n) ? String(n) : '--');
-    setStat('hud-core', 'core-output', frame.core_output);
-    setText($('time-label'), inCouncil() ? 'COUNCIL ENDS IN' : 'NEXT ROUND IN');
+    const briefing = !Number.isFinite(n) || n <= 0;
+    const debrief = frame.mode === 'DEBRIEF';
+    setText($('phase-label'), debrief || briefing ? 'PHASE' : 'ROUND');
+    setText($('phase-value'), debrief ? 'DEBRIEF' : briefing ? 'BRIEFING' : String(n).padStart(2, '0'));
+
+    // CORE STABILITY: the value, and the condition in the same words the
+    // sectors use. The bands are the wall's existing ones.
+    const core = Number(frame.core_output);
+    setText($('core-output'), Number.isFinite(core) ? String(core) : '--');
+    const cs = B.coreStatus(core);
+    setText($('core-state'), cs.label);
+    const hudCore = $('hud-core');
+    if (hudCore.dataset.state !== cs.state) hudCore.dataset.state = cs.state;
+
+    setText($('time-label'), inCouncil() ? 'COUNCIL ENDS IN' : briefing ? 'ROUND 1 BEGINS IN' : 'NEXT ROUND IN');
     show($('tag-blackout'), !!(frame.blackout && frame.blackout.active));
     show($('tag-breather'), !!frame.breather);
     show($('tag-sensors'), !!frame.telemetry_degraded);
-  }
-  function setStat(id, valueId, v) {
-    setText($(valueId), Number.isFinite(v) ? String(v) : '--');
-    const cls = `hud-stat ${U.integrityClass(v)}`;
-    if ($(id).className !== cls) $(id).className = cls;
   }
 
   /** District state, its word when it is not fine, and the one fault indicator. */
@@ -367,29 +377,35 @@
    * old that is — a round, never a clock. The card and the district share
    * one state, decided once in B.healthState.
    */
+  /**
+   * The six monitors. Identity and condition are kept apart on purpose: the
+   * icon, the code and the left edge say WHO the sector is, and only the dot,
+   * the word and the health figure say HOW it is. Medical stays red without
+   * ever looking critical. A sector COM has not reported says so once, in
+   * place of its numbers, instead of repeating it in two lines.
+   */
   function renderCards() {
     const rows = (frame.broadcast && frame.broadcast.rows) || {};
+    setText($('h-reports'), B.reportSummary(rows, PANEL_ORDER).text);
     for (const code of PANEL_ORDER) {
       const card = cardEls[code];
       const s = frame.sectors && frame.sectors[code];
       if (!card || !s) continue;
-      if (s.colour) card.style.setProperty('--accent', s.colour);
       setText(card.querySelector('.shc-name'), sectorName(code));
       const state = B.healthState(s);
       if (card.dataset.state !== state) card.dataset.state = state;
-      setText(card.querySelector('.shc-pct'), String(clamp(s.integrity)));
-      setText(card.querySelector('.shc-word'), B.STATE_WORD[state]);
+      setText(card.querySelector('.shc-pct'), B.healthValue(s));   // never a fabricated 100
+      setText(card.querySelector('.shc-word'), B.CARD_WORD[state]);
 
       const rep = B.reportLine(rows[code]);
+      if (card.dataset.report !== (rep.none ? 'none' : 'yes')) card.dataset.report = rep.none ? 'none' : 'yes';
       const vals = card.querySelector('.rep-vals');
-      show(vals, !rep.none);
-      show(card.querySelector('.rep-none'), rep.none);
       if (!rep.none) {
         const html = rep.values.map((v) => `<span class="rv"><i>${v.glyph}</i><b>${U.escapeHtml(v.value)}</b></span>`).join('');
         if (vals.dataset.sig !== html) { vals.dataset.sig = html; vals.innerHTML = html; }
       }
-      const fresh = B.freshnessLine(rows[code]);
-      const fe = card.querySelector('.shc-fresh');
+      const fresh = B.freshnessShort(rows[code]);
+      const fe = card.querySelector('.rep-fresh');
       setText(fe, fresh.text);
       if (fe.dataset.fresh !== fresh.level) fe.dataset.fresh = fresh.level;
     }
@@ -532,7 +548,7 @@
       setText($('bc-msg'), a.headline ? String(a.message || '') : '');
       setText($('bc-by'), `— COMMS & SENSORS · ROUND ${a.round_number} · ${a.freshness}`);
     } else {
-      setText($('bc-head'), 'NO ACTIVE CITY BROADCAST');
+      setText($('bc-head'), 'STANDBY');      // compact: the band is quiet until COM speaks
       setText($('bc-msg'), '');
       setText($('bc-by'), '');
     }
@@ -601,7 +617,7 @@
     const running = !!(clockObj && clockObj.running) && !frozen;
     setText($('round-clock'), U.mmss(secs));
     const urgency = !running ? '' : secs <= 10 ? ' final' : secs <= 60 ? ' danger' : secs <= 120 ? ' warn' : '';
-    const cls = `hud-stat hud-time${council ? ' council' : ''}${urgency}`;
+    const cls = `hud-time${council ? ' council' : ''}${urgency}`;
     const hud = $('hud-time');
     if (hud.className !== cls) hud.className = cls;
 

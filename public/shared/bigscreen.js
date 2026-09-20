@@ -20,11 +20,81 @@
   const STATES = ['stable', 'degraded', 'critical', 'dark', 'brownout'];
   const STATE_WORD = { stable: 'STABLE', degraded: 'DEGRADED', critical: 'CRITICAL', dark: 'DARK', brownout: 'BROWNOUT' };
   const SECTOR_ORDER = ['POW', 'WTR', 'MED', 'TRN', 'AGR', 'COM'];
+  /**
+   * A sector's IDENTITY colour — who it is, never how it is doing. The Big
+   * Screen spec fixes these, and the card keeps them off the status: Medical
+   * is red because Medical is red, not because Medical is in trouble.
+   */
+  const SECTOR_COLOUR = {
+    POW: '#FFB31A', WTR: '#22C7F2', MED: '#FF4148', TRN: '#E7EDF2', AGR: '#66D72E', COM: '#A855F7',
+  };
+  /** A sector's OPERATIONAL colour — how it is doing, never who it is. */
+  const STATUS_COLOUR = {
+    stable: '#5DD68A', degraded: '#FFB83D', critical: '#FF555D', dark: '#8D98A1', brownout: '#FFB83D', unknown: '#8FA5B8',
+  };
+  /** The card's words. The map's state tag keeps the short STATE_WORD: its box is narrow. */
+  const CARD_WORD = {
+    stable: 'STABLE', degraded: 'DEGRADED', critical: 'CRITICAL', dark: 'DARK / OFFLINE', brownout: 'BROWNOUT',
+  };
+  const AWAITING_REPORT = 'AWAITING REPORT';
   const CORE_INSUFFICIENT = 60;          // the line the Council text already draws
   const ANNOUNCEMENT_MAX_AGE_S = 120;    // a facilitator announcement stays on the strip this long
   const MAX_ALERTS = 4;
 
   const clamp = (v) => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+
+  /**
+   * The Core's condition, from the bands the wall has always drawn it with
+   * (85 / 70 / 50 / 30) and the insufficiency line the Council text already
+   * uses. No new thresholds: the band decides, this only puts a word and a
+   * status colour on it so the room can read the Core at a glance.
+   */
+  function coreBand(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 'healthy';
+    if (n >= 85) return 'healthy';
+    if (n >= 70) return 'weaker';
+    if (n >= 50) return 'warning';
+    if (n >= 30) return 'unstable';
+    return 'critical';
+  }
+  function coreStatus(v) {
+    const band = coreBand(v);
+    const state = band === 'healthy' ? 'stable' : (band === 'weaker' || band === 'warning') ? 'degraded' : 'critical';
+    const insufficient = Number.isFinite(Number(v)) && Number(v) <= CORE_INSUFFICIENT;
+    return { band, state, label: insufficient ? 'CAPACITY INSUFFICIENT' : CARD_WORD[state], insufficient };
+  }
+
+  /**
+   * How many of the six COM has reported, as one line for the panel head. It
+   * replaces the NO REPORT / NOT UPDATED pair that used to repeat on every
+   * card; a card that is still waiting says AWAITING REPORT once.
+   */
+  function reportSummary(rows, order = SECTOR_ORDER) {
+    const r = rows || {};
+    const count = order.filter((c) => reported(r[c])).length;
+    return { reported: count, total: order.length, text: `REPORTS ${count}/${order.length}` };
+  }
+
+  /** The freshness of a report in the width a card has: R2, or R2 · STALE. */
+  function freshnessShort(row) {
+    const f = freshnessLine(row);
+    if (f.level === 'NOT UPDATED') return { level: f.level, text: '' };
+    return { level: f.level, text: f.level === 'CURRENT' ? `R${row.round_number}` : `R${row.round_number} · ${f.level}` };
+  }
+
+  /**
+   * A health value the room can trust: the number when the frame has one, an
+   * em dash when it does not. Nothing here invents 100.
+   */
+  function healthValue(s) {
+    const v = s ? s.integrity : undefined;
+    // null is "the frame did not carry one", which is not the same as 0 — a DARK
+    // sector really is at 0 and says so.
+    if (v === null || v === undefined || v === '') return '—';
+    const n = Number(v);
+    return Number.isFinite(n) ? String(clamp(n)) : '—';
+  }
 
   /**
    * A sector's health state, from the server's status word so the wall never
@@ -134,6 +204,8 @@
 
   return {
     RES_ORDER, GLYPH, RES_NAME, STATES, STATE_WORD, SECTOR_ORDER, CORE_INSUFFICIENT, ANNOUNCEMENT_MAX_AGE_S, MAX_ALERTS,
-    clamp, healthState, healthWord, reported, freshnessLine, reportLine, transferAlert, buildAlerts,
+    SECTOR_COLOUR, STATUS_COLOUR, CARD_WORD, AWAITING_REPORT,
+    clamp, healthState, healthWord, reported, freshnessLine, freshnessShort, reportLine, reportSummary,
+    healthValue, coreBand, coreStatus, transferAlert, buildAlerts,
   };
 });

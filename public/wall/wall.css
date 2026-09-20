@@ -11,12 +11,40 @@
 .wall {
   position: relative;
   width: 100vw; height: 100vh;
-  display: grid; grid-template-rows: 9vh auto minmax(0, 1fr) 11vh;
-  background: var(--bg); overflow: hidden;
+  /* command bar · alert strip (only when it exists) · the city · the broadcast,
+     which is a thin line on standby and opens when COM speaks */
+  display: grid; grid-template-rows: 10vh auto minmax(0, 1fr) auto;
+  background: var(--screen-bg); color: var(--screen-ink); overflow: hidden;
+
+  /* -- the Big Screen's own palette (spec 1.0.0). Scoped here: the sector
+     laptops and Admin keep the shared tokens in /shared/base.css. ---------- */
+  --screen-bg: #070B10;
+  --panel-soft: rgba(12, 19, 26, 0.82);
+  --panel-strong: rgba(10, 16, 22, 0.94);
+  --edge: rgba(112, 148, 174, 0.22);
+  --hud-cyan: #38C8FF;
+  --hud-blue: #2D83FF;
+  --screen-ink: #F3F7FA;
+  --screen-ink-dim: #8FA5B8;
+  --screen-ink-faint: #5F7688;
+  /* condition, never identity */
+  --st-stable: #5DD68A;
+  --st-degraded: #FFB83D;
+  --st-critical: #FF555D;
+  --st-offline: #8D98A1;
+  --core-accent: #FF9D2E;
+  /* identity, never condition — the same six the cards and the map pills use */
+  --sec-POW: #FFB31A;
+  --sec-WTR: #22C7F2;
+  --sec-MED: #FF4148;
+  --sec-TRN: #E7EDF2;
+  --sec-AGR: #66D72E;
+  --sec-COM: #A855F7;
+
   --cmd: clamp(26px, 4vh, 52px);        /* command: an alert's head */
   --status: clamp(18px, 2.6vh, 32px);   /* status: words the room reads */
   --detail: clamp(13px, 1.7vh, 20px);   /* detail: secondary data */
-  --num: clamp(34px, 5.4vh, 62px);      /* the big numbers: round, core, clock */
+  --num: clamp(34px, 5.4vh, 62px);      /* the big numbers: core and the clock */
 }
 [hidden] { display: none !important; }
 .clock { font-variant-numeric: tabular-nums; }
@@ -25,50 +53,57 @@
 
 .hud {
   display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
-  padding: 0 1.8vw; border-bottom: 1px solid #161c22;
-  background: linear-gradient(180deg, #0e1216, #0a0c0e); z-index: 3;
+  padding: 0 1.8vw; border-bottom: 1px solid var(--edge);
+  background: linear-gradient(180deg, rgba(14,20,27,0.96), rgba(7,11,16,0.96)); z-index: 3;
 }
-.hud-brand { display: flex; align-items: baseline; gap: 1.2vw; }
-.hud-brand h1 { font-size: clamp(22px, 3.3vh, 38px); letter-spacing: 0.3em; font-weight: 700; margin: 0; }
-.hud-phase { font-size: var(--detail); letter-spacing: 0.22em; color: var(--ink-dim); font-weight: 700; }
 
-.hud-stats { display: flex; gap: 4vw; }
-.hud-stat { display: flex; flex-direction: column; align-items: center; gap: 0; }
-.hud-stat .k { font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.3em; color: var(--ink-faint); white-space: nowrap; }
-.hud-stat b { font-size: var(--num); line-height: 1; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; font-weight: 700; }
-.hud-stat b small { font-size: 0.45em; margin-left: 2px; color: var(--ink-dim); font-weight: 400; }
-/* quiet when fine; colour only when the number is a problem */
-.hud-stat.warn b { color: var(--amber); }
-.hud-stat.critical b, .hud-stat.dark b { color: var(--red); }
-.wall.core-low #hud-core b { color: var(--red); animation: wallPulse 2.4s ease-in-out infinite; }
-.wall.core-low #hud-core .k { color: var(--red); }
-/* the round clock: neutral, amber under 2:00, red under 1:00, a controlled pulse in the last ten seconds */
-.hud-time b { color: var(--ink); }
-.hud-time.warn b { color: var(--amber); }
-.hud-time.danger b { color: var(--red); }
-.hud-time.final b { color: var(--red); animation: wallPulse 1s ease-in-out infinite; }
-.hud-time.council .k { color: var(--purple); }
-.hud-time.council b { color: var(--purple); }
+/* LEFT: who the city is, and where the session is. */
+.hud-brand { display: flex; align-items: center; gap: 1.6vw; min-width: 0; }
+.hud-mark { display: flex; flex-direction: column; gap: 0.2vh; min-width: 0; }
+.hud-mark h1 { font-size: clamp(22px, 3.2vh, 38px); letter-spacing: 0.26em; font-weight: 700; margin: 0; color: var(--screen-ink); }
+.hud-sub { font-size: clamp(9px, 1.15vh, 13px); letter-spacing: 0.26em; color: var(--screen-ink-faint); white-space: nowrap; }
+.hud-phase { display: flex; flex-direction: column; gap: 0; padding-left: 1.4vw; border-left: 1px solid var(--edge); }
+.hud-phase .k { font-size: clamp(10px, 1.35vh, 15px); letter-spacing: 0.3em; color: var(--screen-ink-faint); font-weight: 700; }
+.hud-phase b { font-size: clamp(22px, 3.4vh, 42px); line-height: 1.05; letter-spacing: 0.1em; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--screen-ink); }
 
-.hud-right { justify-self: end; display: flex; align-items: center; gap: 1.2vw; }
+/* CENTRE: the Core. The loudest metric on the bar, and the only one with a word under it. */
+.hud-core { display: flex; flex-direction: column; align-items: center; gap: 0; justify-self: center; }
+.hud-core .k { font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.3em; color: var(--screen-ink-dim); white-space: nowrap; }
+.hud-core b { font-size: clamp(40px, 6.4vh, 74px); line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--core-accent); }
+.hud-core b small { font-size: 0.42em; margin-left: 2px; color: var(--screen-ink-dim); font-weight: 400; }
+.core-state { font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.24em; font-weight: 700; color: var(--st-stable); white-space: nowrap; }
+.hud-core[data-state="degraded"] b, .hud-core[data-state="degraded"] .core-state { color: var(--st-degraded); }
+.hud-core[data-state="critical"] b, .hud-core[data-state="critical"] .core-state { color: var(--st-critical); }
+.hud-core[data-state="critical"] b { animation: wallPulse 2.6s ease-in-out infinite; }
+
+/* RIGHT: the countdown, the session tags, the feed. */
+.hud-right { justify-self: end; display: flex; align-items: center; gap: 1.4vw; }
+.hud-time { display: flex; flex-direction: column; align-items: flex-end; gap: 0; }
+.hud-time .k { font-size: clamp(10px, 1.35vh, 15px); letter-spacing: 0.26em; color: var(--screen-ink-faint); white-space: nowrap; font-weight: 700; }
+.hud-time b { font-size: clamp(30px, 4.6vh, 54px); line-height: 1; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--screen-ink); }
+.hud-time.warn b { color: var(--st-degraded); }
+.hud-time.danger b { color: var(--st-critical); }
+.hud-time.final b { color: var(--st-critical); animation: wallPulse 1.2s ease-in-out infinite; }
+.hud-time.council .k, .hud-time.council b { color: var(--purple); }
+
 .hud-tags { display: flex; gap: 0.6vw; }
 .tag {
   font-size: clamp(10px, 1.3vh, 14px); letter-spacing: 0.2em; padding: 0.6vh 0.8vw;
-  border: 1px solid var(--line); color: var(--ink-dim); background: #0c1013;
+  border: 1px solid var(--edge); color: var(--screen-ink-dim); background: var(--panel-soft);
 }
-.tag-blackout { color: var(--amber); border-color: #4a3410; animation: wallPulse 1.8s ease-in-out infinite; }
-.tag-breather { color: var(--green); border-color: #1d4a2a; }
-.tag-sensors { color: var(--purple); border-color: #3a2a4a; }
+.tag-blackout { color: var(--st-degraded); border-color: rgba(255,184,61,0.4); animation: wallPulse 2.2s ease-in-out infinite; }
+.tag-breather { color: var(--st-stable); border-color: rgba(93,214,138,0.4); }
+.tag-sensors { color: var(--sec-COM, #A855F7); border-color: rgba(168,85,247,0.4); }
 
 /* the feed: LIVE, DELAYED on silence, RECONNECTING on a drop */
 .live { display: flex; align-items: center; gap: 0.5vw; font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.3em; font-weight: 700; color: var(--ink-dim); }
 .live .dot { width: 1.1vh; height: 1.1vh; border-radius: 50%; background: var(--ink-faint); flex-shrink: 0; }
-.live[data-status="live"] { color: var(--green); }
-.live[data-status="live"] .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
-.live[data-status="stale"] { color: var(--amber); }
-.live[data-status="stale"] .dot { background: var(--amber); }
-.live[data-status="down"] { color: var(--red); }
-.live[data-status="down"] .dot { background: var(--red); animation: wallPulse 1s ease-in-out infinite; }
+.live[data-status="live"] { color: var(--st-stable); }
+.live[data-status="live"] .dot { background: var(--st-stable); box-shadow: 0 0 8px rgba(93,214,138,0.7); animation: livePulse 2.8s ease-in-out infinite; }
+.live[data-status="stale"] { color: var(--st-degraded); }
+.live[data-status="stale"] .dot { background: var(--st-degraded); }
+.live[data-status="down"] { color: var(--st-critical); }
+.live[data-status="down"] .dot { background: var(--st-critical); animation: wallPulse 1.4s ease-in-out infinite; }
 
 /* -- 2. ALERT STRIP: only while something needs the room ---------------------- */
 
@@ -148,9 +183,12 @@
 #map.debug .d-edge { opacity: 1 !important; stroke: #00e5ff !important; stroke-dasharray: none !important; animation: none !important; }
 
 /* the label pill: icon + name, covering the painted callout */
-.l-bg { fill: #0b0e12; stroke: var(--accent); stroke-width: 2; }
-.l-text { font-size: 22px; letter-spacing: 0.18em; font-weight: 700; fill: #e6edf3; }
-.core-label .l-bg { stroke: #f0b64a; }
+/* The animation already names its districts, so these sit lighter: a thin
+   technical tag, not a button, dark enough to read over any frame. */
+.l-bg { fill: rgba(10, 16, 22, 0.78); stroke: var(--accent); stroke-width: 1.5; stroke-opacity: 0.75; }
+.l-text { font-size: 22px; letter-spacing: 0.16em; font-weight: 700; fill: #F3F7FA; }
+.core-label .l-bg { stroke: var(--core-accent); stroke-opacity: 1; stroke-width: 2.5; fill: rgba(10, 16, 22, 0.9); }
+.core-label .l-text { fill: #FFE3B8; }
 .district[data-state="dark"] .l-text { fill: #7d8b97; }
 .district[data-state="dark"] .l-icon { opacity: 0.4; }
 .district[data-state="dark"] .l-bg { stroke: #3a444e; }
@@ -227,91 +265,94 @@
 .cycle-flash span { font-size: var(--status); letter-spacing: 0.08em; color: var(--ink-dim); text-align: center; }
 .cycle-flash span:empty { display: none; }
 
-/* -- SECTOR HEALTH: six monitors in a fixed order ----------------------------- */
+/* -- SECTOR STATUS: six monitors in a fixed order ---------------------------
+   Identity and condition never share a colour. The icon, the code and the
+   left edge are WHO the sector is; the dot, the word and the health figure
+   are HOW it is. Medical is red because Medical is red. */
 
 .health {
   display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0;
-  border-left: 1px solid #161c22; background: #0b0e12; padding: 1vh 0.9vw 1vh 0.9vw;
+  border-left: 1px solid var(--edge); background: rgba(9, 13, 18, 0.9); padding: 1vh 0.9vw;
 }
-.h-title { font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.34em; color: var(--ink-faint); margin: 0 0 0.8vh 0.2vw; font-weight: 700; }
+.h-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6vw; margin: 0 0.2vw 0.8vh; }
+.h-title { font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.3em; color: var(--screen-ink-dim); margin: 0; font-weight: 700; }
+/* one count instead of six repetitions of the same sentence */
+.h-reports { font-size: clamp(10px, 1.4vh, 15px); letter-spacing: 0.2em; color: var(--screen-ink-faint); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .h-cards { display: grid; grid-template-rows: repeat(6, minmax(0, 1fr)); gap: 0.7vh; min-height: 0; }
 
 .shc {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto auto auto;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto auto;
   column-gap: 0.8vw; row-gap: 0.15vh; align-items: center; min-height: 0; overflow: hidden;
   padding: 0.6vh 0.9vw 0.6vh 0.8vw;
-  background: #10151a; border: 1px solid #1b232b; border-left: 6px solid var(--accent);
-  --accent: #9A9A9A;
+  background: var(--panel-soft); border: 1px solid var(--edge); border-left: 4px solid var(--accent);
+  --accent: #8D98A1;
 }
-.shc .k { font-size: clamp(9px, 1.25vh, 14px); letter-spacing: 0.3em; color: var(--ink-faint); font-weight: 700; white-space: nowrap; }
-.shc-icon { grid-column: 1; grid-row: 1 / 3; width: clamp(28px, 4.4vh, 48px); height: clamp(28px, 4.4vh, 48px); object-fit: contain; align-self: center; }
+.shc .k { font-size: clamp(9px, 1.25vh, 14px); letter-spacing: 0.3em; color: var(--screen-ink-faint); font-weight: 700; white-space: nowrap; }
+.shc-icon { grid-column: 1; grid-row: 1 / 3; width: clamp(28px, 4.2vh, 46px); height: clamp(28px, 4.2vh, 46px); object-fit: contain; align-self: center; }
 .shc-id { grid-column: 2; grid-row: 1; display: flex; align-items: baseline; gap: 0.6vw; min-width: 0; }
+/* identity */
 .shc-code { font-size: clamp(16px, 2.3vh, 26px); font-weight: 700; letter-spacing: 0.1em; color: var(--accent); }
-.shc-name { font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.08em; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.shc-name { font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.06em; color: var(--screen-ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* condition */
 .shc-status { grid-column: 2; grid-row: 2; display: flex; align-items: center; gap: 0.5vw; }
-.shc-dot { width: 1.1vh; height: 1.1vh; border-radius: 50%; background: var(--green); flex-shrink: 0; }
-.shc-word { font-size: clamp(14px, 2.1vh, 24px); letter-spacing: 0.18em; font-weight: 700; color: var(--green); white-space: nowrap; }
-/* HEALTH %: the number the room reads first */
+.shc-dot { width: 1.1vh; height: 1.1vh; border-radius: 50%; background: var(--st-stable); flex-shrink: 0; }
+.shc-word { font-size: clamp(13px, 2vh, 23px); letter-spacing: 0.16em; font-weight: 700; color: var(--st-stable); white-space: nowrap; }
 .shc-health { grid-column: 3; grid-row: 1 / 3; justify-self: end; display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }
 .shc-num { font-variant-numeric: tabular-nums; line-height: 1; }
-.shc-pct { font-size: clamp(30px, 4.4vh, 50px); font-weight: 700; }
-.shc-num small { font-size: clamp(13px, 1.9vh, 22px); color: var(--ink-dim); margin-left: 2px; }
-/* what COM reported for this sector: POWER · WATER · MEDICAL · PARTS, spaced to be read apart */
-.shc-rep { grid-column: 1 / 4; grid-row: 3; display: flex; align-items: baseline; gap: 1vw; min-width: 0; margin-top: 0.3vh; }
-.rep-vals { display: flex; gap: 1.1vw; min-width: 0; font-size: clamp(16px, 2.2vh, 26px); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.shc-pct { font-size: clamp(30px, 4.4vh, 50px); font-weight: 700; color: var(--st-stable); }
+.shc-num small { font-size: clamp(13px, 1.9vh, 22px); color: var(--screen-ink-faint); margin-left: 2px; }
+
+/* what COM reported, and how fresh it is — or, once, that it has not reported */
+.shc-rep { grid-column: 1 / 4; grid-row: 3; display: flex; align-items: baseline; gap: 0.9vw; min-width: 0; margin-top: 0.3vh; }
+.rep-vals { display: flex; gap: 1vw; min-width: 0; font-size: clamp(15px, 2.1vh, 25px); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rep-vals .rv { display: inline-flex; align-items: baseline; gap: 0.35vw; }
 .rep-vals .rv i { font-style: normal; font-size: 0.85em; }
-.rep-vals .rv b { color: var(--ink); font-weight: 700; }
-.rep-none { font-size: clamp(15px, 2.1vh, 24px); letter-spacing: 0.22em; color: var(--amber); font-weight: 700; }
-/* how fresh that report is: quiet when current, loud when it is not */
-.shc-fresh { grid-column: 1 / 4; grid-row: 4; font-size: clamp(12px, 1.7vh, 19px); letter-spacing: 0.16em; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.shc-fresh[data-fresh="CURRENT"] { color: var(--ink-faint); font-weight: 400; }
-.shc-fresh[data-fresh="STALE"] { color: var(--amber); }
-.shc-fresh[data-fresh="OUTDATED"], .shc-fresh[data-fresh="NOT UPDATED"] { color: var(--red); }
-.shc-fresh[data-fresh="OUTDATED"]::before, .shc-fresh[data-fresh="NOT UPDATED"]::before { content: '▲ '; }
+.rep-vals .rv b { color: var(--screen-ink); font-weight: 700; }
+.rep-fresh { font-size: clamp(10px, 1.45vh, 15px); letter-spacing: 0.14em; font-weight: 700; color: var(--screen-ink-faint); white-space: nowrap; }
+.rep-fresh[data-fresh="STALE"] { color: var(--st-degraded); }
+.rep-fresh[data-fresh="OUTDATED"] { color: var(--st-critical); }
+.rep-none { font-size: clamp(15px, 2vh, 23px); letter-spacing: 0.18em; color: var(--screen-ink-faint); font-weight: 700; }
+.shc[data-report="yes"] .rep-none { display: none; }
+.shc[data-report="none"] .rep-vals, .shc[data-report="none"] .rep-fresh { display: none; }
 
-/* the card's state: colour, word, icon and number always travel together; only CRITICAL moves */
-.shc[data-state="degraded"] .shc-dot { background: var(--amber); }
-.shc[data-state="degraded"] .shc-word, .shc[data-state="degraded"] .shc-pct { color: var(--amber); }
-.shc[data-state="critical"] { border-color: #4a1c1c; border-left-color: var(--red); background: #160d0d; }
-.shc[data-state="critical"] .shc-dot { background: var(--red); animation: wallPulse 2.6s ease-in-out infinite; }
-.shc[data-state="critical"] .shc-word, .shc[data-state="critical"] .shc-pct { color: var(--red); }
-.shc[data-state="brownout"] { border-left-style: dashed; }
-.shc[data-state="brownout"] .shc-dot { background: var(--amber); }
-.shc[data-state="brownout"] .shc-word { color: var(--amber); }
-.shc[data-state="dark"] { background: #0b0d10; border-color: #1a1f25; border-left-color: #3a444e; }
-.shc[data-state="dark"] .shc-dot { background: #5a1f1f; }
-.shc[data-state="dark"] .shc-word { color: #c07070; }
-.shc[data-state="dark"] .shc-pct { color: #4d5b67; }
-.shc[data-state="dark"] .shc-icon { opacity: 0.4; filter: grayscale(1); }
-.shc[data-state="dark"] .shc-code { color: #7d8b97; }
-.shc.lit { box-shadow: inset 0 0 0 1px var(--accent); }
-.shc.sweep { animation: cardSweep 1.4s ease-out 1; }
+/* condition, on the dot, the word and the figure — never on the identity edge */
+.shc[data-state="degraded"] .shc-dot { background: var(--st-degraded); }
+.shc[data-state="degraded"] .shc-word, .shc[data-state="degraded"] .shc-pct { color: var(--st-degraded); }
+.shc[data-state="critical"] { background: rgba(38, 14, 17, 0.9); box-shadow: inset 0 0 0 1px rgba(255, 85, 93, 0.55); }
+.shc[data-state="critical"] .shc-dot { background: var(--st-critical); animation: wallPulse 2.6s ease-in-out infinite; }
+.shc[data-state="critical"] .shc-word, .shc[data-state="critical"] .shc-pct { color: var(--st-critical); }
+.shc[data-state="brownout"] .shc-dot { background: var(--st-degraded); }
+.shc[data-state="brownout"] .shc-word, .shc[data-state="brownout"] .shc-pct { color: var(--st-degraded); }
+.shc[data-state="dark"] { opacity: 0.62; }
+.shc[data-state="dark"] .shc-dot { background: var(--st-offline); }
+.shc[data-state="dark"] .shc-word, .shc[data-state="dark"] .shc-pct { color: var(--st-offline); }
 
-/* -- 4. CITY BROADCAST ---------------------------------------------------------- */
+/* -- 4. CITY BROADCAST -------------------------------------------------------
+   Standby is one quiet line. A live broadcast opens the band once and then
+   holds still: the room reads it, it does not perform. */
 
 .broadcast {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 2vw;
-  padding: 0 1.8vw; border-top: 1px solid #161c22; background: #0d1014; z-index: 3; min-height: 0;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1.4vw;
+  padding: 0.9vh 1.8vw; border-top: 1px solid var(--edge); background: var(--panel-strong); z-index: 3;
 }
-.bc-tag { font-size: clamp(12px, 1.7vh, 18px); letter-spacing: 0.3em; color: var(--blue); font-weight: 700; white-space: nowrap; }
-.bc-body { display: flex; flex-direction: column; gap: 0.3vh; min-width: 0; }
-.bc-head { font-size: clamp(22px, 3.4vh, 42px); font-weight: 700; line-height: 1.1; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bc-msg {
-  font-size: clamp(16px, 2.3vh, 28px); line-height: 1.2; letter-spacing: 0.04em; color: var(--ink-dim); text-transform: uppercase;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
+.bc-tag { font-size: clamp(10px, 1.4vh, 15px); letter-spacing: 0.26em; color: var(--screen-ink-faint); font-weight: 700; white-space: nowrap; }
+.bc-body { display: flex; flex-direction: column; gap: 0.2vh; min-width: 0; }
+.bc-head { font-size: clamp(16px, 2.2vh, 26px); font-weight: 700; letter-spacing: 0.14em; color: var(--screen-ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bc-msg { font-size: clamp(13px, 1.8vh, 21px); line-height: 1.25; letter-spacing: 0.04em; color: var(--screen-ink-dim); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .bc-msg:empty { display: none; }
-.bc-by { font-size: clamp(12px, 1.7vh, 18px); letter-spacing: 0.12em; color: var(--ink-dim); white-space: nowrap; }
+.bc-by { font-size: clamp(10px, 1.4vh, 15px); letter-spacing: 0.14em; color: var(--screen-ink-faint); white-space: nowrap; }
 .bc-by:empty { display: none; }
-.broadcast[data-state="none"] .bc-head { color: var(--ink-faint); font-weight: 400; letter-spacing: 0.24em; font-size: clamp(16px, 2.4vh, 30px); }
-.broadcast.enter { animation: bcIn 0.6s ease; }
-.wall.council .broadcast { opacity: 0.7; }
+
+/* live: taller, brighter, the amber of an announcement that matters */
+.broadcast[data-state="live"] { padding: 1.6vh 1.8vw; background: linear-gradient(180deg, rgba(22,18,10,0.96), rgba(10,16,22,0.96)); border-top: 2px solid var(--st-degraded); }
+.broadcast[data-state="live"] .bc-tag { color: var(--st-degraded); }
+.broadcast[data-state="live"] .bc-head { font-size: clamp(24px, 3.4vh, 44px); letter-spacing: 0.06em; color: var(--screen-ink); }
+.broadcast.enter { animation: bcIn 0.45s ease; }
 
 /* -- takeovers ------------------------------------------------------------------- */
 
 .takeover {
-  position: absolute; left: 0; right: 0; top: 9vh; bottom: 11vh; z-index: 8;
+  position: absolute; left: 0; right: 0; top: 10vh; bottom: 0; z-index: 8;
   display: flex; align-items: center; justify-content: center; text-align: center;
   background: rgba(6,8,10,0.72);
 }
@@ -348,6 +389,7 @@
 
 /* -- keyframes --------------------------------------------------------------------- */
 
+@keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 @keyframes wallPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @keyframes tintPulse { 0%, 100% { opacity: 0.18; } 50% { opacity: 0.42; } }
 @keyframes alarmGlow { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.65; } }

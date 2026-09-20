@@ -18,18 +18,35 @@
 -->
 <div class="wall" id="wall" data-core="healthy">
 
-  <!-- 1. COMMAND BAR: identity and phase, CURRENT ROUND, CORE STABILITY, NEXT ROUND IN, LIVE -->
+  <!--
+    1. COMMAND BAR. Left: who the city is and where the session is — PHASE
+    BRIEFING before Round 1, ROUND 01 after it. Centre: CORE STABILITY, the
+    loudest thing on the bar. Right: the countdown, whose label says what it
+    is counting to, then the tags and the LIVE feed.
+  -->
   <header class="hud">
     <div class="hud-brand">
-      <h1>HAVEN-9</h1>
-      <span class="hud-phase" id="phase-name">—</span>
+      <div class="hud-mark">
+        <h1>HAVEN-9</h1>
+        <span class="hud-sub">SUBTERRANEAN CONTINUITY AUTHORITY</span>
+      </div>
+      <div class="hud-phase" id="hud-phase">
+        <span class="k" id="phase-label">PHASE</span>
+        <b id="phase-value">—</b>
+      </div>
     </div>
-    <div class="hud-stats">
-      <div class="hud-stat" id="hud-round"><span class="k">CURRENT ROUND</span><b id="round-number">--</b></div>
-      <div class="hud-stat" id="hud-core"><span class="k">CORE STABILITY</span><b><span id="core-output">--</span><small>%</small></b></div>
-      <div class="hud-stat hud-time" id="hud-time"><span class="k" id="time-label">NEXT ROUND IN</span><b class="clock" id="round-clock">--:--</b></div>
+
+    <div class="hud-core" id="hud-core" data-state="stable">
+      <span class="k">CORE STABILITY</span>
+      <b><span id="core-output">--</span><small>%</small></b>
+      <span class="core-state" id="core-state">—</span>
     </div>
+
     <div class="hud-right">
+      <div class="hud-time" id="hud-time">
+        <span class="k" id="time-label">NEXT ROUND IN</span>
+        <b class="clock" id="round-clock">--:--</b>
+      </div>
       <div class="hud-tags">
         <span class="tag tag-blackout" id="tag-blackout" hidden>ROLLING BLACKOUT</span>
         <span class="tag tag-breather" id="tag-breather" hidden>BREATHER</span>
@@ -65,17 +82,25 @@
       </div>
     </section>
 
+    <!-- Six sectors, always in the same order, each one identity first and condition second. -->
     <aside class="health" id="health">
-      <h2 class="h-title">SECTOR HEALTH</h2>
+      <div class="h-head">
+        <h2 class="h-title">SECTOR STATUS</h2>
+        <span class="h-reports" id="h-reports">REPORTS 0/6</span>
+      </div>
       <div class="h-cards" id="h-cards"></div>
     </aside>
   </main>
 
   <!-- 4. CITY BROADCAST: what COM told the city, readable from the back of the room -->
+  <!--
+    4. CITY BROADCAST. A thin standby line while COM has said nothing, and a
+    band that opens once when COM speaks. It never scrolls and never loops.
+  -->
   <footer class="broadcast" id="broadcast" data-state="none">
     <div class="bc-tag">📡 CITY BROADCAST</div>
     <div class="bc-body">
-      <b class="bc-head" id="bc-head">NO ACTIVE CITY BROADCAST</b>
+      <b class="bc-head" id="bc-head">STANDBY</b>
       <span class="bc-msg" id="bc-msg"></span>
     </div>
     <div class="bc-by" id="bc-by"></div>

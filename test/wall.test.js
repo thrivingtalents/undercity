@@ -137,7 +137,7 @@ test('a stable or degraded sector never moves; critical breathes slowly; dark is
   for (const r of infinite) {
     assert.ok(!/data-state="(stable|degraded)"/.test(r.sel), `${r.sel} animates a calm state`);
     assert.ok(!/^\.(district|shc)$/.test(r.sel) && !/^\.(district|shc) /.test(r.sel), `${r.sel} animates every sector`);
-    assert.ok(/critical|dark|core-low|final|blackout|breach|unstable|b-crisis|moving|down/.test(r.sel), `${r.sel} moves for no state`);
+    assert.ok(/critical|dark|core-low|final|blackout|breach|unstable|b-crisis|moving|down|live/.test(r.sel), `${r.sel} moves for no state`);
   }
   for (const r of infinite.filter((x) => /data-state="critical"/.test(x.sel))) {
     const m = r.body.match(/animation:[^;]*?(\d+(?:\.\d+)?)s/);
@@ -218,23 +218,64 @@ test('freshness: CURRENT this round, STALE one round on, OUTDATED after two, NOT
   game.setRound('R4');
   assert.deepEqual(B.freshnessLine(wallRows(game).POW), { level: 'OUTDATED', text: 'UPDATED ROUND 2 · OUTDATED' });
   assert.equal(B.freshnessLine(null).text, 'NOT UPDATED');
-  // quiet when current, noticeable when stale, loud when outdated or never updated
-  assert.ok(/\.shc-fresh\[data-fresh="CURRENT"\] \{[^}]*ink-faint/.test(WALL_CSS));
-  assert.ok(/\.shc-fresh\[data-fresh="STALE"\] \{[^}]*amber/.test(WALL_CSS));
-  assert.ok(/\.shc-fresh\[data-fresh="OUTDATED"\], \.shc-fresh\[data-fresh="NOT UPDATED"\] \{[^}]*red/.test(WALL_CSS));
-  assert.ok(/B\.freshnessLine/.test(WALL_SCRIPT));
+  // On the card the level is one short marker: R2, R2 · STALE, R2 · OUTDATED.
+  // A sector COM never reported has no marker at all — it says AWAITING REPORT once.
+  assert.deepEqual(B.freshnessShort(wallRows(game).POW), { level: 'OUTDATED', text: 'R2 · OUTDATED' });
+  assert.deepEqual(B.freshnessShort(wallRows(game).WTR), { level: 'NOT UPDATED', text: '' });
+  game.setBroadcastRow('MED', { med: 1 }, { by: 'COM' });
+  assert.deepEqual(B.freshnessShort(wallRows(game).MED), { level: 'CURRENT', text: 'R4' });
+  assert.ok(/\.rep-fresh \{[^}]*screen-ink-faint/.test(WALL_CSS), 'a current report is not quiet');
+  assert.ok(/\.rep-fresh\[data-fresh="STALE"\] \{[^}]*st-degraded/.test(WALL_CSS));
+  assert.ok(/\.rep-fresh\[data-fresh="OUTDATED"\] \{[^}]*st-critical/.test(WALL_CSS));
+  assert.ok(/B\.freshnessShort/.test(WALL_SCRIPT));
 });
 
-test('NO REPORT stands alone — no dashes, no glyph row — and a partial report shows what COM gave', () => {
+test('a sector COM has not reported says AWAITING REPORT once, and the panel counts the six', () => {
   const game = running();
-  const none = B.reportLine(wallRows(game).WTR);
-  assert.deepEqual(none, { none: true, text: 'NO REPORT', values: [] });
-  assert.ok(/NO REPORT/.test(WALL_SCRIPT), 'the card has no NO REPORT');
-  assert.ok(!/NO REPORT'\s*:\s*`R\$/.test(WALL_SCRIPT), 'the old dash row is back');
+  assert.deepEqual(B.reportLine(wallRows(game).WTR), { none: true, text: 'NO REPORT', values: [] });
+  // The card prints one phrase in place of the numbers; the old pair of
+  // NO REPORT + NOT UPDATED on every card is gone.
+  assert.equal(B.AWAITING_REPORT, 'AWAITING REPORT');
+  assert.ok(/AWAITING REPORT/.test(WALL_SCRIPT + WALL_INDEX), 'the card never says it is waiting');
+  assert.ok(!/NOT UPDATED/.test(WALL_SCRIPT), 'the card still repeats NOT UPDATED');
+  assert.ok(/\.shc\[data-report="none"\] \.rep-vals/.test(WALL_CSS), 'a waiting card still shows empty value slots');
+  // the summary the panel head carries instead
+  assert.deepEqual(B.reportSummary(wallRows(game)), { reported: 0, total: 6, text: 'REPORTS 0/6' });
   game.setBroadcastRow('WTR', { water: 4 }, { by: 'COM' });
+  game.setBroadcastRow('POW', { power: 1 }, { by: 'COM' });
+  assert.equal(B.reportSummary(wallRows(game)).text, 'REPORTS 2/6');
   assert.equal(B.reportLine(wallRows(game).WTR).text, '⚡ —   💧 4   ⚕ —   🔧 —');
+  assert.ok(/id="h-reports"/.test(WALL_INDEX) && /B\.reportSummary/.test(WALL_SCRIPT));
+  assert.ok(/SECTOR STATUS/.test(WALL_INDEX), 'the panel is not titled SECTOR STATUS');
   const m = WALL_CSS.match(/\.rep-none \{[^}]*font-size: clamp\((\d+)px/);
-  assert.ok(m && Number(m[1]) >= 15, 'NO REPORT is tiny');
+  assert.ok(m && Number(m[1]) >= 15, 'AWAITING REPORT is tiny');
+});
+
+test('identity and condition are different colours: MED is red because MED is red, not because MED is failing', () => {
+  assert.deepEqual(B.SECTOR_COLOUR, { POW: '#FFB31A', WTR: '#22C7F2', MED: '#FF4148', TRN: '#E7EDF2', AGR: '#66D72E', COM: '#A855F7' });
+  // the card's left edge and code are identity; the dot, word and figure are condition
+  assert.ok(/\.shc \{[^}]*border-left: 4px solid var\(--accent\)/s.test(WALL_CSS), 'the identity edge is gone');
+  assert.ok(/\.shc-code \{[^}]*color: var\(--accent\)/.test(WALL_CSS));
+  assert.ok(!/\.shc\[data-state="critical"\] \{[^}]*border-left-color/.test(WALL_CSS), 'a critical sector repaints its identity edge');
+  for (const state of ['degraded', 'critical', 'brownout', 'dark']) {
+    assert.ok(new RegExp(`\\.shc\\[data-state="${state}"\\] \\.shc-word`).test(WALL_CSS), `${state} has no status colour`);
+  }
+  assert.ok(/--st-stable: #5DD68A/.test(WALL_CSS) && /--st-critical: #FF555D/.test(WALL_CSS), 'the status palette is missing');
+  assert.ok(/IDENTITY\[code\]/.test(WALL_SCRIPT), 'the card does not take its identity colour from the shared table');
+  // the words a card uses for each condition
+  assert.equal(B.CARD_WORD.dark, 'DARK / OFFLINE');
+  assert.equal(B.CARD_WORD.stable, 'STABLE');
+});
+
+test('health is the value the frame carries, or an em dash — never a fabricated 100', () => {
+  const game = running();
+  game.setIntegrity('POW', 42);
+  assert.equal(B.healthValue(forBigscreen(game).sectors.POW), '42');
+  assert.equal(B.healthValue({ integrity: null }), '—');
+  assert.equal(B.healthValue({}), '—');
+  assert.equal(B.healthValue(undefined), '—');
+  assert.ok(/B\.healthValue/.test(WALL_SCRIPT), 'the card does not use it');
+  assert.ok(!/String\(clamp\(s\.integrity\)\)/.test(WALL_SCRIPT), 'the card still prints a raw number');
 });
 
 // -- Alerts -------------------------------------------------------------------------
@@ -288,8 +329,11 @@ test('critical and dark sectors outrank a waiting transfer; a calm city shows no
 test("the city broadcast is COM's announcement in a readable area, or NO ACTIVE CITY BROADCAST", () => {
   const game = running();
   assert.equal(forBigscreen(game).broadcast.announcement, null);
-  assert.ok(/NO ACTIVE CITY BROADCAST/.test(WALL_INDEX) && /NO ACTIVE CITY BROADCAST/.test(WALL_SCRIPT));
+  // standby is compact and quiet: the heading stays, the body is one word
   assert.ok(/CITY BROADCAST/.test(WALL_INDEX) && /COMMS & SENSORS/.test(WALL_SCRIPT));
+  assert.ok(/>STANDBY</.test(WALL_INDEX) && /'STANDBY'/.test(WALL_SCRIPT), 'standby is not compact');
+  assert.ok(!/NO ACTIVE CITY BROADCAST/.test(WALL_INDEX + WALL_SCRIPT), 'the long standby sentence is back');
+  assert.ok(/\.broadcast\[data-state="live"\] \{[^}]*padding: 1\.6vh/.test(WALL_CSS), 'a live broadcast does not open');
   game.setBroadcastAnnouncement({ headline: 'MEDICAL SUPPLIES REQUIRED', message: 'Review available stock' }, { by: 'COM' });
   const a = forBigscreen(game).broadcast.announcement;
   assert.equal(a.headline, 'MEDICAL SUPPLIES REQUIRED');
@@ -297,7 +341,7 @@ test("the city broadcast is COM's announcement in a readable area, or NO ACTIVE 
   assert.equal(a.freshness, 'CURRENT');
   assert.ok(/frame\.broadcast\.announcement/.test(WALL_SCRIPT));
   assert.ok(!/class="ticker"|renderTicker|tickerLine/.test(WALL_INDEX + WALL_SCRIPT), 'the ticker is back');
-  const m = WALL_CSS.match(/\.bc-head \{[^}]*font-size: clamp\((\d+)px/);
+  const m = WALL_CSS.match(/\.broadcast\[data-state="live"\] \.bc-head \{[^}]*font-size: clamp\((\d+)px/);
   assert.ok(m && Number(m[1]) >= 22, 'the headline is small');
   assert.ok(/\.broadcast\.enter \{ animation: bcIn [\d.]+s ease; \}/.test(WALL_CSS), 'no single entrance');
   assert.ok(!/\.broadcast[^{]*\{[^}]*infinite/.test(WALL_CSS), 'the broadcast loops');
@@ -305,14 +349,38 @@ test("the city broadcast is COM's announcement in a readable area, or NO ACTIVE 
 
 // -- The command bar ----------------------------------------------------------------
 
-test('CURRENT ROUND, NEXT ROUND IN and LIVE are on the command bar, from the round and its clock', () => {
+test('the command bar: HAVEN-9 and the phase on the left, the Core in the middle, the countdown and LIVE on the right', () => {
   const f = forBigscreen(running());
   assert.equal(f.round_number, 2);
   assert.ok(f.round_clock && typeof f.round_clock.remaining_s === 'number');
-  assert.ok(/CURRENT ROUND/.test(WALL_INDEX) && /id="round-number"/.test(WALL_INDEX));
-  assert.ok(/NEXT ROUND IN/.test(WALL_INDEX) && /id="round-clock"/.test(WALL_INDEX));
+  assert.ok(/SUBTERRANEAN CONTINUITY AUTHORITY/.test(WALL_INDEX), 'the authority line is missing');
+  assert.ok(/id="phase-label"/.test(WALL_INDEX) && /id="phase-value"/.test(WALL_INDEX));
+  assert.ok(/id="round-clock"/.test(WALL_INDEX) && /id="time-label"/.test(WALL_INDEX));
   assert.ok(/id="live"/.test(WALL_INDEX) && /'LIVE'/.test(WALL_SCRIPT));
   assert.ok(/frame\.round_number/.test(WALL_SCRIPT) && /frame\.round_clock/.test(WALL_SCRIPT));
+  // Round 0 is the briefing, and the countdown names what it counts to
+  assert.ok(/'BRIEFING'/.test(WALL_SCRIPT) && /padStart\(2, '0'\)/.test(WALL_SCRIPT), 'a round is not shown as two digits');
+  assert.ok(/'ROUND 1 BEGINS IN'/.test(WALL_SCRIPT) && /'NEXT ROUND IN'/.test(WALL_SCRIPT) && /'COUNCIL ENDS IN'/.test(WALL_SCRIPT));
+  const briefing = forBigscreen(newGame());          // R0, before the first round
+  assert.equal(briefing.round_number, 0, 'the briefing is no longer round 0');
+  // the Core is the loudest thing on the bar
+  const core = WALL_CSS.match(/\.hud-core b \{[^}]*font-size: clamp\((\d+)px, ([\d.]+)vh/);
+  const clock = WALL_CSS.match(/\.hud-time b \{[^}]*font-size: clamp\((\d+)px, ([\d.]+)vh/);
+  const phase = WALL_CSS.match(/\.hud-phase b \{[^}]*font-size: clamp\((\d+)px, ([\d.]+)vh/);
+  assert.ok(core && clock && phase, 'the bar has no sizes to compare');
+  assert.ok(Number(core[2]) > Number(clock[2]) && Number(core[2]) > Number(phase[2]), 'CORE STABILITY is not the strongest metric');
+});
+
+test('the Core carries a condition word from the bands the wall already draws it with', () => {
+  assert.deepEqual(B.coreStatus(100), { band: 'healthy', state: 'stable', label: 'STABLE', insufficient: false });
+  assert.equal(B.coreStatus(84).state, 'degraded');
+  assert.equal(B.coreStatus(61).state, 'degraded');
+  assert.equal(B.coreStatus(60).label, 'CAPACITY INSUFFICIENT', 'the Core says nothing at the insufficiency line');
+  assert.equal(B.coreStatus(29).state, 'critical');
+  assert.equal(B.coreBand(86), 'healthy'); assert.equal(B.coreBand(30), 'unstable');
+  assert.ok(/B\.coreStatus/.test(WALL_SCRIPT) && /id="core-state"/.test(WALL_INDEX));
+  // the insufficiency line is the one the alert already uses — no new threshold
+  assert.equal(B.CORE_INSUFFICIENT, 60);
 });
 
 test('CORE STABILITY is meaningful — it scales POW production and drives the insufficiency alert — so the wall shows it', () => {
