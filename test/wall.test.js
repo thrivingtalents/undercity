@@ -236,9 +236,13 @@ test('a sector COM has not reported says AWAITING REPORT once, and the panel cou
   // The card prints one phrase in place of the numbers; the old pair of
   // NO REPORT + NOT UPDATED on every card is gone.
   assert.equal(B.AWAITING_REPORT, 'AWAITING REPORT');
-  assert.ok(/class="k">REPORT</.test(WALL_SCRIPT) && /rep-none">AWAITING</.test(WALL_SCRIPT), 'the card never says it is waiting for a report');
+  assert.ok(/class="k">FIELD REPORT</.test(WALL_SCRIPT) && /rep-none">AWAITING</.test(WALL_SCRIPT), 'the card never says it is waiting for a report');
   assert.ok(!/NOT UPDATED/.test(WALL_SCRIPT), 'the card still repeats NOT UPDATED');
-  assert.ok(/\.shc\[data-report="none"\] \.rep-vals/.test(WALL_CSS), 'a waiting card still shows empty value slots');
+  // The per-resource counts are off the card: 11px of data nobody reads from
+  // ten metres. reportLine still decides reported-or-not, and the freshness
+  // marker is hidden until there is something to be fresh about.
+  assert.ok(!/rep-vals/.test(WALL_SCRIPT), 'the card still prints the resource counts');
+  assert.ok(/\.shc\[data-report="none"\] \.rep-fresh \{ display: none; \}/.test(WALL_CSS), 'a waiting card shows a freshness marker');
   // the summary the panel head carries instead
   assert.deepEqual(B.reportSummary(wallRows(game)), { reported: 0, total: 6, text: 'REPORTS 0/6' });
   game.setBroadcastRow('WTR', { water: 4 }, { by: 'COM' });
@@ -247,8 +251,18 @@ test('a sector COM has not reported says AWAITING REPORT once, and the panel cou
   assert.equal(B.reportLine(wallRows(game).WTR).text, '⚡ —   💧 4   ⚕ —   🔧 —');
   assert.ok(/id="h-reports"/.test(WALL_INDEX) && /B\.reportSummary/.test(WALL_SCRIPT));
   assert.ok(/SECTOR STATUS/.test(WALL_INDEX), 'the panel is not titled SECTOR STATUS');
-  const m = WALL_CSS.match(/\.rep-none \{[^}]*font-size: clamp\((\d+)px/);
-  assert.ok(m && Number(m[1]) >= 15, 'AWAITING REPORT is tiny');
+  // It is secondary information: still legible across a room, but it must never
+  // compete with the figure and the condition word beside it.
+  // The vh term is what the wall actually renders — the px floor only bites on a
+  // short screen — so that is the number worth asserting against.
+  const vh = (sel) => {
+    const m = WALL_CSS.match(new RegExp(`\\${sel} \\{[^}]*font-size: clamp\\(\\d+px, ([\\d.]+)vh`));
+    return m && Number(m[1]);
+  };
+  const rep = vh('.rep-none');
+  const pct = vh('.shc-pct');
+  assert.ok(rep >= 1.25, 'AWAITING REPORT is too small to read across a room');
+  assert.ok(pct && rep < pct / 2, 'AWAITING REPORT competes with the health figure');
 });
 
 test('identity and condition are different colours: MED is red because MED is red, not because MED is failing', () => {
@@ -260,7 +274,9 @@ test('identity and condition are different colours: MED is red because MED is re
   for (const state of ['degraded', 'critical', 'brownout', 'dark']) {
     assert.ok(new RegExp(`\\.shc\\[data-state="${state}"\\] \\.shc-word`).test(WALL_CSS), `${state} has no status colour`);
   }
-  assert.ok(/--st-stable: #5DD68A/.test(WALL_CSS) && /--st-critical: #FF555D/.test(WALL_CSS), 'the status palette is missing');
+  // condition takes the design system's semantic colours, never the purple theme
+  assert.ok(/--st-stable: var\(--ui-success\)/.test(WALL_CSS) && /--st-critical: var\(--ui-danger\)/.test(WALL_CSS), 'the status palette is missing');
+  assert.ok(!/--st-\w+: var\(--ui-purple/.test(WALL_CSS), 'a condition colour was taken from the accent');
   assert.ok(/IDENTITY\[code\]/.test(WALL_SCRIPT), 'the card does not take its identity colour from the shared table');
   // the words a card uses for each condition
   assert.equal(B.CARD_WORD.dark, 'DARK / OFFLINE');
@@ -349,7 +365,7 @@ test("the city broadcast is COM's announcement in a readable area, or NO ACTIVE 
 
 // -- The command bar ----------------------------------------------------------------
 
-test('the command bar: HAVEN-9 and the phase on the left, the Core in the middle, the countdown and LIVE on the right', () => {
+test('the command bar: the authority and the phase on the left, the Core in the middle, the countdown and LIVE on the right', () => {
   const f = forBigscreen(running());
   assert.equal(f.round_number, 2);
   assert.ok(f.round_clock && typeof f.round_clock.remaining_s === 'number');

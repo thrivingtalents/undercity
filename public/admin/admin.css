@@ -24,7 +24,7 @@ body { overflow: auto; }
 .topbar { display: flex; align-items: center; justify-content: space-between;
           padding: 12px 22px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .topbar h1 { font-size: 14px; letter-spacing: 0.22em; }
-.topbar h1 .sub { color: var(--amber); }
+.topbar h1 .sub { color: var(--accent-bright); }
 .topbar .right { display: flex; align-items: center; gap: 12px; }
 .who { font-size: 11px; color: var(--ink-faint); }
 
@@ -49,7 +49,7 @@ body { overflow: auto; }
 .card:hover { border-color: var(--ink-faint); }
 .card .nm { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
 .card .meta { font-size: 11px; color: var(--ink-faint); display: flex; gap: 12px; flex-wrap: wrap; }
-.card .code { font-family: var(--mono); letter-spacing: 0.14em; color: var(--amber); }
+.card .code { font-family: var(--mono); letter-spacing: 0.14em; color: var(--accent-bright); }
 .card .right { display: flex; align-items: center; gap: 12px; }
 
 .status { font-size: 9px; letter-spacing: 0.16em; padding: 3px 9px; border: 1px solid var(--line); }
@@ -79,7 +79,7 @@ body { overflow: auto; }
 .detail-head { background: var(--panel); border: 1px solid var(--line); padding: 18px; margin-bottom: 14px; }
 .detail-head h3 { font-size: 19px; margin-bottom: 5px; }
 .detail-head .meta { font-size: 12px; color: var(--ink-faint); display: flex; gap: 14px; flex-wrap: wrap; }
-.big-code { font-size: 26px; letter-spacing: 0.3em; color: var(--amber); font-weight: 700; }
+.big-code { font-family: var(--mono); font-size: 26px; letter-spacing: 0.3em; color: var(--accent-bright); font-weight: 700; }
 
 .links { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
 .link-card { background: var(--panel); border: 1px solid var(--line); padding: 13px 15px; }
@@ -98,7 +98,7 @@ body { overflow: auto; }
 .teams-table .sec-cell { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: 0.1em; }
 .teams-table .swatch { width: 11px; height: 11px; }
 .teams-table input { width: 100%; font-size: 12px; }
-.teams-table .join { font-family: var(--mono); letter-spacing: 0.12em; color: var(--amber); }
+.teams-table .join { font-family: var(--mono); letter-spacing: 0.12em; color: var(--accent-bright); }
 .teams-table td.actions { text-align: right; white-space: nowrap; }
 .teams-table td.actions button { padding: 3px 8px; font-size: 10px; margin-left: 4px; }
 
@@ -113,7 +113,7 @@ body { overflow: auto; }
 
 .nav { display: flex; gap: 4px; margin-left: 18px; }
 .nav button { font-size: 10px; letter-spacing: 0.14em; padding: 5px 12px; }
-.nav button.on { background: var(--amber); color: #17130a; border-color: var(--amber); font-weight: 700; }
+.nav button.on { background: var(--ui-active); color: var(--accent-ink); border-color: rgba(210,187,255,0.38); font-weight: 600; box-shadow: 0 0 22px rgba(139,92,246,0.28); }
 
 /* -- print kit -------------------------------------------------------------- */
 
@@ -163,7 +163,7 @@ body { overflow: auto; }
 .people-table td.actions { text-align: right; white-space: nowrap; }
 .people-table td.actions button { padding: 3px 8px; font-size: 10px; margin-left: 4px; }
 .badge { font-size: 9px; letter-spacing: 0.14em; padding: 2px 7px; border: 1px solid var(--line); color: var(--ink-dim); }
-.badge.admin { background: var(--amber); color: #17130a; border-color: var(--amber); font-weight: 700; }
+.badge.admin { background: var(--ui-active); color: var(--accent-ink); border-color: rgba(210,187,255,0.38); font-weight: 600; }
 .badge.you { border-color: var(--green); color: var(--green); }
 
 .notice { border: 1px solid var(--green); background: #101a13; padding: 12px 15px; margin-bottom: 14px; }
@@ -176,7 +176,7 @@ body { overflow: auto; }
 /* first-run setup */
 .setup-note {
   font-size: 11px; line-height: 1.6; color: var(--ink-dim);
-  border-left: 2px solid var(--amber); padding-left: 9px; margin: 0 0 18px;
+  border-left: 2px solid var(--accent); padding-left: 9px; margin: 0 0 18px;
 }
 .login-card label em {
   font-style: normal; text-transform: none; letter-spacing: 0; opacity: 0.7;

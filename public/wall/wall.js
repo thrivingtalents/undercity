@@ -74,6 +74,9 @@
   };
   const PANEL_ORDER = B.SECTOR_ORDER;                                // fixed: the room learns where each one lives
   const IDENTITY = B.SECTOR_COLOUR;                                  // who a sector is — never how it is doing
+  // The sector gauge, in its own little coordinate space: a ring drawn from
+  // twelve o'clock, filled to the sector's health.
+  const RING = { box: 100, c: 50, r: 42, circ: Math.round(2 * Math.PI * 42 * 10) / 10 };
   const BUILD_ORDER = ['WTR', 'POW', 'COM', 'MED', 'TRN', 'AGR'];   // paint order on the map
   const CORE = { x: 836, y: 398, r: 96, label: { x: 855, y: 295, w: 300 }, tunnel7: [[838, 548], [838, 612]] };
 
@@ -101,10 +104,13 @@
     },
   });
 
-  (function soundHint() {
-    const hide = () => { const h = $('sound-hint'); if (h) h.hidden = true; };
-    window.addEventListener('pointerdown', hide, { once: true });
-    window.addEventListener('keydown', hide, { once: true });
+  // Audio unlocks on the first interaction the room happens to make. No prompt
+  // is drawn for it: a browser instruction on the audience screen breaks the
+  // fiction, and the facilitator's own console can always start the sound.
+  (function unlockAudio() {
+    const noop = () => {};
+    window.addEventListener('pointerdown', noop, { once: true });
+    window.addEventListener('keydown', noop, { once: true });
   })();
 
   // -- small helpers ----------------------------------------------------------------
@@ -262,12 +268,20 @@
       card.dataset.state = 'stable';
       card.style.setProperty('--accent', IDENTITY[code] || d.colour);
       card.dataset.report = 'none';
+      // A gauge, the way a monitoring wall draws one: a dark track, an arc of
+      // the sector's condition, and the figure in the middle of it.
       card.innerHTML =
-        `<img class="shc-icon" src="${ART}/icon-${code}.png" alt="">` +
-        `<div class="shc-id"><b class="shc-code">${code}</b><span class="shc-name">${d.name}</span></div>` +
-        '<div class="shc-health"><span class="k">SYSTEM HEALTH</span><span class="shc-num"><b class="shc-pct">—</b><small>%</small></span></div>' +
+        `<div class="shc-id"><img class="shc-icon" src="${ART}/icon-${code}.png" alt=""><b class="shc-code">${code}</b></div>` +
+        `<div class="shc-name">${d.name}</div>` +
+        '<div class="shc-gauge">' +
+          `<svg class="ring" viewBox="0 0 ${RING.box} ${RING.box}" aria-hidden="true">` +
+            `<circle class="ring-track" cx="${RING.c}" cy="${RING.c}" r="${RING.r}"></circle>` +
+            `<circle class="ring-arc" cx="${RING.c}" cy="${RING.c}" r="${RING.r}" stroke-dasharray="0 ${RING.circ}"></circle>` +
+          '</svg>' +
+          '<div class="shc-health"><span class="shc-num"><b class="shc-pct">—</b><small>%</small></span><span class="k">SYSTEM HEALTH</span></div>' +
+        '</div>' +
         '<div class="shc-status"><i class="shc-dot"></i><span class="shc-word">—</span></div>' +
-        '<div class="shc-rep"><span class="k">REPORT</span><span class="rep-vals"></span><span class="rep-fresh" data-fresh="CURRENT"></span><b class="rep-none">AWAITING</b></div>';
+        '<div class="shc-rep"><span class="k">FIELD REPORT</span><span class="rep-fresh" data-fresh="CURRENT"></span><b class="rep-none">AWAITING</b></div>';
       host.appendChild(card);
       cardEls[code] = card;
     }
@@ -399,16 +413,19 @@
       setText(card.querySelector('.shc-name'), sectorName(code));
       const state = B.healthState(s);
       if (card.dataset.state !== state) card.dataset.state = state;
-      setText(card.querySelector('.shc-pct'), B.healthValue(s));   // never a fabricated 100
+      const value = B.healthValue(s);
+      setText(card.querySelector('.shc-pct'), value);   // never a fabricated 100
+      // the arc follows the figure; an unknown health leaves the track empty
+      const pct = value === '—' ? 0 : Number(value);
+      const arc = card.querySelector('.ring-arc');
+      const dash = `${Math.round((pct / 100) * RING.circ * 10) / 10} ${RING.circ}`;
+      if (arc.getAttribute('stroke-dasharray') !== dash) arc.setAttribute('stroke-dasharray', dash);
       setText(card.querySelector('.shc-word'), B.CARD_WORD[state]);
 
+      // whether COM has reported, and how fresh it is — the numbers themselves
+      // live on the sector consoles and the facilitator's screen
       const rep = B.reportLine(rows[code]);
       if (card.dataset.report !== (rep.none ? 'none' : 'yes')) card.dataset.report = rep.none ? 'none' : 'yes';
-      const vals = card.querySelector('.rep-vals');
-      if (!rep.none) {
-        const html = rep.values.map((v) => `<span class="rv"><i>${v.glyph}</i><b>${U.escapeHtml(v.value)}</b></span>`).join('');
-        if (vals.dataset.sig !== html) { vals.dataset.sig = html; vals.innerHTML = html; }
-      }
       const fresh = B.freshnessShort(rows[code]);
       const fe = card.querySelector('.rep-fresh');
       setText(fe, fresh.text);
@@ -621,7 +638,7 @@
     const secs = U.countdown(clockObj, frozen);
     const running = !!(clockObj && clockObj.running) && !frozen;
     setText($('round-clock'), U.mmss(secs));
-    const urgency = !running ? '' : secs <= 10 ? ' final' : secs <= 60 ? ' danger' : secs <= 120 ? ' warn' : '';
+    const urgency = !running ? '' : secs <= 10 ? ' final' : secs <= 20 ? ' danger' : secs <= 60 ? ' warn' : '';
     const cls = `hud-time${council ? ' council' : ''}${urgency}`;
     const hud = $('hud-time');
     if (hud.className !== cls) hud.className = cls;

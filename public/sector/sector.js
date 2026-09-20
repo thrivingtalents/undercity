@@ -524,7 +524,7 @@
     mine = state.sectors && state.sectors[SECTOR];
     if (!mine) return;
 
-    document.documentElement.style.setProperty('--sector', mine.colour || '#E8B33A');
+    document.documentElement.style.setProperty('--sector', mine.colour || 'var(--accent)');
     renderHeader();
     renderModes();
     renderResources();

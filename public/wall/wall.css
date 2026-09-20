@@ -14,27 +14,57 @@
   /* command bar · alert strip (only when it exists) · the city · the broadcast,
      which is a thin line on standby and opens when COM speaks */
   display: grid; grid-template-rows: 10vh auto minmax(0, 1fr) auto;
-  background: var(--screen-bg); color: var(--screen-ink); overflow: hidden;
+  color: var(--screen-ink); overflow: hidden;
+  /* L0: near-black at the edges, the faintest navy-purple where the city sits */
+  background:
+    radial-gradient(circle at 45% 45%, rgba(31, 25, 55, 0.25), rgba(7, 8, 13, 1) 70%),
+    var(--screen-bg);
 
   /* -- the Big Screen's own palette (spec 1.0.0). Scoped here: the sector
      laptops and Admin keep the shared tokens in /shared/base.css. ---------- */
-  --screen-bg: #070B10;
-  --panel-soft: rgba(12, 19, 26, 0.82);
-  --panel-strong: rgba(10, 16, 22, 0.94);
-  --edge: rgba(112, 148, 174, 0.22);
-  --hud-cyan: #38C8FF;
-  --hud-blue: #2D83FF;
-  --hud-line: rgba(56, 200, 255, 0.16);   /* the interface's own light: separators, ticks, brackets */
-  --hud-glow: rgba(56, 200, 255, 0.10);
-  --screen-ink: #F3F7FA;
-  --screen-ink-dim: #8FA5B8;
-  --screen-ink-faint: #5F7688;
+  --screen-bg: #07080D;
+
+  /* THE GLASS SYSTEM. Four depth levels, told apart by how much they let
+     through and how hard they blur — not by how dark they are painted.
+       L0 the page · L1 the city · L2 the status panel · L3 a sector card
+     Every glass surface is background + blur + hairline + inner highlight +
+     shadow. Lowering opacity alone would only make the wall grey. */
+  --glass-panel: rgba(22, 22, 32, 0.58);      /* L2: the panel over the room  */
+  --glass-card: rgba(22, 22, 32, 0.52);       /* L3: a card over the panel    */
+  --glass-bar: rgba(16, 16, 25, 0.62);        /* the command bar and broadcast */
+  --glass-blur: blur(16px) saturate(120%);
+  --glass-blur-soft: blur(14px) saturate(120%);
+  --glass-edge: rgba(190, 170, 255, 0.12);    /* a panel's hairline           */
+  --glass-edge-soft: rgba(180, 165, 220, 0.12); /* a card's, softer still     */
+  --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  --glass-drop: 0 12px 36px rgba(0, 0, 0, 0.24);
+  --glass-lift: 0 8px 26px rgba(0, 0, 0, 0.22);
+  /* ambient purple: meant to be felt, not seen */
+  --glass-ambient: 0 0 35px rgba(128, 78, 220, 0.06);
+  --hairline: rgba(255, 255, 255, 0.06);      /* separators inside a surface  */
+
+  --r-panel: 16px;
+  --r-card: 14px;
+  --r-ctl: 9px;
+
+  --panel-soft: var(--glass-panel);
+  --panel-strong: var(--glass-bar);
+  --edge: var(--glass-edge);
+  --hud-accent: var(--ui-purple-bright);
+  --hud-blue: var(--ui-purple);
+  --hud-line: rgba(139, 92, 246, 0.20);   /* the interface's own light: separators, ticks, brackets */
+  --hud-glow: rgba(139, 92, 246, 0.12);
+  --screen-ink: #F4F1FA;        /* primary data: bright, precise          */
+  --screen-ink-dim: #B8B1C8;    /* secondary: soft grey-lavender          */
+  --screen-ink-faint: #777083;  /* metadata: very muted                   */
   /* condition, never identity */
-  --st-stable: #5DD68A;
-  --st-degraded: #FFB83D;
-  --st-critical: #FF555D;
-  --st-offline: #8D98A1;
+  --st-stable: var(--ui-success);
+  --st-degraded: var(--ui-warning);
+  --st-critical: var(--ui-danger);
+  --st-offline: #6E6880;
   --core-accent: #FF9D2E;
+  --heading: var(--ui-purple-bright);     /* section headings: the one accent, never a second neon */
+  --heading-rule: var(--ui-border-strong);
   /* identity, never condition — the same six the cards and the map pills use */
   --sec-POW: #FFB31A;
   --sec-WTR: #22C7F2;
@@ -49,15 +79,24 @@
   --num: clamp(34px, 5.4vh, 62px);      /* the big numbers: core and the clock */
 }
 [hidden] { display: none !important; }
+/* Each band owns its row. Without this the hidden alert strip drops out of the
+   grid and everything below it slides up a track. */
+.hud { grid-row: 1; }
+.alerts { grid-row: 2; }
+.main { grid-row: 3; }
+.broadcast { grid-row: 4; }
 .clock { font-variant-numeric: tabular-nums; }
 
 /* -- 1. COMMAND BAR ---------------------------------------------------------- */
 
 .hud {
   display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
-  padding: 0 1.8vw; border-bottom: 1px solid var(--edge);
-  background: linear-gradient(180deg, rgba(14,20,27,0.96), rgba(7,11,16,0.96)); z-index: 3;
-  position: relative;
+  padding: 0 1.8vw; border-bottom: 1px solid var(--hairline);
+  /* one continuous sheet of glass, not three stacked blocks */
+  background: linear-gradient(180deg, rgba(24, 24, 36, 0.66), rgba(12, 12, 19, 0.62));
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-inner), 0 10px 30px rgba(0, 0, 0, 0.22);
+  z-index: 3; position: relative;
 }
 
 .hud::after {
@@ -68,18 +107,27 @@
 /* LEFT: who the city is, and where the session is. */
 .hud-brand { display: flex; align-items: center; gap: 1.6vw; min-width: 0; }
 .hud-mark { display: flex; flex-direction: column; gap: 0.2vh; min-width: 0; }
-.hud-mark h1 { font-size: clamp(22px, 3.2vh, 38px); letter-spacing: 0.26em; font-weight: 700; margin: 0; color: var(--screen-ink); }
-.hud-sub { font-size: clamp(9px, 1.15vh, 13px); letter-spacing: 0.2em; color: var(--screen-ink-faint); white-space: nowrap; }
-.hud-phase { display: flex; flex-direction: column; gap: 0; padding-left: 1.4vw; border-left: 1px solid var(--edge); }
-.hud-phase .k { font-size: clamp(10px, 1.35vh, 15px); letter-spacing: 0.2em; color: var(--hud-cyan); font-weight: 700; opacity: 0.8; }
+.hud-mark h1 { display: none; }
+.hud-sub { font-size: clamp(11px, 1.5vh, 16px); letter-spacing: 0.2em; color: var(--screen-ink-dim); white-space: nowrap; font-weight: 500; }
+.hud-phase { display: flex; flex-direction: column; gap: 0; padding-left: 1.4vw; border-left: 1px solid var(--hairline); }
+.hud-phase .k { font-size: clamp(10px, 1.35vh, 15px); letter-spacing: 0.14em; color: var(--hud-accent); font-weight: 600; opacity: 0.72; }
 .hud-phase b { font-size: clamp(22px, 3.4vh, 42px); line-height: 1.05; letter-spacing: 0.1em; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--screen-ink); }
 
 /* CENTRE: the Core. The loudest metric on the bar, and the only one with a word under it. */
-.hud-core { display: flex; flex-direction: column; align-items: center; gap: 0; justify-self: center; }
-.hud-core .k { font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.18em; color: var(--screen-ink-dim); white-space: nowrap; }
-.hud-core b { font-size: clamp(40px, 6.4vh, 74px); line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--core-accent); }
+.hud-core { position: relative; display: flex; flex-direction: column; align-items: center; gap: 0; justify-self: center; padding: 0 3vw; }
+.hud-core::before, .hud-core::after {
+  content: ''; position: absolute; top: 18%; bottom: 18%; width: 1px;
+  background: linear-gradient(180deg, transparent, var(--hairline), transparent);
+}
+.hud-core::before { left: 0; }
+.hud-core::after { right: 0; }
+.hud-core .k { font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.14em; color: var(--screen-ink-dim); white-space: nowrap; font-weight: 500; }
+.hud-core b { font-size: clamp(40px, 6.4vh, 74px); line-height: 1; font-weight: 700; font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--screen-ink); }
 .hud-core b small { font-size: 0.42em; margin-left: 2px; color: var(--screen-ink-dim); font-weight: 400; }
-.core-state { font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.24em; font-weight: 700; color: var(--st-stable); white-space: nowrap; }
+.core-state { font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.16em; font-weight: 600; color: var(--st-stable); white-space: nowrap; }
+/* A healthy Core says nothing: the figure is the message. DEGRADED and
+   CRITICAL keep their word, so a condition is never colour alone. */
+.hud-core[data-state="stable"] .core-state { display: none; }
 .hud-core[data-state="degraded"] b, .hud-core[data-state="degraded"] .core-state { color: var(--st-degraded); }
 .hud-core[data-state="critical"] b, .hud-core[data-state="critical"] .core-state { color: var(--st-critical); }
 .hud-core[data-state="critical"] b { animation: wallPulse 2.6s ease-in-out infinite; }
@@ -87,7 +135,7 @@
 /* RIGHT: the countdown, the session tags, the feed. */
 .hud-right { justify-self: end; display: flex; align-items: center; gap: 1.4vw; }
 .hud-time { display: flex; flex-direction: column; align-items: flex-end; gap: 0; }
-.hud-time .k { font-size: clamp(10px, 1.35vh, 15px); letter-spacing: 0.26em; color: var(--screen-ink-faint); white-space: nowrap; font-weight: 700; }
+.hud-time .k { font-size: clamp(10px, 1.35vh, 15px); letter-spacing: 0.14em; color: var(--screen-ink-faint); white-space: nowrap; font-weight: 500; }
 .hud-time b { font-size: clamp(30px, 4.6vh, 54px); line-height: 1; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--screen-ink); }
 .hud-time.warn b { color: var(--st-degraded); }
 .hud-time.danger b { color: var(--st-critical); }
@@ -96,8 +144,10 @@
 
 .hud-tags { display: flex; gap: 0.6vw; }
 .tag {
-  font-size: clamp(10px, 1.3vh, 14px); letter-spacing: 0.2em; padding: 0.6vh 0.8vw;
-  border: 1px solid var(--edge); color: var(--screen-ink-dim); background: var(--panel-soft);
+  font-size: clamp(10px, 1.3vh, 14px); letter-spacing: 0.12em; padding: 0.6vh 0.9vw;
+  border: 1px solid var(--glass-edge-soft); border-radius: var(--r-ctl);
+  color: var(--screen-ink-dim); background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: var(--glass-blur-soft); -webkit-backdrop-filter: var(--glass-blur-soft);
 }
 .tag-blackout { color: var(--st-degraded); border-color: rgba(255,184,61,0.4); animation: wallPulse 2.2s ease-in-out infinite; }
 .tag-breather { color: var(--st-stable); border-color: rgba(93,214,138,0.4); }
@@ -117,16 +167,19 @@
 
 .alerts {
   display: flex; gap: 1vw; align-items: stretch; overflow: hidden;
-  padding: 0.8vh 1.8vw; min-height: 7.5vh; border-bottom: 1px solid #161c22; background: #0d1014; z-index: 3;
+  padding: 0.8vh 1.8vw; min-height: 7.5vh; border-bottom: 1px solid var(--hairline);
+  background: rgba(14, 14, 22, 0.58);
+  backdrop-filter: var(--glass-blur-soft); -webkit-backdrop-filter: var(--glass-blur-soft); z-index: 3;
 }
 .chip {
   display: flex; flex-direction: column; justify-content: center; gap: 0.2vh; min-width: 0; flex: 0 1 auto; max-width: 50%;
-  padding: 0.5vh 1.2vw 0.5vh 1vw; border-left: 0.55vw solid var(--accent); background: #10141a;
+  padding: 0.6vh 1.2vw 0.6vh 1vw; border-left: 4px solid var(--accent); border-radius: var(--r-ctl);
+  background: rgba(255, 255, 255, 0.035);
   --accent: #9A9A9A;
 }
-.chip[data-accent="red"] { --accent: var(--red); background: #170d0d; }
-.chip[data-accent="amber"] { --accent: var(--amber); background: #16120a; }
-.chip[data-accent="purple"] { --accent: var(--purple); background: #120e18; }
+.chip[data-accent="red"] { --accent: var(--red); background: rgba(255, 107, 122, 0.10); }
+.chip[data-accent="amber"] { --accent: var(--amber); background: rgba(233, 180, 94, 0.10); }
+.chip[data-accent="purple"] { --accent: var(--purple); background: rgba(139, 92, 246, 0.12); }
 .chip[data-accent="blue"] { --accent: var(--blue); }
 .chip[data-accent="grey"] { --accent: #9A9A9A; }
 /* a critical sector never yields its space to a transfer */
@@ -143,14 +196,25 @@
 
 .city {
   position: relative; min-height: 0; min-width: 0; isolation: isolate;
-  background: radial-gradient(ellipse at 50% 45%, #0E161E 0%, #090E14 55%, #05080B 100%);
+  /* L1: the city sits in a well, not in a box — the edge is a gradient and an
+     inner shadow, so the artwork fades into the room instead of stopping. */
+  background: radial-gradient(ellipse at 50% 45%, rgba(18, 22, 34, 0.55) 0%, rgba(9, 10, 17, 0.72) 55%, rgba(5, 6, 11, 0.85) 100%);
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.20);
+}
+/* the faintest seam where the city meets the status panel */
+.city::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  border: 1px solid rgba(125, 100, 190, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.018);
+  /* ~12%: the corners fall away so the map has no hard rectangle */
+  background: radial-gradient(ellipse at 50% 48%, transparent 52%, rgba(5, 6, 11, 0.12) 78%, rgba(5, 6, 11, 0.28) 100%);
 }
 /* HUD frame: four corner brackets in the interface's own light. Detail at the
    edges, nothing across the city. */
 .city-frame { position: absolute; inset: 1.1vh 0.9vw; pointer-events: none; z-index: 1; }
 .city-frame::before, .city-frame::after {
   content: ''; position: absolute; width: 2.2vw; height: 2.2vw;
-  border: 1px solid var(--hud-line);
+  border: 1px solid rgba(169, 112, 255, 0.16);
 }
 .city-frame::before { top: 0; left: 0; border-right: 0; border-bottom: 0; }
 .city-frame::after { bottom: 0; right: 0; border-left: 0; border-top: 0; }
@@ -304,7 +368,10 @@
 .cycle-flash {
   position: absolute; left: 50%; top: 4%; transform: translateX(-50%); z-index: 6;
   display: flex; flex-direction: column; align-items: center; gap: 0.6vh;
-  padding: 1.4vh 2.4vw; background: rgba(12,16,19,0.94); border: 1px solid #2a333c; border-top: 4px solid var(--blue);
+  padding: 1.4vh 2.4vw; border: 1px solid var(--glass-edge); border-top: 2px solid var(--blue);
+  border-radius: var(--r-card); background: rgba(18, 18, 28, 0.66);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-drop);
   animation: toastIn 0.35s ease; pointer-events: none; max-width: 80%;
 }
 .cycle-flash b { font-size: var(--cmd); letter-spacing: 0.14em; font-weight: 700; color: var(--blue); }
@@ -316,27 +383,53 @@
    left edge are WHO the sector is; the dot, the word and the health figure
    are HOW it is. Medical is red because Medical is red. */
 
+/* L2: one sheet of smoked glass standing over the city. */
 .health {
+  position: relative;
   display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0;
-  border-left: 1px solid var(--edge); background: rgba(8, 12, 17, 0.72); backdrop-filter: blur(6px);
-  padding: 1.2vh 1vw;
+  margin: 1vh 0.8vw 1vh 0; padding: 1.4vh 1vw 1.2vh;
+  border: 1px solid var(--glass-edge); border-radius: var(--r-panel);
+  background: var(--glass-panel);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-drop), var(--glass-inner), var(--glass-ambient);
 }
+/* two corner ticks, barely there: the panel reads as instrumentation */
+.health::before, .health::after {
+  content: ''; position: absolute; width: 14px; height: 14px; pointer-events: none;
+  border: 1px solid rgba(169, 112, 255, 0.14);
+}
+.health::before { top: 7px; left: 7px; border-right: 0; border-bottom: 0; border-top-left-radius: 6px; }
+.health::after { bottom: 7px; right: 7px; border-left: 0; border-top: 0; border-bottom-right-radius: 6px; }
 .h-head {
   display: flex; align-items: baseline; justify-content: space-between; gap: 0.6vw;
-  margin: 0 0 1.1vh; padding-bottom: 0.8vh; border-bottom: 1px solid var(--hud-line);
+  margin: 0 0 1.3vh; padding-bottom: 0.8vh; border-bottom: 1px solid var(--hairline);
 }
-.h-title { font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.18em; color: var(--hud-cyan); margin: 0; font-weight: 700; }
+.h-title { font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.16em; color: var(--heading); margin: 0; font-weight: 600; }
 /* one count instead of six repetitions of the same sentence */
-.h-reports { font-size: clamp(10px, 1.4vh, 15px); letter-spacing: 0.14em; color: var(--screen-ink-faint); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.h-cards { display: grid; grid-template-rows: repeat(6, minmax(0, 1fr)); gap: 1vh; min-height: 0; }
+.h-reports { font-size: clamp(10px, 1.35vh, 14px); letter-spacing: 0.08em; color: var(--screen-ink-faint); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Two across, three down: six gauges a room can read at a glance, the way a
+   monitoring wall lays out its meters. */
+.h-cards {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 1.2vh 1.3vw; min-height: 0;
+}
 
 .shc {
   position: relative;
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto auto;
-  column-gap: 0.8vw; row-gap: 0.2vh; align-items: center; min-height: 0; overflow: hidden;
-  padding: 0.5vh 0.9vw 0.5vh 0.8vw;
-  background: rgba(10, 18, 26, 0.75); border: 1px solid var(--edge); border-left: 3px solid var(--accent);
+  display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto auto; justify-items: center;
+  row-gap: 0.3vh; min-height: 0; overflow: hidden; text-align: center;
+  padding: 1.3vh 0.7vw 1.1vh;
+  /* L3: a lighter pane floating on the panel. Almost no outline — a stable
+     card should blend in, so that a failing one does not have to shout. */
+  background: var(--glass-card); border: 1px solid var(--glass-edge-soft);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--r-card);
+  backdrop-filter: var(--glass-blur-soft); -webkit-backdrop-filter: var(--glass-blur-soft);
+  box-shadow: var(--glass-lift), var(--glass-inner);
+  transition: border-color var(--t-normal) var(--ease-ui), box-shadow var(--t-normal) var(--ease-ui), background var(--t-normal) var(--ease-ui);
   --accent: #8D98A1;
+  --arc: var(--st-stable);
+  --arc-glow: rgba(88, 214, 161, 0.18);
 }
 /* a hairline of the sector's own light along the top edge — identity, quietly */
 .shc::before {
@@ -344,45 +437,74 @@
   background: linear-gradient(90deg, var(--accent), transparent 60%); opacity: 0.35;
 }
 .shc .k { font-size: clamp(9px, 1.2vh, 13px); letter-spacing: 0.14em; color: var(--screen-ink-faint); font-weight: 700; white-space: nowrap; }
-.shc-icon { grid-column: 1; grid-row: 1 / 3; width: clamp(26px, 3.8vh, 42px); height: clamp(26px, 3.8vh, 42px); object-fit: contain; align-self: center; }
-.shc-id { grid-column: 2; grid-row: 1; display: flex; align-items: baseline; gap: 0.6vw; min-width: 0; }
+.shc-icon {
+  width: clamp(18px, 2.4vh, 26px); height: clamp(18px, 2.4vh, 26px);
+  object-fit: contain; align-self: center; padding: 3px; box-sizing: content-box;
+  background: rgba(139, 92, 246, 0.10);
+  border: 1px solid rgba(190, 160, 255, 0.12);
+  border-radius: var(--r-ctl);
+}
+.shc-id { display: flex; align-items: center; justify-content: center; gap: 0.45vw; min-width: 0; max-width: 100%; }
 /* identity */
-.shc-code { font-size: clamp(16px, 2.2vh, 25px); font-weight: 700; letter-spacing: 0.08em; color: var(--accent); }
-.shc-name { font-size: clamp(11px, 1.5vh, 17px); letter-spacing: 0.06em; color: var(--screen-ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.shc-code { font-size: clamp(15px, 2.1vh, 24px); font-weight: 700; letter-spacing: 0.08em; color: var(--accent); }
+.shc-name { max-width: 100%; font-size: clamp(9px, 1.2vh, 13px); letter-spacing: 0.1em; color: var(--screen-ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* condition */
-.shc-status { grid-column: 2; grid-row: 2; display: flex; align-items: center; gap: 0.5vw; }
+/* Sized from the ROW, not the column: a squeezed row must shrink the dial, or
+   a circle sized by card width paints over the lines above and below it. */
+.shc-gauge { position: relative; display: grid; place-items: center; height: 100%; min-height: 0; aspect-ratio: 1; max-height: 11vh; justify-self: center; margin: 0.35vh 0; }
+.ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring-track { fill: none; stroke: rgba(255, 255, 255, 0.07); stroke-width: 4; }
+.ring-arc {
+  fill: none; stroke: var(--arc); stroke-width: 4; stroke-linecap: butt; stroke-opacity: 0.85;
+  /* the glow is named per state, never currentColor — currentColor here is the
+     card's ink, which would light every dial white */
+  filter: drop-shadow(0 0 10px var(--arc-glow));
+  transition: stroke-dasharray var(--t-slow) var(--ease-ui), stroke var(--t-normal) var(--ease-ui);
+}
+.shc-health { position: absolute; display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.shc-status { display: flex; align-items: center; justify-content: center; gap: 0.4vw; }
 .shc-dot { width: 1.1vh; height: 1.1vh; border-radius: 50%; background: var(--st-stable); flex-shrink: 0; }
-.shc-word { font-size: clamp(13px, 1.9vh, 22px); letter-spacing: 0.12em; font-weight: 700; color: var(--st-stable); white-space: nowrap; }
-.shc-health { grid-column: 3; grid-row: 1 / 3; justify-self: end; display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }
+.shc-word { font-size: clamp(11px, 1.55vh, 17px); letter-spacing: 0.08em; font-weight: 700; color: var(--st-stable); white-space: nowrap; }
 .shc-num { font-variant-numeric: tabular-nums; line-height: 1; }
-.shc-pct { font-size: clamp(28px, 4.1vh, 46px); font-weight: 700; color: var(--st-stable); line-height: 0.95; }
-.shc-num small { font-size: clamp(13px, 1.9vh, 22px); color: var(--screen-ink-faint); margin-left: 2px; }
+.shc-pct { font-size: clamp(26px, 3.7vh, 42px); font-weight: 700; color: var(--screen-ink); line-height: 0.95; letter-spacing: -0.015em; }
+.shc-num small { font-size: clamp(11px, 1.45vh, 16px); color: var(--screen-ink-faint); margin-left: 2px; font-weight: 400; }
+.shc-health .k { margin-top: 0.3vh; font-size: clamp(6px, 0.82vh, 9px); letter-spacing: 0.12em; font-weight: 500; opacity: 0.62; }
 
 /* what COM reported, and how fresh it is — or, once, that it has not reported */
 .shc-rep {
-  grid-column: 1 / 4; grid-row: 3; display: flex; align-items: baseline; gap: 0.7vw; min-width: 0;
-  margin-top: 0.4vh; padding-top: 0.4vh; border-top: 1px solid rgba(112, 148, 174, 0.12);
+  width: 100%; display: flex; align-items: baseline; justify-content: center; gap: 0.4vw; min-width: 0;
+  margin-top: 0.2vh; padding-top: 0.6vh; border-top: 1px solid var(--hairline);
 }
-.rep-vals { display: flex; gap: 0.9vw; min-width: 0; font-size: clamp(14px, 1.95vh, 23px); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.rep-vals .rv { display: inline-flex; align-items: baseline; gap: 0.35vw; }
-.rep-vals .rv i { font-style: normal; font-size: 0.85em; }
-.rep-vals .rv b { color: var(--screen-ink); font-weight: 700; }
-.rep-fresh { font-size: clamp(10px, 1.45vh, 15px); letter-spacing: 0.14em; font-weight: 700; color: var(--screen-ink-faint); white-space: nowrap; }
+/* One small line: has the field reported, and how fresh it is. The counts
+   themselves were 11px of data nobody can read from ten metres. */
+.rep-fresh { font-size: clamp(11px, 1.3vh, 14px); letter-spacing: 0.06em; font-weight: 600; color: var(--screen-ink-faint); white-space: nowrap; }
 .rep-fresh[data-fresh="STALE"] { color: var(--st-degraded); }
 .rep-fresh[data-fresh="OUTDATED"] { color: var(--st-critical); }
-.rep-none { font-size: clamp(15px, 1.95vh, 22px); letter-spacing: 0.14em; color: var(--screen-ink-faint); font-weight: 700; }
+.rep-none { font-size: clamp(11px, 1.3vh, 14px); letter-spacing: 0.06em; color: var(--screen-ink-faint); font-weight: 500; opacity: 0.75; }
 .shc[data-report="yes"] .rep-none { display: none; }
-.shc[data-report="none"] .rep-vals, .shc[data-report="none"] .rep-fresh { display: none; }
+.shc[data-report="none"] .rep-fresh { display: none; }
 
-/* condition, on the dot, the word and the figure — never on the identity edge */
-.shc[data-state="degraded"] .shc-dot { background: var(--st-degraded); }
-.shc[data-state="degraded"] .shc-word, .shc[data-state="degraded"] .shc-pct { color: var(--st-degraded); }
-.shc[data-state="critical"] { background: rgba(30, 12, 15, 0.82); box-shadow: inset 0 0 0 1px rgba(255, 85, 93, 0.5), 0 0 16px rgba(255, 85, 93, 0.12); }
+/* Condition lives on the dot, the word, the figure and the dial — never on the
+   identity edge. A stable card stays plain glass; only trouble earns an edge. */
+.shc[data-state="degraded"], .shc[data-state="brownout"] {
+  --arc: var(--st-degraded); --arc-glow: rgba(233, 180, 94, 0.20);
+  border-color: rgba(233, 180, 94, 0.28);
+  box-shadow: var(--glass-lift), var(--glass-inner), 0 0 20px rgba(233, 180, 94, 0.07);
+}
+.shc[data-state="degraded"] .shc-dot, .shc[data-state="brownout"] .shc-dot { background: var(--st-degraded); }
+.shc[data-state="degraded"] .shc-word, .shc[data-state="degraded"] .shc-pct,
+.shc[data-state="brownout"] .shc-word, .shc[data-state="brownout"] .shc-pct { color: var(--st-degraded); }
+
+.shc[data-state="critical"] {
+  --arc: var(--st-critical); --arc-glow: rgba(255, 107, 122, 0.24);
+  background: linear-gradient(180deg, rgba(48, 18, 26, 0.50), rgba(26, 26, 38, 0.44));
+  border-color: rgba(255, 107, 122, 0.34);
+  animation: cardAlarm 3.6s ease-in-out infinite;
+}
 .shc[data-state="critical"] .shc-dot { background: var(--st-critical); animation: wallPulse 2.6s ease-in-out infinite; }
 .shc[data-state="critical"] .shc-word, .shc[data-state="critical"] .shc-pct { color: var(--st-critical); }
-.shc[data-state="brownout"] .shc-dot { background: var(--st-degraded); }
-.shc[data-state="brownout"] .shc-word, .shc[data-state="brownout"] .shc-pct { color: var(--st-degraded); }
-.shc[data-state="dark"] { opacity: 0.62; }
+
+.shc[data-state="dark"] { opacity: 0.55; --arc: var(--st-offline); --arc-glow: transparent; }
 .shc[data-state="dark"] .shc-dot { background: var(--st-offline); }
 .shc[data-state="dark"] .shc-word, .shc[data-state="dark"] .shc-pct { color: var(--st-offline); }
 
@@ -392,18 +514,28 @@
 
 .broadcast {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1.4vw;
-  padding: 0.9vh 1.8vw; border-top: 1px solid var(--edge); background: rgba(9, 14, 20, 0.86); backdrop-filter: blur(6px); z-index: 3;
+  padding: 0.9vh 1.8vw; border-top: 1px solid var(--hairline);
+  background: var(--glass-bar);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-inner), 0 -8px 30px rgba(0, 0, 0, 0.20);
+  transition: padding var(--t-normal) var(--ease-ui), background var(--t-normal) var(--ease-ui);
+  z-index: 3;
 }
-.bc-tag { font-size: clamp(10px, 1.4vh, 15px); letter-spacing: 0.16em; color: var(--hud-cyan); font-weight: 700; white-space: nowrap; opacity: 0.85; }
+.bc-tag {
+  font-size: clamp(10px, 1.4vh, 15px); letter-spacing: 0.14em; color: var(--heading);
+  font-weight: 600; white-space: nowrap; line-height: 1.5;
+  padding: 0.2vh 0.7vw; border-radius: var(--r-ctl);
+  background: rgba(139, 92, 246, 0.10); border: 1px solid rgba(190, 160, 255, 0.12);
+}
 .bc-body { display: flex; flex-direction: column; gap: 0.2vh; min-width: 0; }
-.bc-head { font-size: clamp(16px, 2.2vh, 26px); font-weight: 700; letter-spacing: 0.14em; color: var(--screen-ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bc-head { font-size: clamp(13px, 1.7vh, 19px); font-weight: 600; letter-spacing: 0.1em; color: var(--screen-ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
 .bc-msg { font-size: clamp(13px, 1.8vh, 21px); line-height: 1.25; letter-spacing: 0.04em; color: var(--screen-ink-dim); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .bc-msg:empty { display: none; }
 .bc-by { font-size: clamp(10px, 1.4vh, 15px); letter-spacing: 0.14em; color: var(--screen-ink-faint); white-space: nowrap; }
 .bc-by:empty { display: none; }
 
 /* live: taller, brighter, the amber of an announcement that matters */
-.broadcast[data-state="live"] { padding: 1.6vh 1.8vw; background: linear-gradient(180deg, rgba(22,18,10,0.96), rgba(10,16,22,0.96)); border-top: 2px solid var(--st-degraded); }
+.broadcast[data-state="live"] { padding: 1.6vh 1.8vw; background: linear-gradient(180deg, rgba(46, 36, 16, 0.62), rgba(16, 16, 25, 0.66)); border-top: 1px solid rgba(233, 180, 94, 0.42); }
 .broadcast[data-state="live"] .bc-tag { color: var(--st-degraded); }
 .broadcast[data-state="live"] .bc-head { font-size: clamp(24px, 3.4vh, 44px); letter-spacing: 0.06em; color: var(--screen-ink); }
 .broadcast.enter { animation: bcIn 0.45s ease; }
@@ -417,7 +549,11 @@
 }
 .t-inner {
   display: flex; flex-direction: column; align-items: center; gap: 1.6vh;
-  padding: 4vh 4vw; border: 2px solid #2a333c; background: rgba(10,12,14,0.88); max-width: 90%;
+  padding: 4vh 4vw; max-width: 90%;
+  border: 1px solid var(--glass-edge); border-radius: var(--r-panel);
+  background: rgba(18, 18, 28, 0.62);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-drop), var(--glass-inner), var(--glass-ambient);
 }
 .t-inner.wide { padding: 3vh 3vw; }
 .t-tag { font-size: clamp(12px, 1.5vh, 16px); letter-spacing: 0.42em; color: var(--ink-faint); }
@@ -444,11 +580,14 @@
 
 /* -- corner chrome ---------------------------------------------------------------- */
 
-.sound-hint { position: absolute; left: 1.8vw; bottom: 12vh; z-index: 10; font-size: 10px; letter-spacing: 0.18em; color: var(--ink-faint); background: #0c1013; padding: 3px 8px; border: 1px solid var(--line); }
 
 /* -- keyframes --------------------------------------------------------------------- */
 
 @keyframes citySweep { 0% { transform: translateY(-24vh); } 100% { transform: translateY(100vh); } }
+@keyframes cardAlarm {
+  0%, 100% { box-shadow: var(--glass-lift), var(--glass-inner), 0 0 18px rgba(255, 107, 122, 0.10); }
+  50%      { box-shadow: var(--glass-lift), var(--glass-inner), 0 0 30px rgba(255, 107, 122, 0.20); }
+}
 @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 @keyframes wallPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @keyframes tintPulse { 0%, 100% { opacity: 0.18; } 50% { opacity: 0.42; } }

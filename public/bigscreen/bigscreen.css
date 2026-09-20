@@ -32,7 +32,7 @@ body { background: #06080a; }
 .title .sub { font-size: 11px; letter-spacing: 0.36em; color: var(--ink-faint); margin-top: 6px; }
 
 .tempo { text-align: right; }
-.tempo .round { font-size: 28px; font-weight: 700; letter-spacing: 0.16em; color: var(--amber); }
+.tempo .round { font-family: var(--mono); font-size: 28px; font-weight: 700; letter-spacing: 0.16em; color: var(--accent-bright); }
 .tempo .clock { font-size: 52px; font-weight: 700; line-height: 1; letter-spacing: 0.04em; }
 .tempo .clock.low { color: var(--red); animation: pulse 1s infinite; }
 .tempo .mode { font-size: 11px; letter-spacing: 0.28em; color: var(--ink-faint); margin-top: 4px; }
@@ -144,7 +144,7 @@ body { background: #06080a; }
 }
 .ticker-label {
   flex: none; padding: 0 16px; height: 100%; display: flex; align-items: center;
-  background: var(--amber); color: #17130a; font-size: 11px; font-weight: 700;
+  background: var(--ui-active); color: var(--accent-ink); font-size: 11px; font-weight: 600;
   letter-spacing: 0.24em;
 }
 .ticker-viewport { flex: 1; overflow: hidden; }
