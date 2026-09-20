@@ -1013,6 +1013,35 @@ function handleSector(client, entry, msg) {
       return broadcast(entry);
     }
 
+    /** A sector at zero health buying its way back on. */
+    case 'emergency_restart': {
+      send(client.ws, { type: 'restart_result', ...game.emergencyRestart(mine, { by: mine }) });
+      return broadcast(entry);
+    }
+
+    /** The generator. POW/WTR only; every rule is checked in the reducer. */
+    case 'generator_upgrade_start': {
+      if (!game.generatorFor(mine)) return send(client.ws, { type: 'error', reason: 'no_generator' });
+      send(client.ws, { type: 'generator_result', action: 'start', ...game.startGeneratorUpgrade(mine, { by: mine }) });
+      return broadcast(entry);
+    }
+    case 'generator_upgrade_cancel': {
+      if (!game.generatorFor(mine)) return send(client.ws, { type: 'error', reason: 'no_generator' });
+      send(client.ws, { type: 'generator_result', action: 'cancel', ...game.cancelGeneratorUpgrade(mine, { by: mine }) });
+      return broadcast(entry);
+    }
+    /** The other generator signs off on a Level 5 step. Only the named supporter may. */
+    case 'generator_support_confirm': {
+      const forCode = String(msg.for || '').toUpperCase();
+      const g = game.generatorFor(forCode);
+      if (!g) return send(client.ws, { type: 'error', reason: 'no_generator' });
+      if (game.generatorSupportFrom(forCode, g.level + 1) !== mine) {
+        return send(client.ws, { type: 'error', reason: 'not_the_supporter' });
+      }
+      send(client.ws, { type: 'generator_result', action: 'support', ...game.confirmGeneratorSupport(forCode, { by: mine }) });
+      return broadcast(entry);
+    }
+
     /** AGR's dealt hand. Agriculture only. Activation is checked against the live world. */
     case 'agr_select': {
       if (mine !== 'AGR') return send(client.ws, { type: 'error', reason: 'agr_only' });
@@ -1185,6 +1214,11 @@ function handleControl(client, entry, msg) {
       return ok();
     case 'reset_heals':
       reply({ type: 'heals_reset', ...game.resetHeals({ by: 'facilitator' }) });
+      return ok();
+
+    // -- the pressure regulator (P0). Facilitator-only, always logged.
+    case 'pressure_relief':
+      reply({ type: 'pressure_result', ...game.pressureRelief(msg.kind || (msg.payload || {}).kind, msg.payload || {}, { by: 'facilitator', reason: msg.reason || '' }) });
       return ok();
 
     // -- a table's round output, as an override

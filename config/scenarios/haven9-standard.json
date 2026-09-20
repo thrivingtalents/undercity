@@ -47,12 +47,48 @@
     "insufficient_stock_behavior": "refuse",
     "expire_pending_requests_on_round_change": true,
     "expire_pending_transfers_on_round_change": true,
+    "carry_accepted_transfers_on_round_change": true,
     "expire_pending_healing_on_round_change": true,
     "require_physical_transfer_chit": true,
     "allow_facilitator_force_transfer": true,
     "allow_facilitator_force_heal": true,
     "notify_supplier_with_sound": true,
     "show_completed_transfer_on_wall": true,
+    "emergency_restart": {
+      "enabled": true,
+      "cost": { "parts": 2, "power": 1, "water": 1 },
+      "workers": 2,
+      "health_after": 20,
+      "worker_hold": "round"
+    },
+
+    "generator_upgrades": {
+      "enabled": true,
+      "sectors": ["POW", "WTR"],
+      "enabled_from_round": "R1",
+      "start_level": 2,
+      "min_level": 1,
+      "max_level": 5,
+      "cancel_parts_lost": 1,
+      "cancel_returns_round_slot": true,
+      "levels": [
+        { "level": 1, "name": "EMERGENCY",   "output": 2 },
+        { "level": 2, "name": "STANDARD",    "output": 3 },
+        { "level": 3, "name": "ENHANCED",    "output": 4 },
+        { "level": 4, "name": "HIGH OUTPUT", "output": 5 },
+        { "level": 5, "name": "MAXIMUM",     "output": 6 }
+      ],
+      "costs": [
+        { "to_level": 3, "parts": 1, "workers": 1, "support_from": null },
+        { "to_level": 4, "parts": 2, "workers": 2, "support_from": null },
+        { "to_level": 5, "parts": 2, "workers": 3, "support_from": { "POW": "WTR", "WTR": "POW" } }
+      ],
+      "support_labels": {
+        "POW": "COOLING CALIBRATION SUPPORT",
+        "WTR": "PUMP LOAD SUPPORT"
+      }
+    },
+
     "agr_cards_per_round": 3,
     "agr_anti_repeat": true,
     "agr_disabled_cards": ["AGR_WORKFORCE_RECOVERY"],

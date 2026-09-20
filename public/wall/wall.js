@@ -272,7 +272,7 @@
       // the sector's condition, and the figure in the middle of it.
       card.innerHTML =
         `<div class="shc-id"><img class="shc-icon" src="${ART}/icon-${code}.png" alt=""><b class="shc-code">${code}</b></div>` +
-        `<div class="shc-name">${d.name}</div>` +
+        `<div class="shc-name">${d.name}<i class="shc-cap"></i></div>` +
         '<div class="shc-gauge">' +
           `<svg class="ring" viewBox="0 0 ${RING.box} ${RING.box}" aria-hidden="true">` +
             `<circle class="ring-track" cx="${RING.c}" cy="${RING.c}" r="${RING.r}"></circle>` +
@@ -421,6 +421,9 @@
       const dash = `${Math.round((pct / 100) * RING.circ * 10) / 10} ${RING.circ}`;
       if (arc.getAttribute('stroke-dasharray') !== dash) arc.setAttribute('stroke-dasharray', dash);
       setText(card.querySelector('.shc-word'), B.CARD_WORD[state]);
+      // what the city has built, where the whole room can weigh it in Council
+      const gen = s && s.generator;
+      setText(card.querySelector('.shc-cap'), gen ? `L${gen.level}/${gen.max}` : '');
 
       // whether COM has reported, and how fresh it is — the numbers themselves
       // live on the sector consoles and the facilitator's screen

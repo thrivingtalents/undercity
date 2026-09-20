@@ -198,6 +198,10 @@
     $('bc-publish').addEventListener('click', publishAnnouncement);
     $('bc-clear').addEventListener('click', clearAnnouncement);
     $('btn-generate').addEventListener('click', generateOutput);
+    $('btn-restart').addEventListener('click', emergencyRestart);
+    $('btn-gen-start').addEventListener('click', startUpgrade);
+    $('btn-gen-cancel').addEventListener('click', cancelUpgrade);
+    $('btn-gen-support').addEventListener('click', confirmSupport);
 
     // Console.
     const input = $('code-input');
@@ -530,6 +534,8 @@
     renderResources();
     renderUpkeep();
     renderOutput();
+    renderRestart();
+    renderGenerator();
     renderInjured();
     renderTransfers();
     renderFaultList();
@@ -700,6 +706,117 @@
     show(btn, ro.manual && !ro.used);
     btn.disabled = !ro.available;
     show($('output-used'), ro.used);
+  }
+
+  // -- EMERGENCY RESTART: the way back on ------------------------------------
+
+  const RS_BLOCK = {
+    restart_running: 'RESTART ALREADY UNDER WAY',
+    insufficient_stock: 'NOT ENOUGH STOCK FOR THE RESTART',
+    insufficient_crew: 'NOT ENOUGH AVAILABLE WORKERS',
+  };
+
+  function emergencyRestart() { socket.send({ type: 'emergency_restart' }); }
+
+  function renderRestart() {
+    const r = mine && mine.emergency_restart;
+    show($('restart-panel'), !!r);
+    if (!r) return;
+    const costText = Object.entries(r.cost)
+      .map(([k, v]) => `${v} ${resName(k)}`).join(' · ');
+    setText($('rs-health'), String(r.health_after));
+    setText($('rs-cost'), costText);
+    setText($('rs-crew'), `${r.workers_required} WORKER${r.workers_required === 1 ? '' : 'S'}, HELD UNTIL THE ROUND ENDS`);
+    setText($('rs-have'), Object.keys(r.cost)
+      .map((k) => `${ourStock(k)} ${resName(k)}`).concat(`${r.workers_available} AVAILABLE`).join(' · '));
+    const shortText = Object.entries(r.short).map(([k, v]) => `${v} MORE ${resName(k)}`).join(' · ');
+    setText($('rs-warn'), shortText ? `SHORT: ${shortText}` : '');
+    show($('rs-warn'), !!shortText);
+    $('btn-restart').disabled = !r.can_start;
+    const blocked = r.blockers.length ? (RS_BLOCK[r.blockers[0]] || r.blockers[0]) : '';
+    setText($('rs-blocked'), blocked);
+    show($('rs-blocked'), !!blocked);
+  }
+
+  // -- GENERATOR: the one piece of infrastructure a table can buy ------------
+
+  const GEN_BLOCK = {
+    not_open_yet: 'UPGRADES OPEN FROM ROUND 1',
+    sector_dark: 'SECTOR DARK — NO UPGRADE',
+    upgrade_pending: 'UPGRADE ALREADY RUNNING',
+    used_this_round: 'UPGRADE ALREADY USED THIS ROUND',
+    at_maximum: 'GENERATOR AT MAXIMUM LEVEL',
+    insufficient_parts: 'NOT ENOUGH PARTS',
+    insufficient_crew: 'NOT ENOUGH AVAILABLE WORKERS',
+    missing_support: 'WAITING FOR CROSS-SECTOR SUPPORT',
+  };
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 'S'}`;
+
+  function startUpgrade() { socket.send({ type: 'generator_upgrade_start' }); }
+  function cancelUpgrade() { socket.send({ type: 'generator_upgrade_cancel' }); }
+  function confirmSupport() {
+    const code = $('btn-gen-support').dataset.forSector;
+    if (code) socket.send({ type: 'generator_support_confirm', for: code });
+  }
+
+  function renderGenerator() {
+    const g = mine && mine.generator;
+    show($('gen-panel'), !!g);
+    renderSupportAsk();
+    if (!g) return;
+
+    setText($('gen-cap'), `L${g.level} / ${g.max_level}`);
+    setText($('gen-level'), `L${g.level}`);
+    setText($('gen-name'), g.level_name || '');
+    setText($('gen-output'), `${g.output_now} / ROUND`);
+
+    const pending = g.pending;
+    show($('gen-pending'), !!pending);
+    if (pending) {
+      setText($('gen-p-level'), `L${pending.to_level}`);
+      setText($('gen-p-crew'), `${plural(pending.workers_committed, 'WORKER')} · ${plural(pending.parts_spent, 'PART')} SPENT`);
+      setText($('btn-gen-cancel'), `CANCEL UPGRADE — ${plural(g.cancel_parts_lost, 'PART')} LOST`);
+    }
+
+    // the offer, only when there is one to make
+    const offer = !pending && g.next_level;
+    show($('gen-next'), !!offer);
+    if (offer) {
+      setText($('gen-next-level'), `L${g.next_level} ${g.next_level_name} — ${g.output_next} / ROUND`);
+      setText($('gen-cost'), `${plural(g.parts_required, 'PART')} · ${plural(g.workers_required, 'WORKER')}`);
+      setText($('gen-have'), `${plural(g.parts_available, 'PART')} · ${plural(g.workers_available, 'WORKER')} AVAILABLE`);
+      show($('gen-support-row'), !!g.support_from);
+      if (g.support_from) {
+        setText($('gen-support'), `${g.support_from} ${g.support_label} — ${g.support_confirmed ? 'CONFIRMED' : 'NOT CONFIRMED'}`);
+        $('gen-support').classList.toggle('ok', !!g.support_confirmed);
+      }
+      // the sentence the table must read before it commits
+      const warn = g.can_start
+        ? `${plural(g.workers_after, 'WORKER')} WILL REMAIN. COMMITTED WORKERS CANNOT REPAIR FAULTS UNTIL THE ROUND ENDS.`
+        : '';
+      setText($('gen-warn'), warn);
+      show($('gen-warn'), !!warn);
+      const btn = $('btn-gen-start');
+      btn.disabled = !g.can_start;
+      setText(btn, `START UPGRADE — L${g.next_level}`);
+    }
+
+    const blocked = !pending && g.blockers.length ? (GEN_BLOCK[g.blockers[0]] || g.blockers[0]) : '';
+    setText($('gen-blocked'), blocked);
+    show($('gen-blocked'), !!blocked && !offer);
+  }
+
+  /** The other generator is asking us to sign off on its Level 5 step. */
+  function renderSupportAsk() {
+    let ask = null;
+    let code = null;
+    for (const [c, s] of Object.entries(state.sectors || {})) {
+      if (c !== SECTOR && s && s.support_request) { ask = s.support_request; code = c; break; }
+    }
+    show($('gen-ask-panel'), !!ask);
+    if (!ask) return;
+    setText($('gen-ask-text'), `${code} NEEDS ${ask.label} TO REACH L${ask.to_level}. CONFIRMING COSTS YOU NOTHING BUT COMMITS THE CITY'S PARTS TO THEIR GENERATOR.`);
+    $('btn-gen-support').dataset.forSector = code;
   }
 
   function sectorLabel(code) {

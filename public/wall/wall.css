@@ -447,6 +447,12 @@
 .shc-id { display: flex; align-items: center; justify-content: center; gap: 0.45vw; min-width: 0; max-width: 100%; }
 /* identity */
 .shc-code { font-size: clamp(15px, 2.1vh, 24px); font-weight: 700; letter-spacing: 0.08em; color: var(--accent); }
+.shc-cap {
+  font-style: normal; margin-left: 0.4vw; padding: 0 0.35vw;
+  font-size: 0.85em; letter-spacing: 0.04em; font-variant-numeric: tabular-nums;
+  color: var(--heading); border: 1px solid var(--glass-edge-soft); border-radius: var(--r-ctl);
+}
+.shc-cap:empty { display: none; }
 .shc-name { max-width: 100%; font-size: clamp(9px, 1.2vh, 13px); letter-spacing: 0.1em; color: var(--screen-ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* condition */
 /* Sized from the ROW, not the column: a squeezed row must shrink the dial, or

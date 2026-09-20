@@ -237,6 +237,34 @@ button.wide { width: 100%; }
 /* -- the fault's reward ------------------------------------------------------ */
 
 
+/* -- emergency shutdown: the one way back on -------------------------------- */
+
+.restart-block { border-color: rgba(255,107,122,0.42); }
+.restart-block .ptitle { color: var(--red); }
+.rs-lead { font-size: 11.5px; line-height: 1.55; color: var(--ink-dim); margin-bottom: 8px; }
+.rs-lead b { color: var(--ink); }
+
+/* -- the generator: level now, the one upgrade this round may buy ----------- */
+
+.gen-now { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.gen-lv { font-size: 30px; font-weight: 700; line-height: 1; color: var(--accent-bright); font-family: var(--mono); }
+.gen-nm { font-size: 12px; letter-spacing: 0.1em; color: var(--ink-dim); }
+.gen-out { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--ink); font-family: var(--mono); }
+.gen-row { display: flex; align-items: baseline; gap: 8px; font-size: 11px; padding: 3px 0; border-top: 1px solid rgba(255,255,255,0.04); }
+.gen-row .k { min-width: 92px; color: var(--ink-faint); letter-spacing: 0.08em; }
+.gen-row b { color: var(--ink); font-weight: 600; }
+.gen-row b.ok { color: var(--green); }
+.gen-warn {
+  margin: 8px 0; padding: 7px 9px; font-size: 10.5px; line-height: 1.5; letter-spacing: 0.04em;
+  color: var(--amber); background: rgba(233,180,94,0.08);
+  border: 1px solid rgba(233,180,94,0.28); border-radius: var(--r-sm);
+}
+.gen-blocked { margin-top: 8px; font-size: 11px; letter-spacing: 0.06em; color: var(--ink-faint); }
+.gen-pending { border-top: 1px solid var(--ui-border-strong); margin-top: 8px; padding-top: 8px; }
+.gen-pending button { margin-top: 8px; }
+.gen-ask { font-size: 11px; line-height: 1.55; color: var(--ink-dim); margin-bottom: 8px; }
+.gen-support-block { border-color: var(--ui-border-highlight); }
+
 /* -- the city big screen ----------------------------------------------------- */
 
 .broadcast-block.editable { border-color: var(--ui-border-strong); }

@@ -663,7 +663,7 @@ test('no approval until Transport confirms the physical chit', () => {
   assert.equal(logEvents(game, 'transfer_chit')[0].confirmed, true);
 });
 
-test('unfinished requests, transfers and healing all expire at a round change; finished ones do not', () => {
+test('an unanswered request expires with its round; a transfer the supplier accepted carries as DELAYED', () => {
   const game = running();
   const delivered = readyTransfer(game, { from: 'WTR', to: 'POW', resource: 'water', amount: 1 });
   game.approveTransfer(delivered.id, { by: 'TRN' });
@@ -677,19 +677,37 @@ test('unfinished requests, transfers and healing all expire at a round change; f
 
   game.setRound('R3');
   assert.equal(game.findRequest(openRequest.request.id).status, 'EXPIRED');
-  assert.equal(game.findTransfer(openTransfer.transfer.id).status, 'EXPIRED');
   assert.equal(game.findHealing(openHeal.healing.id).status, 'EXPIRED');
   assert.equal(game.findTransfer(delivered.id).status, 'DELIVERED', 'history is not rewritten');
   assert.equal(game.findHealing(healed.healing.id).status, 'HEALED');
   assert.equal(game.state.sectors.WTR.workforce.injured, 0, 'a healed worker stays healed');
-  assert.equal(forSector(game, 'TRN').transfer_queue.items.length, 0);
   assert.equal(forSector(game, 'MED').healing_queue.items.length, 0);
 
-  // Each collection has its own switch.
-  game.patchConfig({ expire_pending_transfers_on_round_change: false });
-  const survivor = game.createTransfer({ from: 'AGR', to: 'MED', resource: 'parts', amount: 1, by: 'AGR' });
+  // TRN-01. A supplier already said yes to this one, so the round boundary
+  // does not erase it: it carries, marked DELAYED, and still needs a slot.
+  const carried = game.findTransfer(openTransfer.transfer.id);
+  assert.equal(carried.status, 'PENDING_TRN_APPROVAL', 'an accepted transfer was erased by the clock');
+  assert.equal(carried.delayed, true);
+  assert.equal(carried.delayed_from_round, 'R2');
+  const queue = forSector(game, 'TRN').transfer_queue.items;
+  assert.equal(queue.length, 1, 'the carried transfer left the queue');
+  assert.equal(queue[0].delayed, true);
+  assert.equal(queue[0].delayed_from_round, 'R2');
+
+  // TRN can still complete it next round, through the ordinary flow — the chit
+  // is still required — and it spends one of next round's slots.
+  assert.equal(game.stampsUsed(), 0, 'the new round did not return the approvals');
+  assert.equal(game.approveTransfer(carried.id, { by: 'TRN' }).reason, 'chit_required',
+    'a carried transfer skipped the physical chit');
+  assert.equal(game.confirmChit(carried.id, true, { by: 'TRN' }).ok, true);
+  assert.equal(game.approveTransfer(carried.id, { by: 'TRN' }).ok, true);
+  assert.equal(game.stampsUsed(), 1, 'a carried transfer did not consume a slot');
+
+  // The old behaviour is one switch away.
+  game.patchConfig({ carry_accepted_transfers_on_round_change: false });
+  const doomed = game.createTransfer({ from: 'AGR', to: 'MED', resource: 'parts', amount: 1, by: 'AGR' });
   game.setRound('R4');
-  assert.equal(game.findTransfer(survivor.transfer.id).status, 'PENDING_TRN_APPROVAL');
+  assert.equal(game.findTransfer(doomed.transfer.id).status, 'EXPIRED');
 });
 
 test('the facilitator can force an approval, and it is flagged as an override', () => {
@@ -3351,6 +3369,515 @@ test('COM goes blind under a comms blackout, and the wall degrades when COM is d
   const brown = forSector(game, 'COM');
   assert.equal(brown.intel.items.find((i) => i.key === 'water_pressure').value, 'UNKNOWN');
   assert.notEqual(brown.intel.items.find((i) => i.key === 'medical_load').value, 'UNKNOWN', 'per-item flag');
+});
+
+
+// -- P0 · worker commitment ---------------------------------------------------------------
+// Workers are counts, so "busy" has to be modelled explicitly: a commitment is
+// a named claim on part of the active pool, and availableWorkers() is the one
+// place anything asks who is free.
+
+test('a commitment takes workers out of the available pool without making them injured', () => {
+  const game = newGame();
+  const pow = game.state.sectors.POW;
+  const before = game.availableWorkers(pow);
+  assert.equal(before, 8, 'the standard scenario no longer starts POW with eight');
+
+  const c = game.commitWorkers('POW', 'GENERATOR_UPGRADE', 3);
+  assert.equal(c.ok, true);
+  assert.equal(game.availableWorkers(pow), before - 3, 'the pool did not shrink');
+  assert.equal(game.committedWorkers(pow), 3);
+  assert.equal(pow.workforce.active, 8, 'a committed worker was counted as gone');
+  assert.equal(pow.workforce.injured, 0, 'a committed worker was counted as injured');
+
+  assert.equal(game.releaseWorkers('POW', 'GENERATOR_UPGRADE'), 3);
+  assert.equal(game.availableWorkers(pow), before, 'the workers never came back');
+  assert.equal(game.committedWorkers(pow), 0);
+});
+
+test('a commitment cannot overdraw the pool, and two purposes stack', () => {
+  const game = newGame();
+  const pow = game.state.sectors.POW;
+  assert.equal(game.commitWorkers('POW', 'GENERATOR_UPGRADE', 99).ok, false);
+  assert.equal(game.committedWorkers(pow), 0, 'a refused commitment took workers anyway');
+
+  assert.equal(game.commitWorkers('POW', 'GENERATOR_UPGRADE', 5).ok, true);
+  assert.equal(game.commitWorkers('POW', 'EMERGENCY_RESTART', 3).ok, true);
+  assert.equal(game.availableWorkers(pow), 0);
+  const over = game.commitWorkers('POW', 'OTHER', 1);
+  assert.equal(over.ok, false);
+  assert.equal(over.reason, 'insufficient_crew');
+  assert.equal(over.available, 0);
+  // releasing one purpose does not release the other
+  game.releaseWorkers('POW', 'GENERATOR_UPGRADE');
+  assert.equal(game.committedWorkers(pow), 3);
+});
+
+// WRK-01
+test('WRK-01 a repair sees only the workers a commitment has left, and says why', () => {
+  const game = newGame();
+  game.setPhase('ROUND_2');
+  const def = loadContent().faults.faults.find((f) => f.sector === 'POW' && f.crew_required >= 2);
+  assert.ok(def, 'no POW fault needs a crew');
+  assert.equal(game.fireFault(def.code, 'POW').ok, true);
+
+  const pow = game.state.sectors.POW;
+  const spare = game.availableWorkers(pow) - def.crew_required + 1;
+  assert.equal(game.commitWorkers('POW', 'GENERATOR_UPGRADE', spare).ok, true);
+  assert.ok(game.availableWorkers(pow) < def.crew_required, 'the commitment left enough crew to repair');
+
+  const res = submitCode(game, {
+    sector: 'POW', fault_code: def.code, code: def.valid_codes[0], workers_assigned: def.crew_required,
+  });
+  assert.equal(res.accepted, false, 'the repair used workers that were committed elsewhere');
+  assert.equal(res.reason, 'invalid_workers');
+  // the console explains the shortfall from its own frame, which now counts the claim
+  assert.equal(forSector(game, 'POW').sectors.POW.workforce.available, game.availableWorkers(pow));
+
+  // released, the same repair goes through
+  game.releaseWorkers('POW', 'GENERATOR_UPGRADE');
+  const ok = submitCode(game, {
+    sector: 'POW', fault_code: def.code, code: def.valid_codes[0], workers_assigned: def.crew_required,
+  });
+  assert.equal(ok.accepted, true, `the repair still fails once the crew is free: ${ok.reason}`);
+});
+
+test('injuries eat into a commitment rather than leaving a claim on workers who are gone', () => {
+  const game = newGame();
+  const pow = game.state.sectors.POW;
+  assert.equal(game.commitWorkers('POW', 'GENERATOR_UPGRADE', 6).ok, true);
+  assert.equal(game.availableWorkers(pow), 2);
+
+  // four injured: two come out of the free pair, two must come off the claim
+  game.injure('POW', 4);
+  assert.equal(pow.workforce.active, 4);
+  assert.equal(pow.workforce.injured, 4);
+  assert.equal(game.committedWorkers(pow), 4, 'the claim outlived the workers holding it');
+  assert.equal(game.availableWorkers(pow), 0);
+  assert.ok(game.committedWorkers(pow) <= pow.workforce.active, 'more workers are committed than exist');
+});
+
+test('a commitment survives a snapshot, and an older snapshot restores without one', () => {
+  const game = newGame();
+  assert.equal(game.commitWorkers('POW', 'GENERATOR_UPGRADE', 2).ok, true);
+  const snap = JSON.parse(JSON.stringify(game.serialise()));
+
+  const back = newGame();
+  back.restore(snap);
+  assert.equal(back.committedWorkers(back.state.sectors.POW), 2, 'the commitment did not survive');
+  assert.equal(back.availableWorkers(back.state.sectors.POW), 6);
+
+  // a snapshot from before this feature has no committed map at all
+  for (const s of Object.values(snap.state.sectors)) delete s.workforce.committed;
+  const old = newGame();
+  old.restore(snap);
+  assert.deepEqual(old.state.sectors.POW.workforce.committed, {}, 'an old snapshot did not get a committed map');
+  assert.equal(old.availableWorkers(old.state.sectors.POW), 8);
+});
+
+test('the facilitator and the sector both see what is committed', () => {
+  const game = newGame();
+  game.commitWorkers('POW', 'GENERATOR_UPGRADE', 3);
+  const ctl = forControl(game).sectors.POW.workforce;
+  assert.equal(ctl.committed_total, 3);
+  assert.deepEqual(ctl.committed, { GENERATOR_UPGRADE: 3 });
+  assert.equal(ctl.available, 5);
+  const own = forSector(game, 'POW').sectors.POW.workforce;
+  assert.equal(own.committed_total, 3);
+  assert.equal(own.available, 5);
+});
+
+
+// -- P0 · generator levels and upgrades ---------------------------------------------------
+// The level sets the BASE output; brownout, core scaling and effects still
+// apply on top. Upgrading is optional — Level 2 is the production the scenario
+// always had — and it cannot fail, skip a level or start half-supplied.
+
+function atRound1() {
+  const game = newGame();
+  game.setPhase('ROUND_1');
+  return game;
+}
+const prodOf = (game, code) => economy.productionFor(game, game.state.sectors[code]);
+
+test('a generator starts at the level the scenario always produced, and the level drives the base', () => {
+  const game = atRound1();
+  const v = game.generatorView('POW');
+  assert.equal(v.level, 2);
+  assert.equal(v.level_name, 'STANDARD');
+  assert.equal(v.output_now, 3, 'Level 2 is no longer the old production baseline');
+  assert.deepEqual(prodOf(game, 'POW'), { power: 3 });
+
+  game.generatorFor('POW').level = 4;
+  assert.deepEqual(prodOf(game, 'POW'), { power: 5 }, 'the level does not drive production');
+
+  // every existing modifier still applies on top of the level
+  game.setStatus('POW', 'BROWNOUT', { by: 'test' });
+  assert.deepEqual(prodOf(game, 'POW'), { power: 1 }, 'brownout stopped applying to a levelled generator');
+  game.setStatus('POW', null, { by: 'test' });
+
+  // a sector with no generator is untouched
+  assert.equal(game.generatorFor('MED'), null);
+  assert.equal(game.generatorView('TRN'), null);
+});
+
+// UPG-01
+test('UPG-01 an upgrade spends its Parts now, holds its crew, and lands at the end of the round', () => {
+  const game = atRound1();
+  const pow = game.state.sectors.POW;
+  pow.inventory.parts = 1;
+  const workersBefore = game.availableWorkers(pow);
+
+  const r = game.startGeneratorUpgrade('POW', { by: 'POW' });
+  assert.equal(r.ok, true, r.reason);
+  assert.equal(pow.inventory.parts, 0, 'the Part was not spent');
+  assert.equal(game.availableWorkers(pow), workersBefore - 1, 'the worker was not held');
+  assert.equal(game.generatorFor('POW').level, 2, 'the level rose before the round ended');
+  assert.deepEqual(prodOf(game, 'POW'), { power: 3 }, 'this round produced at the new level');
+  assert.equal(r.pending.to_level, 3);
+
+  game.setPhase('ROUND_2');
+  assert.equal(game.generatorFor('POW').level, 3, 'the upgrade did not land at round end');
+  assert.equal(game.availableWorkers(pow), workersBefore, 'the crew never came back');
+  assert.equal(game.committedWorkers(pow), 0);
+  assert.deepEqual(prodOf(game, 'POW'), { power: 4 }, 'the next round does not produce more');
+  assert.equal(game.generatorView('POW').used_this_round, false, 'the new round did not reset the slot');
+});
+
+// UPG-02
+test('UPG-02 an upgrade with Parts but no spare crew is refused and costs nothing', () => {
+  const game = atRound1();
+  const wtr = game.state.sectors.WTR;
+  game.generatorFor('WTR').level = 3;
+  wtr.inventory.parts = 2;
+  // leave exactly one worker free; L3→L4 needs two
+  game.commitWorkers('WTR', 'OTHER', game.availableWorkers(wtr) - 1);
+
+  const r = game.startGeneratorUpgrade('WTR', { by: 'WTR' });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'insufficient_crew');
+  assert.equal(wtr.inventory.parts, 2, 'a refused upgrade spent Parts');
+  assert.equal(game.generatorFor('WTR').pending, null);
+  assert.equal(game.generatorFor('WTR').level, 3);
+  assert.ok(game.generatorView('WTR').blockers.includes('insufficient_crew'));
+});
+
+// UPG-03
+test('UPG-03 one upgrade per generator per round', () => {
+  const game = atRound1();
+  game.state.sectors.POW.inventory.parts = 5;
+  assert.equal(game.startGeneratorUpgrade('POW').ok, true);
+  const second = game.startGeneratorUpgrade('POW');
+  assert.equal(second.ok, false);
+  assert.equal(second.reason, 'upgrade_pending');
+
+  // even once the first has landed, the slot is spent for that round
+  game.completeGeneratorUpgrades();
+  const third = game.startGeneratorUpgrade('POW');
+  assert.equal(third.ok, false);
+  assert.equal(third.reason, 'used_this_round');
+});
+
+// UPG-04
+test('UPG-04 cancelling returns the crew at once and all but one Part', () => {
+  const game = atRound1();
+  const pow = game.state.sectors.POW;
+  game.generatorFor('POW').level = 3;
+  pow.inventory.parts = 2;
+  const workersBefore = game.availableWorkers(pow);
+
+  assert.equal(game.startGeneratorUpgrade('POW').ok, true);
+  assert.equal(pow.inventory.parts, 0);
+  assert.equal(game.availableWorkers(pow), workersBefore - 2);
+
+  const c = game.cancelGeneratorUpgrade('POW', { by: 'POW' });
+  assert.equal(c.ok, true);
+  assert.equal(c.workers_released, 2);
+  assert.equal(c.parts_refunded, 1);
+  assert.equal(c.parts_lost, 1);
+  assert.equal(pow.inventory.parts, 1, 'the refund did not arrive');
+  assert.equal(game.availableWorkers(pow), workersBefore, 'the crew did not come back');
+  assert.equal(game.generatorFor('POW').level, 3, 'cancelling still moved the level');
+  assert.equal(game.generatorFor('POW').pending, null);
+  // a team that changes its mind early does not also lose the round
+  assert.equal(game.generatorView('POW').used_this_round, false);
+});
+
+// UPG-05
+test('UPG-05 Level 5 needs the other sector to confirm support, and says which', () => {
+  const game = atRound1();
+  const pow = game.state.sectors.POW;
+  game.generatorFor('POW').level = 4;
+  pow.inventory.parts = 2;
+
+  const v = game.generatorView('POW');
+  assert.equal(v.next_level, 5);
+  assert.equal(v.support_from, 'WTR');
+  assert.equal(v.support_label, 'COOLING CALIBRATION SUPPORT');
+  assert.equal(v.support_confirmed, false);
+  assert.equal(v.can_start, false);
+
+  const refused = game.startGeneratorUpgrade('POW');
+  assert.equal(refused.ok, false);
+  assert.equal(refused.reason, 'missing_support');
+  assert.equal(pow.inventory.parts, 2, 'a refused upgrade spent Parts');
+
+  assert.equal(game.confirmGeneratorSupport('POW', { by: 'WTR' }).ok, true);
+  assert.equal(game.generatorView('POW').support_confirmed, true);
+  const ok = game.startGeneratorUpgrade('POW');
+  assert.equal(ok.ok, true, ok.reason);
+  // the authorisation is spent on that upgrade, not reusable
+  assert.equal(game.generatorFor('POW').confirmation, null);
+
+  game.setPhase('ROUND_2');
+  assert.equal(game.generatorFor('POW').level, 5);
+  assert.deepEqual(prodOf(game, 'POW'), { power: 6 });
+  // and there is nothing above it
+  assert.ok(game.generatorView('POW').blockers.includes('at_maximum'));
+});
+
+// UPG-06
+test('UPG-06 a named event knocks a generator down one level, never below the floor', () => {
+  const game = atRound1();
+  game.generatorFor('POW').level = 4;
+
+  const d = game.damageGeneratorLevel('POW', { reason: 'F-210 cascade', by: 'facilitator' });
+  assert.equal(d.ok, true);
+  assert.equal(d.from_level, 4);
+  assert.equal(d.to_level, 3);
+  assert.deepEqual(prodOf(game, 'POW'), { power: 4 });
+
+  // one level per event, and a floor that holds
+  game.generatorFor('POW').level = 1;
+  const floored = game.damageGeneratorLevel('POW', { reason: 'again' });
+  assert.equal(floored.ok, false);
+  assert.equal(floored.reason, 'at_minimum');
+  assert.equal(game.generatorFor('POW').level, 1);
+  assert.deepEqual(prodOf(game, 'POW'), { power: 2 }, 'the emergency floor does not produce');
+
+  const kinds = logEvents(game).map((e) => e.ev);
+  assert.ok(kinds.includes('generator_level_damaged'), 'the damage was not logged');
+});
+
+test('upgrades are closed before the round the scenario opens them in, and a dark sector cannot start one', () => {
+  const game = newGame();               // R0
+  assert.equal(game.generatorUpgradesOpen(), false);
+  assert.ok(game.generatorView('POW').blockers.includes('not_open_yet'));
+  assert.equal(game.startGeneratorUpgrade('POW').reason, 'not_open_yet');
+
+  const live = atRound1();
+  live.setIntegrity('POW', 0);
+  assert.equal(live.state.sectors.POW.status, 'DARK');
+  assert.ok(live.generatorView('POW').blockers.includes('sector_dark'));
+  assert.equal(live.startGeneratorUpgrade('POW').reason, 'sector_dark');
+});
+
+test('a pending upgrade and its level survive a snapshot', () => {
+  const game = atRound1();
+  game.state.sectors.POW.inventory.parts = 3;
+  assert.equal(game.startGeneratorUpgrade('POW').ok, true);
+  const snap = JSON.parse(JSON.stringify(game.serialise()));
+
+  const back = newGame();
+  back.restore(snap);
+  assert.equal(back.generatorFor('POW').pending.to_level, 3);
+  assert.equal(back.committedWorkers(back.state.sectors.POW), 1, 'the held crew did not survive');
+  back.setPhase('ROUND_2');
+  assert.equal(back.generatorFor('POW').level, 3, 'a restored upgrade never landed');
+});
+
+test('the facilitator and the sector both see the generator, and the log carries the decision', () => {
+  const game = atRound1();
+  game.state.sectors.POW.inventory.parts = 2;
+  game.startGeneratorUpgrade('POW', { by: 'POW' });
+
+  const own = forSector(game, 'POW').sectors.POW.generator;
+  assert.equal(own.level, 2);
+  assert.equal(own.pending.to_level, 3);
+  assert.equal(own.completes, 'END OF CURRENT ROUND');
+  assert.equal(own.workers_after, game.availableWorkers(game.state.sectors.POW));
+
+  const started = logEvents(game).find((e) => e.ev === 'generator_upgrade_started');
+  assert.ok(started, 'the start was not logged');
+  assert.equal(started.sector, 'POW');
+  assert.equal(started.parts_spent, 1);
+  assert.equal(started.workers_committed, 1);
+
+  game.setPhase('ROUND_2');
+  const done = logEvents(game).find((e) => e.ev === 'generator_upgrade_completed');
+  assert.ok(done && done.to_level === 3, 'the completion was not logged');
+});
+
+
+// -- P0 · emergency shutdown and the way back on ------------------------------------------
+
+// DARK-01
+test('DARK-01 a sector at zero health is shut down, not eliminated: it can buy its way back', () => {
+  const game = newGame();
+  game.setPhase('ROUND_2');
+  const pow = game.state.sectors.POW;
+  pow.inventory.parts = 2; pow.inventory.power = 1; pow.inventory.water = 1;
+
+  game.setIntegrity('POW', 0);
+  assert.equal(pow.status, 'DARK');
+
+  // the requirements are on the table before anything is spent
+  const view = forSector(game, 'POW').sectors.POW.emergency_restart;
+  assert.ok(view, 'a shut-down sector is offered nothing');
+  assert.deepEqual(view.cost, { parts: 2, power: 1, water: 1 });
+  assert.equal(view.workers_required, 2);
+  assert.equal(view.health_after, 20);
+  assert.equal(view.can_start, true);
+
+  const r = game.emergencyRestart('POW', { by: 'POW' });
+  assert.equal(r.ok, true, r.reason);
+  assert.equal(pow.integrity, 20);
+  assert.equal(pow.status, 'CRITICAL', 'the restart did not lift the sector out of DARK');
+  assert.equal(pow.inventory.parts, 0);
+  assert.equal(pow.inventory.power, 0);
+  assert.equal(game.committedWorkers(pow), 2, 'the restart crew is not held');
+
+  // and the thing DARK took away — repairing its own faults — is back
+  const def = loadContent().faults.faults.find((f) => f.sector === 'POW');
+  assert.equal(game.fireFault(def.code, 'POW').ok, true);
+  const res = submitCode(game, {
+    sector: 'POW', fault_code: def.code, code: def.valid_codes[0], workers_assigned: def.crew_required,
+  });
+  assert.notEqual(res.reason, 'sector_dark', 'a restarted sector still cannot repair');
+
+  // the crew comes back with everyone else's, at the end of the round
+  game.setPhase('ROUND_3');
+  assert.equal(game.committedWorkers(pow), 0, 'the restart crew never came back');
+});
+
+test('a restart it cannot afford is refused, and says what is short', () => {
+  const game = newGame();
+  game.setPhase('ROUND_2');
+  const wtr = game.state.sectors.WTR;
+  wtr.inventory.parts = 0; wtr.inventory.power = 1; wtr.inventory.water = 1;
+  game.setIntegrity('WTR', 0);
+
+  const view = game.emergencyRestartView('WTR');
+  assert.equal(view.can_start, false);
+  assert.deepEqual(view.short, { parts: 2 });
+  const r = game.emergencyRestart('WTR', { by: 'WTR' });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'insufficient_stock');
+  assert.equal(wtr.integrity, 0, 'a refused restart moved the health anyway');
+  assert.equal(game.committedWorkers(wtr), 0, 'a refused restart held workers');
+
+  // a healthy sector is not offered one
+  assert.equal(game.emergencyRestartView('POW'), null);
+  assert.equal(game.emergencyRestart('POW').reason, 'not_shut_down');
+});
+
+// -- P0 · the facilitator's pressure regulator --------------------------------------------
+
+// FAC-01
+test('FAC-01 a granted TRN slot lasts the round it was granted in, and is logged', () => {
+  const game = newGame();
+  game.setPhase('ROUND_2');
+  assert.equal(game.trnCapacity(), 3);
+
+  const r = game.pressureRelief('trn_capacity', { delta: 1 }, { by: 'facilitator', reason: 'two tables stuck behind TRN' });
+  assert.equal(r.ok, true);
+  assert.equal(game.trnCapacity(), 4, 'the granted slot did not arrive');
+
+  const ev = logEvents(game).find((e) => e.ev === 'facilitator_pressure_relief');
+  assert.ok(ev, 'the intervention was not logged');
+  assert.equal(ev.kind, 'trn_capacity');
+  assert.equal(ev.reason, 'two tables stuck behind TRN');
+  assert.equal(ev.round, 'R2');
+
+  // it is for that round only
+  game.setPhase('ROUND_3');
+  assert.equal(game.trnCapacity(), 3, 'the granted slot outlived its round');
+});
+
+test('fault injection can be held without freezing the game, and the facilitator still fires by hand', () => {
+  const game = newGame();
+  game.setPhase('ROUND_2');
+  const def = loadContent().faults.faults.find((f) => f.sector === 'MED');
+
+  assert.equal(game.pressureRelief('pause_faults', {}, { reason: 'RED — nobody is deciding' }).ok, true);
+  assert.equal(game.pressureView().faults_paused, true);
+  const scripted = game.fireFault(def.code, 'MED', { source: 'timeline' });
+  assert.equal(scripted.ok, false);
+  assert.equal(scripted.reason, 'fault_injection_paused');
+  // the clock is untouched: this is not a pause
+  assert.equal(game.state.paused, false);
+  // and a deliberate hand still gets through
+  assert.equal(game.fireFault(def.code, 'MED', { source: 'facilitator' }).ok, true);
+
+  assert.equal(game.pressureRelief('resume_faults', {}, { reason: 'back to amber' }).ok, true);
+  assert.equal(game.pressureView().faults_paused, false);
+});
+
+test('decay can be frozen for a stated number of seconds, and thaws by itself', () => {
+  const game = newGame();
+  game.setPhase('ROUND_2');
+  game.clock('start');
+  const def = loadContent().faults.faults.find((f) => f.sector === 'AGR' && f.decay_per_min > 0)
+    || loadContent().faults.faults.find((f) => f.decay_per_min > 0);
+  game.fireFault(def.code, def.sector);
+  const sector = game.state.sectors[def.sector];
+
+  assert.equal(game.pressureRelief('freeze_decay', { seconds: 90 }, { reason: 'give them a breath' }).ok, true);
+  assert.equal(game.decayFrozen(), true);
+  const before = sector.integrity;
+  game.tick(60000);                       // tick takes milliseconds
+  assert.equal(sector.integrity, before, 'health bled while decay was frozen');
+
+  // past the window it bleeds again
+  game.tick(60000);
+  assert.equal(game.decayFrozen(), false);
+  game.tick(60000);
+  assert.ok(sector.integrity < before, 'decay never resumed');
+});
+
+test('the next scripted inject can be pushed back, and AGR can be handed a recovery card', () => {
+  const game = newGame();
+  game.setPhase('ROUND_2');
+  assert.equal(game.pressureRelief('delay_inject', { seconds: 60 }).reason, 'nothing_scheduled');
+
+  game.schedule({ kind: 'fault', fault_code: 'F-102', sector: 'POW', delay_s: 30, source: 'test' });
+  const at = game.state.scheduled[0].at_s;
+  const d = game.pressureRelief('delay_inject', { seconds: 60 }, { reason: 'too much at once' });
+  assert.equal(d.ok, true);
+  assert.equal(game.state.scheduled[0].at_s, at + 60);
+
+  game.agrEnsureOffer({ by: 'test' });
+  const had = game.state.agr.offered.length;
+  const g = game.pressureRelief('agr_recovery_card', {}, { reason: 'they need a way back' });
+  assert.equal(g.ok, true, g.reason);
+  assert.equal(game.state.agr.offered.length, had + 1, 'the card was not dealt');
+  assert.ok(logEvents(game).some((e) => e.ev === 'agr_card_granted'));
+});
+
+test('every relief needs a reason, and an unknown one is refused', () => {
+  const game = newGame();
+  assert.equal(game.pressureRelief('nonsense', {}).reason, 'unknown_relief');
+  assert.equal(game.pressureRelief('freeze_decay', {}).reason, 'seconds_required');
+  // the override wrapper is what enforces the reason on the wire
+  const { validate } = require('../lib/override');
+  assert.equal(validate({ action: 'pressure_relief', payload: {} }).reason, 'reason_required');
+  assert.equal(validate({ action: 'pressure_relief', reason: 'RED', payload: {} }).ok, true);
+});
+
+test('the regulator survives a snapshot', () => {
+  const game = newGame();
+  game.setPhase('ROUND_2');
+  game.pressureRelief('pause_faults', {}, { reason: 'x' });
+  const snap = JSON.parse(JSON.stringify(game.serialise()));
+  const back = newGame();
+  back.restore(snap);
+  assert.equal(back.pressureView().faults_paused, true);
+
+  // an older snapshot has no regulator at all
+  delete snap.state.pressure;
+  const old = newGame();
+  old.restore(snap);
+  assert.equal(old.pressureView().faults_paused, false);
 });
 
 // -- timeline ---------------------------------------------------------------------------

@@ -242,6 +242,56 @@
         <div class="msg" id="output-msg" hidden></div>
       </div>
 
+      <!-- Shown only at zero health: the way back on. -->
+      <div class="panel block main-panel restart-block" id="restart-panel" hidden>
+        <h2 class="ptitle">EMERGENCY SHUTDOWN</h2>
+        <div class="rs-lead">SYSTEMS OFFLINE. AN EMERGENCY RESTART BRINGS THIS SECTOR BACK AT <b id="rs-health">20</b>% AND CRITICAL.</div>
+        <div class="gen-row"><span class="k">COST</span><b id="rs-cost">—</b></div>
+        <div class="gen-row"><span class="k">CREW</span><b id="rs-crew">—</b></div>
+        <div class="gen-row"><span class="k">YOU HAVE</span><b id="rs-have">—</b></div>
+        <div class="gen-warn" id="rs-warn" hidden></div>
+        <button type="button" class="primary wide" id="btn-restart">EMERGENCY RESTART</button>
+        <div class="gen-blocked" id="rs-blocked" hidden></div>
+      </div>
+
+      <!-- POWER / WATER ONLY. The generator's installed level and the one
+           upgrade this round may buy. -->
+      <div class="panel block main-panel gen-block" id="gen-panel" hidden>
+        <h2 class="ptitle">GENERATOR <span class="cap" id="gen-cap"></span></h2>
+        <div class="gen-now">
+          <b class="gen-lv" id="gen-level">L2</b>
+          <span class="gen-nm" id="gen-name">STANDARD</span>
+          <span class="gen-out" id="gen-output">3 / ROUND</span>
+        </div>
+
+        <div class="gen-next" id="gen-next" hidden>
+          <div class="gen-row"><span class="k">NEXT</span><b id="gen-next-level">—</b></div>
+          <div class="gen-row"><span class="k">COST</span><b id="gen-cost">—</b></div>
+          <div class="gen-row"><span class="k">YOU HAVE</span><b id="gen-have">—</b></div>
+          <div class="gen-row"><span class="k">COMPLETES</span><b>END OF CURRENT ROUND</b></div>
+          <div class="gen-row" id="gen-support-row" hidden><span class="k">SUPPORT</span><b id="gen-support">—</b></div>
+          <div class="gen-warn" id="gen-warn" hidden></div>
+          <button type="button" class="primary wide" id="btn-gen-start">START UPGRADE</button>
+        </div>
+
+        <div class="gen-pending" id="gen-pending" hidden>
+          <div class="gen-row"><span class="k">UPGRADING TO</span><b id="gen-p-level">—</b></div>
+          <div class="gen-row"><span class="k">COMMITTED</span><b id="gen-p-crew">—</b></div>
+          <div class="gen-row"><span class="k">COMPLETES</span><b>END OF CURRENT ROUND</b></div>
+          <button type="button" class="wide" id="btn-gen-cancel">CANCEL UPGRADE</button>
+        </div>
+
+        <div class="gen-blocked" id="gen-blocked" hidden></div>
+        <div class="msg" id="gen-msg" hidden></div>
+      </div>
+
+      <!-- Asked of us by the other generator: a signature, not a resource. -->
+      <div class="panel block gen-support-block" id="gen-ask-panel" hidden>
+        <h2 class="ptitle">SUPPORT REQUESTED</h2>
+        <div class="gen-ask" id="gen-ask-text">—</div>
+        <button type="button" class="primary wide" id="btn-gen-support">CONFIRM SUPPORT</button>
+      </div>
+
       <!-- MEDICAL ONLY. The server sends this panel's data to MED alone. -->
       <div class="panel block main-panel healing-block" id="healing-panel" hidden>
         <h2 class="ptitle">HEALING THIS ROUND</h2>
