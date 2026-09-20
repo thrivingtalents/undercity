@@ -1,5 +1,5 @@
 {
-  "_comment": "The Big Screen's map media, in one place instead of three. public/wall/wall.js reads this at startup and the server serves it read-only at /config/big-screen-map.json. `source` and `fallbackImage` are URLs as the browser asks for them; the *_file keys are where those bytes live in the repo, and `sourceArtwork` is the master the pipeline copies from (tools/prepare-wall-art.js). The painted map is not a leftover: it is what the wall shows until the video is actually playing, and what it keeps showing if the video cannot load. Set type to \"image\" to run the Big Screen on the painting alone.",
+  "_comment": "The Big Screen's map media, in one place instead of three. public/wall/wall.js reads this at startup and the server serves it read-only at /config/big-screen-map.json. `source` and `fallbackImage` are URLs as the browser asks for them; the *_file keys are where those bytes live in the repo, and `sourceArtwork` is the master the pipeline copies from (tools/prepare-wall-art.js). The painted map is not a leftover: it is what the wall shows until the video is actually playing, and what it keeps showing if the video cannot load. Set type to \"image\" to run the Big Screen on the painting alone. `overlayLabels` is false because this clip prints its own district names: the wall would only repeat them in the wrong places. Set it true for a clip with no baked-in labels and the HTML tags come back, positions and all. The live state on the map — the tints, the CRITICAL/DARK/BROWNOUT words, the fault badges and the transfer routes — is drawn either way.",
   "mapDisplay": {
     "type": "video",
     "source": "/assets/wall/art/haven9-map.mp4",
@@ -14,6 +14,7 @@
     "preload": "auto",
     "controls": false,
     "fit": "contain",
-    "position": "center"
+    "position": "center",
+    "overlayLabels": false
   }
 }

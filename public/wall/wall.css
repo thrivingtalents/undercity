@@ -209,9 +209,18 @@
 #map.debug .d-edge { opacity: 1 !important; stroke: #00e5ff !important; stroke-dasharray: none !important; animation: none !important; }
 
 /* the label pill: icon + name, covering the painted callout */
+/*
+  The name tags. The animation already names every district, so by default
+  these are NOT drawn — two names in two places is worse than one — and the
+  map's live overlays carry the state instead. `overlayLabels: true` in
+  config/big-screen-map.json brings them back for a clip without baked-in
+  names, which is what they were traced for.
+*/
+.label, .core-sub { display: none; }
+.city[data-labels="on"] .label, .city[data-labels="on"] .core-sub { display: inline; }
+
 /* A location identifier, not a button: a square dark tag, a hairline of the
-   sector's own colour, and one small light for its condition. The animation
-   names its districts too, so these stay quiet. */
+   sector's own colour, and one small light for its condition. */
 .l-bg { fill: rgba(7, 12, 17, 0.72); stroke: var(--accent); stroke-width: 1; stroke-opacity: 0.55; }
 .l-text { font-size: 21px; letter-spacing: 0.12em; font-weight: 700; fill: #E8F1F7; }
 .l-state { fill: var(--st-stable); opacity: 0; transition: opacity 0.4s; }
@@ -230,6 +239,8 @@
 .district[data-state="brownout"] .l-bg { stroke-dasharray: 8 6; }
 
 /* the state word under the label: CRITICAL, DARK or BROWNOUT — never colour alone */
+/* The one thing the overlay still says on the map: the condition, when a
+   district has one. It sits on the district's own callout. */
 .state-tag { opacity: 0; transition: opacity 0.4s; }
 .state-tag rect { fill: #0b0e12; stroke: var(--red); stroke-width: 2; }
 .state-tag text { font-size: 20px; font-weight: 700; letter-spacing: 0.24em; fill: var(--red); }

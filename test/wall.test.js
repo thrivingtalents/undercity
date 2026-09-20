@@ -424,6 +424,23 @@ const MAP_MEDIA = JSON.parse(read('config/big-screen-map.json'));
 const SERVER_JS = read('server.js');
 const PREPARE_ART = read('tools/prepare-wall-art.js');
 
+test('the clip names the districts, so the overlay does not: the name tags are off, the live state is not', () => {
+  // The names are the clip's job now. The wall stops printing them in a second
+  // place, and one word in the config brings them back for a clip without any.
+  assert.equal(MAP_MEDIA.mapDisplay.overlayLabels, false, 'the overlay still repeats the clip\'s names');
+  assert.ok(/\.label, \.core-sub \{ display: none; \}/.test(WALL_CSS), 'the name tags are still drawn');
+  assert.ok(/\.city\[data-labels="on"\] \.label/.test(WALL_CSS), 'a label-free clip could not bring them back');
+  assert.ok(/city\.dataset\.labels = m\.overlayLabels === true \? 'on' : 'off'/.test(WALL_SCRIPT), 'the config does not decide');
+  // a painting-only wall keeps them: nothing else would name the districts
+  assert.ok(/city\.dataset\.labels = 'on';/.test(WALL_SCRIPT), 'the fallback map loses its names too');
+  // everything the map says about LIVE state is still drawn
+  for (const live of ['state-tag', 'badge', 'd-tint', 'd-edge', 'route']) {
+    assert.ok(new RegExp(`\\.${live}`).test(WALL_CSS), `${live} was removed with the labels`);
+  }
+  assert.ok(/stateTag\(d\.label\)/.test(WALL_SCRIPT) && /class: 'state-tag'/.test(WALL_SCRIPT), 'the condition word left the map');
+  assert.ok(/renderFaultBadge/.test(WALL_SCRIPT), 'the fault badge left the map');
+});
+
 test('the map media config names real files and is set to play the animation', () => {
   const m = MAP_MEDIA.mapDisplay;
   assert.ok(m, 'no mapDisplay block');

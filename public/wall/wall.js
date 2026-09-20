@@ -664,6 +664,8 @@
     if (!city || !video) return;
     const painting = () => { city.dataset.map = 'image'; };
     painting();
+    // A painting-only wall keeps its tags: nothing else would name the districts.
+    city.dataset.labels = 'on';
     fetch(MAP_MEDIA_URL, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((cfg) => {
@@ -676,6 +678,10 @@
             img.setAttributeNS(XLINK, 'xlink:href', m.fallbackImage);
           }
         }
+        // The clip carries its own district names, so the overlay tags stay off
+        // unless the config says this cut has none. Only the names go: every
+        // live overlay — state words, fault badges, tints, routes — stays.
+        city.dataset.labels = m.overlayLabels === true ? 'on' : 'off';
         if (m.type !== 'video' || !m.source) { video.remove(); return; }   // configured off
         video.loop = m.loop !== false;
         video.muted = m.muted !== false;              // muted is what lets a browser autoplay at all
