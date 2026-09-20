@@ -191,6 +191,12 @@ app.use('/audio', express.static(path.join(__dirname, 'public', 'audio'), static
 for (const view of ['sector', 'bigscreen', 'wall', 'control', 'admin']) {
   app.use(`/assets/${view}`, express.static(path.join(__dirname, 'public', view), staticOpts));
 }
+// The Big Screen's map media settings. ONE file by name, never the config
+// directory: the scenarios in there carry balance and fault overrides that a
+// participant screen has no business reading.
+app.get('/config/big-screen-map.json', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'config', 'big-screen-map.json'));
+});
 
 const view = (name) => path.join(__dirname, 'public', name, 'index.html');
 

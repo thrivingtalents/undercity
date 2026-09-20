@@ -343,3 +343,98 @@ test('no gameplay moved: TRN alone approves, MED alone heals, COM alone reports'
   assert.equal(game.setBroadcastRow('POW', { power: 1 }, { by: 'POW' }).ok, false);
   assert.equal(game.setBroadcastRow('POW', { power: 1 }, { by: 'COM' }).ok, true);
 });
+
+// -- the city animation (2026-09-20) ------------------------------------------------------
+//
+// The Big Screen's map is a looping video with the painting behind it as the
+// fallback. Everything about the media lives in config/big-screen-map.json;
+// the wall reads it at startup and nothing else in the screen changes.
+
+const MAP_MEDIA = JSON.parse(read('config/big-screen-map.json'));
+const SERVER_JS = read('server.js');
+const PREPARE_ART = read('tools/prepare-wall-art.js');
+
+test('the map media config names real files and is set to play the animation', () => {
+  const m = MAP_MEDIA.mapDisplay;
+  assert.ok(m, 'no mapDisplay block');
+  assert.equal(m.type, 'video');
+  assert.equal(m.source, '/assets/wall/art/haven9-map.mp4');
+  assert.equal(m.fallbackImage, '/assets/wall/art/haven9-map.png');
+  // the URLs and the files on disk are the same bytes, served by /assets/wall
+  for (const [url, file] of [[m.source, m.sourceFile], [m.fallbackImage, m.fallbackImageFile]]) {
+    assert.equal(url, `/assets/wall/${file.replace('public/wall/', '')}`, `${file} is not where its URL says`);
+    assert.ok(fs.existsSync(path.join(ROOT, file)), `${file} is missing`);
+    assert.ok(fs.statSync(path.join(ROOT, file)).size > 1000, `${file} is empty`);
+  }
+  assert.ok(fs.existsSync(path.join(ROOT, m.sourceArtwork)), 'the master animation named by the config is gone');
+  // the playback a command-centre display needs, and nothing a viewer can press
+  assert.equal(m.autoplay, true); assert.equal(m.loop, true); assert.equal(m.muted, true);
+  assert.equal(m.playsInline, true); assert.equal(m.preload, 'auto');
+  assert.equal(m.controls, false, 'the Big Screen would show playback controls');
+  assert.equal(m.fit, 'contain', 'the map would be cropped or stretched');
+  assert.equal(m.position, 'center');
+});
+
+test('the config is served by name, and the rest of config/ stays private', () => {
+  assert.ok(/app\.get\('\/config\/big-screen-map\.json'/.test(SERVER_JS), 'the wall cannot read its own config');
+  assert.ok(!/express\.static\(path\.join\(__dirname, 'config'/.test(SERVER_JS), 'the whole config directory is exposed');
+  assert.ok(!/\/config['"`]?, express\.static/.test(SERVER_JS));
+});
+
+test('the wall plays the animation under the same box, with no controls and no chrome', () => {
+  const html = WALL_INDEX;
+  assert.ok(/<video id="map-video"/.test(html), 'no video element');
+  for (const attr of ['autoplay', 'loop', 'muted', 'playsinline', 'preload="auto"']) {
+    assert.ok(new RegExp(`<video id="map-video"[^>]*\\b${attr.replace('"', '"')}`, 's').test(html), `the video is missing ${attr}`);
+  }
+  const tag = html.slice(html.indexOf('<video id="map-video"'), html.indexOf('>', html.indexOf('<video id="map-video"')) + 1);
+  assert.ok(!/\bcontrols\b/.test(tag), 'the video shows controls');
+  assert.ok(/disablepictureinpicture/.test(tag) && /disableremoteplayback/.test(tag), 'the browser can still offer playback UI');
+  assert.ok(/aria-hidden="true"/.test(tag) && /tabindex="-1"/.test(tag), 'the decoration is in the reading order');
+  assert.ok(!/src=/.test(tag), 'the media path is hardcoded in the markup as well as the config');
+  // the video is inside the city panel, before the SVG that draws over it
+  const city = html.indexOf('<section class="city"');
+  assert.ok(city > -1 && html.indexOf('<video id="map-video"') > city && html.indexOf('<video id="map-video"') < html.indexOf('<svg id="map"'));
+  // the painted map is still the SVG's own backdrop
+  assert.ok(/haven9-map\.png/.test(WALL_SCRIPT) && fs.existsSync(path.join(ROOT, 'public/wall/art/haven9-map.png')));
+});
+
+test('the animation fills the map area without distortion, under every overlay', () => {
+  const css = WALL_CSS;
+  const rule = css.slice(css.indexOf('.map-video {'), css.indexOf('}', css.indexOf('.map-video {')));
+  assert.ok(/object-fit: contain/.test(rule), 'the video is stretched or cropped');
+  assert.ok(/object-position: center/.test(rule), 'the video is not centred');
+  assert.ok(/position: absolute/.test(rule) && /inset: 0/.test(rule) && /width: 100%/.test(rule) && /height: 100%/.test(rule), 'the video does not fill the map area');
+  assert.ok(/z-index: -1/.test(rule), 'the video is not behind the overlays');
+  assert.ok(!/border/.test(rule), 'a border was added around the map');
+  assert.ok(/\.city \{[^}]*isolation: isolate/s.test(css), 'the video can escape behind the city panel');
+  assert.ok(/\.city\[data-map="video"\] \.backdrop \{[^}]*opacity: 0/s.test(css), 'the painting stays on top of the animation');
+  assert.ok(/\.wall\.dimmed #map, \.wall\.dimmed \.map-video \{/.test(css), 'a takeover dims the overlays but not the animation');
+});
+
+test('the animation loops natively: no timer restarts it, nothing reloads it, and a failure falls back to the painting', () => {
+  const js = WALL_SCRIPT;
+  const fn = js.slice(js.indexOf('function startMapAnimation()'), js.indexOf('\n  buildMap();'));
+  assert.ok(fn.length > 400, 'startMapAnimation is missing');
+  assert.ok(/fetch\(MAP_MEDIA_URL/.test(fn), 'the wall does not read the media config');
+  assert.ok(/video\.loop = m\.loop !== false/.test(fn) && /video\.muted = m\.muted !== false/.test(fn), 'loop and muted are not taken from the config');
+  assert.ok(/video\.controls = m\.controls === true/.test(fn));
+  // native loop only: no clock is allowed near this element
+  assert.ok(!/setInterval|setTimeout|requestAnimationFrame/.test(fn), 'a timer drives the video');
+  assert.ok(!/currentTime\s*=/.test(fn), 'the video is restarted by hand');
+  assert.ok((fn.match(/video\.src\s*=/g) || []).length === 1, 'the video source is assigned more than once');
+  assert.ok(/video\.load\(\)/.test(fn) === false, 'the video is reloaded');
+  // the fallback: the painting shows until it plays, and comes back if it fails
+  assert.ok(/const painting = \(\) => \{ city\.dataset\.map = 'image'; \};/.test(fn));
+  assert.ok(/addEventListener\('error', painting\)/.test(fn), 'a broken video leaves an empty box');
+  assert.ok(/addEventListener\('playing'/.test(fn), 'the painting is hidden before the video really plays');
+  assert.ok(/if \(m\.type !== 'video' \|\| !m\.source\) \{ video\.remove\(\); return; \}/.test(fn), 'the config cannot turn the animation off');
+  assert.ok(/\.catch\(painting\)/.test(fn), 'a missing config leaves the screen blank');
+  assert.ok(/m\.fallbackImage/.test(fn), 'the config does not control the fallback image');
+});
+
+test('the art pipeline copies the animation beside the painting, so the space in the folder name never reaches a URL', () => {
+  assert.ok(/Map Animation', 'MapAnimation\.mp4'/.test(PREPARE_ART), 'the pipeline does not copy the animation');
+  assert.ok(/haven9-map\.mp4/.test(PREPARE_ART));
+  assert.ok(!/Map%20Animation|Map Animation/.test(WALL_INDEX + WALL_SCRIPT + WALL_CSS + JSON.stringify(MAP_MEDIA.mapDisplay.source)), 'a served URL points into the Asset folder');
+});

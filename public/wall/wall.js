@@ -43,6 +43,7 @@
   const FADE_S = 1.2;            // a cancelled route fading out
   const ART = '/assets/wall/art';
   const MAP = { w: 1672, h: 941, src: `${ART}/haven9-map.png` };
+  const MAP_MEDIA_URL = '/config/big-screen-map.json';   // the map's media settings, in one file
   const DEBUG = /[?&]debug/.test(location.search);
 
   /**
@@ -622,7 +623,81 @@
     $('wall').classList.toggle('dimmed', !$('core-shock').hidden || !!frame.paused || alertIsFull());
   }
 
+  /**
+   * THE CITY ANIMATION (2026-09-20). The map is a looping video laid under
+   * the overlays; the painting the overlays were traced on is its fallback
+   * and stays visible until the video is genuinely playing.
+   *
+   * Everything about the media — the file, the fit, the playback flags —
+   * comes from config/big-screen-map.json, so a projector that should run on
+   * the painting alone is a one-word edit there and no code change here.
+   *
+   * It loops NATIVELY: no timer restarts it, nothing rebuilds it, and it is
+   * never reloaded, so a screen left on for an evening plays one continuous
+   * animation. A browser that refuses to autoplay even a muted video gets one
+   * more try on the room's first touch — the same gesture that unlocks sound.
+   */
+  function startMapAnimation() {
+    const city = $('city');
+    const video = $('map-video');
+    if (!city || !video) return;
+    const painting = () => { city.dataset.map = 'image'; };
+    painting();
+    fetch(MAP_MEDIA_URL, { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((cfg) => {
+        const m = (cfg && cfg.mapDisplay) || {};
+        // The painting is the fallback, and the config names it: if it names a
+        // different one, the backdrop and the dark-sector copy both follow.
+        if (m.fallbackImage && m.fallbackImage !== MAP.src) {
+          for (const img of $('map').querySelectorAll('.backdrop, .d-dark')) {
+            img.setAttribute('href', m.fallbackImage);
+            img.setAttributeNS(XLINK, 'xlink:href', m.fallbackImage);
+          }
+        }
+        if (m.type !== 'video' || !m.source) { video.remove(); return; }   // configured off
+        video.loop = m.loop !== false;
+        video.muted = m.muted !== false;              // muted is what lets a browser autoplay at all
+        video.controls = m.controls === true;
+        video.playsInline = m.playsInline !== false;
+        video.preload = m.preload || 'auto';
+        if (m.fit) video.style.objectFit = m.fit;
+        if (m.position) video.style.objectPosition = m.position;
+        // Ask again on the events that mean it could work now, never on a
+        // timer: the file became playable, the projector came back to the
+        // foreground, someone touched the room. A browser that refuses muted
+        // autoplay outright therefore still starts on the first touch, and
+        // until it does the painting is what the room sees.
+        let playing = false;        // running right now
+        let everPlayed = false;     // it has run at least once
+        const play = () => {
+          if (playing) return;
+          const p = video.play();
+          if (p && p.catch) p.catch(painting);
+        };
+        video.addEventListener('playing', () => {
+          playing = true;
+          everPlayed = true;
+          if (city.dataset.map !== 'video') city.dataset.map = 'video';   // the loop re-fires this; write nothing
+        });
+        // Nothing on this screen can pause it: there are no controls. So a
+        // pause is the browser's — a suspended tab, a power-saving nap — and
+        // the room wants the city moving again.
+        video.addEventListener('pause', () => { playing = false; if (everPlayed) play(); });
+        video.addEventListener('error', painting);
+        video.addEventListener('emptied', painting);
+        for (const ev of ['loadeddata', 'canplay', 'canplaythrough']) video.addEventListener(ev, play);
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') play(); });
+        window.addEventListener('pointerdown', play);
+        window.addEventListener('keydown', play);
+        video.src = m.source;
+        if (m.autoplay !== false) play();
+      })
+      .catch(painting);
+  }
+
   buildMap();
   buildCards();
+  startMapAnimation();
   setInterval(tick, TICK_MS);
 })();

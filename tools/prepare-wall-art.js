@@ -6,6 +6,7 @@
  *   node tools/prepare-wall-art.js
  *
  * Reads  Asset/Map reference/Full Map.png   → public/wall/art/haven9-map.png (copied as-is)
+ *        Asset/Map Animation/MapAnimation.mp4 → public/wall/art/haven9-map.mp4 (copied as-is)
  *        Asset/Icons/<name>.png             → public/wall/art/icon-<CODE>.png
  *
  * The icons arrive as 1254×1254 canvases that are ~80 % empty. Each is trimmed
@@ -175,6 +176,17 @@ function main() {
   fs.copyFileSync(map, path.join(OUT, 'haven9-map.png'));
   const m = decodePng(fs.readFileSync(map));
   console.log(`map     ${m.w}×${m.h}  → public/wall/art/haven9-map.png`);
+
+  // The city animation the Big Screen plays over that painting. Copied as-is:
+  // the master lives in Asset, the browser is served the copy under public,
+  // and the space in the folder name never reaches a URL.
+  const clip = path.join(SRC, 'Map Animation', 'MapAnimation.mp4');
+  if (fs.existsSync(clip)) {
+    fs.copyFileSync(clip, path.join(OUT, 'haven9-map.mp4'));
+    console.log(`anim    ${Math.round(fs.statSync(clip).size / 1024)} KB  → public/wall/art/haven9-map.mp4`);
+  } else {
+    console.log('anim    (none in Asset/Map Animation — the wall falls back to the painting)');
+  }
 
   for (const [code, file] of Object.entries(ICONS)) {
     const src = path.join(SRC, 'Icons', file);

@@ -44,7 +44,18 @@
 
   <!-- 3. THE CITY and its six monitors -->
   <main class="main">
-    <section class="city" id="city">
+    <section class="city" id="city" data-map="image">
+      <!--
+        The city animation. It plays under the SVG, on the same 16:9 box the
+        artwork is traced on, so every callout, tint, badge and route still
+        lands where it was drawn. No controls, no sound, no chrome: the room
+        watches it, nobody operates it. The painted map stays in the SVG below
+        and is what shows until the video is really playing — and what keeps
+        showing if it cannot load. Its source and playback flags come from
+        config/big-screen-map.json.
+      -->
+      <video id="map-video" class="map-video" autoplay loop muted playsinline preload="auto"
+             disablepictureinpicture disableremoteplayback tabindex="-1" aria-hidden="true"></video>
       <svg id="map" viewBox="0 0 1672 941" preserveAspectRatio="xMidYMid meet" role="img" aria-label="HAVEN-9 underground city"></svg>
       <div class="final-count" id="final-count" hidden></div>
       <!-- the round's upkeep pass, for 3.5 seconds -->
