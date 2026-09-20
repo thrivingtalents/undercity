@@ -62,6 +62,9 @@
   <!-- 3. THE CITY and its six monitors -->
   <main class="main">
     <section class="city" id="city" data-map="image">
+      <!-- HUD frame: four corner brackets and one slow scan, drawn in CSS. Detail, never clutter. -->
+      <div class="city-frame" aria-hidden="true"></div>
+      <div class="city-scan" aria-hidden="true"></div>
       <!--
         The city animation. It plays under the SVG, on the same 16:9 box the
         artwork is traced on, so every callout, tint, badge and route still

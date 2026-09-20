@@ -137,7 +137,7 @@ test('a stable or degraded sector never moves; critical breathes slowly; dark is
   for (const r of infinite) {
     assert.ok(!/data-state="(stable|degraded)"/.test(r.sel), `${r.sel} animates a calm state`);
     assert.ok(!/^\.(district|shc)$/.test(r.sel) && !/^\.(district|shc) /.test(r.sel), `${r.sel} animates every sector`);
-    assert.ok(/critical|dark|core-low|final|blackout|breach|unstable|b-crisis|moving|down|live/.test(r.sel), `${r.sel} moves for no state`);
+    assert.ok(/critical|dark|core-low|final|blackout|breach|unstable|b-crisis|moving|down|live|scan/.test(r.sel), `${r.sel} moves for no state`);
   }
   for (const r of infinite.filter((x) => /data-state="critical"/.test(x.sel))) {
     const m = r.body.match(/animation:[^;]*?(\d+(?:\.\d+)?)s/);
@@ -236,7 +236,7 @@ test('a sector COM has not reported says AWAITING REPORT once, and the panel cou
   // The card prints one phrase in place of the numbers; the old pair of
   // NO REPORT + NOT UPDATED on every card is gone.
   assert.equal(B.AWAITING_REPORT, 'AWAITING REPORT');
-  assert.ok(/AWAITING REPORT/.test(WALL_SCRIPT + WALL_INDEX), 'the card never says it is waiting');
+  assert.ok(/class="k">REPORT</.test(WALL_SCRIPT) && /rep-none">AWAITING</.test(WALL_SCRIPT), 'the card never says it is waiting for a report');
   assert.ok(!/NOT UPDATED/.test(WALL_SCRIPT), 'the card still repeats NOT UPDATED');
   assert.ok(/\.shc\[data-report="none"\] \.rep-vals/.test(WALL_CSS), 'a waiting card still shows empty value slots');
   // the summary the panel head carries instead
@@ -254,7 +254,7 @@ test('a sector COM has not reported says AWAITING REPORT once, and the panel cou
 test('identity and condition are different colours: MED is red because MED is red, not because MED is failing', () => {
   assert.deepEqual(B.SECTOR_COLOUR, { POW: '#FFB31A', WTR: '#22C7F2', MED: '#FF4148', TRN: '#E7EDF2', AGR: '#66D72E', COM: '#A855F7' });
   // the card's left edge and code are identity; the dot, word and figure are condition
-  assert.ok(/\.shc \{[^}]*border-left: 4px solid var\(--accent\)/s.test(WALL_CSS), 'the identity edge is gone');
+  assert.ok(/\.shc \{[^}]*border-left: \dpx solid var\(--accent\)/s.test(WALL_CSS), 'the identity edge is gone');
   assert.ok(/\.shc-code \{[^}]*color: var\(--accent\)/.test(WALL_CSS));
   assert.ok(!/\.shc\[data-state="critical"\] \{[^}]*border-left-color/.test(WALL_CSS), 'a critical sector repaints its identity edge');
   for (const state of ['degraded', 'critical', 'brownout', 'dark']) {
@@ -372,10 +372,12 @@ test('the command bar: HAVEN-9 and the phase on the left, the Core in the middle
 });
 
 test('the Core carries a condition word from the bands the wall already draws it with', () => {
-  assert.deepEqual(B.coreStatus(100), { band: 'healthy', state: 'stable', label: 'STABLE', insufficient: false });
+  assert.deepEqual(B.coreStatus(100), { band: 'healthy', state: 'stable', label: 'NOMINAL', insufficient: false });
   assert.equal(B.coreStatus(84).state, 'degraded');
   assert.equal(B.coreStatus(61).state, 'degraded');
-  assert.equal(B.coreStatus(60).label, 'CAPACITY INSUFFICIENT', 'the Core says nothing at the insufficiency line');
+  assert.equal(B.coreStatus(60).insufficient, true, 'the Core misses the insufficiency line');
+  assert.equal(B.coreStatus(60).label, 'DEGRADED');
+  assert.equal(B.coreStatus(20).label, 'CRITICAL');
   assert.equal(B.coreStatus(29).state, 'critical');
   assert.equal(B.coreBand(86), 'healthy'); assert.equal(B.coreBand(30), 'unstable');
   assert.ok(/B\.coreStatus/.test(WALL_SCRIPT) && /id="core-state"/.test(WALL_INDEX));

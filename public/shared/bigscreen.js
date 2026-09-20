@@ -58,11 +58,14 @@
     if (n >= 30) return 'unstable';
     return 'critical';
   }
+  const CORE_WORD = { stable: 'NOMINAL', degraded: 'DEGRADED', critical: 'CRITICAL' };
   function coreStatus(v) {
     const band = coreBand(v);
     const state = band === 'healthy' ? 'stable' : (band === 'weaker' || band === 'warning') ? 'degraded' : 'critical';
+    // The insufficiency line is the Council's, and the alert strip already
+    // spells it out; here the Core keeps one steady word.
     const insufficient = Number.isFinite(Number(v)) && Number(v) <= CORE_INSUFFICIENT;
-    return { band, state, label: insufficient ? 'CAPACITY INSUFFICIENT' : CARD_WORD[state], insufficient };
+    return { band, state, label: CORE_WORD[state], insufficient };
   }
 
   /**
@@ -204,7 +207,7 @@
 
   return {
     RES_ORDER, GLYPH, RES_NAME, STATES, STATE_WORD, SECTOR_ORDER, CORE_INSUFFICIENT, ANNOUNCEMENT_MAX_AGE_S, MAX_ALERTS,
-    SECTOR_COLOUR, STATUS_COLOUR, CARD_WORD, AWAITING_REPORT,
+    SECTOR_COLOUR, STATUS_COLOUR, CARD_WORD, CORE_WORD, AWAITING_REPORT,
     clamp, healthState, healthWord, reported, freshnessLine, freshnessShort, reportLine, reportSummary,
     healthValue, coreBand, coreStatus, transferAlert, buildAlerts,
   };

@@ -181,11 +181,13 @@
 
   /** One label pill: the sector's icon and name, sized to cover the painted callout. */
   function pill(code, { x, y, w }, name, cls = '') {
-    const h = 50;
+    const h = 46;
     const g = el('g', { class: `label ${cls}`.trim(), transform: `translate(${x},${y})` });
-    g.appendChild(el('rect', { class: 'l-bg', x: -w / 2, y: -h / 2, width: w, height: h, rx: 10 }));
-    g.appendChild(image(`${ART}/icon-${code}.png`, { class: 'l-icon', x: -w / 2 + 12, y: -17, width: 34, height: 34 }));
-    g.appendChild(text(name, -w / 2 + 58, 8, 'l-text', 'start'));
+    g.appendChild(el('rect', { class: 'l-bg', x: -w / 2, y: -h / 2, width: w, height: h, rx: 3 }));
+    g.appendChild(image(`${ART}/icon-${code}.png`, { class: 'l-icon', x: -w / 2 + 11, y: -15, width: 30, height: 30 }));
+    g.appendChild(text(name, -w / 2 + 52, 7, 'l-text', 'start'));
+    // the same condition the card shows, as one light — the label never shouts
+    g.appendChild(el('circle', { class: 'l-state', cx: w / 2 - 14, cy: 0, r: 5 }));
     return g;
   }
 
@@ -223,6 +225,9 @@
     const [[x1, y1], [x2, y2]] = CORE.tunnel7;
     g.appendChild(el('line', { class: 'tunnel-7', x1, y1, x2, y2 }));
     g.appendChild(text('TUNNEL 7', x1 - 22, (y1 + y2) / 2 + 6, 't7-label', 'end'));
+    // The city's centre, named twice: what it is, and what it is for. The
+    // subtitle sits ABOVE the label so neither line covers the animated core.
+    g.appendChild(text('PRIMARY ENERGY SOURCE', CORE.label.x, CORE.label.y - 38, 'core-sub', 'middle'));
     g.appendChild(pill('CORE', CORE.label, 'GEOTHERMAL CORE', 'core-label'));
     return g;
   }
@@ -260,9 +265,9 @@
       card.innerHTML =
         `<img class="shc-icon" src="${ART}/icon-${code}.png" alt="">` +
         `<div class="shc-id"><b class="shc-code">${code}</b><span class="shc-name">${d.name}</span></div>` +
-        '<div class="shc-health"><span class="k">HEALTH</span><span class="shc-num"><b class="shc-pct">—</b><small>%</small></span></div>' +
+        '<div class="shc-health"><span class="k">SYSTEM HEALTH</span><span class="shc-num"><b class="shc-pct">—</b><small>%</small></span></div>' +
         '<div class="shc-status"><i class="shc-dot"></i><span class="shc-word">—</span></div>' +
-        '<div class="shc-rep"><span class="rep-vals"></span><span class="rep-fresh" data-fresh="CURRENT"></span><b class="rep-none">AWAITING REPORT</b></div>';
+        '<div class="shc-rep"><span class="k">REPORT</span><span class="rep-vals"></span><span class="rep-fresh" data-fresh="CURRENT"></span><b class="rep-none">AWAITING</b></div>';
       host.appendChild(card);
       cardEls[code] = card;
     }
