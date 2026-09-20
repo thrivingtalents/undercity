@@ -4,7 +4,7 @@
     "type": "video",
     "source": "/assets/wall/art/haven9-map.mp4",
     "sourceFile": "public/wall/art/haven9-map.mp4",
-    "sourceArtwork": "Asset/Map Animation/MapAnimation.mp4",
+    "sourceArtwork": "Asset/Map Animation/MapAnimation1.mp4",
     "fallbackImage": "/assets/wall/art/haven9-map.png",
     "fallbackImageFile": "public/wall/art/haven9-map.png",
     "autoplay": true,

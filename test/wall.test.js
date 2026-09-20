@@ -434,7 +434,8 @@ test('the animation loops natively: no timer restarts it, nothing reloads it, an
 });
 
 test('the art pipeline copies the animation beside the painting, so the space in the folder name never reaches a URL', () => {
-  assert.ok(/Map Animation', 'MapAnimation\.mp4'/.test(PREPARE_ART), 'the pipeline does not copy the animation');
+  assert.ok(/path\.join\(SRC, 'Map Animation'\)/.test(PREPARE_ART), 'the pipeline does not read the animation folder');
+  assert.ok(/mp4\|webm\|mov/.test(PREPARE_ART), 'the pipeline only accepts one file name');
   assert.ok(/haven9-map\.mp4/.test(PREPARE_ART));
   assert.ok(!/Map%20Animation|Map Animation/.test(WALL_INDEX + WALL_SCRIPT + WALL_CSS + JSON.stringify(MAP_MEDIA.mapDisplay.source)), 'a served URL points into the Asset folder');
 });

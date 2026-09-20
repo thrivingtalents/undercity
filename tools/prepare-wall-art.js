@@ -6,7 +6,7 @@
  *   node tools/prepare-wall-art.js
  *
  * Reads  Asset/Map reference/Full Map.png   → public/wall/art/haven9-map.png (copied as-is)
- *        Asset/Map Animation/MapAnimation.mp4 → public/wall/art/haven9-map.mp4 (copied as-is)
+ *        Asset/Map Animation/<newest video>   → public/wall/art/haven9-map.mp4 (copied as-is)
  *        Asset/Icons/<name>.png             → public/wall/art/icon-<CODE>.png
  *
  * The icons arrive as 1254×1254 canvases that are ~80 % empty. Each is trimmed
@@ -179,13 +179,23 @@ function main() {
 
   // The city animation the Big Screen plays over that painting. Copied as-is:
   // the master lives in Asset, the browser is served the copy under public,
-  // and the space in the folder name never reaches a URL.
-  const clip = path.join(SRC, 'Map Animation', 'MapAnimation.mp4');
-  if (fs.existsSync(clip)) {
+  // and the space in the folder name never reaches a URL. The FOLDER is the
+  // source, not a filename — whatever video is in it ships, newest first — so
+  // replacing the clip is a drag and a drop, never a code change.
+  const animDir = path.join(SRC, 'Map Animation');
+  const clips = fs.existsSync(animDir)
+    ? fs.readdirSync(animDir)
+      .filter((f) => /\.(mp4|webm|mov|m4v)$/i.test(f))
+      .map((f) => ({ f, t: fs.statSync(path.join(animDir, f)).mtimeMs }))
+      .sort((a, b) => b.t - a.t)
+    : [];
+  if (clips.length) {
+    const clip = path.join(animDir, clips[0].f);
     fs.copyFileSync(clip, path.join(OUT, 'haven9-map.mp4'));
-    console.log(`anim    ${Math.round(fs.statSync(clip).size / 1024)} KB  → public/wall/art/haven9-map.mp4`);
+    console.log(`anim    ${clips[0].f}  ${Math.round(fs.statSync(clip).size / 1024)} KB  → public/wall/art/haven9-map.mp4`);
+    if (clips.length > 1) console.log(`        ${clips.length - 1} older clip(s) in that folder were ignored`);
   } else {
-    console.log('anim    (none in Asset/Map Animation — the wall falls back to the painting)');
+    console.log('anim    no video in Asset/Map Animation — the wall falls back to the painting');
   }
 
   for (const [code, file] of Object.entries(ICONS)) {
