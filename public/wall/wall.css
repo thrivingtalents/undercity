@@ -150,7 +150,6 @@
   backdrop-filter: var(--glass-blur-soft); -webkit-backdrop-filter: var(--glass-blur-soft);
 }
 .tag-blackout { color: var(--st-degraded); border-color: rgba(255,184,61,0.4); animation: wallPulse 2.2s ease-in-out infinite; }
-.tag-breather { color: var(--st-stable); border-color: rgba(93,214,138,0.4); }
 .tag-sensors { color: var(--sec-COM, #A855F7); border-color: rgba(168,85,247,0.4); }
 
 /* the feed: LIVE, DELAYED on silence, RECONNECTING on a drop */

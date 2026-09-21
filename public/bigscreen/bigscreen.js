@@ -54,11 +54,11 @@
     const body = $('core-body');
     body.setAttribute('class', `core-body ${core < 30 ? 'critical' : core < 60 ? 'warn' : ''}`);
 
-    $('round').textContent = state.round;
+    $('round').textContent = `CYCLE ${state.period_number}`;
     const clock = $('clock');
     clock.textContent = U.mmss(state.round_clock.remaining_s);
     clock.classList.toggle('low', state.round_clock.remaining_s <= 60 && state.round_clock.running);
-    $('mode').textContent = state.breather ? 'BREATHER — SYSTEMS HOLDING' : state.mode;
+    $('mode').textContent = state.mode;
   }
 
   const SVG_NS = 'http://www.w3.org/2000/svg';

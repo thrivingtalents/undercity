@@ -79,11 +79,11 @@
     return { reported: count, total: order.length, text: `REPORTS ${count}/${order.length}` };
   }
 
-  /** The freshness of a report in the width a card has: R2, or R2 · STALE. */
+  /** The freshness of a report in the width a card has: C2, or C2 · STALE. */
   function freshnessShort(row) {
     const f = freshnessLine(row);
     if (f.level === 'NOT UPDATED') return { level: f.level, text: '' };
-    return { level: f.level, text: f.level === 'CURRENT' ? `R${row.round_number}` : `R${row.round_number} · ${f.level}` };
+    return { level: f.level, text: f.level === 'CURRENT' ? `C${row.round_number}` : `C${row.round_number} · ${f.level}` };
   }
 
   /**
@@ -115,14 +115,14 @@
   }
   const healthWord = (s) => STATE_WORD[healthState(s)];
 
-  /** Has COM ever reported this sector? A row with no round stamp is a row COM never touched. */
+  /** Has COM ever reported this sector? A row with no cycle stamp is a row COM never touched. */
   const reported = (row) => !!row && row.round !== null && row.round !== undefined;
 
-  /** The freshness line under a card: UPDATED ROUND 2 · STALE, or NOT UPDATED. */
+  /** The freshness line under a card: UPDATED CYCLE 2 · STALE, or NOT UPDATED. */
   function freshnessLine(row) {
     if (!reported(row) || row.freshness === 'NOT UPDATED') return { level: 'NOT UPDATED', text: 'NOT UPDATED' };
     const level = String(row.freshness || 'CURRENT');
-    return { level, text: `UPDATED ROUND ${row.round_number} · ${level}` };
+    return { level, text: `UPDATED CYCLE ${row.round_number} · ${level}` };
   }
 
   /** What COM reported, in POWER · WATER · MEDICAL · PARTS order — or NO REPORT, alone. */

@@ -30,7 +30,7 @@ const SIX = ['POW', 'WTR', 'MED', 'TRN', 'AGR', 'COM'];
 
 function running() {
   const game = newGame();
-  game.setPhase('ROUND_2');
+  game.setPhase('INTERDEPENDENCE');
   game.clock('start');
   return game;
 }
@@ -208,22 +208,22 @@ test("nothing in the world moves COM's board: a stock edit, a transfer, a fault 
 
 // -- Freshness and NO REPORT ---------------------------------------------------------
 
-test('freshness: CURRENT this round, STALE one round on, OUTDATED after two, NOT UPDATED when COM never reported', () => {
-  const game = running();   // R2
+test('freshness: CURRENT this cycle, STALE one cycle on, OUTDATED after two, NOT UPDATED when COM never reported', () => {
+  const game = running();   // C1
   game.setBroadcastRow('POW', { power: 5 }, { by: 'COM' });
-  assert.deepEqual(B.freshnessLine(wallRows(game).POW), { level: 'CURRENT', text: 'UPDATED ROUND 2 · CURRENT' });
+  assert.deepEqual(B.freshnessLine(wallRows(game).POW), { level: 'CURRENT', text: 'UPDATED CYCLE 1 · CURRENT' });
   assert.deepEqual(B.freshnessLine(wallRows(game).WTR), { level: 'NOT UPDATED', text: 'NOT UPDATED' });
-  game.setRound('R3');
-  assert.deepEqual(B.freshnessLine(wallRows(game).POW), { level: 'STALE', text: 'UPDATED ROUND 2 · STALE' });
-  game.setRound('R4');
-  assert.deepEqual(B.freshnessLine(wallRows(game).POW), { level: 'OUTDATED', text: 'UPDATED ROUND 2 · OUTDATED' });
+  game.cycleControl('process');
+  assert.deepEqual(B.freshnessLine(wallRows(game).POW), { level: 'STALE', text: 'UPDATED CYCLE 1 · STALE' });
+  game.cycleControl('process');
+  assert.deepEqual(B.freshnessLine(wallRows(game).POW), { level: 'OUTDATED', text: 'UPDATED CYCLE 1 · OUTDATED' });
   assert.equal(B.freshnessLine(null).text, 'NOT UPDATED');
-  // On the card the level is one short marker: R2, R2 · STALE, R2 · OUTDATED.
+  // On the card the level is one short marker: C1, C1 · STALE, C1 · OUTDATED.
   // A sector COM never reported has no marker at all — it says AWAITING REPORT once.
-  assert.deepEqual(B.freshnessShort(wallRows(game).POW), { level: 'OUTDATED', text: 'R2 · OUTDATED' });
+  assert.deepEqual(B.freshnessShort(wallRows(game).POW), { level: 'OUTDATED', text: 'C1 · OUTDATED' });
   assert.deepEqual(B.freshnessShort(wallRows(game).WTR), { level: 'NOT UPDATED', text: '' });
   game.setBroadcastRow('MED', { med: 1 }, { by: 'COM' });
-  assert.deepEqual(B.freshnessShort(wallRows(game).MED), { level: 'CURRENT', text: 'R4' });
+  assert.deepEqual(B.freshnessShort(wallRows(game).MED), { level: 'CURRENT', text: 'C3' });
   assert.ok(/\.rep-fresh \{[^}]*screen-ink-faint/.test(WALL_CSS), 'a current report is not quiet');
   assert.ok(/\.rep-fresh\[data-fresh="STALE"\] \{[^}]*st-degraded/.test(WALL_CSS));
   assert.ok(/\.rep-fresh\[data-fresh="OUTDATED"\] \{[^}]*st-critical/.test(WALL_CSS));
@@ -353,7 +353,7 @@ test("the city broadcast is COM's announcement in a readable area, or NO ACTIVE 
   game.setBroadcastAnnouncement({ headline: 'MEDICAL SUPPLIES REQUIRED', message: 'Review available stock' }, { by: 'COM' });
   const a = forBigscreen(game).broadcast.announcement;
   assert.equal(a.headline, 'MEDICAL SUPPLIES REQUIRED');
-  assert.equal(a.round_number, 2);
+  assert.equal(a.round_number, 1);
   assert.equal(a.freshness, 'CURRENT');
   assert.ok(/frame\.broadcast\.announcement/.test(WALL_SCRIPT));
   assert.ok(!/class="ticker"|renderTicker|tickerLine/.test(WALL_INDEX + WALL_SCRIPT), 'the ticker is back');
@@ -365,20 +365,26 @@ test("the city broadcast is COM's announcement in a readable area, or NO ACTIVE 
 
 // -- The command bar ----------------------------------------------------------------
 
-test('the command bar: the authority and the phase on the left, the Core in the middle, the countdown and LIVE on the right', () => {
+test('the command bar: the authority and the operating cycle on the left, the Core in the middle, MASTER TIME and LIVE on the right', () => {
   const f = forBigscreen(running());
-  assert.equal(f.round_number, 2);
+  assert.equal(f.round_number, undefined, 'the wall was told the round');
+  assert.equal(f.phase, undefined, 'the wall was told the phase');
+  assert.equal(f.period_number, 1);
   assert.ok(f.round_clock && typeof f.round_clock.remaining_s === 'number');
+  assert.ok(/MASTER TIME/.test(WALL_INDEX) && !/NEXT ROUND IN/.test(WALL_INDEX), 'the clock is still a round clock');
+  assert.ok(!/BREATHER|DEBRIEF/.test(WALL_INDEX), 'the wall still carries a break screen');
   assert.ok(/SUBTERRANEAN CONTINUITY AUTHORITY/.test(WALL_INDEX), 'the authority line is missing');
   assert.ok(/id="phase-label"/.test(WALL_INDEX) && /id="phase-value"/.test(WALL_INDEX));
   assert.ok(/id="round-clock"/.test(WALL_INDEX) && /id="time-label"/.test(WALL_INDEX));
   assert.ok(/id="live"/.test(WALL_INDEX) && /'LIVE'/.test(WALL_SCRIPT));
-  assert.ok(/frame\.round_number/.test(WALL_SCRIPT) && /frame\.round_clock/.test(WALL_SCRIPT));
-  // Round 0 is the briefing, and the countdown names what it counts to
-  assert.ok(/'BRIEFING'/.test(WALL_SCRIPT) && /padStart\(2, '0'\)/.test(WALL_SCRIPT), 'a round is not shown as two digits');
-  assert.ok(/'ROUND 1 BEGINS IN'/.test(WALL_SCRIPT) && /'NEXT ROUND IN'/.test(WALL_SCRIPT) && /'COUNCIL ENDS IN'/.test(WALL_SCRIPT));
-  const briefing = forBigscreen(newGame());          // R0, before the first round
-  assert.equal(briefing.round_number, 0, 'the briefing is no longer round 0');
+  assert.ok(/frame\.period_number/.test(WALL_SCRIPT) && /frame\.round_clock/.test(WALL_SCRIPT));
+  // Before live play the bar says BRIEFING; after it, the operating cycle.
+  assert.ok(/'BRIEFING'/.test(WALL_SCRIPT) && /padStart\(2, '0'\)/.test(WALL_SCRIPT), 'the cycle is not shown as two digits');
+  assert.ok(/'OPERATING CYCLE'/.test(WALL_SCRIPT) && /'MASTER TIME'/.test(WALL_SCRIPT) && /'COUNCIL ENDS IN'/.test(WALL_SCRIPT));
+  assert.ok(!/'ROUND/.test(WALL_SCRIPT), 'the wall script still names a round');
+  const briefing = forBigscreen(newGame());          // before live play
+  assert.equal(briefing.round_number, undefined, 'the briefing frame carries a round');
+  assert.equal(briefing.period_number, 1, 'the wall is not told the operating cycle');
   // the Core is the loudest thing on the bar
   const core = WALL_CSS.match(/\.hud-core b \{[^}]*font-size: clamp\((\d+)px, ([\d.]+)vh/);
   const clock = WALL_CSS.match(/\.hud-time b \{[^}]*font-size: clamp\((\d+)px, ([\d.]+)vh/);

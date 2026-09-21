@@ -34,14 +34,15 @@
       </div>
     </div>
 
+    <!-- Continuous gameflow: the shift, not a round. The cycle is when the
+         city produces, pays its upkeep and hands the allowances back. -->
     <div class="hstat round-block">
-      <span class="label">Current round</span>
-      <b class="hval" id="hdr-phase">—</b>
+      <span class="label">Next operating cycle</span>
+      <b class="hval clock" id="hdr-phase">--:--</b>
     </div>
 
-    <!-- One clock. Upkeep falls due when it runs out. -->
     <div class="hstat next-block">
-      <span class="label">Next round in</span>
+      <span class="label">Master time</span>
       <b class="hval huge clock" id="hdr-round-clock">--:--</b>
     </div>
 
@@ -49,6 +50,18 @@
       <span class="dot"></span><span class="text" id="conn-text">CONNECTING</span>
     </div>
   </header>
+
+  <!--
+    THE DECK. Two destinations, not a second navigation system: OVERVIEW is
+    what needs my attention; RESOURCE EXCHANGE is what I do about it. The
+    badge counts only what this sector must answer itself.
+  -->
+  <nav class="deck" id="deck" role="tablist" aria-label="Console pages">
+    <button type="button" class="deck-btn on" data-page="overview" role="tab" aria-selected="true">OVERVIEW</button>
+    <button type="button" class="deck-btn" data-page="exchange" role="tab" aria-selected="false" id="deck-exchange">
+      <span id="deck-exchange-label">RESOURCE EXCHANGE</span><span class="deck-badge" id="deck-badge" hidden>0</span>
+    </button>
+  </nav>
 
   <!-- ===== BANNERS (persistent, stacked) =================================== -->
   <div class="banners" id="banners">
@@ -60,12 +73,11 @@
     <div class="banner banner-notice" id="banner-notice" hidden></div>
     <div class="banner banner-council" id="banner-council" hidden>COUNCIL SUMMONED — CHIEF + LIAISON REPORT TO CENTRAL COUNCIL <b class="clock" id="banner-council-clock">05:00</b></div>
     <div class="banner banner-brownout" id="banner-brownout" hidden>⚠ SECTOR BROWNOUT — PRODUCTION REDUCED · OPERATIONS DEGRADED</div>
-    <div class="banner banner-breather" id="banner-breather" hidden>BREATHER — SYSTEMS HOLDING</div>
     <div class="banner banner-result" id="banner-result" hidden></div>
   </div>
 
   <!-- ===== MAIN ============================================================ -->
-  <main class="columns">
+  <main class="columns" id="columns">
 
     <!-- LEFT: resources & upkeep -->
     <section class="col col-left">
@@ -96,9 +108,9 @@
         <div class="wextra" id="wf-extra" hidden></div>
       </div>
 
-      <!-- What the round's end will cost, and whether the tray can pay it now. -->
+      <!-- What the next operating cycle will cost, and whether the tray can pay it. -->
       <div class="panel block upkeep-block">
-        <h2 class="ptitle">NEXT ROUND UPKEEP</h2>
+        <h2 class="ptitle">NEXT CYCLE UPKEEP</h2>
         <div class="upkeep-line">
           <span class="upkeep-items" id="upkeep-delivery">—</span>
           <span class="upkeep-full" id="upkeep-full" hidden></span>
@@ -107,59 +119,19 @@
       </div>
 
       <!--
-        REQUEST asks another table for stock. TRANSFER proposes a movement of
-        our own. Neither moves anything: Transport's approval does. Above the
-        line: act. Below it: only what still needs attention; the rest folds
-        into HISTORY.
+        The dashboard says how much is waiting; the Resource Exchange page is
+        where it is answered. Nothing is managed from here.
       -->
-      <div class="panel block transfers-block">
-        <h2 class="ptitle">RESOURCE REQUESTS</h2>
-        <!--
-          v20: one door. A table asks another sector for what it needs; if the
-          supplier accepts, the transfer raises itself and waits for Transport.
-          Nobody pushes stock at anybody.
-        -->
-        <form class="transfer-form" id="transfer-form" autocomplete="off">
-          <label class="tf-field">
-            <span class="tf-label" id="tf-label">REQUEST FROM</span>
-            <select id="tf-sector" aria-label="Other sector"></select>
-          </label>
-          <div class="tf-row">
-            <label class="tf-field grow">
-              <span class="tf-label" id="tf-res-label">RESOURCE</span>
-              <select id="tf-res" aria-label="Resource">
-                <option value="power">⚡ POWER</option>
-                <option value="water">💧 WATER</option>
-                <option value="parts">🔧 PARTS</option>
-                <option value="med">⚕ MEDICAL</option>
-                <option value="workers">👤 WORKERS</option>
-              </select>
-            </label>
-            <label class="tf-field">
-              <span class="tf-label" id="tf-amt-label">QTY</span>
-              <select id="tf-amt" aria-label="Quantity"></select>
-            </label>
-          </div>
-          <button type="submit" class="primary wide" id="tf-submit">SEND REQUEST</button>
-          <div class="tf-hint" id="tf-hint">Ask another sector for resources. If they accept, TRN must approve the transfer before anything moves.</div>
-        </form>
-        <div class="msg" id="transfer-msg" hidden></div>
-
-        <div class="mv-head">
-          <span class="sub-title">ACTIVE <span class="count" id="mv-active-count">0</span></span>
-          <div class="mv-filters" id="mv-filters" role="group" aria-label="Filter">
-            <button type="button" data-filter="ALL" class="on">ALL</button>
-            <button type="button" data-filter="INCOMING">INCOMING</button>
-            <button type="button" data-filter="OUTGOING">OUTGOING</button>
-          </div>
+      <div class="panel block exchange-summary">
+        <h2 class="ptitle">RESOURCE EXCHANGE</h2>
+        <div class="xs-counts">
+          <div class="xs-count act"><b id="xs-action-n">0</b><span>NEEDS ACTION</span></div>
+          <div class="xs-count"><b id="xs-waiting-n">0</b><span>WAITING TRN</span></div>
+          <div class="xs-count"><b id="xs-outgoing-n">0</b><span>OUTGOING</span></div>
         </div>
-        <div class="transfers" id="transfers"></div>
-
-        <div class="mv-history-head">
-          <span class="sub-title">HISTORY <span class="count dim" id="mv-history-count">0</span></span>
-          <button type="button" class="ghost mv-history-toggle" id="mv-history-toggle" aria-expanded="false">VIEW HISTORY</button>
-        </div>
-        <div class="transfers history" id="history" hidden></div>
+        <div class="xs-line" id="xs-approvals" hidden>TRANSFER APPROVALS WAITING <b id="xs-approvals-n">0</b></div>
+        <div class="xs-line" id="xs-support" hidden>TECHNICAL SUPPORT <b id="xs-support-n">0</b></div>
+        <button type="button" class="primary wide" id="xs-open">OPEN RESOURCE EXCHANGE</button>
       </div>
     </section>
 
@@ -232,13 +204,13 @@
         <div class="council-call">CHIEF + LIAISON<br>REPORT TO CENTRAL COUNCIL</div>
       </div>
 
-      <!-- POWER and WATER: the round's output, generated by hand, once. The server sends this to a producing sector alone. -->
+      <!-- POWER and WATER: the cycle's output, generated by hand, once. The server sends this to a producing sector alone. -->
       <div class="panel block main-panel output-block" id="output-panel" hidden>
-        <h2 class="ptitle">ROUND OUTPUT <span class="cap" id="output-round"></span></h2>
+        <h2 class="ptitle">CYCLE OUTPUT <span class="cap" id="output-round"></span></h2>
         <div class="ro-amount" id="output-amount">—</div>
         <div class="ro-note" id="output-note" hidden></div>
         <button type="button" class="primary wide ro-btn" id="btn-generate">GENERATE</button>
-        <div class="ro-used" id="output-used" hidden>ROUND OUTPUT ALREADY GENERATED</div>
+        <div class="ro-used" id="output-used" hidden>OUTPUT ALREADY GENERATED THIS CYCLE</div>
         <div class="msg" id="output-msg" hidden></div>
       </div>
 
@@ -255,20 +227,20 @@
       </div>
 
       <!-- POWER / WATER ONLY. The generator's installed level and the one
-           upgrade this round may buy. -->
+           upgrade this cycle may buy. -->
       <div class="panel block main-panel gen-block" id="gen-panel" hidden>
         <h2 class="ptitle">GENERATOR <span class="cap" id="gen-cap"></span></h2>
         <div class="gen-now">
           <b class="gen-lv" id="gen-level">L2</b>
           <span class="gen-nm" id="gen-name">STANDARD</span>
-          <span class="gen-out" id="gen-output">3 / ROUND</span>
+          <span class="gen-out" id="gen-output">3 / CYCLE</span>
         </div>
 
         <div class="gen-next" id="gen-next" hidden>
           <div class="gen-row"><span class="k">NEXT</span><b id="gen-next-level">—</b></div>
           <div class="gen-row"><span class="k">COST</span><b id="gen-cost">—</b></div>
           <div class="gen-row"><span class="k">YOU HAVE</span><b id="gen-have">—</b></div>
-          <div class="gen-row"><span class="k">COMPLETES</span><b>END OF CURRENT ROUND</b></div>
+          <div class="gen-row"><span class="k">COMPLETES</span><b>NEXT OPERATING CYCLE</b></div>
           <div class="gen-row" id="gen-support-row" hidden><span class="k">SUPPORT</span><b id="gen-support">—</b></div>
           <div class="gen-warn" id="gen-warn" hidden></div>
           <button type="button" class="primary wide" id="btn-gen-start">START UPGRADE</button>
@@ -277,7 +249,7 @@
         <div class="gen-pending" id="gen-pending" hidden>
           <div class="gen-row"><span class="k">UPGRADING TO</span><b id="gen-p-level">—</b></div>
           <div class="gen-row"><span class="k">COMMITTED</span><b id="gen-p-crew">—</b></div>
-          <div class="gen-row"><span class="k">COMPLETES</span><b>END OF CURRENT ROUND</b></div>
+          <div class="gen-row"><span class="k">COMPLETES</span><b>NEXT OPERATING CYCLE</b></div>
           <button type="button" class="wide" id="btn-gen-cancel">CANCEL UPGRADE</button>
         </div>
 
@@ -285,16 +257,9 @@
         <div class="msg" id="gen-msg" hidden></div>
       </div>
 
-      <!-- Asked of us by the other generator: a signature, not a resource. -->
-      <div class="panel block gen-support-block" id="gen-ask-panel" hidden>
-        <h2 class="ptitle">SUPPORT REQUESTED</h2>
-        <div class="gen-ask" id="gen-ask-text">—</div>
-        <button type="button" class="primary wide" id="btn-gen-support">CONFIRM SUPPORT</button>
-      </div>
-
       <!-- MEDICAL ONLY. The server sends this panel's data to MED alone. -->
       <div class="panel block main-panel healing-block" id="healing-panel" hidden>
-        <h2 class="ptitle">HEALING THIS ROUND</h2>
+        <h2 class="ptitle">HEALING THIS CYCLE</h2>
         <div class="cap-big" id="healing-cap">—</div>
         <div class="sub-title">HEALING QUEUE</div>
         <div class="healing" id="healing"></div>
@@ -302,21 +267,9 @@
         <div class="declare-note">Only Medical Bay heals. Transport is not involved.</div>
       </div>
 
-      <!-- TRANSPORT ONLY. The server sends this panel's data to TRN alone. -->
-      <div class="panel block main-panel approval-block" id="queue-panel" hidden>
-        <h2 class="ptitle">TRANSFER APPROVALS</h2>
-        <!-- the allowance: dots, then words -->
-        <div class="cap-dots" id="queue-dots" aria-hidden="true"></div>
-        <div class="cap-big" id="queue-cap">—</div>
-        <div class="cap-sub" id="queue-left"></div>
-        <div class="sub-title">PENDING APPROVALS <span class="count" id="queue-count">0</span></div>
-        <div class="queue" id="queue"></div>
-        <div class="msg" id="queue-msg" hidden></div>
-      </div>
-
       <!-- AGRICULTURE ONLY. The server deals three cards to AGR alone. -->
       <div class="panel block main-panel agr-block" id="agr-panel" hidden>
-        <h2 class="ptitle">INTERVENTIONS THIS ROUND <span class="cap" id="agr-round"></span></h2>
+        <h2 class="ptitle">INTERVENTIONS THIS CYCLE <span class="cap" id="agr-round"></span></h2>
         <div class="cap-big" id="agr-cap">3 RANDOM CARDS · CHOOSE 1</div>
         <div class="agr-instruction" id="agr-instruction"></div>
         <div class="agr-cards" id="agr-cards"></div>
@@ -367,6 +320,99 @@
     </section>
 
   </main>
+
+  <!-- ===== RESOURCE EXCHANGE =============================================== -->
+  <!--
+    One workspace for the whole ask: make one, answer one, watch one. The
+    lifecycle underneath is unchanged — a request, the supplier's answer, the
+    transfer it raises, Transport's approval. This page only makes it legible.
+  -->
+  <main class="exchange" id="exchange-page" hidden>
+    <header class="rx-head">
+      <h2 class="rx-title" id="rx-title">RESOURCE EXCHANGE</h2>
+      <div class="rx-cap" id="rx-cap" hidden><b id="rx-cap-used">0 / 0 USED</b><span id="rx-cap-left"></span></div>
+      <button type="button" class="primary rx-new" id="rx-new">+ NEW REQUEST</button>
+    </header>
+    <div class="msg" id="transfer-msg" hidden></div>
+
+    <div class="rx-summary" id="rx-summary">
+      <button type="button" class="rx-tile on" data-filter="ACTION"><b id="rx-n-action">0</b><span>NEEDS MY ACTION</span></button>
+      <button type="button" class="rx-tile" data-filter="WAITING"><b id="rx-n-waiting">0</b><span>WAITING</span></button>
+      <button type="button" class="rx-tile" data-filter="OUTGOING"><b id="rx-n-outgoing">0</b><span>OUTGOING</span></button>
+      <button type="button" class="rx-tile" data-filter="COMPLETED"><b id="rx-n-history">0</b><span>HISTORY</span></button>
+    </div>
+
+    <div class="rx-filters" id="rx-filters" role="group" aria-label="Filter requests">
+      <button type="button" data-filter="APPROVALS" id="rx-f-approvals" hidden>WAITING APPROVAL</button>
+      <button type="button" data-filter="ACTION" class="on">NEEDS ACTION</button>
+      <button type="button" data-filter="INCOMING">INCOMING</button>
+      <button type="button" data-filter="OUTGOING">OUTGOING</button>
+      <button type="button" data-filter="WAITING">WAITING TRN</button>
+      <button type="button" data-filter="COMPLETED">COMPLETED</button>
+    </div>
+
+    <div class="rx-body">
+      <div class="rx-queue" id="rx-queue"></div>
+
+      <!-- TRANSPORT ONLY. The server sends this panel's data to TRN alone. -->
+      <div class="panel block main-panel approval-block" id="queue-panel" hidden>
+        <h2 class="ptitle">TRANSFER APPROVALS</h2>
+        <!-- the allowance: dots, then words -->
+        <div class="cap-dots" id="queue-dots" aria-hidden="true"></div>
+        <div class="cap-big" id="queue-cap">—</div>
+        <div class="cap-sub" id="queue-left"></div>
+        <div class="sub-title">PENDING APPROVALS <span class="count" id="queue-count">0</span></div>
+        <div class="queue" id="queue"></div>
+        <div class="msg" id="queue-msg" hidden></div>
+      </div>
+
+      <!--
+        TECHNICAL SUPPORT. A signature the other generator needs, not stock on
+        a pallet — so it never shares a card with a resource quantity.
+      -->
+      <aside class="panel block gen-support-block rx-support" id="gen-ask-panel" hidden>
+        <h2 class="ptitle">TECHNICAL SUPPORT</h2>
+        <div class="rx-support-tag">COORDINATION — NOT A RESOURCE TRANSFER</div>
+        <div class="gen-ask" id="gen-ask-text">—</div>
+        <button type="button" class="primary wide" id="btn-gen-support">CONFIRM SUPPORT</button>
+      </aside>
+    </div>
+  </main>
+
+  <!-- NEW REQUEST: the one door onto the lifecycle, unchanged underneath. -->
+  <div class="overlay rx-modal" id="rx-modal" hidden>
+    <form class="panel rx-form" id="transfer-form" autocomplete="off">
+      <h2 class="ptitle">NEW REQUEST</h2>
+      <label class="tf-field">
+        <span class="tf-label">REQUEST FROM</span>
+        <select id="tf-sector" aria-label="Other sector"></select>
+      </label>
+      <label class="tf-field">
+        <span class="tf-label">RESOURCE</span>
+        <select id="tf-res" aria-label="Resource">
+          <option value="power">⚡ POWER</option>
+          <option value="water">💧 WATER</option>
+          <option value="parts">🔧 PARTS</option>
+          <option value="med">⚕ MEDICAL</option>
+          <option value="workers">👤 WORKERS</option>
+        </select>
+      </label>
+      <div class="tf-field">
+        <span class="tf-label">QUANTITY</span>
+        <div class="qty">
+          <button type="button" class="qty-btn" id="qty-less" aria-label="Less">−</button>
+          <b class="qty-value" id="qty-value">1</b>
+          <button type="button" class="qty-btn" id="qty-more" aria-label="More">+</button>
+        </div>
+        <input type="hidden" id="tf-amt" value="1">
+      </div>
+      <div class="rx-form-btns">
+        <button type="button" class="ghost" id="rx-cancel">CANCEL</button>
+        <button type="submit" class="primary" id="tf-submit">SEND REQUEST</button>
+      </div>
+      <div class="tf-hint">Ask another sector for resources. If they fulfil it, TRN must approve the transfer before anything moves.</div>
+    </form>
+  </div>
 
   <!-- ===== OVERLAYS ======================================================== -->
   <div class="overlay alert-full" id="alert-full" hidden>

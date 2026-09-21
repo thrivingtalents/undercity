@@ -6,6 +6,7 @@
 
   "defaults": {
     "cycle_length_s": 120,
+    "live_length_s": 2400,
     "council_clock_s": 90,
     "round_length_s": { "R0": 300, "R1": 480, "R2": 600, "R3": 600, "R4": 480 },
     "alert_full_screen_s": 5,

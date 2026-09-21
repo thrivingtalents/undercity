@@ -24,7 +24,8 @@
   THE FACILITATOR'S COMMAND CENTRE (v16): UNDERSTAND → DECIDE → INTERVENE.
   The top bar says where the session is and carries only what is pressed
   repeatedly. OVERVIEW is the default and stays readable; EVENTS runs the
-  scenario; CITY SYSTEMS inspects authoritative state; DEBRIEF looks back.
+  scenario; CITY SYSTEMS inspects authoritative state; SESSION REVIEW looks
+  back — for the facilitator alone, never as a stage the room is put through.
   Direct changes to authoritative state live one level deeper, ask for a
   reason, and are logged as ADMIN OVERRIDE events.
 -->
@@ -41,11 +42,13 @@
       <span class="label">PHASE</span>
       <b id="phase-name">—</b>
       <span class="pill" id="mode-pill">—</span>
-      <span class="pill breather hidden" id="breather-pill">BREATHER</span>
     </div>
 
+    <!-- Continuous gameflow: no round on any screen. Admin watches the
+         operating cycle — the beat that produces, charges upkeep and hands
+         the allowances back — and the internal phase, below the bar. -->
     <div class="tb-stat">
-      <span class="label">ROUND</span>
+      <span class="label">CYCLE <em id="cycle-note"></em></span>
       <b id="round-value">—</b>
     </div>
 
@@ -69,9 +72,10 @@
     <div class="tb-buttons">
       <button id="btn-start" class="primary">START</button>
       <button id="btn-pause">PAUSE</button>
-      <button id="btn-timer" title="Add or take minutes, set MM:SS, reset to the round default — the one round clock every screen shows">TIMER ▾</button>
+      <button id="btn-timer" title="Add or take minutes, set MM:SS, reset to the shift length — the one MASTER TIME every screen shows">TIMER ▾</button>
       <button id="btn-next-phase" class="primary">NEXT PHASE ›</button>
-      <button id="btn-end-phase" class="ghost" title="Stop the round clock at 00:00. The phase does not change; NEXT PHASE does that.">STOP CLOCK</button>
+      <button id="btn-end-phase" class="ghost" title="Stop MASTER TIME at 00:00. The phase does not change; NEXT PHASE does that.">STOP CLOCK</button>
+      <button id="btn-end-sim" class="ghost" title="End the simulation: every live timer stops and the final city state stands. Nothing is cleared, refilled or reset, and no debrief screen is launched at the room.">END SIMULATION</button>
     </div>
 
     <div class="tb-right">
@@ -99,7 +103,7 @@
     <button data-view="overview" class="on">OVERVIEW</button>
     <button data-view="events">EVENTS</button>
     <button data-view="systems">CITY SYSTEMS</button>
-    <button data-view="debrief">DEBRIEF</button>
+    <button data-view="debrief">SESSION REVIEW</button>
     <span class="crumb hidden" id="crumb"></span>
   </nav>
 
@@ -113,7 +117,6 @@
         <div class="qg">
           <span class="qg-title">SESSION</span>
           <button data-quick="council" class="q-council">CALL COUNCIL</button>
-          <button data-quick="breather" id="btn-breather">BREATHER</button>
         </div>
         <div class="qg">
           <span class="qg-title">CITY EVENTS</span>
@@ -413,7 +416,7 @@
         <h2 class="col-title">CORE</h2>
         <div class="stat-row" id="core-summary"></div>
         <div class="block">
-          <span class="label">Round upkeep <em>— charged when a played round ends</em></span>
+          <span class="label">Cycle upkeep <em>— charged at the end of each operating cycle</em></span>
           <div class="cycle-summary" id="cycle-summary"><div class="hint">No upkeep pass yet.</div></div>
         </div>
         <div class="block">
@@ -461,7 +464,7 @@
         <h2 class="col-title">ADMIN OVERRIDES <span class="hint">direct changes to authoritative state — every one shows current → proposed, asks why, and is logged</span></h2>
         <div class="ovr-index">
           <div class="ovr-card"><h3>SECTOR</h3><p>Health, inventory, workers, force DARK, force-resolve a fault, generate a table's output.</p><div class="ovr-pick" id="ovr-sectors"></div></div>
-          <div class="ovr-card"><h3>CAPACITY</h3><p>Reset the round allowances.</p><button id="ovr-reset-stamps">RESET TRN APPROVALS</button><button id="ovr-reset-heals">RESET MED HEALS</button></div>
+          <div class="ovr-card"><h3>CAPACITY</h3><p>Reset the cycle allowances.</p><button id="ovr-reset-stamps">RESET TRN APPROVALS</button><button id="ovr-reset-heals">RESET MED HEALS</button></div>
           <div class="ovr-card"><h3>CORE</h3><p>Core output, an upkeep pass, the stability score.</p><button data-go="systems:core">OPEN CORE</button></div>
           <div class="ovr-card"><h3>TRANSFERS · HEALING</h3><p>Force an approval or a heal, decline, cancel.</p><button data-go="systems:transfers">OPEN TRANSFERS</button><button data-go="systems:workforce">OPEN WORKFORCE</button></div>
           <div class="ovr-card"><h3>AGR · COM</h3><p>Reroll or force a card; write the board.</p><button data-go="systems:agr">OPEN AGR</button><button data-go="systems:com">OPEN COM</button></div>
@@ -474,7 +477,7 @@
       </div>
     </section>
 
-    <!-- ================= DEBRIEF ================= -->
+    <!-- ================= SESSION REVIEW (facilitator only) ================= -->
     <section class="view" id="view-debrief">
       <nav class="subnav" data-for="debrief">
         <button data-sub="observations" class="on">OBSERVATIONS</button>
@@ -515,7 +518,6 @@
       <div class="sub panel" id="sub-analysis">
         <div class="row">
           <button id="btn-debrief-refresh" class="primary">REFRESH</button>
-          <button id="btn-wall-debrief">SHOW ON WALL</button>
           <button id="btn-export-2">EXPORT LOG</button>
           <span class="hint" id="debrief-hint"></span>
         </div>
@@ -540,7 +542,7 @@
         <div class="hint">Nothing here is playtested. Every field applies live to this run; SAVE to keep it.</div>
         <div class="settings" id="settings"></div>
         <div class="block">
-          <span class="label">Sector economy <em>— per round</em></span>
+          <span class="label">Sector economy <em>— per operating cycle</em></span>
           <div class="sector-config" id="sector-config"></div>
         </div>
         <div class="block">
@@ -593,9 +595,9 @@
     </form>
   </div>
 
-  <!-- GAME TIMER popover (v18): the one authoritative round clock, adjusted by hand -->
+  <!-- MASTER TIME popover: the one authoritative shift clock, adjusted by hand -->
   <div class="picker timer-pop hidden" id="timer-pop">
-    <div class="picker-head"><b>GAME TIMER · NEXT ROUND IN</b><button id="timer-close">✕</button></div>
+    <div class="picker-head"><b>MASTER TIME</b><button id="timer-close">✕</button></div>
     <div class="picker-body timer-body">
       <div class="timer-big"><b id="timer-remaining">--:--</b><span id="timer-status" class="hint">—</span></div>
       <div class="row timer-quick">
@@ -605,11 +607,11 @@
       <div class="row timer-set">
         <input type="text" id="timer-set-input" placeholder="MM:SS" maxlength="6" autocomplete="off">
         <button type="button" id="timer-set">SET TIME</button>
-        <button type="button" id="timer-reset">RESET TO ROUND DEFAULT (<span id="timer-default">--:--</span>)</button>
+        <button type="button" id="timer-reset">RESET TO SHIFT LENGTH (<span id="timer-default">--:--</span>)</button>
       </div>
       <div class="row timer-run">
         <button type="button" id="timer-pause">PAUSE TIMER</button>
-        <span class="hint">Timer only. Session PAUSE in the top bar freezes everything, this clock included — edit the time while paused and RESUME continues from it. 00:00 stops the clock and never moves the round; NEXT PHASE does. Every change asks why and is logged.</span>
+        <span class="hint">Timer only. Session PAUSE in the top bar freezes everything, this clock included — edit the time while paused and RESUME continues from it. 00:00 stops the clock and moves nothing else. Every change asks why and is logged.</span>
       </div>
     </div>
   </div>

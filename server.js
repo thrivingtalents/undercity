@@ -1013,6 +1013,19 @@ function handleSector(client, entry, msg) {
       return broadcast(entry);
     }
 
+    /** One approval a round beyond the limit, paid for in TRN's own health. */
+    case 'transfer_emergency_approve': {
+      if (mine !== 'TRN') return send(client.ws, { type: 'error', reason: 'trn_only' });
+      send(client.ws, { type: 'transfer_result', action: 'emergency', ...game.useEmergencyMovement(msg.id, { by: 'TRN' }) });
+      return broadcast(entry);
+    }
+
+    /** Under a brownout, the one thing this sector keeps. */
+    case 'brownout_preserve': {
+      send(client.ws, { type: 'brownout_result', ...game.chooseBrownoutFunction(mine, String(msg.function || ''), { by: mine }) });
+      return broadcast(entry);
+    }
+
     /** A sector at zero health buying its way back on. */
     case 'emergency_restart': {
       send(client.ws, { type: 'restart_result', ...game.emergencyRestart(mine, { by: mine }) });
@@ -1121,9 +1134,14 @@ function handleControl(client, entry, msg) {
       if (summary) reply({ type: 'cycle_summary', summary });
       return ok();
     }
+    // The emergency pause and its resume. There is no breather and no rest:
+    // continuous gameflow (2026-09-21) left the facilitator one full stop.
     case 'pause':       game.pause(); return ok();
     case 'resume':      game.resume(); return ok();
-    case 'breather':    game.setBreather(msg.on); return ok();
+    case 'end_simulation': {
+      reply({ type: 'end_result', ...game.endSimulation({ by: 'facilitator' }) });
+      return ok();
+    }
 
     // -- the room
     case 'announce':    game.announce(msg.text, { sector: msg.sector || null }); return ok();
@@ -1246,19 +1264,9 @@ function handleControl(client, entry, msg) {
       reply({ type: 'agr_result', ...game.agrSetCardEnabled(msg.card, msg.enabled !== false, { by: 'facilitator' }) });
       return ok();
 
-    // -- debrief on the wall
-    case 'wall_debrief': {
-      if (msg.on) {
-        const { runlog } = registry.paths(entry.code);
-        const text = fs.existsSync(runlog) ? fs.readFileSync(runlog, 'utf8') : '';
-        game.state.wall_debrief = analyse(text, { runId: game.state.run_id }).comparison;
-      } else {
-        game.state.wall_debrief = null;
-      }
-      entry.log.write('wall_debrief', { on: !!msg.on });
-      game.touch();
-      return ok();
-    }
+    // The wall's debrief takeover is gone (2026-09-21): no screen in the room
+    // ever turns into a debrief. The comparison lives in Admin's own review
+    // view and in /api/debrief, which are the facilitator's, not the room's.
 
     case 'observe':
       entry.log.write('observe', {

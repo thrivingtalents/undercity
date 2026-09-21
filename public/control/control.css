@@ -72,7 +72,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: none;
 #core-value.low { color: var(--red); }
 #core-value.warn { color: #E8853A; }
 .pill { font-size: 10px; letter-spacing: 0.06em; padding: 2px 10px; border-radius: var(--r-pill); background: rgba(255,255,255,0.04); border: 1px solid var(--line); }
-.pill.breather { background: rgba(233,180,94,0.14); color: var(--amber); border-color: rgba(233,180,94,0.38); }
 .pill.paused { background: rgba(255,107,122,0.16); color: var(--red); border-color: rgba(255,107,122,0.42); font-weight: 700; }
 .tb-buttons { display: flex; gap: 6px; align-items: center; margin-left: 8px; }
 .tb-buttons button { padding: 9px 14px; font-weight: 700; letter-spacing: 0.08em; }

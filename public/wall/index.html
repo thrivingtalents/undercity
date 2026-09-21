@@ -19,8 +19,8 @@
 <div class="wall" id="wall" data-core="healthy">
 
   <!--
-    1. COMMAND BAR. Left: who the city is and where the session is — PHASE
-    BRIEFING before Round 1, ROUND 01 after it. Centre: CORE STABILITY, the
+    1. COMMAND BAR. Left: who the city is and where the shift is — STATUS
+    BRIEFING before live play, OPERATING CYCLE 01 after it. Centre: CORE STABILITY, the
     loudest thing on the bar. Right: the countdown, whose label says what it
     is counting to, then the tags and the LIVE feed.
   -->
@@ -43,12 +43,11 @@
 
     <div class="hud-right">
       <div class="hud-time" id="hud-time">
-        <span class="k" id="time-label">NEXT ROUND IN</span>
+        <span class="k" id="time-label">MASTER TIME</span>
         <b class="clock" id="round-clock">--:--</b>
       </div>
       <div class="hud-tags">
         <span class="tag tag-blackout" id="tag-blackout" hidden>ROLLING BLACKOUT</span>
-        <span class="tag tag-breather" id="tag-breather" hidden>BREATHER</span>
         <span class="tag tag-sensors" id="tag-sensors" hidden>SENSORS OFFLINE</span>
       </div>
       <div class="live" id="live" data-status="down"><span class="dot"></span><span class="live-text" id="live-text">CONNECTING</span></div>
@@ -126,16 +125,6 @@
     </div>
   </div>
 
-  <div class="takeover debrief" id="debrief" hidden>
-    <div class="t-inner wide">
-      <div class="t-tag">DEBRIEF</div>
-      <div class="t-title">ROUND 3 <span>vs</span> AFTERSHOCK</div>
-      <table class="debrief-table">
-        <thead><tr><th class="metric"></th><th>ROUND 3</th><th>AFTERSHOCK</th></tr></thead>
-        <tbody id="debrief-rows"></tbody>
-      </table>
-    </div>
-  </div>
 
   <div class="takeover paused" id="paused" hidden>
     <div class="t-inner">

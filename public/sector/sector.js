@@ -63,8 +63,13 @@
   const faultRows = new Map(); // fault code -> list row element
   const cityRows = new Map();  // sector code -> feed row element
   const transferRows = new Map(); // (unused since v12; kept for the healing rows' pattern)
-  let movementFilter = 'ALL';     // ALL | INCOMING | OUTGOING — resets to ALL on reload
-  let historyOpen = false;        // HISTORY is folded by default
+  // RESOURCE EXCHANGE (2026-09-21): the console has two destinations. OVERVIEW
+  // is situational awareness; EXCHANGE is the workspace where asks are made and
+  // answered. Nothing about the lifecycle underneath changed.
+  let page = 'overview';          // 'overview' | 'exchange'
+  let exchangeFilter = 'ACTION';  // ACTION | INCOMING | OUTGOING | WAITING | COMPLETED | APPROVALS
+  let filterTouched = false;      // until a filter is picked, Transport opens on its queue
+  let modalOpen = false;          // the NEW REQUEST form
   let movementActing = null;      // card id the last ACCEPT / DECLINE / WITHDRAW was sent for
   const queueRows = new Map();    // transfer id -> queue card element
   let queueConfirm = null;        // { id, kind: 'approve' | 'decline' } — the one card asking "are you sure?"
@@ -186,14 +191,28 @@
       host.appendChild(row);
     }
 
-    // Transfer form.
-    const amt = $('tf-amt');
-    for (let n = 1; n <= 9; n += 1) amt.insertAdjacentHTML('beforeend', `<option value="${n}">${n}</option>`);
-    $('transfer-form').addEventListener('submit', (e) => { e.preventDefault(); submitForm(); });
-    for (const b of $('mv-filters').querySelectorAll('button')) {
-      b.addEventListener('click', () => { movementFilter = b.dataset.filter; renderTransfers(); });
+    // The deck, the exchange queue's filters, and the NEW REQUEST form.
+    for (const b of $('deck').querySelectorAll('[data-page]')) {
+      b.addEventListener('click', () => goto(b.dataset.page));
     }
-    $('mv-history-toggle').addEventListener('click', () => { historyOpen = !historyOpen; renderTransfers(); });
+    $('xs-open').addEventListener('click', () => goto('exchange'));
+    $('rx-new').addEventListener('click', openRequestForm);
+    $('rx-cancel').addEventListener('click', closeRequestForm);
+    $('transfer-form').addEventListener('submit', (e) => { e.preventDefault(); submitForm(); });
+    $('qty-less').addEventListener('click', () => setQty(qtyValue() - 1));
+    $('qty-more').addEventListener('click', () => setQty(qtyValue() + 1));
+    for (const b of $('rx-filters').querySelectorAll('button')) {
+      b.addEventListener('click', () => setFilter(b.dataset.filter));
+    }
+    for (const b of $('rx-summary').querySelectorAll('button')) {
+      b.addEventListener('click', () => setFilter(b.dataset.filter));
+    }
+    // The arrival notice offers the page; it never takes the player there.
+    $('banner-request').addEventListener('click', (e) => {
+      if (e.target.closest('[data-goto-exchange]')) goto('exchange');
+    });
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modalOpen) closeRequestForm(); });
+    setQty(1);
     $('btn-heal-request').addEventListener('click', requestHealing);
     $('bc-publish').addEventListener('click', publishAnnouncement);
     $('bc-clear').addEventListener('click', clearAnnouncement);
@@ -276,6 +295,10 @@
     const amount = Number($('tf-amt').value || 1);
     pendingTransferAction = 'transfer';
     socket.send({ type: 'transfer_request', from: other, to: SECTOR, resource, amount });
+    // Back to the queue, on the view the new request lands in. No other page
+    // opens itself under the player.
+    closeRequestForm();
+    setFilter('OUTGOING');
   }
 
   function withdrawRequest(id) {
@@ -384,7 +407,7 @@
     const res = (RES[msg.resource] || { name: String(msg.resource || '').toUpperCase() }).name;
     switch (msg.reason) {
       case 'capacity':
-        return `TRANSPORT HAS USED ALL ${msg.capacity} STAMPS FOR THIS ${String(msg.basis || 'round').toUpperCase()}`;
+        return `TRANSPORT HAS USED ALL ${msg.capacity} STAMPS FOR THIS ${String(msg.basis || 'cycle').toUpperCase()}`;
       case 'not_supplier':     return `ONLY ${msg.supplier || 'THE SUPPLYING SECTOR'} CAN ACCEPT OR DECLINE THIS REQUEST`;
       case 'approval_trn_only': return 'ONLY TRANSPORT & TUNNELS CAN APPROVE RESOURCE TRANSFERS';
       case 'insufficient_stock_accept':
@@ -396,7 +419,7 @@
       case 'not_accepted':     return 'CANNOT APPROVE — THE SUPPLIER HAS NOT ACCEPTED THIS REQUEST';
       case 'chit_required':    return 'CANNOT APPROVE — PHYSICAL TRANSFER CHIT NOT CONFIRMED';
       case 'cancel_locked':    return 'ALREADY WITH TRANSPORT — ASK THE FACILITATOR TO CANCEL';
-      case 'expired':          return 'THIS EXPIRED WHEN THE ROUND CHANGED';
+      case 'expired':          return 'THIS EXPIRED';
       case 'already_stamped':  return 'ALREADY APPROVED';
       case 'transfer_closed':  return 'TRANSFER ALREADY CLOSED';
       case 'request_closed':   return 'REQUEST ALREADY ANSWERED';
@@ -410,7 +433,7 @@
       case 'invalid_amount':   return 'AMOUNT MUST BE GREATER THAN ZERO';
       // healing
       case 'heal_med_only':    return 'ONLY MEDICAL BAY CAN HEAL INJURED WORKERS';
-      case 'med_capacity':     return `MEDICAL HAS USED ALL ${msg.capacity} HEALS FOR THIS ROUND`;
+      case 'med_capacity':     return `MEDICAL HAS USED ALL ${msg.capacity} HEALS FOR THIS CYCLE`;
       case 'worker_not_injured': return 'THAT WORKER IS NOT CURRENTLY INJURED';
       case 'not_own_sector':   return 'A SECTOR MAY ONLY ASK FOR ITS OWN WORKERS';
       case 'healing_closed':   return 'THAT HEALING REQUEST IS ALREADY ANSWERED';
@@ -419,9 +442,9 @@
       case 'empty_announcement': return 'WRITE A HEADLINE OR A MESSAGE FIRST';
       // AGR interventions
       case 'agr_only':               return 'ONLY AGRICULTURE CAN PLAY AN INTERVENTION';
-      case 'agr_offer_not_ready':    return 'INTERVENTION CARDS HAVE NOT BEEN DEALT FOR THIS ROUND';
-      case 'agr_card_not_in_offer':  return 'THAT CARD IS NOT IN THIS ROUND\'S HAND';
-      case 'agr_card_already_used':  return 'INTERVENTION ALREADY USED THIS ROUND — NEW CARDS NEXT ROUND';
+      case 'agr_offer_not_ready':    return 'INTERVENTION CARDS HAVE NOT BEEN DEALT FOR THIS CYCLE';
+      case 'agr_card_not_in_offer':  return 'THAT CARD IS NOT IN THIS CYCLE\'S HAND';
+      case 'agr_card_already_used':  return 'INTERVENTION ALREADY USED THIS CYCLE — NEW CARDS NEXT CYCLE';
       case 'agr_target_required':    return 'CHOOSE A VALID TARGET BEFORE ACTIVATING';
       case 'agr_invalid_target':     return 'THAT TARGET IS NOT VALID FOR THIS INTERVENTION';
       case 'agr_injured_worker_blocked': return 'INJURED WORKERS MUST BE HEALED BY MEDICAL BAY';
@@ -443,11 +466,11 @@
       return;
     }
     if (msg.ok && msg.type === 'agr_result') {
-      if (msg.action === 'activate') { agrPick = null; transientMsg(target, 'INTERVENTION ACTIVATED — LOCKED UNTIL NEXT ROUND', 'ok', 8000); }
+      if (msg.action === 'activate') { agrPick = null; transientMsg(target, 'INTERVENTION ACTIVATED — LOCKED UNTIL NEXT CYCLE', 'ok', 8000); }
       return;
     }
     if (msg.ok && msg.type === 'broadcast_result') {
-      const word = msg.action === 'row' ? `ROW SAVED — LAST UPDATED: ROUND ${state ? state.broadcast.round_number : ''}`
+      const word = msg.action === 'row' ? `ROW SAVED — LAST UPDATED: CYCLE ${state ? state.broadcast.round_number : ''}`
         : msg.action === 'announce' ? 'ANNOUNCEMENT PUBLISHED' : 'ANNOUNCEMENT CLEARED';
       if (msg.action === 'announce') { $('bc-head').value = ''; $('bc-msg').value = ''; }
       transientMsg(target, word, 'ok', 5000);
@@ -472,7 +495,7 @@
     if (target === 'transfer-msg' && msg.type === 'transfer_result') {
       // A refusal lands on the card it was about; a success goes on the panel,
       // because the card it was about is usually gone with the next frame.
-      const card = movementActing && $('transfers').querySelector(`[data-id="${movementActing}"]`);
+      const card = movementActing && $('rx-queue').querySelector(`[data-id="${movementActing}"]`);
       movementActing = null;
       if (!msg.ok) {
         const word = `REFUSED — ${transferReason(msg)}`;
@@ -503,7 +526,7 @@
   function queueRefusal(msg) {
     switch (msg.reason) {
       case 'chit_required':            return 'CHIT REQUIRED BEFORE APPROVAL';
-      case 'capacity':                 return 'APPROVAL CAPACITY REACHED — NEW APPROVALS AVAILABLE NEXT ROUND';
+      case 'capacity':                 return 'APPROVAL CAPACITY REACHED — NEW APPROVALS AVAILABLE NEXT CYCLE';
       case 'insufficient_stock_stamp': return 'SUPPLIER SHORT OF STOCK — NOTHING MOVED';
       case 'expired': case 'transfer_closed': case 'already_stamped': case 'unknown_transfer':
         return 'REQUEST NO LONGER AVAILABLE';
@@ -537,7 +560,7 @@
     renderRestart();
     renderGenerator();
     renderInjured();
-    renderTransfers();
+    renderExchange();
     renderFaultList();
     renderCard();
     renderRewardChoices();
@@ -550,6 +573,7 @@
     renderAgr();
     renderIntel();
     renderResolved();
+    renderDeck();
     tick();
   }
 
@@ -569,7 +593,15 @@
     if (bar.className !== cls) bar.className = cls;
     bar.firstElementChild.style.width = `${Math.max(0, Math.min(100, value))}%`;
 
-    setText($('hdr-phase'), String(state.phase_name || state.phase || '—').toUpperCase());
+    // No phase, no round: the room is told the time and the next operating cycle.
+    setText($('hdr-phase'), U.mmss(cycleRemaining()));
+  }
+
+  /** Seconds to the next operating cycle — production, upkeep, allowances. */
+  function cycleRemaining() {
+    const c = state && state.cycle;
+    if (!c) return 0;
+    return U.countdown({ running: c.running, remaining_s: c.remaining_s }, !!(state && state.frozen));
   }
 
   function renderModes() {
@@ -581,7 +613,6 @@
     body.classList.toggle('is-paused', !!state.paused);
 
     show($('banner-brownout'), word === 'BROWNOUT');
-    show($('banner-breather'), !!state.breather);
     show($('dark-overlay'), word === 'DARK');
     show($('pause-overlay'), !!state.paused);
 
@@ -661,12 +692,12 @@
     status.dataset.status = word;
   }
 
-  // -- ROUND OUTPUT: a producing table generates its own stock, once a round --
+  // -- CYCLE OUTPUT: a producing table generates its own stock, once a cycle --
 
   const OUTPUT_WORD = {
-    already_generated: 'ROUND OUTPUT ALREADY GENERATED',
+    already_generated: 'OUTPUT ALREADY GENERATED THIS CYCLE',
     sector_dark: 'SECTOR DARK — NO OUTPUT',
-    no_output_now: 'NO OUTPUT AVAILABLE THIS ROUND',
+    no_output_now: 'NO OUTPUT AVAILABLE THIS CYCLE',
     no_output: 'THIS SECTOR HAS NO OUTPUT',
     frozen: 'CLOCKS FROZEN',
     output_automatic: 'OUTPUT IS AUTOMATIC IN THIS SCENARIO',
@@ -688,15 +719,15 @@
     if (!ro) return;
     const resKey = Object.keys(ro.base)[0];
     const resName = (RES[resKey] || { name: resKey }).name;
-    setText($('output-round'), `ROUND ${state.round_number || ''}`);
+    setText($('output-round'), `CYCLE ${state.period_number || ''}`);
     setText($('output-amount'), ro.used ? fmtAdded(ro.added) : (fmtAdded(ro.amount) || `+0 ${resName}`));
     $('output-amount').classList.toggle('reduced', !ro.used && ro.reduced);
     const note = [];
-    if (!ro.manual) note.push('GENERATED AUTOMATICALLY WHEN THE ROUND ENDS');
+    if (!ro.manual) note.push('GENERATED AUTOMATICALLY ON THE OPERATING CYCLE');
     else if (!ro.used && ro.reduced) {
       if (mine.brownout) note.push('BROWNOUT — OUTPUT HALVED');
       if (resKey === 'power' && ro.core_output < 100) note.push(`CORE AT ${ro.core_output}% — OUTPUT SCALED`);
-      if (!Object.values(ro.amount).some((v) => v > 0)) note.push('NO OUTPUT THIS ROUND');
+      if (!Object.values(ro.amount).some((v) => v > 0)) note.push('NO OUTPUT THIS CYCLE');
       if (!note.length) note.push(`ENTITLEMENT ${fmtAdded(ro.base)}`);
     }
     setText($('output-note'), note.join(' · '));
@@ -726,7 +757,7 @@
       .map(([k, v]) => `${v} ${resName(k)}`).join(' · ');
     setText($('rs-health'), String(r.health_after));
     setText($('rs-cost'), costText);
-    setText($('rs-crew'), `${r.workers_required} WORKER${r.workers_required === 1 ? '' : 'S'}, HELD UNTIL THE ROUND ENDS`);
+    setText($('rs-crew'), `${r.workers_required} WORKER${r.workers_required === 1 ? '' : 'S'}, HELD UNTIL THE NEXT OPERATING CYCLE`);
     setText($('rs-have'), Object.keys(r.cost)
       .map((k) => `${ourStock(k)} ${resName(k)}`).concat(`${r.workers_available} AVAILABLE`).join(' · '));
     const shortText = Object.entries(r.short).map(([k, v]) => `${v} MORE ${resName(k)}`).join(' · ');
@@ -741,10 +772,10 @@
   // -- GENERATOR: the one piece of infrastructure a table can buy ------------
 
   const GEN_BLOCK = {
-    not_open_yet: 'UPGRADES OPEN FROM ROUND 1',
+    not_open_yet: 'UPGRADES OPEN ONCE LIVE PLAY BEGINS',
     sector_dark: 'SECTOR DARK — NO UPGRADE',
     upgrade_pending: 'UPGRADE ALREADY RUNNING',
-    used_this_round: 'UPGRADE ALREADY USED THIS ROUND',
+    used_this_round: 'UPGRADE ALREADY USED THIS CYCLE',
     at_maximum: 'GENERATOR AT MAXIMUM LEVEL',
     insufficient_parts: 'NOT ENOUGH PARTS',
     insufficient_crew: 'NOT ENOUGH AVAILABLE WORKERS',
@@ -768,7 +799,7 @@
     setText($('gen-cap'), `L${g.level} / ${g.max_level}`);
     setText($('gen-level'), `L${g.level}`);
     setText($('gen-name'), g.level_name || '');
-    setText($('gen-output'), `${g.output_now} / ROUND`);
+    setText($('gen-output'), `${g.output_now} / CYCLE`);
 
     const pending = g.pending;
     show($('gen-pending'), !!pending);
@@ -782,7 +813,7 @@
     const offer = !pending && g.next_level;
     show($('gen-next'), !!offer);
     if (offer) {
-      setText($('gen-next-level'), `L${g.next_level} ${g.next_level_name} — ${g.output_next} / ROUND`);
+      setText($('gen-next-level'), `L${g.next_level} ${g.next_level_name} — ${g.output_next} / CYCLE`);
       setText($('gen-cost'), `${plural(g.parts_required, 'PART')} · ${plural(g.workers_required, 'WORKER')}`);
       setText($('gen-have'), `${plural(g.parts_available, 'PART')} · ${plural(g.workers_available, 'WORKER')} AVAILABLE`);
       show($('gen-support-row'), !!g.support_from);
@@ -792,7 +823,7 @@
       }
       // the sentence the table must read before it commits
       const warn = g.can_start
-        ? `${plural(g.workers_after, 'WORKER')} WILL REMAIN. COMMITTED WORKERS CANNOT REPAIR FAULTS UNTIL THE ROUND ENDS.`
+        ? `${plural(g.workers_after, 'WORKER')} WILL REMAIN. COMMITTED WORKERS CANNOT REPAIR FAULTS UNTIL THE NEXT OPERATING CYCLE.`
         : '';
       setText($('gen-warn'), warn);
       show($('gen-warn'), !!warn);
@@ -806,15 +837,23 @@
     show($('gen-blocked'), !!blocked && !offer);
   }
 
-  /** The other generator is asking us to sign off on its Level 5 step. */
-  function renderSupportAsk() {
-    let ask = null;
-    let code = null;
-    for (const [c, s] of Object.entries(state.sectors || {})) {
-      if (c !== SECTOR && s && s.support_request) { ask = s.support_request; code = c; break; }
+  /**
+   * The other generator asking us to sign off on its Level 5 step. It is a
+   * signature, not stock: it lives beside the exchange queue as TECHNICAL
+   * SUPPORT and never becomes a resource card.
+   */
+  function supportAsk() {
+    for (const [c, s] of Object.entries((state && state.sectors) || {})) {
+      if (c !== SECTOR && s && s.support_request) return { ask: s.support_request, code: c };
     }
-    show($('gen-ask-panel'), !!ask);
-    if (!ask) return;
+    return null;
+  }
+
+  function renderSupportAsk() {
+    const found = supportAsk();
+    show($('gen-ask-panel'), !!found);
+    if (!found) return;
+    const { ask, code } = found;
     setText($('gen-ask-text'), `${code} NEEDS ${ask.label} TO REACH L${ask.to_level}. CONFIRMING COSTS YOU NOTHING BUT COMMITS THE CITY'S PARTS TO THEIR GENERATOR.`);
     $('btn-gen-support').dataset.forSector = code;
   }
@@ -833,16 +872,21 @@
       : Number((mine.inventory || {})[key]) || 0;
   }
 
-  /** A banner and a sound, once, when something new lands on this screen. */
+  /**
+   * A banner and a sound, once, when something new lands on this screen. It
+   * offers the page; the player decides whether to leave what they are doing.
+   */
   function notifyArrival(text) {
     const rules = state.transfer_rules || {};
-    setText($('banner-request'), text);
-    show($('banner-request'), true);
+    const el = $('banner-request');
+    const html = `<span>${esc(text)}</span><button type="button" class="banner-act" data-goto-exchange>VIEW</button>`;
+    if (el.dataset.sig !== html) { el.dataset.sig = html; el.innerHTML = html; }
+    show(el, true);
     requestBannerUntil = performance.now() + REQUEST_BANNER_MS;
     if (rules.notify_supplier_with_sound !== false) U.playSting('chime');
   }
 
-  // -- RESOURCE REQUESTS: one card per journey (v20) -------------------------
+  // -- RESOURCE EXCHANGE: one card per journey (v20), one page for them ------
 
   /** "⚡ 1 POWER", "👤 2 WORKERS": the icon always with its word. */
   function movementItem(c) {
@@ -858,6 +902,77 @@
   }
 
   /**
+   * The word the card prints. The engine's own status names are untouched;
+   * this is only what a player reads.
+   */
+  function rxStatus(c) {
+    if (c.action_required) return 'NEEDS RESPONSE';
+    switch (c.status) {
+      case 'WAITING_FOR_SUPPLIER': return 'AWAITING OTHER SECTOR';
+      case 'WAITING_FOR_TRN': case 'DELAYED': return 'WAITING TRN';
+      case 'APPROVED': return 'PROCESSING';
+      case 'DELIVERED': return 'COMPLETED';
+      case 'DECLINED': case 'TRN_DECLINED': return 'DECLINED';
+      case 'EXPIRED': return 'EXPIRED';
+      case 'CANCELLED': return 'CANCELLED';
+      default: return c.label;
+    }
+  }
+
+  /**
+   * WHOSE ASK IT IS — the page's direction, which is not the frame's. The
+   * frame says which way the STOCK would travel, so while a supplier is still
+   * deciding, its card reads OUTGOING there. A player means something simpler:
+   * INCOMING is an ask that came to this table, OUTGOING is one it sent. A
+   * transfer with no request behind it keeps the stock's direction, because
+   * nobody asked for it.
+   */
+  function rxDirection(c) {
+    if (c.kind !== 'journey') return c.direction;
+    return c.from === SECTOR ? 'INCOMING' : 'OUTGOING';
+  }
+
+  /** Whose move it is. Never whether the move is a good one. */
+  function rxWhose(c) {
+    if (c.action_required) return 'YOUR RESPONSE IS REQUIRED';
+    if (c.stage === 'REQUEST') return `${c.from} HAS NOT ANSWERED YET`;
+    if (c.status === 'WAITING_FOR_TRN' || c.status === 'DELAYED') return 'TRANSPORT HAS NOT APPROVED YET';
+    return '';
+  }
+
+  /** Three steps, always the same three, with the one it is on marked. */
+  const RX_STEPS = ['SUPPLIER RESPONSE', 'TRANSPORT APPROVAL', 'DELIVERY'];
+  function rxSteps(c) {
+    const delivered = c.status === 'DELIVERED';
+    const at = c.stage === 'REQUEST' ? 0 : c.stage === 'TRANSFER' ? 1 : 2;
+    return `<div class="rx-steps">${RX_STEPS.map((n, i) => {
+      const st = delivered || i < at ? 'done' : i > at ? 'next' : c.active ? 'now' : 'stopped';
+      return `<span class="rx-step" data-step="${st}">${n}</span>`;
+    }).join('')}</div>`;
+  }
+
+  /**
+   * FULFILMENT FIGURES. What is in the tray, what would leave it, what would
+   * be left, and what the next cycle asks for. Numbers only: whether to send
+   * is the table's call and the screen does not have an opinion.
+   */
+  function rxFigures(c) {
+    const have = ourStock(c.resource);
+    const amount = Number(c.amount) || 0;
+    const name = resName(c.resource);
+    const need = c.resource === 'workers' ? 0
+      : Number(((mine && mine.upkeep_delivery) || {})[c.resource]) || 0;
+    const figs = [
+      ['CURRENT STOCK', `${have} ${name}`],
+      ['TRANSFER', `−${amount} ${name}`],
+      ['REMAINING', `${have - amount} ${name}`],
+    ];
+    if (need > 0) figs.push(['NEXT UPKEEP', `${need} ${name}`]);
+    return `<div class="rx-figs">${figs.map(([k, v]) =>
+      `<span class="rx-fig"><i>${esc(k)}</i><b>${esc(v)}</b></span>`).join('')}</div>`;
+  }
+
+  /**
    * One card for the whole journey: the request's reference the whole way,
    * the words changing as it moves. The linked transfer is named underneath
    * once it exists, because that is the number on the paper chit.
@@ -865,17 +980,30 @@
   function movementCard(c, { history = false } = {}) {
     const btns = [];
     if (!history && c.action_required) {
-      btns.push(`<button type="button" class="primary" data-accept="${esc(c.id)}"${c.can_accept ? '' : ' disabled title="Not enough stock to send"'}>ACCEPT REQUEST</button>`);
+      btns.push(`<button type="button" class="primary" data-accept="${esc(c.id)}"${c.can_accept ? '' : ' disabled title="Not enough stock to send"'}>FULFILL</button>`);
       btns.push(`<button type="button" class="secondary" data-decline="${esc(c.id)}">DECLINE</button>`);
     }
     if (!history && c.can_withdraw) btns.push(`<button type="button" class="ghost" data-withdraw="${esc(c.id)}">WITHDRAW</button>`);
     const linked = c.transfer_id && c.transfer_id !== c.id ? `<div class="mv-link">Transfer ${esc(c.transfer_id)}${c.stage === 'TRANSFER' ? ' — chit with Transport' : ''}</div>` : '';
     const short = !history && c.action_required && !c.can_accept ? '<div class="mv-short">NOT ENOUGH STOCK TO SEND</div>' : '';
-    return `<article class="mv-card mv-${c.kind} stage-${c.stage} dir-${c.direction}${c.action_required && !history ? ' act' : ''}" data-id="${esc(c.id)}" data-status="${esc(c.status)}">
-        <div class="mv-top"><span class="mv-id">${esc(c.id)}</span><span class="mv-dir">${c.direction}${c.action_required && !history ? ' · ACTION REQUIRED' : ''}</span></div>
-        <div class="mv-route">${esc(movementRoute(c))}</div>
-        <div class="mv-item">${esc(movementItem(c))}</div>
-        <div class="mv-status" data-label="${esc(c.label)}">${esc(c.label)}</div>
+    const whose = history ? '' : rxWhose(c);
+    const word = rxStatus(c);
+    // How the age reads, and which stamp it counts from.
+    const mode = history ? 'closed' : c.stage === 'REQUEST' ? (c.action_required ? 'received' : 'waiting') : 'trn';
+    const since = mode === 'closed' || mode === 'trn' ? (c.updated_at || c.at) : c.at;
+    return `<article class="rx-card mv-${c.kind} stage-${c.stage} dir-${rxDirection(c)}${c.action_required && !history ? ' act' : ''}" data-id="${esc(c.id)}" data-status="${esc(c.status)}" data-mode="${mode}" data-since="${esc(since || '')}">
+        <div class="rx-top">
+          <span class="rx-state" data-label="${esc(word)}">${esc(word)}</span>
+          <span class="rx-id">${esc(c.id)}</span>
+          <span class="rx-age"></span>
+        </div>
+        <div class="rx-line">
+          <span class="rx-route">${esc(movementRoute(c))}</span>
+          <span class="rx-item">${esc(movementItem(c))}</span>
+        </div>
+        ${rxSteps(c)}
+        ${whose ? `<div class="rx-whose">${esc(whose)}</div>` : ''}
+        ${!history && c.action_required ? rxFigures(c) : ''}
         ${short}${linked}
         ${btns.length ? `<div class="mv-btns">${btns.join('')}</div>` : ''}
         <div class="mv-msg" hidden></div>
@@ -888,47 +1016,184 @@
     for (const b of host.querySelectorAll('[data-withdraw]')) b.addEventListener('click', () => withdrawRequest(b.dataset.withdraw));
   }
 
-  /** ACTIVE: only what still needs attention, oldest first. HISTORY: folded, newest first. */
-  function renderTransfers() {
-    const mv = state.movement || { active: [], history: [], history_total: 0 };
-    const active = mv.active.filter((c) => movementFilter === 'ALL' || c.direction === movementFilter);
-    setText($('mv-active-count'), String(mv.active.length));
-    for (const b of $('mv-filters').querySelectorAll('button')) b.classList.toggle('on', b.dataset.filter === movementFilter);
+  /** The one reading of the frame both pages count from. */
+  function rxBuckets() {
+    const mv = (state && state.movement) || { active: [], history: [], history_total: 0 };
+    const active = mv.active;
+    const action = active.filter((c) => c.action_required);
+    const rest = active.filter((c) => !c.action_required);
+    return {
+      mv,
+      active,
+      action,
+      waiting: rest,
+      waiting_trn: rest.filter((c) => c.status === 'WAITING_FOR_TRN' || c.status === 'DELAYED'),
+      outgoing: rest.filter((c) => rxDirection(c) === 'OUTGOING'),
+      approvals: ((state && state.transfer_queue && state.transfer_queue.items) || []),
+      support: supportAsk() ? 1 : 0,
+    };
+  }
 
-    const host = $('transfers');
-    const html = active.length
-      ? active.map((c) => movementCard(c)).join('')
-      : `<div class="empty"><b>${mv.active.length ? 'NOTHING ' + movementFilter : 'NO ACTIVE RESOURCE REQUESTS'}</b><br>New requests will appear here.</div>`;
-    if (host.dataset.sig !== html) { host.dataset.sig = html; host.innerHTML = html; bindMovement(host); }
+  /**
+   * Sort: what this table must answer first, then the oldest wait, then the
+   * newest. No request carries an expiry, so nothing is ranked by one.
+   */
+  const rxAt = (c) => Date.parse(c.at) || 0;
+  function rxSort(list) {
+    return list.slice().sort((a, b) =>
+      (a.action_required === b.action_required ? 0 : a.action_required ? -1 : 1) || (rxAt(a) - rxAt(b)));
+  }
 
-    setText($('mv-history-count'), String(mv.history_total));
-    const toggle = $('mv-history-toggle');
-    setText(toggle, historyOpen ? 'HIDE HISTORY' : 'VIEW HISTORY');
-    toggle.setAttribute('aria-expanded', historyOpen ? 'true' : 'false');
-    toggle.disabled = !mv.history_total;
-    const hist = $('history');
-    show(hist, historyOpen && mv.history_total > 0);
-    if (historyOpen) {
-      const hh = mv.history.map((c) => movementCard(c, { history: true })).join('') || '<div class="empty">Nothing yet.</div>';
-      if (hist.dataset.sig !== hh) { hist.dataset.sig = hh; hist.innerHTML = hh; }
+  const RX_EMPTY = {
+    ACTION: 'NOTHING NEEDS YOUR RESPONSE',
+    INCOMING: 'NOTHING INCOMING',
+    OUTGOING: 'NOTHING OUTGOING',
+    WAITING: 'NOTHING WAITING FOR TRANSPORT',
+    COMPLETED: 'NOTHING CLOSED YET',
+  };
+
+  // -- the deck ---------------------------------------------------------------
+
+  function goto(p) {
+    page = p === 'exchange' ? 'exchange' : 'overview';
+    show($('columns'), page === 'overview');
+    show($('exchange-page'), page === 'exchange');
+    for (const btn of $('deck').querySelectorAll('[data-page]')) {
+      const on = btn.dataset.page === page;
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
     }
+    if (page === 'exchange') { requestBannerUntil = 0; show($('banner-request'), false); }
+    else closeRequestForm();
+    if (state) { renderExchange(); renderQueue(); }
+  }
+
+  function setFilter(f) {
+    if (!f) return;
+    exchangeFilter = f;
+    filterTouched = true;
+    if (page !== 'exchange') { goto('exchange'); return; }
+    if (state) { renderExchange(); renderQueue(); }
+  }
+
+  /** The badge counts only what this sector can resolve itself. */
+  function renderDeck() {
+    const b = rxBuckets();
+    const n = b.action.length + b.approvals.length + b.support;
+    const badge = $('deck-badge');
+    setText(badge, String(n));
+    show(badge, n > 0);
+    $('deck-exchange').classList.toggle('needs', n > 0);
+    setText($('deck-exchange-label'), state.transfer_queue ? 'TRANSFER CONTROL' : 'RESOURCE EXCHANGE');
+  }
+
+  // -- the NEW REQUEST form ---------------------------------------------------
+
+  function qtyValue() { return Math.max(1, Math.min(9, Number($('tf-amt').value) || 1)); }
+
+  function setQty(n) {
+    const v = Math.max(1, Math.min(9, Number(n) || 1));
+    $('tf-amt').value = String(v);
+    setText($('qty-value'), String(v));
+    $('qty-less').disabled = v <= 1;
+    $('qty-more').disabled = v >= 9;
+  }
+
+  function openRequestForm() {
+    modalOpen = true;
+    show($('rx-modal'), true);
+    setQty(1);
+    $('tf-sector').focus();
+  }
+
+  function closeRequestForm() {
+    modalOpen = false;
+    show($('rx-modal'), false);
+  }
+
+  // -- the page ---------------------------------------------------------------
+
+  /** ACTIVE cards under the chosen view, plus the dashboard's compact count. */
+  function renderExchange() {
+    const b = rxBuckets();
+    const isTransport = !!state.transfer_queue;
+    // Transport opens on the queue only it can clear, until it says otherwise.
+    if (!filterTouched && isTransport && exchangeFilter === 'ACTION') exchangeFilter = 'APPROVALS';
+    if (!isTransport && exchangeFilter === 'APPROVALS') exchangeFilter = 'ACTION';
+
+    setText($('rx-title'), isTransport ? 'TRANSFER CONTROL' : 'RESOURCE EXCHANGE');
+    show($('rx-f-approvals'), isTransport);
+
+    setText($('rx-n-action'), String(b.action.length + b.approvals.length));
+    setText($('rx-n-waiting'), String(b.waiting.length));
+    setText($('rx-n-outgoing'), String(b.outgoing.length));
+    setText($('rx-n-history'), String(b.mv.history_total));
+    for (const el of $('rx-summary').querySelectorAll('.rx-tile')) el.classList.toggle('on', el.dataset.filter === exchangeFilter);
+    for (const el of $('rx-filters').querySelectorAll('button')) el.classList.toggle('on', el.dataset.filter === exchangeFilter);
+
+    const history = exchangeFilter === 'COMPLETED';
+    const list = history ? b.mv.history
+      : exchangeFilter === 'ACTION' ? rxSort(b.action)
+        : exchangeFilter === 'INCOMING' ? rxSort(b.active.filter((c) => rxDirection(c) === 'INCOMING'))
+          : exchangeFilter === 'OUTGOING' ? rxSort(b.active.filter((c) => rxDirection(c) === 'OUTGOING'))
+            : exchangeFilter === 'WAITING' ? rxSort(b.waiting_trn)
+              : [];
+
+    const host = $('rx-queue');
+    show(host, exchangeFilter !== 'APPROVALS');
+    const html = list.length
+      ? list.map((c) => movementCard(c, { history })).join('')
+      : `<div class="empty"><b>${RX_EMPTY[exchangeFilter] || 'NOTHING HERE'}</b><br>New requests appear here as they arrive.</div>`;
+    if (host.dataset.sig !== html) { host.dataset.sig = html; host.innerHTML = html; bindMovement(host); }
+    rxAges();
+
+    // The dashboard's compact summary: how much is waiting, never the workflow.
+    setText($('xs-action-n'), String(b.action.length));
+    setText($('xs-waiting-n'), String(b.waiting_trn.length));
+    setText($('xs-outgoing-n'), String(b.outgoing.length));
+    setText($('xs-approvals-n'), String(b.approvals.length));
+    show($('xs-approvals'), isTransport);
+    setText($('xs-support-n'), String(b.support));
+    show($('xs-support'), b.support > 0);
 
     // A new ask for OUR stock rings once, as it always did.
-    const asks = mv.active.filter((c) => c.action_required);
-    const fresh = asks.filter((c) => !inboxSeen.has(c.id));
-    for (const c of asks) inboxSeen.add(c.id);
-    for (const id of [...inboxSeen]) if (!asks.some((c) => c.id === id)) inboxSeen.delete(id);
+    const fresh = b.action.filter((c) => !inboxSeen.has(c.id));
+    for (const c of b.action) inboxSeen.add(c.id);
+    for (const id of [...inboxSeen]) if (!b.action.some((c) => c.id === id)) inboxSeen.delete(id);
     if (fresh.length) {
       const c = fresh[0];
       notifyArrival(`NEW RESOURCE REQUEST — ${sectorLabel(c.to)} REQUESTS ${c.amount} ${resName(c.resource)}`);
     }
 
-    // The other five sectors, for both forms.
+    // The other five sectors, for the request form.
     const sel = $('tf-sector');
     const others = Object.keys(state.sectors).filter((c) => c !== SECTOR);
     if (sel.dataset.keys !== others.join(',')) {
       sel.dataset.keys = others.join(',');
       sel.innerHTML = others.map((c) => `<option value="${c}">${U.SECTOR_GLYPH[c] || ''} ${c}</option>`).join('');
+    }
+  }
+
+  /** mm:ss since a stamp; hours only when it has come to that. */
+  function agoText(iso) {
+    const t = Date.parse(iso);
+    if (!Number.isFinite(t)) return '';
+    const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+    const mm = String(Math.floor(s / 60) % 60).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    return s >= 3600 ? `${Math.floor(s / 3600)}:${mm}:${ss}` : `${mm}:${ss}`;
+  }
+
+  const RX_AGE_WORD = { received: 'Received', waiting: 'Waiting', trn: 'Waiting for TRN', closed: 'Updated' };
+  /** Ages tick on the card, not through a rebuild: a pressed button stays put. */
+  function rxAges() {
+    for (const card of $('rx-queue').children) {
+      const since = card.dataset && card.dataset.since;
+      if (!since) continue;
+      const t = agoText(since);
+      const mode = card.dataset.mode;
+      const tail = mode === 'received' || mode === 'closed' ? ' ago' : '';
+      setText(card.querySelector('.rx-age'), t ? `${RX_AGE_WORD[mode] || 'Waiting'} ${t}${tail}` : '');
     }
   }
 
@@ -983,7 +1248,7 @@
           <span class="q-n">${i + 1}.</span>
           <span class="q-text">${esc(sectorLabel(h.sector))} · ${esc(h.worker_label)}${gone ? ' · NO LONGER INJURED' : ''}</span>
           <button type="button" class="q-stamp" data-heal="${esc(h.id)}"${blocked ? ' disabled' : ''}
-            title="${gone ? 'This worker is no longer injured' : full ? 'No heals left this round' : !q.can_heal ? 'Medical is dark' : 'Heal this worker'}">HEAL</button>
+            title="${gone ? 'This worker is no longer injured' : full ? 'No heals left this cycle' : !q.can_heal ? 'Medical is dark' : 'Heal this worker'}">HEAL</button>
           <button type="button" class="q-chit" data-hdecline="${esc(h.id)}">DECLINE</button>
         </div>`;
     }).join('') || `<div class="empty">Queue empty.</div>`;
@@ -1043,7 +1308,7 @@
     show($('broadcast-panel'), editable);
     if (!editable) return;
 
-    setText($('bc-round'), `CURRENT ROUND: ${b.round_number}`);
+    setText($('bc-round'), `CURRENT CYCLE: ${b.round_number}`);
     const host = $('bc-rows');
     const codes = Object.keys(b.rows);
     if (!boardBuilt || host.children.length !== codes.length) {
@@ -1064,7 +1329,7 @@
       const row = b.rows[code];
       const el = host.querySelector(`[data-code="${code}"]`);
       if (!el) continue;
-      setText(el.querySelector('.bc-upd'), row.round_number === null ? 'NOT PUBLISHED' : `PUBLISHED ROUND ${row.round_number}`);
+      setText(el.querySelector('.bc-upd'), row.round_number === null ? 'NOT PUBLISHED' : `PUBLISHED CYCLE ${row.round_number}`);
       const fresh = el.querySelector('.bc-fresh');
       setText(fresh, freshWord(row.freshness));
       fresh.dataset.fresh = row.freshness;
@@ -1076,16 +1341,16 @@
     if (a) {
       setText($('bc-ann-head'), a.headline);
       setText($('bc-ann-msg'), a.message);
-      setText($('bc-ann-meta'), `ON THE WALL · ROUND ${a.round_number} · ${freshWord(a.freshness)}`);
+      setText($('bc-ann-meta'), `ON THE WALL · CYCLE ${a.round_number} · ${freshWord(a.freshness)}`);
       $('bc-ann').dataset.fresh = a.freshness;
     }
     show($('bc-ann-none'), !a);
     $('bc-clear').disabled = !a;
   }
 
-  // -- AGR: the round's three interventions -------------------------------------
+  // -- AGR: the cycle's three interventions -------------------------------------
   //
-  // Three cards, dealt by the server once per round and sent to AGR alone.
+  // Three cards, dealt by the server once per operating cycle, to AGR alone.
   // This screen never rolls anything: a refresh shows the same three. One
   // SELECT opens a target choice where the card needs one, then CONFIRM.
 
@@ -1126,8 +1391,8 @@
     const a = state.agr_cards;
     show($('agr-panel'), !!a);
     if (!a) return;
-    setText($('agr-round'), `ROUND ${a.round_number}`);
-    setText($('agr-cap'), a.used ? 'INTERVENTION USED — LOCKED UNTIL NEXT ROUND' : '3 RANDOM CARDS · CHOOSE 1');
+    setText($('agr-round'), `CYCLE ${a.round_number}`);
+    setText($('agr-cap'), a.used ? 'INTERVENTION USED — LOCKED UNTIL NEXT CYCLE' : '3 RANDOM CARDS · CHOOSE 1');
     $('agr-cap').classList.toggle('warn', !!a.used);
     setText($('agr-instruction'), a.message);
     $('agr-panel').classList.toggle('used', !!a.used);
@@ -1147,7 +1412,7 @@
           ${needs}
           ${body}
         </div>`;
-    }).join('') || '<div class="empty">No cards dealt for this round yet.</div>';
+    }).join('') || '<div class="empty">No cards dealt for this cycle yet.</div>';
     if (host.dataset.sig !== html) {
       host.dataset.sig = html;
       host.innerHTML = html;
@@ -1462,7 +1727,7 @@
 
   function effectLabel(e) {
     switch (e.kind) {
-      case 'no_production': return 'NO ROUND OUTPUT';
+      case 'no_production': return 'NO CYCLE OUTPUT';
       case 'trn_capacity':  return 'TRANSPORT CAPACITY REDUCED';
       case 'com_blind':     return 'TELEMETRY OFFLINE';
       default:              return String(e.kind || 'EFFECT').toUpperCase().replace(/_/g, ' ');
@@ -1474,7 +1739,7 @@
     const host = $('effects');
     const html = list.map((e) =>
       `<div class="effect" data-id="${esc(e.id)}"><span>${effectLabel(e)}</span>` +
-      `<b class="clock ef-clock">${e.cycles_remaining !== undefined && e.remaining_s == null ? esc(`${e.cycles_remaining} ROUND${e.cycles_remaining === 1 ? '' : 'S'}`) : ''}</b></div>`).join('');
+      `<b class="clock ef-clock">${e.cycles_remaining !== undefined && e.remaining_s == null ? esc(`${e.cycles_remaining} CYCLE${e.cycles_remaining === 1 ? '' : 'S'}`) : ''}</b></div>`).join('');
     if (host.dataset.sig !== html) { host.dataset.sig = html; host.innerHTML = html; }
     show($('effects-panel'), list.length > 0);
   }
@@ -1482,7 +1747,7 @@
   /**
    * RESOURCE APPROVAL QUEUE — Transport only. The server sends this to nobody
    * else, so no other screen can render an APPROVE control. Transfers waiting
-   * on us, the approvals left this round, and the two gates before approval:
+   * on us, the approvals left this cycle, and the two gates before approval:
    * the paper chit in our hand, and the supplier still holding the goods.
    */
   /** "Waiting 27s" / "Waiting 1m 12s": elapsed, in words — never a clock. */
@@ -1511,22 +1776,29 @@
 
   function renderQueue() {
     const q = state.transfer_queue;
-    show($('queue-panel'), !!q);
+    // Transport's queue is a view of the exchange page, not a second panel.
+    show($('queue-panel'), !!q && exchangeFilter === 'APPROVALS');
     if (!q) return;
     const cap = Math.max(0, Number(q.capacity) || 0);
     const used = Math.max(0, Number(q.used) || 0);
     const full = used >= cap;
     const left = Math.max(0, (q.remaining !== undefined ? q.remaining : cap - used));
-    const period = String(q.basis || 'round').toUpperCase();
+    const period = String(q.basis || 'cycle').toUpperCase();
 
     // The allowance: dots you can count, then the words.
     const dots = Array.from({ length: cap }, (_, i) => (i < used ? '●' : '○')).join(' ');
     setText($('queue-dots'), dots);
     setText($('queue-cap'), `${used} OF ${cap} USED`);
-    setText($('queue-left'), full ? 'APPROVAL CAPACITY REACHED' : period === 'ROUND' ? `${left} LEFT THIS ROUND` : `${left} LEFT`);
+    setText($('queue-left'), full ? 'APPROVAL CAPACITY REACHED' : period === 'CYCLE' ? `${left} LEFT THIS CYCLE` : `${left} LEFT`);
     $('queue-cap').classList.toggle('warn', full);
     $('queue-left').classList.toggle('warn', full);
     $('queue-dots').classList.toggle('warn', full);
+    // The allowance again in the page's own header, so it is readable from
+    // every view of TRANSFER CONTROL.
+    setText($('rx-cap-used'), `${used} / ${cap} USED`);
+    setText($('rx-cap-left'), full ? 'CAPACITY REACHED' : period === 'CYCLE' ? `${left} LEFT THIS CYCLE` : `${left} LEFT`);
+    $('rx-cap').classList.toggle('warn', full);
+    show($('rx-cap'), true);
 
     const items = q.items || [];
     setText($('queue-count'), String(items.length));
@@ -1671,7 +1943,8 @@
     if (!state || !mine) return;
     const frozen = !!state.frozen;
 
-    // One clock: the round's. Upkeep falls due when it ends.
+    // MASTER TIME: one clock for the whole shift. Upkeep falls due on the
+    // operating cycle beside it, which runs straight through every phase.
     const rc = U.countdown(state.round_clock, frozen);
     const rcText = state.round_clock && state.round_clock.running === false && !frozen && rc <= 0 ? 'HOLD' : U.mmss(rc);
     setText($('hdr-round-clock'), rcText);
@@ -1705,8 +1978,9 @@
       show($('banner-request'), false);
     }
 
-    // TRN queue waiting times.
+    // TRN queue waiting times, and the exchange cards' ages.
     for (const card of queueRows.values()) setText(card.querySelector('.q-wait'), elapsedText(card.dataset.since));
+    if (page === 'exchange') rxAges();
 
     // Effects with a running clock.
     const effects = (state.effects || []);

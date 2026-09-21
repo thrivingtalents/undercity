@@ -300,7 +300,6 @@
     renderBroadcast();
     renderModes();
     renderAlertTakeover();
-    renderDebrief();
     renderPaused();
     renderCycle();
     tick();
@@ -308,17 +307,18 @@
   }
 
   /**
-   * The command bar. Round 0 is the briefing and says so — the room is not
-   * asked to read ROUND 0 — and the countdown's label names what it is
-   * counting to: the first round, the next one, or the end of a Council.
-   * The Core keeps the middle and the largest type on the bar.
+   * The command bar. Continuous gameflow (2026-09-21): the wall never names a
+   * round or a phase. Before live play it says BRIEFING; once the shift is
+   * running it counts OPERATING CYCLES, and the clock beside it is MASTER
+   * TIME. The Core keeps the middle and the largest type on the bar.
    */
   function renderHud() {
-    const n = Number(frame.round_number);
-    const briefing = !Number.isFinite(n) || n <= 0;
-    const debrief = frame.mode === 'DEBRIEF';
-    setText($('phase-label'), debrief || briefing ? 'PHASE' : 'ROUND');
-    setText($('phase-value'), debrief ? 'DEBRIEF' : briefing ? 'BRIEFING' : String(n).padStart(2, '0'));
+    const n = Number(frame.period_number);
+    const briefing = frame.mode === 'BRIEFING';
+    const ended = frame.mode === 'ENDED';
+    setText($('phase-label'), briefing || ended ? 'STATUS' : 'OPERATING CYCLE');
+    setText($('phase-value'), briefing ? 'BRIEFING' : ended ? 'SHIFT ENDED'
+      : Number.isFinite(n) ? String(n).padStart(2, '0') : '--');
 
     // CORE STABILITY: the value, and the condition in the same words the
     // sectors use. The bands are the wall's existing ones.
@@ -329,9 +329,8 @@
     const hudCore = $('hud-core');
     if (hudCore.dataset.state !== cs.state) hudCore.dataset.state = cs.state;
 
-    setText($('time-label'), inCouncil() ? 'COUNCIL ENDS IN' : briefing ? 'ROUND 1 BEGINS IN' : 'NEXT ROUND IN');
+    setText($('time-label'), inCouncil() ? 'COUNCIL ENDS IN' : 'MASTER TIME');
     show($('tag-blackout'), !!(frame.blackout && frame.blackout.active));
-    show($('tag-breather'), !!frame.breather);
     show($('tag-sensors'), !!frame.telemetry_degraded);
   }
 
@@ -571,7 +570,7 @@
     if (live) {
       setText($('bc-head'), String(a.headline || a.message));
       setText($('bc-msg'), a.headline ? String(a.message || '') : '');
-      setText($('bc-by'), `— COMMS & SENSORS · ROUND ${a.round_number} · ${a.freshness}`);
+      setText($('bc-by'), `— COMMS & SENSORS · CYCLE ${a.round_number} · ${a.freshness}`);
     } else {
       setText($('bc-head'), 'STANDBY');      // compact: the band is quiet until COM speaks
       setText($('bc-msg'), '');
@@ -582,7 +581,7 @@
   /** Whole-screen modes that colour more than one band. */
   function renderModes() {
     const w = $('wall');
-    w.classList.toggle('council', inCouncil() && !frame.debrief);
+    w.classList.toggle('council', inCouncil());
     w.classList.toggle('core-low', Number(frame.core_output) <= B.CORE_INSUFFICIENT);
   }
 
@@ -599,28 +598,16 @@
     show($('alert-full'), alertIsFull());
   }
 
-  function renderDebrief() {
-    const d = frame.debrief;
-    show($('debrief'), !!d);
-    if (!d) return;
-    const fmt = (v, unit) => (v == null ? '—' : unit === 's' ? U.mmss(v) : unit === '%' ? `${v}%` : String(v));
-    $('debrief-rows').innerHTML = (Array.isArray(d.rows) ? d.rows : []).map((r) => `<tr>
-        <td class="metric">${U.escapeHtml(r.label)}</td>
-        <td>${U.escapeHtml(fmt(d.R3 ? d.R3[r.key] : null, r.unit))}</td>
-        <td>${U.escapeHtml(fmt(d.R4 ? d.R4[r.key] : null, r.unit))}</td>
-      </tr>`).join('');
-  }
-
   function renderPaused() { show($('paused'), !!frame.paused); }
 
-  /** The round's upkeep pass: 3.5 seconds of UPKEEP PROCESSED, with what it cost. */
+  /** The operating cycle: 3.5 seconds of UPKEEP PROCESSED, with what it cost. */
   function renderCycle() {
     const n = Number(frame.cycle && frame.cycle.number);
     if (prevCycle !== null && Number.isFinite(n) && n > prevCycle) {
       const feed = Array.isArray(frame.ticker) ? frame.ticker : (frame.feed || []);
       const cost = feed.filter((e) => e.kind === 'cycle' && ageOf(e.t) < 6 && /missed upkeep/i.test(e.text))
         .map((e) => `${e.text.slice(0, 3)} MISSED UPKEEP`);
-      setText($('cycle-flash-title'), 'ROUND UPKEEP PROCESSED');
+      setText($('cycle-flash-title'), 'OPERATING CYCLE — UPKEEP PROCESSED');
       setText($('cycle-flash-sub'), cost.length ? cost.join('  ·  ') : '');
       cycleFlashUntil = performance.now() + CYCLE_FLASH_MS;
       show($('cycle-flash'), true);

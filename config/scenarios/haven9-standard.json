@@ -14,6 +14,7 @@
     "dark_at": 0,
     "core_start_output": 100,
     "round_length_s": { "R0": 900, "R1": 1200, "R2": 1800, "R3": 1800, "R4": 1500 },
+    "live_length_s": 6300,
     "fault_overrides": {},
     "resolve_recovery": 5,
     "lockout_s": 20,
@@ -23,9 +24,8 @@
     "auto_economy": true,
     "deduct_resources_on_resolve": true,
     "resolve_requires_resources": true,
-    "cycle_length_s": 420,
-    "cycle_autostart": false,
-    "upkeep_on_round_change": true,
+    "cycle_length_s": 600,
+    "cycle_autostart": true,
     "round_output_manual": true,
     "upkeep_shortfall_penalty": 4,
     "upkeep_shortfall_penalty_cap": 12,
@@ -36,7 +36,7 @@
 
     "resource_min_thresholds": { "power": 1, "water": 1, "parts": 1, "med": 0 },
 
-    "transfer_limit_basis": "round",
+    "transfer_limit_basis": "cycle",
     "trn_approval_limit": 3,
     "med_healing_limit": 3,
     "transport_stamp_limit": 3,
@@ -45,15 +45,43 @@
     "enforce_supplier_stock": true,
     "allow_direct_participant_transfer": false,
     "insufficient_stock_behavior": "refuse",
-    "expire_pending_requests_on_round_change": true,
-    "expire_pending_transfers_on_round_change": true,
+    "expire_pending_requests_on_round_change": false,
+    "expire_pending_transfers_on_round_change": false,
     "carry_accepted_transfers_on_round_change": true,
-    "expire_pending_healing_on_round_change": true,
+    "expire_pending_healing_on_round_change": false,
+    "request_timeout_s": 0,
+    "transfer_timeout_s": 0,
     "require_physical_transfer_chit": true,
     "allow_facilitator_force_transfer": true,
     "allow_facilitator_force_heal": true,
     "notify_supplier_with_sound": true,
     "show_completed_transfer_on_wall": true,
+    "trn_emergency_movement": {
+      "enabled": true,
+      "uses_per_round": 1,
+      "health_cost": 5
+    },
+
+    "brownout_preserve": {
+      "enabled": true,
+      "options": {
+        "default": ["PRESERVE_CREW", "PRESERVE_SYSTEMS"],
+        "POW": ["PRESERVE_PRODUCTION", "PRESERVE_CREW", "PRESERVE_SYSTEMS"],
+        "WTR": ["PRESERVE_PRODUCTION", "PRESERVE_CREW", "PRESERVE_SYSTEMS"],
+        "TRN": ["PRESERVE_LOGISTICS", "PRESERVE_CREW", "PRESERVE_SYSTEMS"],
+        "COM": ["PRESERVE_INTELLIGENCE", "PRESERVE_CREW", "PRESERVE_SYSTEMS"]
+      },
+      "labels": {
+        "PRESERVE_PRODUCTION": "KEEP FULL OUTPUT",
+        "PRESERVE_CREW": "KEEP ONE MORE WORKER",
+        "PRESERVE_SYSTEMS": "STOP THE PASSIVE BLEED",
+        "PRESERVE_LOGISTICS": "KEEP TWO APPROVALS",
+        "PRESERVE_INTELLIGENCE": "KEEP THE TELEMETRY FEED"
+      },
+      "crew_released": 1,
+      "logistics_capacity": 2
+    },
+
     "emergency_restart": {
       "enabled": true,
       "cost": { "parts": 2, "power": 1, "water": 1 },
