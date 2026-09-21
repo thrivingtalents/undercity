@@ -272,8 +272,11 @@
   // every screen draws the city from, so it is gated exactly as this page is.
   $('btn-calibrate').addEventListener('click', () => {
     $('more').classList.add('hidden');
-    const url = new URL('/calibrate', location.origin);
+    // Hosted consoles live under /s/CODE, and the tool's save is gated on that
+    // session's control token — so the link carries the session with it.
+    const url = new URL(`${CTX.base}/calibrate`, location.origin);
     if (TOKEN) url.searchParams.set('token', TOKEN);
+    if (!CTX.base && CTX.session && CTX.session !== 'LOCAL') url.searchParams.set('session', CTX.session);
     window.open(url.toString(), '_blank', 'noopener');
   });
   $('btn-settings').addEventListener('click', () => go('settings'));

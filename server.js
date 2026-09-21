@@ -222,6 +222,18 @@ app.get('/s/:code/wall', requireSession, (_req, res) => res.sendFile(view('wall'
 app.get('/s/:code/bigscreen', requireSession, (_req, res) => res.sendFile(view('bigscreen')));
 app.get('/s/:code/control', requireSession, (_req, res) => res.sendFile(view('control')));
 app.get('/s/:code/calibrate', requireSession, (_req, res) => res.sendFile(view('calibrate')));
+
+/**
+ * THE MAP CALIBRATION TOOL, on every deployment rather than LAN alone.
+ *
+ * The regions it writes are a property of the map MEDIA, not of a cohort:
+ * one clip, one set of coordinates, shared by every session on the box. So
+ * the page is served here, outside the LAN block, and a hosted facilitator
+ * names their session in the query string (?session=CODE&token=...) exactly
+ * as the console's own API calls do. The page is inert without that token and
+ * every save is gated on it.
+ */
+app.get('/calibrate', (_req, res) => res.sendFile(view('calibrate')));
 app.get('/s/:code/sector/:sector', requireSession, (req, res) => {
   if (!content.sectors.sectors[String(req.params.sector).toUpperCase()]) {
     return res.status(404).send('Unknown sector');
@@ -253,9 +265,6 @@ if (MODE === 'lan') {
   // In LAN mode /admin IS the game master console. The page asks for the
   // facilitator token if the URL does not carry one.
   app.get('/admin', (_req, res) => res.sendFile(view('control')));
-  // The map calibration tool. Developer/facilitator only: the page itself is
-  // inert without the control token, and every save is gated on it.
-  app.get('/calibrate', (_req, res) => res.sendFile(view('calibrate')));
 }
 
 // -- admin (hosted sessions panel) -------------------------------------------

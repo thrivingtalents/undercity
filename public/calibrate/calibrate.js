@@ -43,10 +43,14 @@
   // -- context ----------------------------------------------------------------
 
   (function readContext() {
-    const parts = location.pathname.split('/').filter(Boolean);
-    if (parts[0] === 's' && parts[1]) session = parts[1].toUpperCase();
     const qs = new URLSearchParams(location.search);
     token = qs.get('token') || '';
+    // Hosted: /s/ABC123/calibrate, or /calibrate?session=ABC123 — the console
+    // links the second form, and a facilitator who pastes a URL by hand may
+    // use either. LAN has one implicit session and needs neither.
+    const parts = location.pathname.split('/').filter(Boolean);
+    if (parts[0] === 's' && parts[1]) session = parts[1].toUpperCase();
+    else if (qs.get('session')) session = qs.get('session').toUpperCase();
   }());
 
   const api = (path) => `${path}?${new URLSearchParams({ token, ...(session ? { session } : {}) })}`;
@@ -68,6 +72,7 @@
       if (!r.ok) { $('token-error').classList.remove('hidden'); return; }
       const url = new URL(location.href);
       url.searchParams.set('token', token);
+      if (session && !location.pathname.startsWith('/s/')) url.searchParams.set('session', session);
       history.replaceState(null, '', url);
       openTool();
     }).catch(() => $('token-error').classList.remove('hidden'));
