@@ -56,6 +56,20 @@
     "allow_facilitator_force_heal": true,
     "notify_supplier_with_sound": true,
     "show_completed_transfer_on_wall": true,
+    "com_intelligence_priority": {
+      "enabled": true,
+      "cooldown_s": 300,
+      "categories": [
+        { "id": "POWER_RISK",        "label": "POWER RISK" },
+        { "id": "WATER_RISK",        "label": "WATER RISK" },
+        { "id": "MEDICAL_LOAD",      "label": "MEDICAL LOAD" },
+        { "id": "LOGISTICS_RISK",    "label": "LOGISTICS RISK" },
+        { "id": "FOOD_SECURITY",     "label": "FOOD SECURITY" },
+        { "id": "SENSOR_VISIBILITY", "label": "SENSOR VISIBILITY" },
+        { "id": "CORE_STABILITY",    "label": "CORE STABILITY" }
+      ]
+    },
+
     "trn_emergency_movement": {
       "enabled": true,
       "uses_per_round": 1,
@@ -118,6 +132,14 @@
     },
 
     "agr_cards_per_round": 3,
+    "agr_balanced_draw": {
+      "enabled": true,
+      "buckets": [
+        { "id": "RECOVERY",  "categories": ["health", "workforce"] },
+        { "id": "SUPPLY",    "categories": ["resources", "capacity"] },
+        { "id": "SITUATION", "categories": ["sector_support"] }
+      ]
+    },
     "agr_anti_repeat": true,
     "agr_disabled_cards": ["AGR_WORKFORCE_RECOVERY"],
     "fault_rewards_enabled": true,

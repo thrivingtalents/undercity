@@ -1020,6 +1020,16 @@ function handleSector(client, entry, msg) {
       return broadcast(entry);
     }
 
+    /** COM names the city's biggest risk. A claim, not a fix. */
+    case 'com_priority_set': {
+      send(client.ws, { type: 'broadcast_result', action: 'priority', ...game.setCityPriority(msg.category, { by: mine }) });
+      return broadcast(entry);
+    }
+    case 'com_priority_clear': {
+      send(client.ws, { type: 'broadcast_result', action: 'priority_clear', ...game.clearCityPriority({ by: mine }) });
+      return broadcast(entry);
+    }
+
     /** Under a brownout, the one thing this sector keeps. */
     case 'brownout_preserve': {
       send(client.ws, { type: 'brownout_result', ...game.chooseBrownoutFunction(mine, String(msg.function || ''), { by: mine }) });
@@ -1247,6 +1257,12 @@ function handleControl(client, entry, msg) {
     // -- COM's board and AGR's hand, as overrides
     case 'com_board_set':
       reply({ type: 'broadcast_result', ...game.setBroadcastRow(msg.row || msg.sector, msg.values || {}, { by: 'facilitator' }) });
+      return ok();
+    case 'com_priority_set':
+      reply({ type: 'broadcast_result', ...game.setCityPriority(msg.category, { by: 'facilitator' }) });
+      return ok();
+    case 'com_priority_clear':
+      reply({ type: 'broadcast_result', ...game.clearCityPriority({ by: 'facilitator' }) });
       return ok();
     case 'com_announce':
       reply({ type: 'broadcast_result', ...game.setBroadcastAnnouncement(msg, { by: 'facilitator' }) });

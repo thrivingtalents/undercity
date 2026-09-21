@@ -20,6 +20,9 @@ const { analyse } = require('../lib/analytics');
 const { ScenarioLibrary, deepMerge } = require('../lib/config');
 const { Store } = require('../lib/db');
 
+/** The phase id for round 2, looked up rather than spelled out. */
+const PHASE_R2 = (rounds.phases || []).find((p) => p.round === 'R2').id;
+
 const SECTORS = ['POW', 'WTR', 'MED', 'TRN', 'AGR', 'COM'];
 
 /** A game in ROUND_2 with the clock running. */
@@ -4126,6 +4129,141 @@ test('Transport sees the valve and its price in its own queue', () => {
   assert.equal(q.emergency.available, true);
   assert.equal(q.emergency.health_cost, 5);
   assert.equal(q.emergency.used_this_round, false);
+});
+
+
+// -- P1 · COM names the city's biggest risk -----------------------------------------------
+// A claim COM has to be willing to defend, on a cooldown so it stays a
+// judgement. It fixes nothing and discloses nothing.
+
+test('COM publishes one city priority, the whole city reads it, and only COM may set it', () => {
+  const game = running();
+  const before = JSON.parse(JSON.stringify(game.state.sectors));
+
+  assert.equal(game.setCityPriority('NONSENSE', { by: 'COM' }).reason, 'unknown_category');
+  const r = game.setCityPriority('WATER_RISK', { by: 'COM' });
+  assert.equal(r.ok, true);
+  assert.equal(r.priority.category, 'WATER_RISK');
+  assert.equal(r.priority.label, 'WATER RISK');
+
+  // the wall and every table see it; COM also gets the control
+  assert.equal(forBigscreen(game).broadcast.priority.current.category, 'WATER_RISK');
+  assert.equal(forSector(game, 'POW').broadcast.priority.current.label, 'WATER RISK');
+  assert.equal(forSector(game, 'COM').broadcast.priority.ready, false, 'COM may fire it twice in a row');
+  assert.ok(forSector(game, 'COM').broadcast.priority.categories.length >= 5);
+  assert.equal(forSector(game, 'POW').broadcast.priority.categories, undefined, 'a table that is not COM got the controls');
+
+  // it is a communication aid: nothing in the world moved
+  assert.deepEqual(game.state.sectors, before, 'naming a priority changed the city');
+
+  assert.equal(game.setCityPriority('POWER_RISK', { by: 'POW' }).reason, 'com_edit_forbidden');
+});
+
+test('the priority is on a cooldown, which the facilitator may ignore', () => {
+  const game = running();
+  assert.equal(game.setCityPriority('CORE_STABILITY', { by: 'COM' }).ok, true);
+
+  const blocked = game.setCityPriority('POWER_RISK', { by: 'COM' });
+  assert.equal(blocked.reason, 'cooldown');
+  assert.ok(blocked.ready_in_s > 0 && blocked.ready_in_s <= 300);
+  assert.equal(game.state.broadcast.priority.category, 'CORE_STABILITY', 'a refused change went through anyway');
+
+  // the facilitator is not on the clock
+  assert.equal(game.setCityPriority('POWER_RISK', { by: 'facilitator' }).ok, true);
+
+  game.tick(300000);
+  assert.equal(game.comPriorityView().ready, true);
+  assert.equal(game.setCityPriority('MEDICAL_LOAD', { by: 'COM' }).ok, true);
+
+  assert.equal(game.clearCityPriority({ by: 'COM' }).ok, true);
+  assert.equal(game.state.broadcast.priority, null);
+  assert.equal(game.clearCityPriority({ by: 'COM' }).reason, 'no_priority');
+
+  const ev = logEvents(game).filter((e) => e.ev === 'com_intelligence_priority');
+  assert.equal(ev.length, 3, 'the priorities were not all logged');
+  assert.equal(ev[0].category, 'CORE_STABILITY');
+});
+
+test('a board from before the priority existed restores without one', () => {
+  const game = running();
+  game.setCityPriority('FOOD_SECURITY', { by: 'COM' });
+  const snap = JSON.parse(JSON.stringify(game.serialise()));
+  const back = newGame();
+  back.restore(snap);
+  assert.equal(back.state.broadcast.priority.category, 'FOOD_SECURITY');
+
+  delete snap.state.broadcast.priority;
+  const old = newGame();
+  old.restore(snap);
+  assert.equal(old.state.broadcast.priority, null);
+  assert.equal(old.comPriorityView().ready, true, 'an old board cannot name a priority');
+});
+
+// -- P1 · AGR's hand is balanced, not tamed -----------------------------------------------
+
+test('every hand offers a way to recover, a way to supply and something situational', () => {
+  const BUCKET = {
+    health: 'RECOVERY', workforce: 'RECOVERY',
+    resources: 'SUPPLY', capacity: 'SUPPLY',
+    sector_support: 'SITUATION',
+  };
+  const hands = [];
+  for (let i = 0; i < 12; i += 1) {
+    const game = newGame({ runId: `balance-${i}` });
+    game.setPhase(PHASE_R2);
+    game.agrEnsureOffer({ by: 'test' });
+    const hand = game.state.agr.offered;
+    assert.equal(hand.length, 3, 'the hand is no longer three cards');
+    const buckets = new Set(hand.map((id) => BUCKET[game.agrCard(id).category]));
+    assert.equal(buckets.size, 3, `hand ${hand.join(',')} left a bucket empty`);
+    hands.push(hand.join(','));
+  }
+  // balanced, not identical: the cards themselves still move between runs
+  assert.ok(new Set(hands).size > 1, 'every run was dealt the same three cards');
+});
+
+test('the balanced draw keeps the seed, the anti-repeat rule and the reroll', () => {
+  const a = newGame({ runId: 'seeded' });
+  a.setPhase(PHASE_R2);
+  a.agrEnsureOffer({ by: 'test' });
+  const b = newGame({ runId: 'seeded' });
+  b.setPhase(PHASE_R2);
+  b.agrEnsureOffer({ by: 'test' });
+  assert.deepEqual(a.state.agr.offered, b.state.agr.offered, 'the same run and period dealt different hands');
+
+  const before = [...a.state.agr.offered];
+  const re = a.agrReroll({ by: 'facilitator' });
+  assert.equal(re.ok, true, re.reason);
+  assert.notDeepEqual(a.state.agr.offered, before, 'a reroll dealt the same hand again');
+  assert.equal(a.state.agr.offered.length, 3);
+
+  // and turning the balance off falls back to the old free draw
+  const plain = newGame({ runId: 'plain' });
+  plain.setPhase(PHASE_R2);
+  plain.patchConfig({ agr_balanced_draw: { enabled: false } });
+  plain.agrEnsureOffer({ by: 'test' });
+  assert.equal(plain.state.agr.offered.length, 3);
+});
+
+test('a disabled card never reaches a balanced hand either', () => {
+  const game = newGame({ runId: 'disabled' });
+  const all = game.agrPool().map((c) => c.id);
+  const banned = all.filter((id) => game.agrCard(id).category === 'sector_support');
+  game.patchConfig({ agr_disabled_cards: banned });
+
+  // The hand is dealt when the run is built, so a ban applies from the next
+  // deal — which is exactly what a facilitator banning a card mid-run gets.
+  const fresh = game.agrDraw(game.periodKey(), { salt: 99 }).hand;
+  for (const id of fresh) {
+    assert.ok(!banned.includes(id), `${id} was dealt although it is disabled`);
+  }
+  assert.equal(fresh.length, 3, 'an empty bucket cost the hand a card');
+
+  // and through the reroll a facilitator actually presses
+  assert.equal(game.agrReroll({ by: 'facilitator' }).ok, true);
+  for (const id of game.state.agr.offered) {
+    assert.ok(!banned.includes(id), `${id} survived a reroll although it is disabled`);
+  }
 });
 
 // -- timeline ---------------------------------------------------------------------------
