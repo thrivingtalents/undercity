@@ -2370,7 +2370,7 @@ test('NEEDS ATTENTION is derived from authoritative state, in priority order, ea
   const byKind = Object.fromEntries(att.map((a) => [a.kind, a]));
   assert.equal(byKind.dark.text, 'COM · DARK'); assert.deepEqual(byKind.dark.target, { view: 'overview', sector: 'COM' });
   assert.equal(byKind.critical.text, 'AGR · 27% HEALTH · CRITICAL'); assert.equal(byKind.critical.sector, 'AGR');
-  assert.equal(byKind.upkeep.text, 'WTR · NEXT ROUND UPKEEP SHORTFALL · MISSING 1 POWER');
+  assert.equal(byKind.upkeep.text, 'WTR · NEXT CYCLE UPKEEP SHORTFALL · MISSING 1 POWER');
   assert.equal(byKind.trn.text, 'TRN · 3/3 APPROVALS USED · 1 TRANSFER WAITING'); assert.deepEqual(byKind.trn.target, { view: 'systems', tab: 'transfers' });
   assert.ok(/^MED · 3\/3 HEALS USED · 1 INJURED WAITING$/.test(byKind.med.text)); assert.deepEqual(byKind.med.target, { view: 'systems', tab: 'workforce' });
   assert.deepEqual(byKind.com.target, { view: 'systems', tab: 'com' });

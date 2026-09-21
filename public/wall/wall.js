@@ -3,7 +3,7 @@
  * CITY WALL — the participant Big Screen of HAVEN-9. Display-only.
  *
  * Four bands, top to bottom: the command bar (phase, CURRENT ROUND, CORE
- * STABILITY, NEXT ROUND IN, LIVE), an alert strip drawn only while something
+ * STABILITY, MASTER TIME, LIVE), an alert strip drawn only while something
  * needs the room, the city beside its six health monitors, and COM's city
  * broadcast. The city is the hero: the illustration in
  * public/wall/art/haven9-map.png with everything alive drawn over it in an
@@ -93,6 +93,9 @@
   const cardEls = {};
   const chipEls = new Map();       // alert key -> element
   const routeEls = new Map();      // transfer id -> { g, path, packet, phase }
+  let regions = null;              // the calibrated sector regions, once loaded
+  let stateTracker = null;         // keeps the overlay on the video's image
+  let missingSig = null;           // what was last reported as uncalibrated
 
   U.connect({
     hello: { type: 'hello', role: 'bigscreen', session: CTX.session, token: null },
@@ -293,6 +296,7 @@
     if (!frame) return;
     renderHud();
     renderDistricts();
+    renderStateOverlay();
     renderCore();
     renderCards();
     renderMovement();
@@ -335,7 +339,78 @@
   }
 
   /** District state, its word when it is not fine, and the one fault indicator. */
+  /**
+   * THE CALIBRATED STATE OVERLAY (2026-09-21).
+   *
+   * Where a sector IS on the map is no longer inferred from the painted map
+   * the video replaced — it is read from mapConfig/haven9-map-regions.json,
+   * measured by hand at /calibrate and stored normalised, and drawn onto the
+   * rectangle the video's image actually occupies. That rectangle is
+   * recomputed on resize, on fullscreen and on an orientation change, so the
+   * dim over a browned-out sector stays on that sector at every size.
+   *
+   * A sector with no region draws nothing and is named in the console for the
+   * facilitator. A missing overlay is honest; a guessed one tells the room the
+   * wrong part of the city is failing.
+   */
+  function startStateOverlay() {
+    const city = $('city');
+    const video = $('map-video');
+    const svg = $('map-state');
+    const words = $('map-words');
+    if (!city || !svg || !words || !window.MapOverlay) return;
+    stateTracker = window.MapOverlay.track(city, video, svg, {
+      onChange: (rect) => {
+        words.style.left = `${rect.x}px`;
+        words.style.top = `${rect.y}px`;
+        words.style.width = `${rect.width}px`;
+        words.style.height = `${rect.height}px`;
+      },
+    });
+    window.MapOverlay.loadRegions().then((doc) => {
+      regions = doc;
+      const known = Object.keys(doc.sectors || {}).length;
+      if (!known) console.warn('[map] no calibrated sector regions — state overlays are off. Calibrate at /calibrate.');
+      renderStateOverlay();
+    });
+  }
+
+  /** One group and one word per sector, each from its own saved region. */
+  function renderStateOverlay() {
+    const svg = $('map-state');
+    if (!svg || !regions || !window.MapOverlay) return;
+    const states = {};
+    for (const code of BUILD_ORDER) {
+      const s = frame && frame.sectors && frame.sectors[code];
+      if (s) states[code] = B.healthState(s);
+    }
+    const { missing } = window.MapOverlay.paint(svg, $('map-words'), regions, states);
+    renderOverlayBadges();
+    // Said once per set of sectors, not once a frame: a projector left running
+    // for an evening must not fill a console with the same line.
+    const sig = missing.sort().join(',');
+    if (sig !== missingSig) {
+      missingSig = sig;
+      if (sig) console.warn(`[map] not calibrated, so nothing is drawn for: ${sig}. Calibrate at /calibrate.`);
+    }
+  }
+
+  /**
+   * Which map is showing decides who draws the state: under the clip it is the
+   * calibrated overlay, under the painting it is the painted districts, whose
+   * footprints were traced on that very artwork. Called the moment the media
+   * changes — not on the next state frame, which can be ten seconds away and
+   * would leave the old district shapes sitting on the video.
+   */
+  function syncMapLayers() {
+    const painted = $('city').dataset.map !== 'video';
+    $('map').dataset.districts = painted ? 'on' : 'off';
+    if (!painted && regions) renderStateOverlay();
+  }
+
   function renderDistricts() {
+    if ($('city').dataset.map === 'video') { $('map').dataset.districts = 'off'; return; }
+    $('map').dataset.districts = 'on';
     for (const code of BUILD_ORDER) {
       const g = districtEls[code];
       const s = frame.sectors && frame.sectors[code];
@@ -347,6 +422,48 @@
       const unresolved = Number(s.unresolved_faults) || 0;
       g.classList.toggle('has-fault', unresolved > 0);
       renderFaultBadge(g, DISTRICTS[code].badge, s.top_fault || null, unresolved);
+    }
+  }
+
+  /**
+   * The fault badge on the calibrated map. It hangs from the same measured
+   * anchor as the status word, just under it, so it is on the sector it
+   * belongs to — the painted badge positions are the old artwork's and are
+   * not used while the clip is running.
+   */
+  function renderOverlayBadges() {
+    const layer = $('map-words');
+    if (!layer || !regions) return;
+    const sectors = (regions.sectors) || {};
+    const wanted = new Map();
+    for (const code of BUILD_ORDER) {
+      const s = frame && frame.sectors && frame.sectors[code];
+      const region = sectors[code];
+      if (!s || !window.MapOverlay.isCalibrated(region)) continue;
+      const unresolved = Number(s.unresolved_faults) || 0;
+      if (!unresolved) continue;
+      const tf = s.top_fault || null;
+      wanted.set(code, {
+        text: tf ? `\u26a0 ${tf.code}${unresolved > 1 ? ` \u00d7${unresolved}` : ''}` : `\u26a0 \u00d7${unresolved}`,
+        crisis: !!(tf && Number(tf.severity) >= 3),
+        at: window.MapOverlay.labelAnchor(region),
+      });
+    }
+    for (const el of [...layer.querySelectorAll('[data-badge]')]) {
+      if (!wanted.has(el.getAttribute('data-badge'))) el.remove();
+    }
+    for (const [code, spec] of wanted) {
+      let el = layer.querySelector(`[data-badge="${code}"]`);
+      if (!el) {
+        el = document.createElement('div');
+        el.setAttribute('data-badge', code);
+        el.className = 'mo-badge';
+        layer.appendChild(el);
+      }
+      if (el.textContent !== spec.text) el.textContent = spec.text;
+      el.classList.toggle('crisis', spec.crisis);
+      el.style.left = `${spec.at.x * 100}%`;
+      el.style.top = `${spec.at.y * 100}%`;
     }
   }
 
@@ -669,7 +786,7 @@
     const city = $('city');
     const video = $('map-video');
     if (!city || !video) return;
-    const painting = () => { city.dataset.map = 'image'; };
+    const painting = () => { city.dataset.map = 'image'; syncMapLayers(); };
     painting();
     // A painting-only wall keeps its tags: nothing else would name the districts.
     city.dataset.labels = 'on';
@@ -712,7 +829,7 @@
         video.addEventListener('playing', () => {
           playing = true;
           everPlayed = true;
-          if (city.dataset.map !== 'video') city.dataset.map = 'video';   // the loop re-fires this; write nothing
+          if (city.dataset.map !== 'video') { city.dataset.map = 'video'; syncMapLayers(); }   // the loop re-fires this; write nothing
         });
         // Nothing on this screen can pause it: there are no controls. So a
         // pause is the browser's — a suspended tab, a power-saving nap — and
@@ -733,5 +850,6 @@
   buildMap();
   buildCards();
   startMapAnimation();
+  startStateOverlay();
   setInterval(tick, TICK_MS);
 })();

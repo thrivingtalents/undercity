@@ -267,6 +267,15 @@
   $('btn-snapshot').addEventListener('click', () => { send({ type: 'snapshot' }); toast('SNAPSHOT WRITTEN', 'ok'); });
   $('btn-export').addEventListener('click', () => send({ type: 'export_log' }));
   $('btn-export-2').addEventListener('click', () => send({ type: 'export_log' }));
+  // The map calibration tool, where the six sector regions are measured. It
+  // opens in its own tab carrying this console's token — it writes the file
+  // every screen draws the city from, so it is gated exactly as this page is.
+  $('btn-calibrate').addEventListener('click', () => {
+    $('more').classList.add('hidden');
+    const url = new URL('/calibrate', location.origin);
+    if (TOKEN) url.searchParams.set('token', TOKEN);
+    window.open(url.toString(), '_blank', 'noopener');
+  });
   $('btn-settings').addEventListener('click', () => go('settings'));
   $('btn-reset').addEventListener('click', askReset);
   $('ovr-reset-session').addEventListener('click', askReset);
@@ -519,8 +528,33 @@
 
   // -- NEEDS ATTENTION ------------------------------------------------------------
 
+  /**
+   * THE MAP CALIBRATION WARNING (2026-09-21). A sector with no saved region
+   * draws NOTHING on the Big Screen when it browns out — which is the right
+   * behaviour, and useless if nobody is told. The console is where the
+   * facilitator is, so the console is where it says so.
+   */
+  let mapMissing = [];
+  (function checkMapCalibration() {
+    fetch('/config/haven9-map-regions.json', { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : { sectors: {} }))
+      .then((doc) => {
+        const ok = (r) => !!(r && Array.isArray(r.polygon) && r.polygon.length >= 3);
+        mapMissing = ['POW', 'WTR', 'MED', 'TRN', 'AGR', 'COM'].filter((c) => !ok((doc.sectors || {})[c]));
+        if (state) renderAttention();
+      })
+      .catch(() => {});
+  }());
+
   function renderAttention() {
-    const items = state.needs_attention || [];
+    const items = (state.needs_attention || []).slice();
+    if (mapMissing.length) {
+      items.unshift({
+        priority: 2,
+        text: `MAP NOT CALIBRATED — ${mapMissing.join(', ')}: the Big Screen draws no state overlay for ${mapMissing.length === 1 ? 'it' : 'them'}. Calibrate at /calibrate`,
+        target: null,
+      });
+    }
     $('attn-count').textContent = String(items.length);
     $('attention-panel').classList.toggle('quiet', items.length === 0);
     $('attention-panel').classList.toggle('hot', items.some((a) => a.priority <= 1));

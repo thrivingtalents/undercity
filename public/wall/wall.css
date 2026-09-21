@@ -245,6 +245,22 @@
   background: transparent; pointer-events: none;
 }
 .city[data-map="video"] .backdrop { opacity: 0; transition: opacity 0.5s ease; }
+/*
+  The calibrated state overlay. Positioned entirely from JS — left/top/width/
+  height are the video's real image rectangle — so nothing here may set them.
+  While the painting is showing, the painted districts carry the state as they
+  always did and this layer stands down.
+*/
+.map-state, .map-words { position: absolute; z-index: 0; pointer-events: none; }
+.city[data-map="image"] .map-state, .city[data-map="image"] .map-words { display: none; }
+/*
+  While the clip is running, the painted districts draw NOTHING. Their shapes
+  were traced on the painting the video replaced, so every one of them — the
+  dim, the edge, the greyscale DARK copy, the state tag, the fault badge —
+  would land on the wrong rock. An id selector because the per-state rules
+  below are class-heavy and would otherwise win.
+*/
+#map[data-districts="off"] .district { display: none; }
 
 /* a district: overlays traced on the artwork. STABLE and DEGRADED are still. */
 .d-dark { display: none; filter: grayscale(1) brightness(0.42); }

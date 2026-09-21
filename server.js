@@ -41,6 +41,7 @@ const override = require('./lib/override');
 const { Kit } = require('./lib/kit');
 const { inspectStorage, reportStorage } = require('./lib/storage');
 const { zip } = require('./lib/zip');
+const mapRegions = require('./lib/map-regions');
 
 const PORT = Number(process.env.PORT || 3000);
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -188,7 +189,7 @@ const staticOpts = { redirect: false };
 app.use('/shared', express.static(path.join(__dirname, 'public', 'shared'), staticOpts));
 // Optional replaceable audio: drop fault_alert.mp3 etc. into public/audio.
 app.use('/audio', express.static(path.join(__dirname, 'public', 'audio'), staticOpts));
-for (const view of ['sector', 'bigscreen', 'wall', 'control', 'admin']) {
+for (const view of ['sector', 'bigscreen', 'wall', 'control', 'admin', 'calibrate']) {
   app.use(`/assets/${view}`, express.static(path.join(__dirname, 'public', view), staticOpts));
 }
 // The Big Screen's map media settings. ONE file by name, never the config
@@ -196,6 +197,13 @@ for (const view of ['sector', 'bigscreen', 'wall', 'control', 'admin']) {
 // participant screen has no business reading.
 app.get('/config/big-screen-map.json', (_req, res) => {
   res.sendFile(path.join(__dirname, 'config', 'big-screen-map.json'));
+});
+
+// The calibrated sector regions (2026-09-21). Readable by any screen that
+// draws the map — they are coordinates, not answers — and writable only
+// through the control-token gate below.
+app.get('/config/haven9-map-regions.json', (_req, res) => {
+  res.set('Cache-Control', 'no-cache').json(mapRegions.load());
 });
 
 const view = (name) => path.join(__dirname, 'public', name, 'index.html');
@@ -213,6 +221,7 @@ function requireSession(req, res, next) {
 app.get('/s/:code/wall', requireSession, (_req, res) => res.sendFile(view('wall')));
 app.get('/s/:code/bigscreen', requireSession, (_req, res) => res.sendFile(view('bigscreen')));
 app.get('/s/:code/control', requireSession, (_req, res) => res.sendFile(view('control')));
+app.get('/s/:code/calibrate', requireSession, (_req, res) => res.sendFile(view('calibrate')));
 app.get('/s/:code/sector/:sector', requireSession, (req, res) => {
   if (!content.sectors.sectors[String(req.params.sector).toUpperCase()]) {
     return res.status(404).send('Unknown sector');
@@ -244,6 +253,9 @@ if (MODE === 'lan') {
   // In LAN mode /admin IS the game master console. The page asks for the
   // facilitator token if the URL does not carry one.
   app.get('/admin', (_req, res) => res.sendFile(view('control')));
+  // The map calibration tool. Developer/facilitator only: the page itself is
+  // inert without the control token, and every save is gated on it.
+  app.get('/calibrate', (_req, res) => res.sendFile(view('calibrate')));
 }
 
 // -- admin (hosted sessions panel) -------------------------------------------
@@ -595,6 +607,21 @@ app.get('/api/debrief', (req, res) => {
   const text = fs.existsSync(runlog) ? fs.readFileSync(runlog, 'utf8') : '';
   const entry = registry.live.get(row.code);
   res.json(analyse(text, { runId: entry ? entry.game.state.run_id : null }));
+});
+
+/**
+ * SAVE THE CALIBRATED MAP REGIONS. The whole document, or none of it: a
+ * half-written map would put an overlay on the wrong platform, which is the
+ * exact failure this system exists to end. Validated before anything is
+ * written — three points minimum, every coordinate inside 0..1, known sectors.
+ */
+app.post('/api/map-regions', (req, res) => {
+  const row = controlSession(req, res);
+  if (!row) return;
+  const body = (req.body && req.body.document) || req.body || {};
+  const result = mapRegions.save({ ...mapRegions.load(), ...body, sectors: body.sectors || {} });
+  if (!result.ok) return res.status(400).json({ error: result.reason, detail: result.detail || null });
+  res.json({ ok: true, document: result.document, missing: mapRegions.missing(result.document) });
 });
 
 app.get('/api/scenarios', (req, res) => {

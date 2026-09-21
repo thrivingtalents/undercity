@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UNDERCITY — Map Calibration</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 fill=%27%230a0c0e%27/%3E%3Ccircle cx=%278%27 cy=%278%27 r=%275%27 fill=%27%2300E5FF%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/shared/base.css">
+<link rel="stylesheet" href="/assets/calibrate/calibrate.css">
+</head>
+<body>
+
+<!-- TOKEN GATE. This tool writes the file every screen draws the city from, so
+     it is facilitator-only and says so before it shows anything. -->
+<div class="token-gate" id="token-gate">
+  <form class="token-card panel" id="token-form">
+    <h1>UNDERCITY <span class="sub">MAP CALIBRATION</span></h1>
+    <p>Facilitator token required. In LAN mode this is <code>FACILITATOR_TOKEN</code> (default <code>haven9</code>).</p>
+    <input type="password" id="token-input" placeholder="facilitator token" autocomplete="off" autofocus>
+    <button type="submit" class="primary wide">OPEN CALIBRATION</button>
+    <div class="error hidden" id="token-error">Rejected — wrong token.</div>
+  </form>
+</div>
+
+<!--
+  THE CALIBRATION TOOL (2026-09-21).
+
+  One job: record where each sector actually is on the HAVEN-9 map video, in
+  normalised coordinates, so no screen ever has to guess. You click the corners
+  of a platform, drop the anchor its status word hangs from, and save. What you
+  see here is drawn by the same module the Big Screen uses, on the same
+  rectangle, so what you calibrate is exactly what the room gets.
+-->
+<div class="shell hidden" id="shell">
+
+  <header class="topbar">
+    <div class="tb-ident">
+      <h1>UNDERCITY <span class="sub">MAP CALIBRATION</span></h1>
+      <span class="hint" id="media-note">—</span>
+    </div>
+
+    <div class="tb-sectors" id="sector-tabs"></div>
+
+    <div class="tb-right">
+      <span class="pill" id="dirty-pill" hidden>UNSAVED</span>
+      <button id="btn-reset" class="ghost" title="Throw away every unsaved change and reload the saved file">RESET UNSAVED</button>
+      <button id="btn-save" class="primary" title="Validate and write mapConfig/haven9-map-regions.json">SAVE ALL REGIONS</button>
+    </div>
+  </header>
+
+  <main class="work">
+    <!-- LEFT: the map, exactly as the wall shows it -->
+    <section class="stage" id="stage">
+      <div class="media" id="media">
+        <video id="map-video" class="cal-video" autoplay loop muted playsinline preload="auto"
+               disablepictureinpicture disableremoteplayback tabindex="-1" aria-hidden="true"></video>
+        <!-- layer 2: the regions, on the video's real image rectangle -->
+        <svg id="overlay" class="cal-overlay" viewBox="0 0 1 1" preserveAspectRatio="none"></svg>
+        <!-- layer 3: status words, upright whatever the viewport does -->
+        <div id="labels" class="cal-labels"></div>
+        <!-- the editing handles, on the same rectangle again -->
+        <svg id="editor" class="cal-editor" viewBox="0 0 1 1" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="readout" id="readout">—</div>
+    </section>
+
+    <!-- RIGHT: what to do, and what has been done -->
+    <aside class="side">
+      <section class="panel">
+        <h2 class="col-title">SECTOR <b id="sel-name">—</b></h2>
+        <div class="mode-row" id="modes">
+          <button data-mode="point" class="on">ADD POINTS</button>
+          <button data-mode="label">LABEL ANCHOR</button>
+          <button data-mode="core-from">CORE FROM</button>
+          <button data-mode="core-to">CORE TO</button>
+        </div>
+        <p class="hint" id="mode-hint">Click the corners of this sector's platform. Drag any point to move it. The polygon closes itself.</p>
+        <div class="row">
+          <button id="btn-undo">UNDO POINT</button>
+          <button id="btn-clear">CLEAR REGION</button>
+          <button id="btn-close-poly">CLOSE POLYGON</button>
+        </div>
+        <div class="row">
+          <button id="btn-clear-label" class="ghost">CLEAR ANCHOR</button>
+          <button id="btn-clear-core" class="ghost">CLEAR CORE LINK</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 class="col-title">PREVIEW STATE</h2>
+        <div class="mode-row" id="states">
+          <button data-state="normal">NORMAL</button>
+          <button data-state="degraded">DEGRADED</button>
+          <button data-state="critical">CRITICAL</button>
+          <button data-state="brownout" class="on">BROWNOUT</button>
+          <button data-state="dark">DARK</button>
+        </div>
+        <label class="check"><input type="checkbox" id="preview-all"> Preview every calibrated sector at once</label>
+        <p class="hint">The preview is drawn by the same module as the Big Screen. If it looks right here, it is right there.</p>
+      </section>
+
+      <section class="panel">
+        <h2 class="col-title">CALIBRATION</h2>
+        <div class="status-list" id="status-list"></div>
+        <p class="hint">A sector with no region draws nothing on the wall — never a guess. Six of six is a fully calibrated map.</p>
+      </section>
+
+      <section class="panel">
+        <h2 class="col-title">SAVED COORDINATES</h2>
+        <textarea id="json-view" spellcheck="false" rows="10"></textarea>
+        <div class="row">
+          <button id="btn-apply-json" class="ghost">APPLY EDITED JSON</button>
+          <span class="hint" id="json-note"></span>
+        </div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script src="/shared/map-overlay.js"></script>
+<script src="/assets/calibrate/calibrate.js"></script>
+</body>
+</html>

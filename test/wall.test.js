@@ -534,7 +534,9 @@ test('the animation loops natively: no timer restarts it, nothing reloads it, an
   assert.ok((fn.match(/video\.src\s*=/g) || []).length === 1, 'the video source is assigned more than once');
   assert.ok(/video\.load\(\)/.test(fn) === false, 'the video is reloaded');
   // the fallback: the painting shows until it plays, and comes back if it fails
-  assert.ok(/const painting = \(\) => \{ city\.dataset\.map = 'image'; \};/.test(fn));
+  // The fallback also hands the state back to the painted districts, whose
+  // footprints belong to that artwork (2026-09-21).
+  assert.ok(/const painting = \(\) => \{ city\.dataset\.map = 'image'; syncMapLayers\(\); \};/.test(fn));
   assert.ok(/addEventListener\('error', painting\)/.test(fn), 'a broken video leaves an empty box');
   assert.ok(/addEventListener\('playing'/.test(fn), 'the painting is hidden before the video really plays');
   assert.ok(/if \(m\.type !== 'video' \|\| !m\.source\) \{ video\.remove\(\); return; \}/.test(fn), 'the config cannot turn the animation off');

@@ -75,6 +75,16 @@
       <video id="map-video" class="map-video" autoplay loop muted playsinline preload="auto"
              disablepictureinpicture disableremoteplayback tabindex="-1" aria-hidden="true"></video>
       <svg id="map" viewBox="0 0 1672 941" preserveAspectRatio="xMidYMid meet" role="img" aria-label="HAVEN-9 underground city"></svg>
+      <!--
+        The state overlay (2026-09-21). Layer 2 is the calibrated sector
+        regions; layer 3 is their status words. Both are sized by
+        shared/map-overlay.js to the rectangle the VIDEO IMAGE actually
+        occupies — not to this panel, which letterboxes the clip whenever the
+        screen is not 16:9. Empty until mapConfig/haven9-map-regions.json says
+        where a sector is: a missing overlay is honest, a guessed one lies.
+      -->
+      <svg id="map-state" class="map-state" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true"></svg>
+      <div id="map-words" class="map-words" aria-hidden="true"></div>
       <div class="final-count" id="final-count" hidden></div>
       <!-- the round's upkeep pass, for 3.5 seconds -->
       <div class="cycle-flash" id="cycle-flash" hidden>
@@ -137,6 +147,7 @@
 
 </div>
 <script src="/shared/ws.js"></script>
+<script src="/shared/map-overlay.js"></script>
 <script src="/shared/bigscreen.js"></script>
 <script src="/assets/wall/wall.js"></script>
 </body>

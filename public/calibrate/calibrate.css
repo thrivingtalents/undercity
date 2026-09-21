@@ -1,0 +1,92 @@
+/* Map calibration — a workbench, not a show screen. Dark glass like the
+   console, with the map given every pixel it can have. */
+
+.hidden { display: none !important; }
+.shell { display: flex; flex-direction: column; height: 100vh; min-height: 0; }
+.hint { font-size: 10px; color: var(--ink-faint); line-height: 1.5; }
+.row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.col-title {
+  font-size: 10px; letter-spacing: 0.2em; color: var(--ink-dim);
+  padding-bottom: 6px; border-bottom: 1px solid var(--line); margin: 0 0 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.col-title b { color: var(--accent-bright); letter-spacing: 0.08em; }
+button.ghost { background: transparent; color: var(--ink-dim); }
+button.on { background: var(--ui-active); color: var(--accent-ink); border-color: var(--ui-border-highlight); font-weight: 600; }
+.bad { color: var(--red) !important; }
+
+/* -- token gate ------------------------------------------------------------- */
+
+.token-gate { position: fixed; inset: 0; background: rgba(6,8,10,0.96); z-index: 100; display: flex; align-items: center; justify-content: center; }
+.token-card { width: 420px; padding: 28px; display: flex; flex-direction: column; gap: 12px; }
+.token-card h1 { font-size: 18px; letter-spacing: 0.24em; }
+.token-card h1 .sub { color: var(--accent-bright); }
+.token-card p { margin: 0; font-size: 12px; color: var(--ink-dim); line-height: 1.6; }
+.token-card code { color: var(--accent-bright); }
+.token-card .error { color: var(--red); font-size: 12px; }
+
+/* -- top bar ---------------------------------------------------------------- */
+
+.topbar {
+  display: flex; align-items: center; gap: 14px; padding: 8px 14px;
+  border-bottom: 1px solid var(--line); background: var(--ui-glass);
+  backdrop-filter: blur(var(--ui-glass-blur)); -webkit-backdrop-filter: blur(var(--ui-glass-blur));
+}
+.tb-ident { display: flex; flex-direction: column; gap: 2px; min-width: 200px; }
+.topbar h1 { font-size: 13px; letter-spacing: 0.2em; }
+.topbar h1 .sub { color: var(--accent-bright); }
+.tb-sectors { display: flex; gap: 4px; margin-left: 10px; }
+.tb-sectors button {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 6px 10px; border-radius: var(--r-md); line-height: 1.1;
+}
+.tb-sectors button b { font-size: 12px; letter-spacing: 0.08em; }
+.tb-sectors button span { font-size: 9px; color: var(--ink-faint); letter-spacing: 0.04em; }
+.tb-sectors button.done b::after { content: ' ●'; color: var(--green); font-size: 9px; }
+.tb-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.pill { font-size: 10px; letter-spacing: 0.06em; padding: 3px 10px; border-radius: var(--r-pill); background: rgba(233,180,94,0.16); color: var(--amber); border: 1px solid rgba(233,180,94,0.4); }
+
+/* -- the workbench ---------------------------------------------------------- */
+
+.work { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 340px; gap: 10px; padding: 10px 14px; }
+.stage { display: flex; flex-direction: column; min-width: 0; min-height: 0; gap: 6px; }
+.media {
+  position: relative; flex: 1; min-height: 0; border: 1px solid var(--line);
+  border-radius: var(--r-lg); overflow: hidden; background: #05070b;
+}
+.cal-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+/* Layers 2, 3 and the handles are sized to the video's IMAGE by map-overlay.js
+   — never to this element, which is letterboxed whenever the pane is not 16:9. */
+.cal-overlay, .cal-editor { position: absolute; }
+.cal-overlay { pointer-events: none; }
+.cal-editor { cursor: crosshair; touch-action: none; }
+.cal-labels { position: absolute; pointer-events: none; }
+.readout { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); letter-spacing: 0.04em; padding-left: 4px; }
+
+.side { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 0; }
+.side .panel { padding: 12px; }
+.mode-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.mode-row button { font-size: 10px; padding: 6px 9px; letter-spacing: 0.06em; }
+.check { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--ink-dim); margin-top: 8px; }
+
+.status-list { display: flex; flex-direction: column; gap: 3px; }
+.st-count { font-size: 10px; letter-spacing: 0.14em; color: var(--accent-bright); padding-bottom: 4px; }
+.st-row { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 6px; font-size: 10.5px; color: var(--ink-faint); padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.st-row b { color: var(--ink-dim); letter-spacing: 0.08em; }
+.st-row i { font-style: normal; font-size: 9.5px; color: var(--red); letter-spacing: 0.06em; }
+.st-row.ok b { color: var(--ink); }
+.st-row.ok i { color: var(--green); }
+
+#json-view {
+  width: 100%; font-family: var(--mono); font-size: 10.5px; line-height: 1.5;
+  background: rgba(0,0,0,0.35); color: var(--ink-dim); border: 1px solid var(--line);
+  border-radius: var(--r-md); padding: 8px; resize: vertical;
+}
+
+/* -- the editing handles ---------------------------------------------------- */
+
+.cal-shape { fill: rgba(0,229,255,0.10); stroke: #00e5ff; stroke-width: 2; stroke-linejoin: round; }
+.cal-handle { fill: #00e5ff; stroke: #04141a; stroke-width: 2; cursor: grab; pointer-events: all; }
+.cal-handle:hover { fill: #fff; }
+.cal-anchor { fill: none; stroke: var(--amber); stroke-width: 2; }
+.cal-core { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 5; opacity: 0.8; }

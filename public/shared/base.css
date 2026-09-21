@@ -306,3 +306,60 @@ input:focus, select:focus, textarea:focus {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* -- the calibrated map overlay (2026-09-21) --------------------------------
+   The state visuals for a sector region, in one place because two screens draw
+   them: the Big Screen and the calibration tool. The shapes live in a viewBox
+   of 0 0 1 1 stretched onto the video's image, so every stroke is marked
+   non-scaling in the markup — the geometry is deliberately non-uniform, the
+   linework must not be. NORMAL and DEGRADED draw no region at all. */
+
+.mo-region .mo-dim,
+.mo-region .mo-edge,
+.mo-region .mo-link { opacity: 0; transition: opacity 0.6s ease; }
+.mo-region .mo-dim { fill: #04060a; }
+.mo-region .mo-edge { fill: none; stroke: var(--amber); stroke-width: 2.5; stroke-linejoin: round; }
+.mo-region .mo-link { stroke: var(--amber); stroke-width: 2; }
+
+/* BROWNOUT — the region dims and takes an amber warning outline. */
+.mo-region[data-state="brownout"] .mo-dim { opacity: 0.55; animation: moPulse 3.4s ease-in-out infinite; }
+.mo-region[data-state="brownout"] .mo-edge { opacity: 0.9; }
+.mo-region[data-state="brownout"] .mo-link { opacity: 0.55; }
+
+/* CRITICAL — red outline and a restrained glow, no dimming: the sector is
+   still running, and the room needs to read it as alarm, not as loss. */
+.mo-region[data-state="critical"] .mo-edge { opacity: 0.95; stroke: var(--red); animation: moPulse 2s ease-in-out infinite; }
+.mo-region[data-state="critical"] .mo-dim { opacity: 0.12; fill: var(--red); }
+
+/* DARK — near-black, and the outline goes out with the sector. */
+.mo-region[data-state="dark"] .mo-dim { opacity: 0.82; }
+.mo-region[data-state="dark"] .mo-edge { opacity: 0.35; stroke: var(--ink-faint); }
+
+/* DEGRADED — the lightest possible amber wash, no outline, no word. */
+.mo-region[data-state="degraded"] .mo-dim { opacity: 0.1; fill: var(--amber); }
+
+@keyframes moPulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.34; } }
+
+/* Layer 3: the status word, upright and centred on its saved anchor. */
+.mo-word {
+  position: absolute; transform: translate(-50%, -50%);
+  font-family: var(--mono); font-size: clamp(11px, 1.5vh, 20px);
+  letter-spacing: 0.22em; font-weight: 700; white-space: nowrap;
+  padding: 0.35em 0.7em; border-radius: 3px; pointer-events: none;
+  background: rgba(6, 8, 12, 0.72); border: 1px solid currentColor;
+  color: var(--amber); text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+}
+.mo-word[data-state="dark"] { color: var(--ink-dim); }
+.mo-word[data-state="critical"] { color: var(--red); }
+
+/* The fault badge on the calibrated map: under the status word, on the same
+   measured anchor, so it is always on the sector it names. */
+.mo-badge {
+  position: absolute; transform: translate(-50%, calc(-50% + 2.2em));
+  font-family: var(--mono); font-size: clamp(10px, 1.25vh, 16px);
+  letter-spacing: 0.12em; white-space: nowrap; pointer-events: none;
+  padding: 0.3em 0.6em; border-radius: 3px;
+  background: rgba(6, 8, 12, 0.78); border: 1px solid rgba(233, 180, 94, 0.5);
+  color: var(--amber);
+}
+.mo-badge.crisis { border-color: rgba(255, 107, 122, 0.6); color: var(--red); }
