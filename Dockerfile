@@ -40,6 +40,11 @@ COPY server.js ./
 COPY lib ./lib
 COPY content ./content
 COPY config ./config
+# The calibrated sector regions for the map clip. Shipped with the image
+# because a box with no calibration draws no state on the Big Screen at all;
+# a facilitator who re-calibrates on a hosted instance writes to /var/data,
+# which is the only thing here that survives a deploy.
+COPY mapConfig ./mapConfig
 COPY public ./public
 COPY scripts ./scripts
 

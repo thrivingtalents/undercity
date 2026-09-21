@@ -197,6 +197,25 @@ test('the status word hangs from the saved anchor, never from a centroid when on
 
 // -- the store on disk ---------------------------------------------------------
 
+test('the shipped calibration reaches a hosted box, and a re-calibration survives its next deploy', () => {
+  // The image is rebuilt on every deploy and only the mounted disk survives,
+  // so the runtime stage must carry the shipped file AND the store must write
+  // to DATA_DIR when there is one. Both halves were missing once; a map that
+  // silently reads as empty draws no state on the Big Screen at all.
+  const dockerfile = fs.readFileSync(path.join(ROOT, 'Dockerfile'), 'utf8');
+  const runtime = dockerfile.slice(dockerfile.lastIndexOf('FROM '));
+  assert.ok(/^COPY mapConfig \.\/mapConfig$/m.test(runtime), 'the runtime image does not ship mapConfig');
+
+  assert.ok(regions.BUNDLED.includes('mapConfig'), 'the shipped copy is not in the repository');
+  // Without DATA_DIR (a laptop) the tool writes the repository file, which is
+  // what lets a calibration be committed beside the clip it describes.
+  assert.equal(regions.DISK, process.env.DATA_DIR
+    ? path.join(process.env.DATA_DIR, 'haven9-map-regions.json') : null);
+  assert.equal(regions.writePath(), regions.DISK || regions.BUNDLED);
+  // And the read prefers the disk only when the disk actually has one.
+  assert.equal(regions.readPath(), regions.BUNDLED);
+});
+
 test('a save writes the whole document or none of it', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'undercity-map-'));
   const file = path.join(dir, 'regions.json');
