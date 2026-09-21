@@ -309,7 +309,7 @@ test('v18 over the wire: a participant socket cannot touch a tray or the clock; 
   const say = (msg) => control.ws.send(JSON.stringify(msg));
   say({ type: 'reset_run', run_id: 'v18-wire', confirm: true });
   await wait(400);
-  say({ type: 'set_phase', phase: 'INTERDEPENDENCE' });
+  say({ type: 'set_phase', phase: 'ROUND_2' });
   say({ type: 'clock', which: 'round', action: 'start' });
   await wait(400);
   const power0 = control.state.sectors.POW.inventory.power;

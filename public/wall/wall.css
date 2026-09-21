@@ -379,6 +379,21 @@
   text-shadow: 0 0 40px rgba(232,90,90,0.55); pointer-events: none; animation: countIn 0.9s ease-out;
 }
 
+/*
+  The round marker. Deliberately small and brief: a wall that announces a
+  chapter teaches the room to wait for the next one, and this simulation has
+  no pauses to wait for. Pointer events off — it can never take a click from
+  anything underneath it.
+*/
+.round-flash {
+  position: absolute; left: 50%; top: 4%; transform: translateX(-50%); z-index: 7;
+  padding: 1.2vh 3vw; border: 1px solid var(--glass-edge); border-top: 2px solid var(--accent);
+  border-radius: var(--r-card); background: rgba(18, 18, 28, 0.72);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-drop); animation: toastIn 0.35s ease; pointer-events: none;
+}
+.round-flash b { font-size: var(--cmd); letter-spacing: 0.24em; font-weight: 700; color: var(--ink); }
+
 /* the round's upkeep pass */
 .cycle-flash {
   position: absolute; left: 50%; top: 4%; transform: translateX(-50%); z-index: 6;

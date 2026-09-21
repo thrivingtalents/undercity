@@ -38,8 +38,11 @@
       <span class="scenario" id="scenario-name">—</span>
     </div>
 
+    <!-- SIMPLIFIED ROUND DISPLAY (2026-09-21): a number, and never a name.
+         What Round 3 does to the city is in the runbook, on paper — printing
+         it here puts it one screenshot away from the room. -->
     <div class="tb-stat tb-phase">
-      <span class="label">PHASE</span>
+      <span class="label">CURRENT ROUND</span>
       <b id="phase-name">—</b>
       <span class="pill" id="mode-pill">—</span>
     </div>
@@ -73,8 +76,9 @@
       <button id="btn-start" class="primary">START</button>
       <button id="btn-pause">PAUSE</button>
       <button id="btn-timer" title="Add or take minutes, set MM:SS, reset to the shift length — the one MASTER TIME every screen shows">TIMER ▾</button>
-      <button id="btn-next-phase" class="primary">NEXT PHASE ›</button>
-      <button id="btn-end-phase" class="ghost" title="Stop MASTER TIME at 00:00. The phase does not change; NEXT PHASE does that.">STOP CLOCK</button>
+      <button id="btn-prev-round" class="ghost" title="Back one round. Nothing in the city is reset or replayed — only which inject pool is armed changes.">‹ PREV ROUND</button>
+      <button id="btn-next-phase" class="primary">NEXT ROUND ›</button>
+      <button id="btn-end-phase" class="ghost" title="Stop MASTER TIME at 00:00. The round does not change; NEXT ROUND does that.">STOP CLOCK</button>
       <button id="btn-end-sim" class="ghost" title="End the simulation: every live timer stops and the final city state stands. Nothing is cleared, refilled or reset, and no debrief screen is launched at the room.">END SIMULATION</button>
     </div>
 

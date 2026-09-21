@@ -28,27 +28,26 @@ const SECTORS = ['POW', 'WTR', 'MED', 'TRN', 'AGR', 'COM'];
 /** A game in ROUND_2 with the clock running. */
 function running() {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   game.clock('start');
   return game;
 }
 
 // -- phases -------------------------------------------------------------------
 
-test('phases walk SETUP → ENDED with no debrief and no rest in the list', () => {
+test('the phases ARE the rounds: ROUND_0 → ROUND_4, and then the end', () => {
   const game = newGame();
-  assert.equal(game.state.phase, 'SETUP');
+  assert.equal(game.state.phase, 'ROUND_0');
   assert.equal(game.phaseConfig().mode, 'BRIEFING');
   const seen = [];
   while (game.nextPhase()) seen.push(game.state.phase);
-  assert.deepEqual(seen, ['ORIENTATION', 'STABLE_OPERATIONS', 'INTERDEPENDENCE', 'ESCALATION',
-    'CORE_FAILURE', 'TEMPORARY_STABILISATION', 'AFTERSHOCK', 'FINAL_CRISIS', 'ENDED']);
+  assert.deepEqual(seen, ['ROUND_1', 'ROUND_2', 'ROUND_3', 'ROUND_4', 'ENDED']);
   assert.ok(!seen.some((id) => /DEBRIEF|REST|BREATHER|REFLECT/.test(id)), 'no scheduled break is a phase');
   assert.equal(game.state.round, 'R4');
   assert.equal(game.state.mode, 'ENDED');
   assert.equal(game.nextPhase(), false, 'ENDED is the end');
   const phases = logEvents(game, 'phase');
-  assert.equal(phases.length, 9);
+  assert.equal(phases.length, 5);
   assert.ok(phases.every((p) => p.t && p.phase && p.round), 'every phase change is timestamped');
 });
 
@@ -70,7 +69,7 @@ test('CT-001/CT-002/CT-004: an internal phase change interrupts nothing and rese
   };
   game.tick(1000);
   before.integrity = pow.integrity;      // an open fault bleeds; that is gameplay, not a reset
-  for (const id of ['ESCALATION', 'CORE_FAILURE', 'TEMPORARY_STABILISATION', 'AFTERSHOCK', 'FINAL_CRISIS']) {
+  for (const id of ['ROUND_3', 'ROUND_4']) {
     assert.equal(game.setPhase(id), true);
     assert.equal(game.state.round_clock.running, before.running, `${id}: MASTER TIME keeps running`);
     assert.equal(game.frozen, false, `${id}: nothing is frozen`);
@@ -85,7 +84,7 @@ test('CT-001/CT-002/CT-004: an internal phase change interrupts nothing and rese
 
 test('START runs MASTER TIME and the operating cycle together; frozen states stop both', () => {
   const game = newGame();
-  game.setPhase('STABLE_OPERATIONS');
+  game.setPhase('ROUND_1');
   game.clock('start');
   assert.equal(game.state.mode, 'PLAY');
   assert.equal(game.state.cycle.running, true, 'the operating cycle runs with MASTER TIME');
@@ -655,7 +654,7 @@ test('an operating cycle restores Transport approvals; an internal phase change 
   }
   assert.equal(game.stampsUsed(), 3);
 
-  game.setPhase('CORE_FAILURE');
+  game.setPhase('ROUND_3');
   assert.equal(game.stampsUsed(), 3, 'a phase change is not a refresh');
   assert.equal(forSector(game, 'TRN').transfer_queue.remaining, 0);
 
@@ -707,7 +706,7 @@ test('CT-001: unfinished paperwork survives an internal phase change, and expire
   game.healWorker(healed.healing.id, { by: 'MED' });
 
   // The phase moves under the room. Nothing unfinished notices.
-  game.setPhase('CORE_FAILURE');
+  game.setPhase('ROUND_3');
   assert.equal(game.findRequest(openRequest.request.id).status, 'REQUESTED', 'a phase change swept the queue');
   assert.equal(game.findHealing(openHeal.healing.id).status, 'WAITING_FOR_MED');
   assert.equal(game.findTransfer(delivered.id).status, 'DELIVERED', 'history is not rewritten');
@@ -916,7 +915,7 @@ test('an operating cycle restores healing capacity; an internal phase change doe
   }
   assert.equal(game.medHealsUsed(), 2);
 
-  game.setPhase('CORE_FAILURE');
+  game.setPhase('ROUND_3');
   assert.equal(game.medHealsUsed(), 2, 'a phase change is not a refresh');
   assert.equal(forSector(game, 'MED').healing_queue.remaining, 1);
 
@@ -1127,7 +1126,7 @@ test('a row from last cycle is STALE, two cycles old is OUTDATED, never set is N
   game.setBroadcastRow('POW', { power: 5 }, { by: 'COM' });
   assert.equal(forBigscreen(game).broadcast.rows.POW.freshness, 'CURRENT');
   assert.equal(forBigscreen(game).broadcast.rows.WTR.freshness, 'NOT UPDATED');
-  game.setPhase('CORE_FAILURE');
+  game.setPhase('ROUND_3');
   assert.equal(forBigscreen(game).broadcast.rows.POW.freshness, 'CURRENT', 'a phase change aged the board');
   game.cycleControl('process');
   assert.equal(forBigscreen(game).broadcast.rows.POW.freshness, 'STALE');
@@ -1179,7 +1178,7 @@ test('a refresh, a reconnect, a reopened screen and an internal phase change all
   const hand = [...game.state.agr.offered];
   // A "refresh"/"reconnect"/"reopen" is a new projection of the same state.
   for (let i = 0; i < 5; i += 1) assert.deepEqual(forSector(game, 'AGR').agr_cards.offered.map((c) => c.id), hand);
-  game.setPhase('CORE_FAILURE');
+  game.setPhase('ROUND_3');
   assert.deepEqual(game.state.agr.offered, hand, 'a phase change redealt');
   // A restart from snapshot keeps the hand too.
   const again = newGame({ runId: 'agr-restore' });
@@ -1225,9 +1224,9 @@ test('the fallback fills from last cycle when fewer than three fresh cards remai
 });
 
 test('the same run and cycle deal the same hand; a different run deals differently', () => {
-  const a = newGame({ runId: 'seeded-run' }); a.setPhase('INTERDEPENDENCE');
-  const b = newGame({ runId: 'seeded-run' }); b.setPhase('INTERDEPENDENCE');
-  const c = newGame({ runId: 'another-run' }); c.setPhase('INTERDEPENDENCE');
+  const a = newGame({ runId: 'seeded-run' }); a.setPhase('ROUND_2');
+  const b = newGame({ runId: 'seeded-run' }); b.setPhase('ROUND_2');
+  const c = newGame({ runId: 'another-run' }); c.setPhase('ROUND_2');
   assert.deepEqual(a.state.agr.offered, b.state.agr.offered);
   const differs = [1, 2].some(() => { a.cycleControl('process'); c.cycleControl('process'); return JSON.stringify(a.state.agr.offered) !== JSON.stringify(c.state.agr.offered); })
     || JSON.stringify(a.state.agr.offered) !== JSON.stringify(c.state.agr.offered);
@@ -1279,7 +1278,7 @@ test('a new operating cycle clears the selection and deals again; a phase change
   const hand = [...game.state.agr.offered];
   game.state.agr.offered = ['AGR_POWER_SURGE', 'AGR_WATER_RESERVE', 'AGR_EMERGENCY_PARTS'];
   game.agrActivate('AGR_POWER_SURGE', { by: 'AGR' });
-  game.setPhase('CORE_FAILURE');
+  game.setPhase('ROUND_3');
   assert.equal(game.state.agr.used, true, 'a phase change unlocked the choice');
   assert.equal(game.agrActivate('AGR_WATER_RESERVE', { by: 'AGR' }).reason, 'agr_card_already_used');
   game.cycleControl('process');
@@ -1679,11 +1678,12 @@ test("the sector markup has no city table, no legend, an announcement nudge, and
 const KIT_JS = fs.readFileSync(path.join(__dirname, '..', 'tools', 'kit', 'build_kit.js'), 'utf8');
 const BINDER_JS = fs.readFileSync(path.join(__dirname, '..', 'tools', 'kit', 'build_binders.js'), 'utf8');
 
-test('the sector screen speaks in cycles and MASTER TIME: no round word anywhere on it', () => {
+test('the sector screen: the round as a number, the cycle and MASTER TIME as clocks', () => {
   // What the room reads: comments and element ids are not on the screen.
   const visible = SECTOR_INDEX.replace(/<!--[\s\S]*?-->/g, '').replace(/\s(?:id|class)="[^"]*"/g, '');
-  assert.ok(!/round/i.test(visible), 'index.html still says round');
-  for (const bad of ['NEXT ROUND', 'THIS ROUND', 'ROUND OUTPUT', '/ ROUND', 'ROUND ${', 'CURRENT ROUND']) {
+  assert.ok(/Current round/.test(visible), 'the header lost the round');
+  // The number, never a name, and never the old per-round mechanics wording.
+  for (const bad of ['NEXT ROUND UPKEEP', 'THIS ROUND', 'ROUND OUTPUT', '/ ROUND']) {
     assert.ok(!SECTOR_SCRIPT.includes(bad), `sector.js still carries ${bad}`);
   }
   for (const good of ['Next operating cycle', 'Master time', 'NEXT CYCLE UPKEEP', 'CYCLE OUTPUT', 'HEALING THIS CYCLE',
@@ -1702,7 +1702,9 @@ test("the charter's history keeps its Cycles; the scenario phases keep their nam
   assert.ok(BINDER_JS.includes('Cycle 31 records purge'));
   const game = running();
   const ids = (game.rounds.phases || []).map((p) => p.id);
-  assert.ok(ids.includes('ORIENTATION') && ids.includes('AFTERSHOCK'));
+  assert.ok(ids.includes('ROUND_0') && ids.includes('ROUND_4'), 'the phases are not the rounds');
+  // The round's own name survives in the data file as history for the
+  // facilitator's runbook — and reaches no screen. See round-flow.test.js.
   assert.equal(game.roundConfig('R2').name, 'Interdependence');
 });
 
@@ -1761,7 +1763,7 @@ test('WTR: ROUND OUTPUT is +3 water, once a round; the next round opens it again
   assert.deepEqual(game.generateOutput('WTR', { by: 'WTR' }).added, { water: 3 });
   assert.equal(wtr.inventory.water, before + 3);
   assert.equal(game.generateOutput('WTR', { by: 'WTR' }).reason, 'already_generated');
-  game.setPhase('CORE_FAILURE');
+  game.setPhase('ROUND_3');
   assert.equal(forSector(game, 'WTR').sectors.WTR.round_output.used, true, 'a phase change re-opened the output');
   game.cycleControl('process');                       // upkeep is charged here too
   assert.equal(forSector(game, 'WTR').sectors.WTR.round_output.used, false, 'a new cycle, a new output');
@@ -1802,7 +1804,7 @@ test('upkeep is charged by the operating cycle alone, and never by a phase chang
   const passes = game.state.cycle.number;
 
   // A phase change charges nothing and moves no stock.
-  game.setPhase('CORE_FAILURE');
+  game.setPhase('ROUND_3');
   assert.equal(game.state.cycle.number, passes, 'a phase change charged an upkeep pass');
   assert.deepEqual(pow.inventory, { power: 3, water: 3, parts: 3, med: 1 });
 
@@ -2419,7 +2421,7 @@ test('an ADMIN OVERRIDE needs a reason, reads the target before and after, and w
   const e = written[0];
   assert.equal(e.ev, 'admin_override'); assert.equal(e.actor, 'facilitator'); assert.ok(e.t);
   assert.equal(e.target, 'POW'); assert.equal(e.before.integrity, 100); assert.equal(e.after.integrity, 90);
-  assert.equal(e.reason, 'binder misprint, compensating'); assert.equal(e.round, 'R2'); assert.equal(e.phase, 'INTERDEPENDENCE');
+  assert.equal(e.reason, 'binder misprint, compensating'); assert.equal(e.round, 'R2'); assert.equal(e.phase, 'ROUND_2');
   assert.equal(rec.target, 'POW');
   assert.ok(game.state.ticker.some((t) => t.kind === 'override' && /OVERRIDE ADJUST INTEGRITY · POW — binder misprint/.test(t.text)), 'the override is on the admin ticker');
   assert.ok(forControl(game).ticker.some((t) => t.kind === 'override'));
@@ -2447,8 +2449,8 @@ test('override snapshots name every target kind, and the debrief counts override
   assert.equal(override.snapshot(game, 'adjust_integrity', { sector: 'XXX' }), null, 'an unknown sector is null, not a crash');
 
   const lines = [
-    { t: '2026-09-18T03:00:00.000Z', ev: 'run_reset', run_id: 'r', round: 'R2', phase: 'INTERDEPENDENCE' },
-    { t: '2026-09-18T03:01:00.000Z', ev: 'admin_override', round: 'R2', phase: 'INTERDEPENDENCE', actor: 'facilitator', action: 'adjust_integrity', target: 'POW', reason: 'test', before: { integrity: 100 }, after: { integrity: 90 } },
+    { t: '2026-09-18T03:00:00.000Z', ev: 'run_reset', run_id: 'r', round: 'R2', phase: 'ROUND_2' },
+    { t: '2026-09-18T03:01:00.000Z', ev: 'admin_override', round: 'R2', phase: 'ROUND_2', actor: 'facilitator', action: 'adjust_integrity', target: 'POW', reason: 'test', before: { integrity: 100 }, after: { integrity: 90 } },
   ].map((l) => JSON.stringify(l)).join('\n');
   const d = analyse(lines, { runId: 'r' });
   assert.equal(d.rounds.R2.overrides, 1);
@@ -2459,7 +2461,7 @@ test('an observation carries phase, round and time, and reaches the facilitator 
   const game = running();
   game.log.write('observe', { sector: 'POW', tag: 'DOMINANCE', note: 'chief talks over liaison' });
   const ev = logEvents(game, 'observe')[0];
-  assert.equal(ev.round, 'R2'); assert.equal(ev.phase, 'INTERDEPENDENCE'); assert.ok(ev.t); assert.equal(ev.tag, 'DOMINANCE');
+  assert.equal(ev.round, 'R2'); assert.equal(ev.phase, 'ROUND_2'); assert.ok(ev.t); assert.equal(ev.tag, 'DOMINANCE');
 });
 
 test('the console markup: four destinations, OVERVIEW first, one PAUSE, no city figure, phase and round shown, STOP CLOCK ≠ NEXT PHASE', () => {
@@ -2543,7 +2545,7 @@ function repair(game, code, sector, extra = {}) {
 }
 /** A fresh running game whose faults are pinned to the archetypes given (they skip the band, never the caps). */
 function pinned(overrides, runId = 'pinned') {
-  const g = newGame({ runId }); g.setPhase('INTERDEPENDENCE'); g.clock('start');
+  const g = newGame({ runId }); g.setPhase('ROUND_2'); g.clock('start');
   g.patchConfig({ fault_reward_overrides: Object.fromEntries(Object.entries(overrides).map(([k, v]) => [k, { archetype: v }])) });
   return g;
 }
@@ -2592,7 +2594,7 @@ test('v17.3 case table: every fault matches the spec on sector, title, crew, mat
 
 test('parameterised: every normal fault refuses a short tray, short crew and a wrong code without consuming, then consumes exactly its recipe once and pays exactly the reward it showed', () => {
   for (const m of NORMAL) {
-    const game = newGame({ runId: `p-${m.fault_id}` }); game.setPhase('INTERDEPENDENCE'); game.clock('start');
+    const game = newGame({ runId: `p-${m.fault_id}` }); game.setPhase('ROUND_2'); game.clock('start');
     game.fireFault(m.fault_id, m.sector);
     const inst = liveFault(game, m.sector, m.fault_id);
     const shown = JSON.parse(JSON.stringify(inst.reward));
@@ -2642,7 +2644,7 @@ test('F-210 invents nothing: no crew, no materials, no code; any submit is refus
   assert.deepEqual(inst.reward.resource_effects, []); assert.equal(inst.reward.resource_units_reserved, 0);
   assert.equal(game.state.repair_material_units_issued, 0, 'a ghost joined the budget basis');
   for (let i = 0; i < 40; i += 1) {
-    const g = newGame({ runId: `ghost-${i}` }); g.setPhase('INTERDEPENDENCE'); g.clock('start');
+    const g = newGame({ runId: `ghost-${i}` }); g.setPhase('ROUND_2'); g.clock('start');
     g.fireFault('F-210', 'AGR');
     const r = liveFault(g, 'AGR', 'F-210').reward;
     assert.ok(!/SUPPLY|SALVAGE/.test(r.archetype) && NO_STOCK(r.archetype), `run ${i}: a ghost rolled ${r.archetype}`);
@@ -2708,14 +2710,14 @@ test('the reward is dealt once at creation as an exact persisted payload: refres
   submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-04-340', workers_assigned: 1 });
   game.setInventory('POW', { parts: 0 });
   submitCode(game, { sector: 'POW', fault_code: 'F-201', code: 'P-04-340', workers_assigned: 2 });
-  game.setPhase('CORE_FAILURE'); game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_3'); game.setPhase('ROUND_2');
   assert.deepEqual(inst.reward, dealt, 'a failed attempt or a phase change rerolled');
   const again = newGame({ runId: 'reward-restore' });
   again.restore(JSON.parse(JSON.stringify(game.serialise())));
   assert.deepEqual(again.state.sectors.POW.faults[0].reward, dealt, 'a restart rerolled');
   assert.equal(again.state.fault_reward_resource_units_reserved, game.state.fault_reward_resource_units_reserved);
   const seen = new Set();
-  for (let i = 0; i < 30; i += 1) { const g = newGame({ runId: `r-${i}` }); g.setPhase('INTERDEPENDENCE'); g.clock('start'); g.fireFault('F-201', 'POW'); seen.add(liveFault(g, 'POW', 'F-201').reward.archetype); }
+  for (let i = 0; i < 30; i += 1) { const g = newGame({ runId: `r-${i}` }); g.setPhase('ROUND_2'); g.clock('start'); g.fireFault('F-201', 'POW'); seen.add(liveFault(g, 'POW', 'F-201').reward.archetype); }
   assert.ok(seen.size >= 3, `F-201 always rolls the same: ${[...seen]}`);
 });
 
@@ -2807,7 +2809,7 @@ test('health rewards use points, cap at 100 and never revive DARK; TRN and MED b
 });
 
 test('a 3-sector session never rolls Medical rewards or targets an inactive sector; Transport bonuses, health, stabilisation, caches and salvage stay possible', () => {
-  const g = newGame({ runId: 'three' }); g.setPhase('INTERDEPENDENCE'); g.clock('start');
+  const g = newGame({ runId: 'three' }); g.setPhase('ROUND_2'); g.clock('start');
   g.patchConfig({ active_sectors: ['POW', 'WTR', 'TRN'] });
   assert.deepEqual(rewardsMod.activeSectors(g), ['POW', 'WTR', 'TRN']);
   g.fireFault('F-101', 'POW'); g.fireFault('F-201', 'POW'); g.fireFault('F-301', 'POW');
@@ -2836,7 +2838,7 @@ test('a 3-sector session never rolls Medical rewards or targets an inactive sect
 test('per-fault limits: no reward above the target or outside the band; one-material faults never roll stock; F-201 at most 1 unit; F-301 at most 2 units and never 3', () => {
   const game = running();
   for (const m of MATRIX) {
-    const g = newGame({ runId: `band-${m.fault_id}` }); g.setPhase('INTERDEPENDENCE'); g.clock('start');
+    const g = newGame({ runId: `band-${m.fault_id}` }); g.setPhase('ROUND_2'); g.clock('start');
     g.fireFault(m.fault_id, m.sector);
     const f = liveFault(g, m.sector, m.fault_id);
     const bal = POOLS.faults[m.fault_id];
@@ -2848,7 +2850,7 @@ test('per-fault limits: no reward above the target or outside the band; one-mate
     if (bal.material_units <= 1) assert.ok(el.every((e) => e.resource_units === 0), `${m.fault_id}: a one-material fault can roll stock`);
   }
   for (let i = 0; i < 40; i += 1) {
-    const g = newGame({ runId: `one-${i}` }); g.setPhase('INTERDEPENDENCE'); g.clock('start');
+    const g = newGame({ runId: `one-${i}` }); g.setPhase('ROUND_2'); g.clock('start');
     g.fireFault('F-001', 'POW');
     const r = liveFault(g, 'POW', 'F-001').reward;
     assert.equal(r.rvu, 1, `F-001 rolled rvu ${r.rvu}`); assert.equal(r.resource_units_reserved, 0, `F-001 rolled stock: ${r.archetype}`);
@@ -2873,7 +2875,7 @@ test('reward strength follows the case, not the phase: targets differ within a r
   const counts = { rvu: {}, cat: {} };
   const N = 300;
   for (let i = 0; i < N; i += 1) {
-    const g = newGame({ runId: `heavy-${i}` }); g.setPhase('INTERDEPENDENCE'); g.clock('start');
+    const g = newGame({ runId: `heavy-${i}` }); g.setPhase('ROUND_2'); g.clock('start');
     g.fireFault('F-201', 'POW');
     const r = liveFault(g, 'POW', 'F-201').reward;
     counts.rvu[r.rvu] = (counts.rvu[r.rvu] || 0) + 1;
@@ -2887,7 +2889,7 @@ test('reward strength follows the case, not the phase: targets differ within a r
   assert.ok(resource <= 0.3, `resource share ${resource} (cap 0.3)`);
   assert.ok((counts.cat.cross || 0) > (counts.cat.local || 0), `cross ${counts.cat.cross} vs local ${counts.cat.local}`);
   for (let i = 0; i < 60; i += 1) {
-    const g = newGame({ runId: `basic-${i}` }); g.setPhase('INTERDEPENDENCE'); g.clock('start');
+    const g = newGame({ runId: `basic-${i}` }); g.setPhase('ROUND_2'); g.clock('start');
     g.fireFault('F-102', 'POW');
     const r = liveFault(g, 'POW', 'F-102').reward;
     assert.equal(r.rvu, 2); assert.ok(NO_STOCK(r.archetype));
@@ -3145,7 +3147,7 @@ test('v18 resource control: a reason is required, the audit line carries before/
   assert.equal(r.ok, true);
   const ev = logEvents(game, 'admin_resource_override').pop();
   for (const k of ['sector', 'before', 'after', 'delta', 'reason', 'by', 'round', 'phase', 'run_id', 't']) assert.ok(k in ev, `audit lacks ${k}`);
-  assert.equal(ev.sector, 'POW'); assert.equal(ev.reason, 'playtest correction'); assert.equal(ev.round, 'R2'); assert.equal(ev.phase, 'INTERDEPENDENCE');
+  assert.equal(ev.sector, 'POW'); assert.equal(ev.reason, 'playtest correction'); assert.equal(ev.round, 'R2'); assert.equal(ev.phase, 'ROUND_2');
   assert.equal(ev.after.power, 6); assert.equal(ev.delta.power, 6 - ev.before.power); assert.equal(ev.after.parts, 0);
   assert.deepEqual({
     requests: game.state.requests.length, transfers: game.state.transfers.length, stamps: game.stampsUsed(), heals: game.medHealsUsed(),
@@ -3188,7 +3190,7 @@ test('CT-007/CT-008: add and take minutes, set MM:SS, never below 00:00; reset r
   const res = game.clock('reset', null, 'round', { reason: 'fresh round' });
   assert.equal(res.ok, true); assert.equal(clk.remaining_s, len); assert.equal(clk.running, true, 'reset stopped a running clock');
   assert.deepEqual(everythingBut(game, 'round_clock', 'ticker', 'feed', 'updated_at', 'game_clock_s'), world, 'reset touched more than the time');
-  assert.equal(game.state.round, 'R2'); assert.equal(game.state.phase, 'INTERDEPENDENCE'); assert.equal(game.stampsUsed(), 1); assert.equal(game.state.sectors.AGR.integrity, 61);
+  assert.equal(game.state.round, 'R2'); assert.equal(game.state.phase, 'ROUND_2'); assert.equal(game.stampsUsed(), 1); assert.equal(game.state.sectors.AGR.integrity, 61);
   const rs = logEvents(game, 'admin_timer_reset').pop();
   assert.deepEqual([rs.before_remaining_ms, rs.default_remaining_ms, rs.reason], [0, len * 1000, 'fresh round']);
   // the wrapper checks the payload before anything moves
@@ -3200,7 +3202,7 @@ test('CT-007/CT-008: add and take minutes, set MM:SS, never below 00:00; reset r
   assert.equal(override.validate({ action: 'timer_reset', reason: 'x', payload: {} }).ok, true);
   const snap = override.snapshot(game, 'timer_set', {});
   assert.equal(snap.remaining_ms, len * 1000); assert.equal(snap.default_s, len); assert.equal(snap.round, 'R2');
-  assert.equal(snap.phase, 'INTERDEPENDENCE');
+  assert.equal(snap.phase, 'ROUND_2');
   assert.equal(override.targetName(game, 'timer_set', {}), 'MASTER TIME');
 });
 
@@ -3244,7 +3246,7 @@ test('v18 timer control: 00:00 stops nothing but the clock; NEXT PHASE still run
   const passes = game.state.cycle.number;
   game.tick(10000);
   assert.equal(clk.remaining_s, 0);
-  assert.equal(game.state.round, 'R2'); assert.equal(game.state.phase, 'INTERDEPENDENCE');
+  assert.equal(game.state.round, 'R2'); assert.equal(game.state.phase, 'ROUND_2');
   assert.equal(logEvents(game, 'round').length, rounds); assert.equal(logEvents(game, 'phase').length, phases);
   assert.equal(game.state.cycle.number, passes, '00:00 charged upkeep');
   game.tick(60000);
@@ -3262,11 +3264,11 @@ test('v18 timer control: 00:00 stops nothing but the clock; NEXT PHASE still run
   const upkeep = game.state.cycle.number;
   const was = game.state.round_clock.remaining_s;
   assert.equal(game.nextPhase(), true);
-  assert.equal(game.state.phase, 'ESCALATION');
+  assert.equal(game.state.phase, 'ROUND_3');
   assert.equal(game.state.cycle.number, upkeep, 'the phase transition charged upkeep');
   assert.equal(clk === game.state.round_clock, true, 'the phase transition replaced the clock');
   assert.equal(game.state.round_clock.remaining_s, was, 'the phase transition moved MASTER TIME');
-  assert.equal(logEvents(game, 'round').length, rounds, 'ESCALATION stays inside R2');
+  assert.equal(logEvents(game, 'round').length, rounds + 1, 'the next round armed its own injects');
   // the console has what its popover and drawer need
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'control', 'index.html'), 'utf8');
   const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'control', 'control.js'), 'utf8');
@@ -3479,7 +3481,7 @@ test('a commitment cannot overdraw the pool, and two purposes stack', () => {
 // WRK-01
 test('WRK-01 a repair sees only the workers a commitment has left, and says why', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   const def = loadContent().faults.faults.find((f) => f.sector === 'POW' && f.crew_required >= 2);
   assert.ok(def, 'no POW fault needs a crew');
   assert.equal(game.fireFault(def.code, 'POW').ok, true);
@@ -3558,7 +3560,7 @@ test('the facilitator and the sector both see what is committed', () => {
 
 function atRound1() {
   const game = newGame();
-  game.setPhase('STABLE_OPERATIONS');
+  game.setPhase('ROUND_1');
   return game;
 }
 const prodOf = (game, code) => economy.productionFor(game, game.state.sectors[code]);
@@ -3599,7 +3601,7 @@ test('UPG-01 an upgrade spends its Parts now, holds its crew, and lands at the e
   assert.deepEqual(prodOf(game, 'POW'), { power: 3 }, 'this round produced at the new level');
   assert.equal(r.pending.to_level, 3);
 
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   assert.equal(game.generatorFor('POW').level, 2, 'a phase change landed the upgrade');
   game.cycleControl('process');
   assert.equal(game.generatorFor('POW').level, 3, 'the upgrade did not land on the operating cycle');
@@ -3779,7 +3781,7 @@ test('the facilitator and the sector both see the generator, and the log carries
 // DARK-01
 test('DARK-01 a sector at zero health is shut down, not eliminated: it can buy its way back', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   const pow = game.state.sectors.POW;
   pow.inventory.parts = 2; pow.inventory.power = 1; pow.inventory.water = 1;
 
@@ -3811,7 +3813,7 @@ test('DARK-01 a sector at zero health is shut down, not eliminated: it can buy i
   assert.notEqual(res.reason, 'sector_dark', 'a restarted sector still cannot repair');
 
   // the crew comes back with everyone else's, on the next operating cycle
-  game.setPhase('CORE_FAILURE');
+  game.setPhase('ROUND_3');
   assert.equal(game.committedWorkers(pow), 2, 'a phase change released the crew');
   game.cycleControl('process');
   assert.equal(game.committedWorkers(pow), 0, 'the restart crew never came back');
@@ -3819,7 +3821,7 @@ test('DARK-01 a sector at zero health is shut down, not eliminated: it can buy i
 
 test('a restart it cannot afford is refused, and says what is short', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   const wtr = game.state.sectors.WTR;
   wtr.inventory.parts = 0; wtr.inventory.power = 1; wtr.inventory.water = 1;
   game.setIntegrity('WTR', 0);
@@ -3843,7 +3845,7 @@ test('a restart it cannot afford is refused, and says what is short', () => {
 // FAC-01
 test('FAC-01 a granted TRN slot lasts the round it was granted in, and is logged', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   assert.equal(game.trnCapacity(), 3);
 
   const r = game.pressureRelief('trn_capacity', { delta: 1 }, { by: 'facilitator', reason: 'two tables stuck behind TRN' });
@@ -3863,7 +3865,7 @@ test('FAC-01 a granted TRN slot lasts the round it was granted in, and is logged
 
 test('fault injection can be held without freezing the game, and the facilitator still fires by hand', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   const def = loadContent().faults.faults.find((f) => f.sector === 'MED');
 
   assert.equal(game.pressureRelief('pause_faults', {}, { reason: 'RED — nobody is deciding' }).ok, true);
@@ -3882,7 +3884,7 @@ test('fault injection can be held without freezing the game, and the facilitator
 
 test('decay can be frozen for a stated number of seconds, and thaws by itself', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   game.clock('start');
   const def = loadContent().faults.faults.find((f) => f.sector === 'AGR' && f.decay_per_min > 0)
     || loadContent().faults.faults.find((f) => f.decay_per_min > 0);
@@ -3904,7 +3906,7 @@ test('decay can be frozen for a stated number of seconds, and thaws by itself', 
 
 test('the next scripted inject can be pushed back, and AGR can be handed a recovery card', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   assert.equal(game.pressureRelief('delay_inject', { seconds: 60 }).reason, 'nothing_scheduled');
 
   game.schedule({ kind: 'fault', fault_code: 'F-102', sector: 'POW', delay_s: 30, source: 'test' });
@@ -3933,7 +3935,7 @@ test('every relief needs a reason, and an unknown one is refused', () => {
 
 test('the regulator survives a snapshot', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   game.pressureRelief('pause_faults', {}, { reason: 'x' });
   const snap = JSON.parse(JSON.stringify(game.serialise()));
   const back = newGame();
@@ -3954,7 +3956,7 @@ test('the regulator survives a snapshot', () => {
 
 test('a brownout sector chooses one thing to keep, and only while the brownout lasts', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   assert.equal(game.brownoutView('POW'), null, 'a healthy sector is offered a choice');
 
   game.setStatus('POW', 'BROWNOUT', { by: 'test' });
@@ -3980,7 +3982,7 @@ test('a brownout sector chooses one thing to keep, and only while the brownout l
 
 test('each preserved function undoes exactly the penalty it names, and nothing else', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   const pow = game.state.sectors.POW;
   const plain = { prod: economy.productionFor(game, pow), crew: game.availableWorkers(pow) };
   assert.deepEqual(plain.prod, { power: 3 });
@@ -4002,7 +4004,7 @@ test('each preserved function undoes exactly the penalty it names, and nothing e
 // BRN-01
 test('BRN-01 COM in brownout is offered its feed, and keeps it when it chooses it', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   game.setStatus('COM', 'BROWNOUT', { by: 'test' });
 
   const view = forSector(game, 'COM').sectors.COM.brownout_choice;
@@ -4020,7 +4022,7 @@ test('BRN-01 COM in brownout is offered its feed, and keeps it when it chooses i
 
 test('TRN in brownout can keep two approvals instead of one', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   assert.equal(game.trnCapacity(), 3);
   game.setStatus('TRN', 'BROWNOUT', { by: 'test' });
   assert.equal(game.trnCapacity(), 1, 'brownout no longer cuts Transport to one');
@@ -4030,7 +4032,7 @@ test('TRN in brownout can keep two approvals instead of one', () => {
 
 test('PRESERVE_SYSTEMS stops the slow bleed every brownout sector suffers', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   game.clock('start');
   game.setStatus('MED', 'BROWNOUT', { by: 'test' });
   const med = game.state.sectors.MED;
@@ -4054,7 +4056,7 @@ test('PRESERVE_SYSTEMS stops the slow bleed every brownout sector suffers', () =
 // TRN-02
 test('TRN-02 one approval a round beyond the limit, paid for in Transport\'s own health', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   game.setInventory('WTR', { water: 9 });
   const ready = (to) => {
     const r = game.requestTransfer({ from: 'WTR', to, resource: 'water', amount: 1, by: to });
@@ -4085,7 +4087,7 @@ test('TRN-02 one approval a round beyond the limit, paid for in Transport\'s own
   assert.equal(Math.round(game.state.sectors.TRN.integrity), 95, 'a refused valve still cost health');
 
   // and it comes back on the next operating cycle
-  game.setPhase('CORE_FAILURE');
+  game.setPhase('ROUND_3');
   assert.equal(game.trnEmergencyView().available, false, 'a phase change returned the valve');
   game.cycleControl('process');
   assert.equal(game.trnEmergencyView().available, true);
@@ -4093,7 +4095,7 @@ test('TRN-02 one approval a round beyond the limit, paid for in Transport\'s own
 
 test('the valve buys capacity, not a pass on the rules — and charges nothing when it would fail', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   game.setInventory('WTR', { water: 3 });
   const ready = (to, amt = 1) => {
     const r = game.requestTransfer({ from: 'WTR', to, resource: 'water', amount: amt, by: to });
@@ -4123,7 +4125,7 @@ test('the valve buys capacity, not a pass on the rules — and charges nothing w
 
 test('Transport sees the valve and its price in its own queue', () => {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   const q = forSector(game, 'TRN').transfer_queue;
   assert.ok(q.emergency, 'the queue does not carry the valve');
   assert.equal(q.emergency.available, true);
@@ -4320,7 +4322,7 @@ test('configuration patches apply live and survive a snapshot', () => {
   const again = newGame();
   again.restore(snap);
   assert.equal(again.cfg.critical_below, 50);
-  assert.equal(again.state.phase, 'INTERDEPENDENCE');
+  assert.equal(again.state.phase, 'ROUND_2');
 });
 
 test('deepMerge replaces arrays and scalars, merges objects', () => {
@@ -4403,7 +4405,7 @@ test('wall feed shows public kinds only; facilitator-only and sector-scoped line
 
 test('the debrief folds the log into per-round figures and a Round 3 vs Aftershock comparison', () => {
   const game = newGame();
-  game.setPhase('CORE_FAILURE');
+  game.setPhase('ROUND_3');
   game.clock('start');
   game.fireFault('F-301', 'POW');
   game.fireFault('F-302', 'WTR');
@@ -4422,7 +4424,7 @@ test('the debrief folds the log into per-round figures and a Round 3 vs Aftersho
   game.tick(2000);
 
   game.setPhase('DEBRIEF_1');
-  game.setPhase('AFTERSHOCK');
+  game.setPhase('ROUND_4');
   game.clock('start');
   game.fireFault('F-401', 'POW');
   game.tick(10000);
@@ -4518,7 +4520,7 @@ test('core output at start and round lengths come from the scenario', () => {
   assert.equal(forBigscreen(game).core_output, 80);
   assert.ok(game.state.city_stability < 100, 'stability reflects the lower core from the first frame');
 
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   assert.equal(game.state.round_clock.remaining_s, game.liveLength(), 'a phase change reset MASTER TIME');
   const r1 = rounds.rounds.find((r) => r.id === 'R1');
   assert.equal(game.roundConfig('R1').length_s, r1.length_s, 'rounds without an override keep rounds.json');

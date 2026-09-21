@@ -1,5 +1,5 @@
 {
-  "note": "Derived from undercity-spec.md §8 (Round Configuration), converted to CONTINUOUS GAMEFLOW (2026-09-21). Rounds survive as backend inject groups only: they carry the timeline and the fault pool a phase draws from. They are never shown to a participant, they no longer reset the clock, and nothing refreshes when one ends — production, upkeep and every allowance ride the OPERATING CYCLE instead (defaults.cycle_length_s). MASTER TIME is one countdown for the whole live shift (defaults.live_length_s). Phases are backend-only pacing markers; only Admin sees them. Balance numbers live in config/scenarios/*.json, which override these defaults.",
+  "note": "Derived from undercity-spec.md §8 (Round Configuration), converted to CONTINUOUS GAMEFLOW (2026-09-21) and then to the SIMPLIFIED ROUND DISPLAY (2026-09-21): the visible flow is Round 0 → Round 4 and nothing else. One phase per round, so what the engine tracks and what a screen shows are the same thing and no internal pacing name can leak onto a projector. The descriptive names those rounds used to carry — Stable Ops, Interdependence, Core Failure, Aftershock — live in the facilitator's runbook, on paper, and nowhere in this file. A round still carries its own inject timeline and fault pool (timelines[] in the scenario), and still resets NOTHING when it changes: production, upkeep and every allowance ride the OPERATING CYCLE (defaults.cycle_length_s), and MASTER TIME is one countdown for the whole live shift (defaults.live_length_s). Balance numbers live in config/scenarios/*.json, which override these defaults.",
   "defaults": {
     "upkeep_interval_s": 600,
     "resolve_recovery": 5,
@@ -76,74 +76,46 @@
   ],
   "phases": [
     {
-      "id": "SETUP",
-      "name": "Setup",
+      "id": "ROUND_0",
+      "name": "Round 0",
+      "number": 0,
       "round": "R0",
-      "mode": "BRIEFING",
-      "hint": "Laptops connected, binders on tables, klaxon not yet fired."
+      "mode": "BRIEFING"
     },
     {
-      "id": "ORIENTATION",
-      "name": "Orientation",
-      "round": "R0",
-      "mode": "PLAY",
-      "hint": "Tutorial fault per sector. Zero stakes. The last calm stretch."
-    },
-    {
-      "id": "STABLE_OPERATIONS",
-      "name": "Stable Operations",
+      "id": "ROUND_1",
+      "name": "Round 1",
+      "number": 1,
       "round": "R1",
-      "mode": "PLAY",
-      "hint": "Live play begins. Mostly internal sector problems; confidence and rhythm."
+      "mode": "PLAY"
     },
     {
-      "id": "INTERDEPENDENCE",
-      "name": "Interdependence",
+      "id": "ROUND_2",
+      "name": "Round 2",
+      "number": 2,
       "round": "R2",
-      "mode": "PLAY",
-      "hint": "Cross-sector dependencies, transfers, Council #1."
+      "mode": "PLAY"
     },
     {
-      "id": "ESCALATION",
-      "name": "Escalation",
-      "round": "R2",
-      "mode": "PLAY",
-      "hint": "Simultaneous faults, resource pressure, competing priorities."
-    },
-    {
-      "id": "CORE_FAILURE",
-      "name": "Core Failure",
+      "id": "ROUND_3",
+      "name": "Round 3",
+      "number": 3,
       "round": "R3",
-      "mode": "PLAY",
-      "hint": "Core decline, Continuity Order, brownout pressure."
+      "mode": "PLAY"
     },
     {
-      "id": "TEMPORARY_STABILISATION",
-      "name": "Temporary Stabilisation",
-      "round": "R3",
-      "mode": "PLAY",
-      "hint": "Fewer NEW majors so teams can recover operationally. NOT a pause, NOT a rest: every system keeps running and nothing on a screen says otherwise."
-    },
-    {
-      "id": "AFTERSHOCK",
-      "name": "Aftershock",
+      "id": "ROUND_4",
+      "name": "Round 4",
+      "number": 4,
       "round": "R4",
-      "mode": "PLAY",
-      "hint": "A late pressure wave onto the city the teams have left. Nothing resets."
-    },
-    {
-      "id": "FINAL_CRISIS",
-      "name": "Final Crisis",
-      "round": "R4",
-      "mode": "PLAY",
-      "hint": "The last sustained push into the end-state calculation."
+      "mode": "PLAY"
     },
     {
       "id": "ENDED",
-      "name": "Simulation Ended",
+      "name": "Ended",
+      "number": null,
       "round": "R4",
-      "mode": "ENDED",
-      "hint": "Live systems stopped. The final city state stands on the wall; the log is the debrief."
+      "mode": "ENDED"
     }
   ]
 }

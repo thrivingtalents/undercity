@@ -34,7 +34,7 @@ const PAGE = HTML.slice(
 
 function running() {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   game.clock('start');
   return game;
 }

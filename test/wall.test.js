@@ -30,7 +30,7 @@ const SIX = ['POW', 'WTR', 'MED', 'TRN', 'AGR', 'COM'];
 
 function running() {
   const game = newGame();
-  game.setPhase('INTERDEPENDENCE');
+  game.setPhase('ROUND_2');
   game.clock('start');
   return game;
 }
@@ -367,23 +367,27 @@ test("the city broadcast is COM's announcement in a readable area, or NO ACTIVE 
 
 test('the command bar: the authority and the operating cycle on the left, the Core in the middle, MASTER TIME and LIVE on the right', () => {
   const f = forBigscreen(running());
-  assert.equal(f.round_number, undefined, 'the wall was told the round');
+  // SIMPLIFIED ROUND DISPLAY (2026-09-21): the wall IS told the round number
+  // — and never its name, nor the phase, which no longer exist separately.
+  assert.equal(f.round_number, 2);
+  assert.equal(f.round_name, undefined, 'the wall was told a round name');
   assert.equal(f.phase, undefined, 'the wall was told the phase');
   assert.equal(f.period_number, 1);
   assert.ok(f.round_clock && typeof f.round_clock.remaining_s === 'number');
   assert.ok(/MASTER TIME/.test(WALL_INDEX) && !/NEXT ROUND IN/.test(WALL_INDEX), 'the clock is still a round clock');
+  assert.ok(/CURRENT ROUND/.test(WALL_SCRIPT), 'the bar does not label the round');
+  assert.ok(/`ROUND \$\{n\}`/.test(WALL_SCRIPT), 'the bar does not print the round number');
   assert.ok(!/BREATHER|DEBRIEF/.test(WALL_INDEX), 'the wall still carries a break screen');
   assert.ok(/SUBTERRANEAN CONTINUITY AUTHORITY/.test(WALL_INDEX), 'the authority line is missing');
   assert.ok(/id="phase-label"/.test(WALL_INDEX) && /id="phase-value"/.test(WALL_INDEX));
   assert.ok(/id="round-clock"/.test(WALL_INDEX) && /id="time-label"/.test(WALL_INDEX));
   assert.ok(/id="live"/.test(WALL_INDEX) && /'LIVE'/.test(WALL_SCRIPT));
-  assert.ok(/frame\.period_number/.test(WALL_SCRIPT) && /frame\.round_clock/.test(WALL_SCRIPT));
-  // Before live play the bar says BRIEFING; after it, the operating cycle.
-  assert.ok(/'BRIEFING'/.test(WALL_SCRIPT) && /padStart\(2, '0'\)/.test(WALL_SCRIPT), 'the cycle is not shown as two digits');
-  assert.ok(/'OPERATING CYCLE'/.test(WALL_SCRIPT) && /'MASTER TIME'/.test(WALL_SCRIPT) && /'COUNCIL ENDS IN'/.test(WALL_SCRIPT));
+  assert.ok(/frame\.round_number/.test(WALL_SCRIPT) && /frame\.round_clock/.test(WALL_SCRIPT));
+  assert.ok(/'MASTER TIME'/.test(WALL_SCRIPT) && /'COUNCIL ENDS IN'/.test(WALL_SCRIPT));
   assert.ok(!/'ROUND/.test(WALL_SCRIPT), 'the wall script still names a round');
   const briefing = forBigscreen(newGame());          // before live play
-  assert.equal(briefing.round_number, undefined, 'the briefing frame carries a round');
+  assert.equal(briefing.round_number, 0, 'before live play the city is in Round 0');
+  assert.equal(briefing.round_name, undefined, 'the briefing frame carries a round name');
   assert.equal(briefing.period_number, 1, 'the wall is not told the operating cycle');
   // the Core is the loudest thing on the bar
   const core = WALL_CSS.match(/\.hud-core b \{[^}]*font-size: clamp\((\d+)px, ([\d.]+)vh/);

@@ -38,6 +38,7 @@
   const TICK_MS = 250;
   const SHOCK_MS = 4500;
   const CYCLE_FLASH_MS = 3500;
+  const ROUND_FLASH_MS = 3000;      // the spec's ceiling, and long enough to read four characters
   const ROUTE_S = 2.6;           // a packet's journey along its route
   const SWEEP_S = 1.4;           // the confirmation sweep at the destination
   const FADE_S = 1.2;            // a cancelled route fading out
@@ -87,6 +88,8 @@
   let alertRenderedId = null;
   let shockUntil = 0;
   let cycleFlashUntil = 0;
+  let roundFlashUntil = 0;
+  let prevRound = null;             // the round the wall last showed
   let broadcastKey = null;
   let booted = false;             // the first frame paints without entry animations
   const districtEls = {};
@@ -305,6 +308,7 @@
     renderModes();
     renderAlertTakeover();
     renderPaused();
+    renderRoundFlash();
     renderCycle();
     tick();
     booted = true;
@@ -317,12 +321,12 @@
    * TIME. The Core keeps the middle and the largest type on the bar.
    */
   function renderHud() {
-    const n = Number(frame.period_number);
-    const briefing = frame.mode === 'BRIEFING';
+    // The round, as a number. The wall never names one: the room reads
+    // ROUND 3 and learns nothing about what Round 3 is going to do to it.
+    const n = Number(frame.round_number);
     const ended = frame.mode === 'ENDED';
-    setText($('phase-label'), briefing || ended ? 'STATUS' : 'OPERATING CYCLE');
-    setText($('phase-value'), briefing ? 'BRIEFING' : ended ? 'SHIFT ENDED'
-      : Number.isFinite(n) ? String(n).padStart(2, '0') : '--');
+    setText($('phase-label'), ended ? 'STATUS' : 'CURRENT ROUND');
+    setText($('phase-value'), ended ? 'ENDED' : Number.isFinite(n) ? `ROUND ${n}` : '—');
 
     // CORE STABILITY: the value, and the condition in the same words the
     // sectors use. The bands are the wall's existing ones.
@@ -718,6 +722,23 @@
   function renderPaused() { show($('paused'), !!frame.paused); }
 
   /** The operating cycle: 3.5 seconds of UPKEEP PROCESSED, with what it cost. */
+  /**
+   * THE ROUND MARKER (2026-09-21). When the round number changes the wall says
+   * so for three seconds and then stops saying it. No title, no objective, no
+   * hint of what is coming: the number is the whole message. It pauses
+   * nothing and covers nothing anybody needs to press.
+   */
+  function renderRoundFlash() {
+    const n = Number(frame.round_number);
+    if (!Number.isFinite(n)) return;
+    if (prevRound !== null && n !== prevRound && frame.mode !== 'ENDED') {
+      setText($('round-flash-text'), `ROUND ${n}`);
+      roundFlashUntil = performance.now() + ROUND_FLASH_MS;
+      show($('round-flash'), true);
+    }
+    prevRound = n;
+  }
+
   function renderCycle() {
     const n = Number(frame.cycle && frame.cycle.number);
     if (prevCycle !== null && Number.isFinite(n) && n > prevCycle) {
@@ -763,6 +784,7 @@
     // Overlays and routes with a life of their own.
     if (!$('core-shock').hidden && now >= shockUntil) show($('core-shock'), false);
     if (!$('cycle-flash').hidden && now >= cycleFlashUntil) show($('cycle-flash'), false);
+    if (!$('round-flash').hidden && now >= roundFlashUntil) show($('round-flash'), false);
     if (routeEls.size || (frame.transfers || []).length) renderMovement();
     show($('alert-full'), !!frame.alert && alertIsFull());
     $('wall').classList.toggle('dimmed', !$('core-shock').hidden || !!frame.paused || alertIsFull());

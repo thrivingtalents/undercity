@@ -250,15 +250,34 @@
   $('btn-next-phase').addEventListener('click', () => {
     const next = nextPhase();
     if (!next) return;
-    const roundChange = state && next.round !== state.round;
-    if (!confirm(`NEXT PHASE → ${next.name}${roundChange ? `\n\nThis enters ${next.round}: the outgoing round's upkeep is charged, TRN and MED allowances reset, unfinished paperwork expires and AGR is dealt again.` : ''}`)) return;
+    // Nothing in the city moves with the round: no upkeep pass, no allowance
+    // reset, no expiry, no clock. Only which injects are armed changes.
+    if (!confirm(`GO TO ${roundLabel(next)}?\n\nNothing is reset: health, stock, workers, faults, transfers and upgrades all carry over, and MASTER TIME keeps running.`)) return;
     send({ type: 'next_phase' });
   });
+
+  $('btn-prev-round').addEventListener('click', () => {
+    const prev = prevPhase();
+    if (!prev) return;
+    if (!confirm(`GO BACK TO ${roundLabel(prev)}?\n\nNothing is reset or replayed — the city stays exactly as it is. Only that round's inject list is armed again.`)) return;
+    send({ type: 'set_phase', phase: prev.id });
+  });
+  /** The next round in the visible sequence, or null at the end of it. */
   function nextPhase() {
     if (!state || !state.phases) return null;
     const i = state.phases.findIndex((p) => p.id === state.phase);
     return i >= 0 ? state.phases[i + 1] || null : null;
   }
+
+  /** The one before it. Going back arms that round's injects and resets nothing. */
+  function prevPhase() {
+    if (!state || !state.phases) return null;
+    const i = state.phases.findIndex((p) => p.id === state.phase);
+    return i > 0 ? state.phases[i - 1] : null;
+  }
+
+  /** How a round is written, everywhere, for everyone: ROUND 2. Never a name. */
+  const roundLabel = (p) => (p && p.number !== null && p.number !== undefined ? `ROUND ${p.number}` : 'END');
 
   // the ••• menu
   $('btn-more').addEventListener('click', (e) => { e.stopPropagation(); $('more').classList.toggle('hidden'); });
@@ -489,12 +508,12 @@
   function renderTopbar() {
     $('run-id').textContent = state.run_id;
     $('scenario-name').textContent = state.scenario_name;
-    $('phase-name').textContent = state.phase_name;
+    $('phase-name').textContent = state.mode === 'ENDED' ? 'ENDED' : `Round ${state.round_number}`;
     $('mode-pill').textContent = state.mode;
     $('paused-pill').classList.toggle('hidden', !state.paused);
     // The operating cycle, and how long until the next one turns over.
     $('round-value').textContent = `${state.cycle ? state.cycle.number : '—'}`;
-    $('round-value').title = `Internal phase ${state.phase_name || state.phase || ''} (${state.round || ''}) — Admin only`;
+    $('round-value').title = 'The operating cycle: production, upkeep, and the allowances coming back';
     const cyc = state.cycle ? U.countdown({ running: state.cycle.running, remaining_s: state.cycle.remaining_s }, state.frozen) : 0;
     $('cycle-note').textContent = state.cycle ? `— next in ${U.mmss(cyc)}` : '';
     $('btn-pause').textContent = state.paused ? 'RESUME' : 'PAUSE';
@@ -504,8 +523,11 @@
     $('btn-start').disabled = !!rc.running;
     $('btn-end-phase').disabled = !rc.running;
     const next = nextPhase();
-    $('btn-next-phase').textContent = next ? `NEXT PHASE › ${next.name.toUpperCase()}${next.round !== state.round ? ` (${next.round})` : ''}` : 'LAST PHASE';
+    const prev = prevPhase();
+    $('btn-next-phase').textContent = next ? `NEXT › ${roundLabel(next)}` : 'LAST ROUND';
     $('btn-next-phase').disabled = !next;
+    $('btn-prev-round').textContent = prev ? `‹ ${roundLabel(prev)}` : '‹ PREV ROUND';
+    $('btn-prev-round').disabled = !prev;
     $('btn-sound').textContent = state.sound_enabled ? '🔊 AUDIO ON' : '🔇 AUDIO OFF';
     const core = $('core-value');
     core.textContent = `${state.core_output}%`;
@@ -515,7 +537,7 @@
   function renderProgress() {
     const phases = state.phases || [];
     const i = phases.findIndex((p) => p.id === state.phase);
-    const html = phases.map((p, k) => `<button class="ph${k < i ? ' done' : k === i ? ' on' : ''}" data-phase="${esc(p.id)}" title="Jump to ${esc(p.name)}"><span class="ph-name">${esc(p.name.replace(/^Round \d+ — /, '').toUpperCase())}</span><span class="ph-round">${esc(p.round)}</span></button>`).join('<span class="ph-arrow">›</span>');
+    const html = phases.map((p, k) => `<button class="ph${k < i ? ' done' : k === i ? ' on' : ''}" data-phase="${esc(p.id)}" title="Go to ${esc(roundLabel(p))}"><span class="ph-name">${esc(roundLabel(p))}</span></button>`).join('<span class="ph-arrow">›</span>');
     if ($('progress').dataset.sig !== html) {
       $('progress').dataset.sig = html;
       $('progress').innerHTML = html;
@@ -523,7 +545,7 @@
         b.addEventListener('click', () => {
           const p = phases.find((x) => x.id === b.dataset.phase);
           if (!p || p.id === state.phase) return;
-          if (confirm(`JUMP TO ${p.name.toUpperCase()}${p.round !== state.round ? ` (${p.round})` : ''}? Skipped phases are not played.`)) send({ type: 'set_phase', phase: p.id });
+          if (confirm(`GO TO ${roundLabel(p)}? Nothing in the city is reset; only that round's injects are armed.`)) send({ type: 'set_phase', phase: p.id });
         });
       }
     }
@@ -937,7 +959,7 @@
   }
 
   function renderTimeline() {
-    $('tl-round').textContent = `${state.round} — ${state.round_name}`;
+    $('tl-round').textContent = `Round ${state.round_number}`;
     const items = state.timeline || [];
     let ready = 0;
     const html = items.map((it) => {
@@ -1365,9 +1387,9 @@
     ['lockout_after_consecutive_invalid', 'Lockout after N wrong', 'n'], ['council_clock_s', 'Council clock (s)', 'n'],
     ['CORE, MASTER TIME & THE OPERATING CYCLE'],
     ['core_start_output', 'Core output at start (%) — applies on reset', 'n'],
-    ['round_length_s.R0', 'R0 Onboarding (s)', 'n'], ['round_length_s.R1', 'R1 Stable Ops (s)', 'n'],
-    ['round_length_s.R2', 'R2 Interdependence (s)', 'n'], ['round_length_s.R3', 'R3 Core Failure (s)', 'n'],
-    ['round_length_s.R4', 'R4 Aftershock (s)', 'n'],
+    ['round_length_s.R0', 'Round 0 inject window (s)', 'n'], ['round_length_s.R1', 'Round 1 inject window (s)', 'n'],
+    ['round_length_s.R2', 'Round 2 inject window (s)', 'n'], ['round_length_s.R3', 'Round 3 inject window (s)', 'n'],
+    ['round_length_s.R4', 'Round 4 inject window (s)', 'n'],
     ['live_length_s', 'MASTER TIME — length of the whole live shift (s)', 'n'],
     ['ECONOMY'],
     ['auto_economy', 'Digital economy on (production, upkeep, stock moves)', 'b'],

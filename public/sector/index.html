@@ -34,8 +34,16 @@
       </div>
     </div>
 
-    <!-- Continuous gameflow: the shift, not a round. The cycle is when the
-         city produces, pays its upkeep and hands the allowances back. -->
+    <!-- SIMPLIFIED ROUND DISPLAY (2026-09-21): the number, never a name.
+         A title like "Core Failure" tells a table what is about to happen to
+         it, which is the one thing the exercise must not give away. -->
+    <div class="hstat round-block">
+      <span class="label">Current round</span>
+      <b class="hval" id="hdr-round">—</b>
+    </div>
+
+    <!-- The cycle is when the city produces, pays its upkeep and hands the
+         allowances back. It is a mechanic, not a chapter. -->
     <div class="hstat round-block">
       <span class="label">Next operating cycle</span>
       <b class="hval clock" id="hdr-phase">--:--</b>

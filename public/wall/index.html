@@ -19,8 +19,8 @@
 <div class="wall" id="wall" data-core="healthy">
 
   <!--
-    1. COMMAND BAR. Left: who the city is and where the shift is — STATUS
-    BRIEFING before live play, OPERATING CYCLE 01 after it. Centre: CORE STABILITY, the
+    1. COMMAND BAR. Left: who the city is and which round it is — a number,
+    never a name. Centre: CORE STABILITY, the
     loudest thing on the bar. Right: the countdown, whose label says what it
     is counting to, then the tags and the LIVE feed.
   -->
@@ -87,6 +87,10 @@
       <div id="map-words" class="map-words" aria-hidden="true"></div>
       <div class="final-count" id="final-count" hidden></div>
       <!-- the round's upkeep pass, for 3.5 seconds -->
+      <!-- The round marker. Three seconds, one number, no description of
+           what the round holds — and it blocks nothing: the clock runs, the
+           faults decay and every console stays live underneath it. -->
+      <div class="round-flash" id="round-flash" hidden><b id="round-flash-text"></b></div>
       <div class="cycle-flash" id="cycle-flash" hidden>
         <b id="cycle-flash-title"></b>
         <span id="cycle-flash-sub"></span>

@@ -221,7 +221,11 @@ C.push(p(t("There are no breathers and no round breaks to hide behind. The only 
 C.push(p([t("What continues during a quiet stretch: "), t("everything", { bold: true }),
   t(". MASTER TIME, open faults and their decay, repairs, transfers, healing, generator upgrades, COM’s board, Council consequences, and the operating cycle that charges upkeep. A team can use the stretch to catch up on all of it. That is the recovery — operational, earned, and visible in the log.")]));
 C.push(p([t("The internal phases in the console — Stable Operations, Interdependence, Escalation, Core Failure, Temporary Stabilisation, Aftershock, Final Crisis — are "), t("yours, not theirs", { bold: true }),
-  t(". Pressing NEXT PHASE changes what you may fire next and stamps the log for analysis. It changes nothing the room can see: no clock resets, no screen announces it, no stock, health, worker, transfer or upgrade moves. If you want the room to feel a change, fire something.")]));
+  t(". Pressing NEXT ROUND changes what you may fire next and stamps the log for analysis. It changes nothing else: no clock resets, no stock, health, worker, transfer or upgrade moves, and the wall says only the new number for three seconds. If you want the room to feel a change, fire something.")]));
+
+C.push(p([t("The waves named in Part 5 are ", { bold: true }), t("yours and the paper's. "),
+  t("Every screen in the building — yours included — shows one thing: "), t("Round 0 to Round 4", { bold: true }),
+  t(". A title like “Core Failure” on a console is one screenshot away from the room, and a table that can name what is coming stops behaving like a table under pressure. So the runbook below names the waves, the console counts them, and only four of them are a button.")]));
 C.push(callout("The only full stop is an emergency.", "PAUSE freezes every clock and every decay for a technical failure, a safety issue or an equipment problem. It is not a pacing tool and it is not a rest. Resume continues from the exact frozen state — nothing is replenished, nothing is cleared."));
 
 C.push(H2("3.4 The three seeded probes"));
@@ -284,12 +288,12 @@ C.push(tbl([
 ], BW));
 
 C.push(H2("5.1 The Shift — starting it (00:00)"));
-C.push(callout("You start MASTER TIME once.", "Press NEXT PHASE to Stable Operations, then START. That is the only start of the day. From here you change waves with NEXT PHASE — which interrupts nothing — and you end the day with END SIMULATION. STOP CLOCK and PAUSE are not part of the script."));
+C.push(callout("You start MASTER TIME once.", "Press NEXT ROUND to Round 1, then START. That is the only start of the day. From here the button is pressed exactly four times — Rounds 1, 2, 3 and 4 — and the day ends with END SIMULATION. STOP CLOCK and PAUSE are not part of the script."));
 C.push(p([t("What the room sees from now on: MASTER TIME counting down, their own health and stock, their faults, and the next operating cycle. What they never see: a round, a phase, a debrief screen, or a screen telling them to rest. "),
   t("The operating cycle", { bold: true }),
   t(" comes round every ten minutes and is when the city produces, pays its upkeep and hands back Transport’s approvals, Medical’s heals and Agriculture’s intervention cards. It is not a round: it interrupts nothing and it pauses nobody.")]));
 
-C.push(H3("Wave 1 · Stable Operations (00:00 – 15:00)"));
+C.push(H3("Wave 1 · Stable Operations (00:00 – 15:00) · Round 1"));
 C.push(callout("This stretch should feel easy.", "It is the baseline measurement. If you make it hard, you have no calm-state reading and the whole delta collapses. Resist the urge to add pressure. Boring is correct.", "E8F5E8", "2E7D32"));
 C.push(tbl([
   headRow(["MASTER TIME", "DO THIS", "WATCH FOR"], BW),
@@ -301,11 +305,11 @@ C.push(tbl([
   beat("14:00", "Nothing new. Let the tables clear what they hold.", "Which tables are relaxed and which are already tense at low load."),
 ], BW));
 
-C.push(H3("Wave 2 · Interdependence (15:00 – 40:00)"));
-C.push(p(t("The first cross-sector wave. Every fault now requires a value that lives in another sector’s binder. Liaisons must move; the room gets loud. Press NEXT PHASE and say nothing — the faults are the announcement.")));
+C.push(H3("Wave 2 · Interdependence (15:00 – 40:00) · Round 2"));
+C.push(p(t("The first cross-sector wave. Every fault now requires a value that lives in another sector’s binder. Liaisons must move; the room gets loud. Press NEXT ROUND and say nothing — the faults are the announcement.")));
 C.push(tbl([
   headRow(["MASTER TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("15:00", "NEXT PHASE → Interdependence. Announce in-world: \"Core output is fluctuating. Systems are coupling in ways they should not.\"", "How long before the first liaison stands up."),
+  beat("15:00", "NEXT ROUND → Round 2. Announce in-world: \"Core output is fluctuating. Systems are coupling in ways they should not.\"", "How long before the first liaison stands up."),
   beat("16:00", "Fire F-201 (POW) and F-203 (WTR).", "F-201 is the discrepancy fault. Watch WTR’s table when POW asks for the reservoir figure."),
   beat("20:00", "Fire F-205 (MED), F-209 (AGR).", "MED’s cold chain has real urgency. Do they escalate or absorb?"),
   beat("23:00", "Fire F-210 (AGR) — the false alarm.", "Do they check with COM, or spend resources on a ghost? Tag either way."),
@@ -316,20 +320,20 @@ C.push(tbl([
 ], BW));
 C.push(callout("Council sittings are your richest data.", "Whole-group, compressed, high stakes, one microphone. If you tag nothing else in the shift, tag the Council. Remember the pressure it creates is that the stations are running short-handed while it sits — it is not a rest for anyone."));
 
-C.push(H3("Wave 3 · Escalation (40:00 – 52:00)"));
+C.push(H3("Wave 3 · Escalation (40:00 – 52:00) · Round 2"));
 C.push(p(t("No new script: this wave is where you spend the off-script inject library on the tables that are coping, and let the ones that are behind stay behind. Competing priorities are the point.")));
 C.push(tbl([
   headRow(["MASTER TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("40:00", "NEXT PHASE → Escalation. Fire F-208 (TRN), F-212 (COM).", "The room is now carrying unresolved work from the last wave into this one. Nobody gets a clean sheet."),
+  beat("40:00", "No button — this wave is inside Round 2. Fire F-208 (TRN), F-212 (COM).", "The room is now carrying unresolved work from the last wave into this one. Nobody gets a clean sheet."),
   beat("44:00", "INJURE WORKER on the busiest sector. Fire one off-script fault at any table that is clear.", "Who asks for help first, and whether anyone offers before being asked."),
   beat("48:00", "Fire one more off-script fault into the loudest sector. Say nothing to the quiet ones.", "Sectors below 50 health. Note them; Core Failure will land on them hardest."),
 ], BW));
 
-C.push(H3("Wave 4 · Core Failure (52:00 – 1:17:00)"));
+C.push(H3("Wave 4 · Core Failure (52:00 – 1:17:00) · Round 3"));
 C.push(p(t("The climax. Two-spec faults, fast decay, and a decision with no right answer — landing on a city that has had no break since the shift began.")));
 C.push(tbl([
   headRow(["MASTER TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("52:00", "NEXT PHASE → Core Failure. Announce: \"Core integrity is falling. Assume nothing is routine.\"", ""),
+  beat("52:00", "NEXT ROUND → Round 3. Announce: \"Core integrity is falling. Assume nothing is routine.\"", ""),
   beat("53:00", "Fire F-301 (POW), F-303 (MED).", "Two specs each now. Coordination cost doubles."),
   beat("56:00", "Fire F-302 (WTR, 3.0/min decay) and F-305 (AGR).", "Both need their own buried Appendix C. Watch how long before anyone opens the back of the binder."),
   beat("57:00", "Drop Core Integrity to 60. Announce: \"Core output cannot sustain six sectors.\" Klaxon.", "The room changes here. Note who moves first — toward the problem or toward protecting their own sector."),
@@ -340,28 +344,28 @@ C.push(tbl([
   beat("76:00", "Redeploy brownout sectors as aid crews to other tables. Nobody sits out.", "How brownout participants are treated by the sectors they join."),
 ], BW));
 
-C.push(H3("Wave 5 · Temporary Stabilisation (1:17:00 – 1:25:00)"));
-C.push(callout("This is not a break, and it must never be called one.", "Press NEXT PHASE and then fire nothing new for eight minutes. The clock runs, faults decay, repairs and transfers continue, the operating cycle charges upkeep. Tables use the stretch to catch up. If you announce anything at all, announce it in-world: \"Core output is holding.\"", "E8F5E8", "2E7D32"));
+C.push(H3("Wave 5 · Temporary Stabilisation (1:17:00 – 1:25:00) · Round 3"));
+C.push(callout("This is not a break, and it must never be called one.", "Fire nothing new for eight minutes — no button, this wave is inside Round 3. The clock runs, faults decay, repairs and transfers continue, the operating cycle charges upkeep. Tables use the stretch to catch up. If you announce anything at all, announce it in-world: \"Core output is holding.\"", "E8F5E8", "2E7D32"));
 C.push(tbl([
   headRow(["MASTER TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("1:17:00", "NEXT PHASE → Temporary Stabilisation. Fire nothing.", "What a team does with slack: clear the backlog, fix the tray, help a neighbour, or stop working. All three are findings."),
+  beat("1:17:00", "No button — still Round 3. Fire nothing.", "What a team does with slack: clear the backlog, fix the tray, help a neighbour, or stop working. All three are findings."),
   beat("1:20:00", "Walk the floor. Tag. Do not fix anything and do not explain anything.", "Who starts talking about the day while it is still running — that is a table that has decided it is over."),
 ], BW));
 
-C.push(H3("Wave 6 · Aftershock (1:25:00 – 1:37:00)"));
+C.push(H3("Wave 6 · Aftershock (1:25:00 – 1:37:00) · Round 4"));
 C.push(p(t("Same teams, same roles, a fresh crisis onto the city they have left. Every fault needs a value buried in another sector’s Appendix C, so nothing can be solved from memory. Nothing is restored, refilled or healed for this wave — they carry what they built and what they broke. This is where the post-measurement begins.")));
 C.push(tbl([
   headRow(["MASTER TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("1:25:00", "NEXT PHASE → Aftershock. Announce in-world: \"Seismic activity detected.\" Restore brownout sectors to active.", "Whether anyone notices that nothing else was given back."),
+  beat("1:25:00", "NEXT ROUND → Round 4. Announce in-world: \"Seismic activity detected.\" Restore brownout sectors to active.", "Whether anyone notices that nothing else was given back."),
   beat("1:26:00", "Fire F-401 (POW), F-402 (MED).", "Both need buried appendices from other sectors. Watch the asking behaviour — it should look different from the early shift. That difference is the deliverable."),
   beat("1:30:00", "Fire F-403 (WTR), F-404 (TRN).", "TRN’s is the mini-triage feed. Decay pressure returns onto tired people."),
   beat("1:34:00", "Optional short Council if the group is coping well. Skip if they are not.", "Compare directly against the first sitting. Same people, same format, measurable difference."),
 ], BW));
 
-C.push(H3("Wave 7 · Final Crisis (1:37:00 – 1:45:00)"));
+C.push(H3("Wave 7 · Final Crisis (1:37:00 – 1:45:00) · Round 4"));
 C.push(tbl([
   headRow(["MASTER TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("1:37:00", "NEXT PHASE → Final Crisis. Fire into whichever two sectors are weakest.", "Triage under exhaustion. Who is still asking questions and who has stopped."),
+  beat("1:37:00", "No button — still Round 4. Fire into whichever two sectors are weakest.", "Triage under exhaustion. Who is still asking questions and who has stopped."),
   beat("1:42:00", "Last three minutes. Announce the time remaining once, plainly.", "What a table chooses to spend its last minutes on."),
   beat("1:45:00", "END SIMULATION. Every clock stops and the final city state stays exactly as they left it.", "Silence, then talk. Do not explain anything yet."),
 ], BW));

@@ -593,7 +593,9 @@
     if (bar.className !== cls) bar.className = cls;
     bar.firstElementChild.style.width = `${Math.max(0, Math.min(100, value))}%`;
 
-    // No phase, no round: the room is told the time and the next operating cycle.
+    // The round as one number, the cycle as a countdown, the shift as a clock.
+    // Nothing on this screen names a round or a phase.
+    setText($('hdr-round'), state.round_number === undefined ? '—' : `Round ${state.round_number}`);
     setText($('hdr-phase'), U.mmss(cycleRemaining()));
   }
 
