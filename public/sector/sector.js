@@ -625,6 +625,8 @@
     show($('banner-council'), council);
     // The city feed is COM's product — its sensors, undelayed. Every other table reads the wall.
     show($('city-block'), SECTOR === 'COM' && !council);
+    // Intelligence sits with it: the same job, the slower half of it.
+    show($('intel-block'), SECTOR === 'COM' && !council && !!state.intel);
 
     // Alert: remember the frame's age so the tick can promote full → reduced locally.
     const a = state.alert;
@@ -1056,17 +1058,16 @@
 
   // -- the deck ---------------------------------------------------------------
 
-  const PAGES = ['overview', 'exchange', 'bigscreen', 'intel'];
+  const PAGES = ['overview', 'exchange', 'bigscreen'];
 
   function goto(p) {
     page = PAGES.includes(p) ? p : 'overview';
     // Comms' two pages exist for Comms alone: a stray hash or a stale button
     // cannot walk another table onto them.
-    if ((page === 'bigscreen' || page === 'intel') && SECTOR !== 'COM') page = 'overview';
+    if (page === 'bigscreen' && SECTOR !== 'COM') page = 'overview';
     show($('columns'), page === 'overview');
     show($('exchange-page'), page === 'exchange');
     show($('bigscreen-page'), page === 'bigscreen');
-    show($('intel-page'), page === 'intel');
     for (const btn of $('deck').querySelectorAll('[data-page]')) {
       const on = btn.dataset.page === page;
       btn.classList.toggle('on', on);
@@ -1319,7 +1320,6 @@
     show($('banner-city'), !!(b && !editable && b.announcement_active));
     // The page belongs to Comms, and the deck only offers it to Comms.
     show($('deck-bigscreen'), editable);
-    show($('deck-intel'), editable);
     if (!editable) return;
 
     setText($('bc-round'), `CURRENT CYCLE: ${b.round_number}`);
@@ -1978,8 +1978,9 @@
 
   function renderIntel() {
     const intel = state.intel;
-    // Intelligence has a door of its own, and nothing here publishes: taking
-    // any of it to the city is a decision made on the Big Screen page.
+    // Intelligence reads on the overview, beside the city feed, and nothing
+    // here publishes: taking any of it to the city is a decision made on the
+    // Big Screen page.
     if (!intel) return;
     show($('intel-degraded'), !!intel.degraded);
     const html = (intel.items || []).map((i) => {

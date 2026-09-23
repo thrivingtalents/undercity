@@ -1667,7 +1667,7 @@ test("the sector markup has no city table, no legend, an announcement nudge, and
   assert.ok(/CITY BIG SCREEN CONTROL/.test(SECTOR_INDEX));
   // The panel became a page (2026-09-24): the deck offers it to COMM alone.
   assert.ok(/show\(\$\('deck-bigscreen'\), editable\)/.test(SECTOR_SCRIPT), 'the page is not gated to COM');
-  assert.ok(/show\(\$\('deck-intel'\), editable\)/.test(SECTOR_SCRIPT), 'intelligence is not gated to COM');
+  assert.ok(/show\(\$\('intel-block'\), SECTOR === 'COM'/.test(SECTOR_SCRIPT), 'intelligence is not gated to COM');
   assert.ok(/show\(\$\('banner-city'\), !!\(b && !editable && b\.announcement_active\)\)/.test(SECTOR_SCRIPT), 'the nudge is not gated to non-COM');
 });
 

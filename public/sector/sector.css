@@ -654,9 +654,9 @@ body.is-dark .columns, body.is-dark .exchange { filter: grayscale(0.7); opacity:
   pointer-events: none;
 }
 
-/* -- CITY BIG SCREEN CONTROL and INTELLIGENCE: COMM's two pages ------------- */
+/* -- CITY BIG SCREEN CONTROL: COMM's one extra page ------------------------- */
 
-.bigscreen-page, .intel-page {
+.bigscreen-page {
   flex: 1; min-height: 0; overflow-y: auto; padding: 10px 14px;
   display: flex; flex-direction: column; gap: 10px;
 }

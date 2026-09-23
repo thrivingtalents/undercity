@@ -82,7 +82,7 @@ test('COMM-BS-001: COMM has a CITY BIG SCREEN CONTROL page, and no alert control
 
 test('the page is COMM\'s alone: another table cannot reach it or write through it', () => {
   const game = live();
-  assert.ok(/if \(\(page === 'bigscreen' \|\| page === 'intel'\) && SECTOR !== 'COM'\)/.test(SECTOR_SCRIPT),
+  assert.ok(/if \(page === 'bigscreen' && SECTOR !== 'COM'\)/.test(SECTOR_SCRIPT),
     'another table can open the page by hand');
   // The focus intent names its target in `focus`, never `sector`: a sector
   // message naming another table is refused before it reaches the reducer,
@@ -232,11 +232,21 @@ test('COMM-BS-007: intelligence is COMM\'s, private, and never published by itse
   const board = forBigscreen(game).broadcast;
   assert.equal(board.announcement, null);
   assert.ok(Object.values(board.rows).every((r) => r.status === null));
-  // It has its own door on the console, separate from the Big Screen page.
-  assert.ok(/id="intel-page"/.test(SECTOR_INDEX), 'intelligence has no page of its own');
-  assert.ok(/data-page="intel"/.test(SECTOR_INDEX), 'the deck does not offer intelligence');
-  const bigScreenPage = SECTOR_INDEX.slice(SECTOR_INDEX.indexOf('id="bigscreen-page"'), SECTOR_INDEX.indexOf('id="intel-page"'));
+  // It reads on COMM's overview, beside the city feed — not on the Big
+  // Screen page, where every control publishes.
+  assert.ok(/id="intel-block"/.test(SECTOR_INDEX), 'intelligence has no panel on the overview');
+  assert.ok(!/data-page="intel"/.test(SECTOR_INDEX), 'the deck still has an intelligence door');
+  assert.ok(!/id="intel-page"/.test(SECTOR_INDEX), 'the intelligence page was left behind');
+  const overview = SECTOR_INDEX.slice(SECTOR_INDEX.indexOf('id="columns"'), SECTOR_INDEX.indexOf('id="bigscreen-page"'));
+  assert.ok(overview.includes('id="intel-block"') && overview.includes('id="intel"'),
+    'intelligence is not on the overview');
+  assert.ok(overview.indexOf('id="city-block"') < overview.indexOf('id="intel-block"'),
+    'intelligence does not sit with the city feed');
+  const bigScreenPage = SECTOR_INDEX.slice(SECTOR_INDEX.indexOf('id="bigscreen-page"'));
   assert.ok(!bigScreenPage.includes('id="intel"'), 'intelligence was merged into the Big Screen page');
+  // COMM alone sees the panel, and never while the Council has the column.
+  assert.ok(/show\(\$\('intel-block'\), SECTOR === 'COM' && !council/.test(SECTOR_SCRIPT),
+    'the intelligence panel is not gated to COMM');
 });
 
 // -- reconnect -------------------------------------------------------------------------

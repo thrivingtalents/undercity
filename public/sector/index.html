@@ -64,11 +64,11 @@
     needs my attention; RESOURCE EXCHANGE is what I do about it. The badge
     counts only what this sector must answer itself.
 
-    Comms carries two more, and only Comms: the controls for the shared city
-    screen, and its own private intelligence. They are separate doors on
-    purpose — what the city is told and what Comms knows are different things,
-    and the whole point of the role is deciding how much of the second becomes
-    the first.
+    Comms carries one more, and only Comms: the controls for the shared city
+    screen. What Comms knows stays on its overview beside the city feed, and
+    what the city is told is a separate door — the whole point of the role is
+    deciding how much of the first becomes the second, and that decision
+    should cost a deliberate move away from the reading.
   -->
   <nav class="deck" id="deck" role="tablist" aria-label="Console pages">
     <button type="button" class="deck-btn on" data-page="overview" role="tab" aria-selected="true">OVERVIEW</button>
@@ -76,7 +76,6 @@
       <span id="deck-exchange-label">RESOURCE EXCHANGE</span><span class="deck-badge" id="deck-badge" hidden>0</span>
     </button>
     <button type="button" class="deck-btn" data-page="bigscreen" role="tab" aria-selected="false" id="deck-bigscreen" hidden>CITY BIG SCREEN CONTROL</button>
-    <button type="button" class="deck-btn" data-page="intel" role="tab" aria-selected="false" id="deck-intel" hidden>INTELLIGENCE</button>
   </nav>
 
   <!-- ===== BANNERS (persistent, stacked) =================================== -->
@@ -303,6 +302,18 @@
         <div class="city" id="city"></div>
       </div>
 
+      <!--
+        COM ONLY, and private: what Comms knows, as a file rather than a feed.
+        It sits under the city feed because the two are one job — reading the
+        city. Nothing here reaches the city by itself; publishing any of it is
+        a decision made on the CITY BIG SCREEN CONTROL page.
+      -->
+      <div class="panel block intel-block" id="intel-block" hidden>
+        <h2 class="ptitle">CITY INTELLIGENCE <span class="tag warn" id="intel-degraded" hidden>TELEMETRY DEGRADED</span></h2>
+        <div class="intel" id="intel"></div>
+        <div class="declare-note">Private to Comms. Nothing here reaches the city unless you put it there.</div>
+      </div>
+
       <div class="panel block resolved-block" id="resolved-block" hidden>
         <h2 class="ptitle">RECENTLY RESOLVED</h2>
         <div class="resolved" id="resolved"></div>
@@ -365,21 +376,6 @@
     </section>
 
     <div class="msg" id="broadcast-msg" hidden></div>
-  </main>
-
-  <!--
-    ===== INTELLIGENCE (COMM only, private) =================================
-    What Comms knows. It is never published by itself: taking any of it to the
-    city is a decision made on the page next door.
-  -->
-  <main class="intel-page" id="intel-page" hidden>
-    <header class="bsp-head">
-      <h2 class="bsp-title">CITY INTELLIGENCE</h2>
-      <span class="bsp-note">Private to Comms. Nothing here reaches the city unless you put it there <span class="tag warn" id="intel-degraded" hidden>TELEMETRY DEGRADED</span></span>
-    </header>
-    <section class="panel bsp-panel">
-      <div class="intel" id="intel"></div>
-    </section>
   </main>
 
   <main class="exchange" id="exchange-page" hidden>
