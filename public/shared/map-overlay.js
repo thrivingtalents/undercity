@@ -202,12 +202,18 @@
         const link = document.createElementNS(NS, 'line');
         link.setAttribute('class', 'mo-link');
         link.setAttribute('vector-effect', 'non-scaling-stroke');
-        g.appendChild(dim); g.appendChild(edge); g.appendChild(link);
+        // The focus ring: drawn from the same measured polygon, on its own
+        // element so that emphasis never touches the state marks beside it.
+        const ring = document.createElementNS(NS, 'polygon');
+        ring.setAttribute('class', 'mo-focus-ring');
+        ring.setAttribute('vector-effect', 'non-scaling-stroke');
+        g.appendChild(dim); g.appendChild(edge); g.appendChild(link); g.appendChild(ring);
         svg.appendChild(g);
       }
       const pts = points(region.polygon);
       g.querySelector('.mo-dim').setAttribute('points', pts);
       g.querySelector('.mo-edge').setAttribute('points', pts);
+      g.querySelector('.mo-focus-ring').setAttribute('points', pts);
       const link = g.querySelector('.mo-link');
       if (region.coreConnection) {
         link.setAttribute('x1', region.coreConnection.from[0]);

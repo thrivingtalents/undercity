@@ -320,6 +320,11 @@ input:focus, select:focus, textarea:focus {
 .mo-region .mo-dim { fill: #04060a; }
 .mo-region .mo-edge { fill: none; stroke: var(--amber); stroke-width: 2.5; stroke-linejoin: round; }
 .mo-region .mo-link { stroke: var(--amber); stroke-width: 2; }
+/* Sector focus: additive only. It sets no opacity on the state marks. */
+.mo-region .mo-focus-ring {
+  fill: none; stroke: var(--accent-bright, #a970ff); stroke-width: 3;
+  stroke-linejoin: round; opacity: 0; transition: opacity 0.3s ease;
+}
 
 /* BROWNOUT — the region dims and takes an amber warning outline. */
 .mo-region[data-state="brownout"] .mo-dim { opacity: 0.55; animation: moPulse 3.4s ease-in-out infinite; }

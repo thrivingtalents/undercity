@@ -287,7 +287,7 @@
           '<div class="shc-health"><span class="shc-num"><b class="shc-pct">—</b><small>%</small></span><span class="k">SYSTEM HEALTH</span></div>' +
         '</div>' +
         '<div class="shc-status"><i class="shc-dot"></i><span class="shc-word">—</span></div>' +
-        '<div class="shc-rep"><span class="k">FIELD REPORT</span><span class="rep-fresh" data-fresh="CURRENT"></span><b class="rep-none">AWAITING</b></div>';
+        '<div class="shc-rep"><span class="k">FIELD REPORT</span><span class="rep-said"></span><span class="rep-fresh" data-fresh="CURRENT"></span><b class="rep-none">AWAITING</b></div>';
       host.appendChild(card);
       cardEls[code] = card;
     }
@@ -302,6 +302,7 @@
     renderStateOverlay();
     renderCore();
     renderCards();
+    renderFocus();
     renderMovement();
     renderAlerts();
     renderBroadcast();
@@ -523,6 +524,24 @@
    * ever looking critical. A sector COM has not reported says so once, in
    * place of its numbers, instead of repeating it in two lines.
    */
+  /**
+    * SECTOR FOCUS. Eight seconds of COMM pointing at one sector: the card
+    * lifts and the calibrated region takes a bright edge. It is drawn UNDER
+    * the system's own state — the brownout dim, the DARK wash, the critical
+    * edge all keep their opacity — so COMM can draw the eye and can never
+    * hide what the city is actually doing.
+    */
+  function renderFocus() {
+    const f = (frame.broadcast && frame.broadcast.focus) || null;
+    const code = f ? f.sector : null;
+    for (const [c, card] of Object.entries(cardEls)) card.classList.toggle('focused', c === code);
+    const svg = $('map-state');
+    if (!svg) return;
+    for (const g of svg.querySelectorAll('[data-region]')) {
+      g.classList.toggle('focused', g.getAttribute('data-region') === code);
+    }
+  }
+
   function renderCards() {
     const rows = (frame.broadcast && frame.broadcast.rows) || {};
     setText($('h-reports'), B.reportSummary(rows, PANEL_ORDER).text);
@@ -553,6 +572,20 @@
       const fe = card.querySelector('.rep-fresh');
       setText(fe, fresh.text);
       if (fe.dataset.fresh !== fresh.level) fe.dataset.fresh = fresh.level;
+
+      /*
+        What COMM says the sector's condition is. It sits inside FIELD REPORT,
+        beside the freshness and under the card's own SYSTEM HEALTH — never on
+        top of them. The gap between the two is the point: a card reading 24%
+        CRITICAL with a field report of STABLE is a finding, and the room can
+        see both at once.
+      */
+      const said = (rows[code] || {}).status || '';
+      const se = card.querySelector('.rep-said');
+      setText(se, said);
+      if (se.dataset.said !== said) se.dataset.said = said;
+      const disagrees = !!said && said !== B.CARD_WORD[state] && !(said === 'STABLE' && state === 'stable');
+      se.classList.toggle('differs', disagrees);
     }
   }
 

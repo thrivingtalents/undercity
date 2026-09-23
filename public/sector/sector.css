@@ -370,7 +370,11 @@ button.wide { width: 100%; }
 .bc-ann em, .bc-upd { font-size: 9px; letter-spacing: 0.16em; color: var(--ink-faint); font-style: normal; }
 .bc-ann[data-fresh="OUTDATED"] { border-left-color: var(--red); }
 .bc-rows { display: flex; flex-direction: column; gap: 3px; }
-.bc-row { display: grid; grid-template-columns: 52px 1fr auto; gap: 4px 6px; align-items: center; background: var(--steel); border: 1px solid var(--line); padding: 3px 6px; font-size: 11px; }
+.bc-row { display: grid; grid-template-columns: 52px 128px 1fr auto; gap: 4px 6px; align-items: center; background: var(--steel); border: 1px solid var(--line); padding: 3px 6px; font-size: 11px; }
+/* The reported condition: a claim about the sector, sitting with the figures
+   it is a claim alongside — never styled like this console's own status. */
+.bc-status { font-size: 10.5px; letter-spacing: 0.08em; padding: 2px 4px; width: 100%; }
+.bc-status[data-status=""] { color: var(--ink-faint); }
 .bc-row .bc-code { letter-spacing: 0.1em; color: var(--ink-dim); white-space: nowrap; }
 .bc-cells { display: flex; gap: 6px; }
 .bc-cell { display: inline-flex; align-items: center; gap: 2px; }
@@ -649,3 +653,28 @@ body.is-dark .columns, body.is-dark .exchange { filter: grayscale(0.7); opacity:
   background: var(--panel); border: 1px solid var(--line); padding: 5px 9px;
   pointer-events: none;
 }
+
+/* -- CITY BIG SCREEN CONTROL and INTELLIGENCE: COMM's two pages ------------- */
+
+.bigscreen-page, .intel-page {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.bsp-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.bsp-title { font-size: 15px; letter-spacing: 0.16em; margin: 0; }
+.bsp-note { font-size: 10.5px; color: var(--ink-faint); letter-spacing: 0.02em; }
+.bsp-note em { font-style: normal; color: var(--ink-dim); }
+.bsp-panel { padding: 12px; }
+.bsp-panel .hint { font-size: 10.5px; color: var(--ink-faint); line-height: 1.5; margin: 0 0 8px; }
+.bsp-panel textarea {
+  width: 100%; font-family: inherit; font-size: 12px; line-height: 1.5;
+  background: rgba(0,0,0,0.3); color: var(--ink); border: 1px solid var(--line);
+  padding: 6px 8px; resize: vertical;
+}
+/* Sector focus: six buttons, and the one that is live wears the accent. */
+.bsp-focus-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.bc-focus-btn { padding: 8px 14px; font-size: 11px; letter-spacing: 0.08em; }
+.bc-focus-btn.on { background: var(--ui-active, rgba(169,112,255,0.2)); border-color: var(--accent); color: var(--ink); }
+.bsp-focus-now { margin-top: 8px; font-size: 11px; letter-spacing: 0.1em; color: var(--ink-dim); }
+.bsp-focus-now b { color: var(--accent); }
+.bsp-focus-now i { font-style: normal; color: var(--ink-faint); }

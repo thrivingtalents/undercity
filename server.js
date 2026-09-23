@@ -1037,6 +1037,23 @@ function handleSector(client, entry, msg) {
       return broadcast(entry);
     }
 
+    /**
+     * COMM points at one sector on the shared screen for eight seconds. It is
+     * emphasis and nothing else — no health, no status, no fault, no stock.
+     */
+    case 'com_sector_focus': {
+      if (mine !== 'COM') return send(client.ws, { type: 'error', reason: 'com_edit_forbidden' });
+      // 'focus', not 'sector': a sector message naming another table is
+      // refused upstream, and COMM points at every table but its own.
+      send(client.ws, { type: 'broadcast_result', action: 'focus', ...game.setSectorFocus(msg.focus, { by: 'COM' }) });
+      return broadcast(entry);
+    }
+    case 'com_sector_focus_clear': {
+      if (mine !== 'COM') return send(client.ws, { type: 'error', reason: 'com_edit_forbidden' });
+      send(client.ws, { type: 'broadcast_result', action: 'focus_clear', ...game.clearSectorFocus({ by: 'COM' }) });
+      return broadcast(entry);
+    }
+
     /** A choosing reward: the table names its target. Only its own fault, only while the choice is open. */
     case 'reward_choose': {
       send(client.ws, { type: 'reward_result', ...game.chooseRewardTarget(mine, msg.fault_id, msg.target || null, { by: mine }) });

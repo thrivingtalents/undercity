@@ -408,6 +408,29 @@
 .cycle-flash span { font-size: var(--status); letter-spacing: 0.08em; color: var(--ink-dim); text-align: center; }
 .cycle-flash span:empty { display: none; }
 
+/*
+  COMM's reported condition, inside the field-report line. Quiet when it agrees
+  with the card's own word and amber when it does not — the disagreement is
+  worth seeing from the back of the room, and it is never loud enough to be
+  mistaken for the system's own status.
+*/
+.rep-said { font-size: var(--detail); letter-spacing: 0.14em; color: var(--ink-faint); }
+.rep-said:empty { display: none; }
+.rep-said.differs { color: var(--st-degraded); }
+
+/*
+  SECTOR FOCUS. A lift and a rim on the card, a bright edge on the map region.
+  Both are additive: nothing here sets an opacity, a fill or a display on the
+  state overlays, so a browned-out or DARK sector under focus keeps every one
+  of its own marks. The violet is named outright rather than taken from
+  --accent, because a card scopes --accent to its own sector identity: focus
+  has to look the same on every sector, and must never borrow a colour the
+  room reads as a condition.
+*/
+.shc.focused { box-shadow: 0 0 0 2px var(--ui-purple-bright), 0 6px 30px var(--ui-purple-glow-strong); transform: translateY(-2px); }
+.mo-region.focused .mo-focus-ring { opacity: 1; }
+#map-state .mo-region.focused { filter: drop-shadow(0 0 6px var(--ui-purple)); }
+
 /* -- SECTOR STATUS: six monitors in a fixed order ---------------------------
    Identity and condition never share a colour. The icon, the code and the
    left edge are WHO the sector is; the dot, the word and the health figure
