@@ -409,16 +409,6 @@
 .cycle-flash span:empty { display: none; }
 
 /*
-  COMM's reported condition, inside the field-report line. Quiet when it agrees
-  with the card's own word and amber when it does not — the disagreement is
-  worth seeing from the back of the room, and it is never loud enough to be
-  mistaken for the system's own status.
-*/
-.rep-said { font-size: var(--detail); letter-spacing: 0.14em; color: var(--ink-faint); }
-.rep-said:empty { display: none; }
-.rep-said.differs { color: var(--st-degraded); }
-
-/*
   SECTOR FOCUS. A lift and a rim on the card, a bright edge on the map region.
   Both are additive: nothing here sets an opacity, a fill or a display on the
   state overlays, so a browned-out or DARK sector under focus keeps every one

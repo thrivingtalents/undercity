@@ -1293,9 +1293,6 @@
       const el = $(`bc-${code}-${k}`);
       if (el && el.value !== '') values[k] = Number(el.value);
     }
-    // '' is a real choice here — NOT REPORTED — so it is sent, not skipped.
-    const sel = $(`bc-${code}-status`);
-    if (sel) values.status = sel.value || null;
     pendingTransferAction = 'broadcast';
     // 'row', not 'sector': a sector message naming another table is refused upstream.
     socket.send({ type: 'com_board_set', row: code, values });
@@ -1327,18 +1324,14 @@
     const codes = Object.keys(b.rows);
     if (!boardBuilt || host.children.length !== codes.length) {
       boardBuilt = true;
-      const words = (b.statuses || ['STABLE', 'DEGRADED', 'CRITICAL', 'DARK']);
       host.innerHTML = codes.map((code) => {
         const row = b.rows[code];
         const cells = BOARD_KEYS.map((k) => `<label class="bc-cell"><span class="bc-glyph">${U.GLYPH[k]}</span><input type="number" min="0" step="1" id="bc-${code}-${k}" value="${row[k] ?? ''}" placeholder="—" aria-label="${code} ${k}"></label>`).join('');
-        // The reported condition. It is a claim about the sector and never the
-        // sector itself, which is why it sits beside the figures and not on the
-        // console's own status block.
-        const opts = ['<option value="">NOT REPORTED</option>']
-          .concat(words.map((w) => `<option value="${w}">${w}</option>`)).join('');
+        // Four figures and nothing else. A sector's CONDITION is the system's
+        // to say, not COMM's: the wall reads it off the sector, and there is
+        // no control here that could put a different word on it.
         return `<div class="bc-row" data-code="${code}">
             <span class="bc-code">${U.SECTOR_GLYPH[code] || ''} ${code}</span>
-            <select class="bc-status" id="bc-${code}-status" aria-label="${code} reported status">${opts}</select>
             <span class="bc-cells">${cells}</span>
             <button type="button" class="bc-save" data-save="${code}">SAVE</button>
             <span class="bc-meta"><em class="bc-upd"></em> <i class="bc-fresh"></i></span>
@@ -1350,10 +1343,6 @@
       const row = b.rows[code];
       const el = host.querySelector(`[data-code="${code}"]`);
       if (!el) continue;
-      // The select is only written when the player is not in the middle of it.
-      const sel = el.querySelector('.bc-status');
-      if (sel && document.activeElement !== sel) sel.value = row.status || '';
-      if (sel) sel.dataset.status = row.status || '';
       setText(el.querySelector('.bc-upd'), row.round_number === null ? 'NOT PUBLISHED' : `PUBLISHED CYCLE ${row.round_number}`);
       const fresh = el.querySelector('.bc-fresh');
       setText(fresh, freshWord(row.freshness));

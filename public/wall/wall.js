@@ -289,7 +289,7 @@
           '<div class="shc-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><i class="shc-bar-fill"></i></div>' +
         '</div>' +
         '<div class="shc-status"><i class="shc-dot"></i><span class="shc-word">—</span></div>' +
-        '<div class="shc-rep"><span class="rep-said"></span><span class="rep-fresh" data-fresh="CURRENT"></span></div>' +
+        '<div class="shc-rep"><span class="rep-fresh" data-fresh="CURRENT"></span></div>' +
         '<div class="shc-res"><b class="res-tag"></b><span class="res-vals"></span><b class="rep-none">AWAITING REPORT</b></div>';
       host.appendChild(card);
       cardEls[code] = card;
@@ -585,20 +585,6 @@
       const fe = card.querySelector('.rep-fresh');
       setText(fe, fresh.text);
       if (fe.dataset.fresh !== fresh.level) fe.dataset.fresh = fresh.level;
-
-      /*
-        What COMM says the sector's condition is. It sits on the report line,
-        beside the freshness and under the card's own figure and bar — never on
-        top of them. The gap between the two is the point: a card reading 24%
-        CRITICAL with a report of STABLE is a finding, and the room can see
-        both at once.
-      */
-      const said = (rows[code] || {}).status || '';
-      const se = card.querySelector('.rep-said');
-      setText(se, said);
-      if (se.dataset.said !== said) se.dataset.said = said;
-      const disagrees = !!said && said !== B.CARD_WORD[state] && !(said === 'STABLE' && state === 'stable');
-      se.classList.toggle('differs', disagrees);
     }
   }
 

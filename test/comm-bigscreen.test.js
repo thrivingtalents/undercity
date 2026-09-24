@@ -62,10 +62,10 @@ test('COMM-BS-001: COMM has a CITY BIG SCREEN CONTROL page, and no alert control
     const b = forSector(game, code).broadcast;
     assert.equal(b.editable, false, `${code} can edit the board`);
     assert.equal(b.rows, undefined, `${code} was sent the board`);
-    assert.equal(b.statuses, undefined);
   }
   assert.ok(/id="bigscreen-page"/.test(SECTOR_INDEX), 'there is no Big Screen page');
   assert.ok(/data-page="bigscreen"[^>]*>CITY BIG SCREEN CONTROL/.test(SECTOR_INDEX), 'the deck does not offer it');
+  assert.equal(forSector(game, 'COM').broadcast.statuses, undefined, 'COMM is still offered condition words');
   for (const section of ['CITY BOARD', 'CITY BROADCAST', 'SECTOR FOCUS']) {
     assert.ok(SECTOR_INDEX.includes(`>${section}<`), `the page has no ${section} section`);
   }
@@ -88,53 +88,79 @@ test('the page is COMM\'s alone: another table cannot reach it or write through 
   // message naming another table is refused before it reaches the reducer,
   // and COMM points at every table but its own.
   assert.ok(/type: 'com_sector_focus', focus:/.test(SECTOR_SCRIPT), 'the focus intent would be refused as wrong_sector');
-  assert.equal(game.setBroadcastRow('MED', { status: 'STABLE' }, { by: 'POW' }).reason, 'com_edit_forbidden');
+  assert.equal(game.setBroadcastRow('MED', { power: 2 }, { by: 'POW' }).reason, 'com_edit_forbidden');
   assert.equal(game.setBroadcastAnnouncement({ headline: 'x' }, { by: 'AGR' }).reason, 'com_edit_forbidden');
   assert.equal(game.setSectorFocus('POW', { by: 'WTR' }).reason, 'com_edit_forbidden');
 });
 
 // -- the board ------------------------------------------------------------------
 
-test('COMM-BS-002: a reported status moves the board and nothing else', () => {
+test('COMM-BS-002: the figures move the board and nothing else', () => {
   const game = live();
   game.setIntegrity('MED', 24);
   const before = world(game);
 
-  const r = game.setBroadcastRow('MED', { status: 'STABLE' }, { by: 'COM' });
+  const r = game.setBroadcastRow('MED', { power: 3, med: 9 }, { by: 'COM' });
   assert.equal(r.ok, true);
-  assert.equal(r.row.status, 'STABLE');
+  assert.equal(r.row.power, 3);
+  assert.equal(r.row.med, 9);
 
-  // The city is told STABLE. The city is not stable.
-  assert.equal(forBigscreen(game).broadcast.rows.MED.status, 'STABLE');
+  // The city is told MED has nine medical. The city is at 24%.
+  assert.equal(forBigscreen(game).broadcast.rows.MED.med, 9);
   assert.equal(game.state.sectors.MED.integrity, 24, 'reporting changed the sector');
   assert.equal(world(game), before, 'reporting changed the simulation');
-  assert.ok(logEvents(game, 'com_row_updated').length, 'the claim was not recorded');
+  assert.ok(logEvents(game, 'com_row_updated').length, 'the report was not recorded');
 
-  // Only the four words, and clearing is a choice of its own.
-  assert.deepEqual(GameState.REPORTED_STATUSES, ['STABLE', 'DEGRADED', 'CRITICAL', 'DARK']);
-  assert.equal(game.setBroadcastRow('MED', { status: 'FINE' }, { by: 'COM' }).reason, 'invalid_status');
-  assert.equal(game.setBroadcastRow('MED', { status: null }, { by: 'COM' }).row.status, null);
   // Every sector is independent.
-  game.setBroadcastRow('POW', { status: 'CRITICAL' }, { by: 'COM' });
+  game.setBroadcastRow('POW', { parts: 1 }, { by: 'COM' });
   const rows = forBigscreen(game).broadcast.rows;
-  assert.equal(rows.POW.status, 'CRITICAL');
-  assert.equal(rows.MED.status, null);
-  assert.equal(rows.WTR.status, null);
+  assert.equal(rows.POW.parts, 1);
+  assert.equal(rows.MED.parts, null);
+  assert.equal(rows.WTR.parts, null);
 });
 
-test('the wall shows the reported word beside the real one, never instead of it', () => {
-  assert.ok(/class="rep-said"/.test(WALL_SCRIPT), 'the card has nowhere to print the report');
-  assert.ok(/\.rep-said:empty \{ display: none; \}/.test(WALL_CSS), 'an unreported condition holds a line open');
-  assert.ok(/rows\[code\] \|\| \{\}\)\.status/.test(WALL_SCRIPT), 'the card does not read the reported status');
-  // The card's own health and status line are still rendered from the sector.
+test('COMM cannot put a condition on a sector: the claim is gone from every layer (2026-09-25)', () => {
+  const game = live();
+  game.setIntegrity('MED', 24);
+
+  // The engine has no such field and no such vocabulary.
+  assert.equal(GameState.REPORTED_STATUSES, undefined, 'the word list survived');
+  const r = game.setBroadcastRow('MED', { status: 'STABLE', med: 4 }, { by: 'COM' });
+  assert.equal(r.ok, true, 'a stray status broke the figures');
+  assert.equal(r.row.status, undefined, 'a status was written anyway');
+  assert.equal(r.row.med, 4, 'the figures stopped working');
+  assert.equal(game.state.broadcast.rows.MED.status, undefined);
+
+  // No frame carries one, to any audience.
+  for (const view of [forBigscreen(game), forSector(game, 'COM'), forControl(game)]) {
+    const rows = view.broadcast.rows;
+    assert.equal(view.broadcast.statuses, undefined, 'a frame still offers the words');
+    for (const row of Object.values(rows)) assert.equal(row.status, undefined, 'a frame still carries a claim');
+  }
+
+  // No console offers the control, and the wall has nowhere to print one.
+  assert.ok(!/bc-status|NOT REPORTED/.test(SECTOR_SCRIPT + SECTOR_INDEX), 'the board still has a condition control');
+  assert.ok(!/rep-said/.test(WALL_SCRIPT + WALL_CSS), 'the card still has somewhere to print a claim');
+  assert.ok(!/\)\.status/.test(WALL_SCRIPT), 'the card still reads a reported status');
+
+  // What the card says about a sector's condition is the system's, as before.
   assert.ok(/setText\(card\.querySelector\('\.shc-word'\), B\.CARD_WORD\[state\]\)/.test(WALL_SCRIPT),
     "the card stopped printing the system's own word");
-  // Since 2026-09-24 real health is the figure and the bar under it, not a
-  // labelled ring — the reported word still sits beneath both.
   assert.ok(/setText\(card\.querySelector\('\.shc-pct'\), value\)/.test(WALL_SCRIPT), 'the card stopped printing real health');
   assert.ok(/shc-bar-fill/.test(WALL_SCRIPT), 'the card stopped drawing real health');
-  // And the reported word is visually subordinate: it never gets the status colour.
-  assert.ok(/\.rep-said \{[^}]*--ink-faint/.test(WALL_CSS), 'the reported word is as loud as the real one');
+});
+
+test('a run saved while COMM could claim a condition drops the claim on restore', () => {
+  const game = live();
+  const snapshot = JSON.parse(JSON.stringify(game.serialise()));
+  snapshot.state.broadcast.rows.MED.status = 'STABLE';
+  snapshot.state.broadcast.rows.POW.status = 'DARK';
+
+  const back = newGame({ runId: 'comm-status-drop' });
+  assert.equal(back.restore(snapshot), true);
+  assert.equal(back.state.broadcast.rows.MED.status, undefined, 'an old claim survived the migration');
+  assert.equal(back.state.broadcast.rows.POW.status, undefined);
+  assert.equal(forBigscreen(back).broadcast.rows.MED.status, undefined, 'an old claim reached the wall');
 });
 
 // -- the broadcast ----------------------------------------------------------------
@@ -157,7 +183,7 @@ test('COMM-BS-003/004: one active broadcast, replaced by the next, removed by CL
   assert.equal(live2.message, 'replaces it');
 
   // CLEAR removes the broadcast and leaves the rest of the screen alone.
-  game.setBroadcastRow('POW', { status: 'DEGRADED', power: 4 }, { by: 'COM' });
+  game.setBroadcastRow('POW', { power: 4 }, { by: 'COM' });
   const boardBefore = JSON.stringify(forBigscreen(game).broadcast.rows);
   assert.equal(game.clearBroadcastAnnouncement({ by: 'COM' }).ok, true);
   assert.equal(forBigscreen(game).broadcast.announcement, null);
@@ -218,8 +244,9 @@ test('COMM-BS-006/008: focus cannot dim a brownout, a DARK sector or a Core warn
   assert.ok(/opacity: 0;/.test(ring), 'the focus ring is on by default');
   assert.ok(!/\.mo-region\.focused \.mo-dim/.test(WALL_CSS), 'focus touches the state dim');
   assert.ok(!/\.mo-region\.focused \.mo-edge/.test(WALL_CSS), 'focus touches the state edge');
-  // The reported status is a claim on the card, not a status the map draws.
-  game.setBroadcastRow('POW', { status: 'STABLE' }, { by: 'COM' });
+  // A report is four figures. Nothing COMM can file touches the word the map
+  // and the card draw — there is no longer even a field for it.
+  game.setBroadcastRow('POW', { power: 9 }, { by: 'COM' });
   assert.equal(forBigscreen(game).sectors.POW.status, 'BROWNOUT', 'a report overrode the real status');
 });
 
@@ -235,7 +262,7 @@ test('COMM-BS-007: intelligence is COMM\'s, private, and never published by itse
   // Nothing about intelligence reaches the board or the broadcast on its own.
   const board = forBigscreen(game).broadcast;
   assert.equal(board.announcement, null);
-  assert.ok(Object.values(board.rows).every((r) => r.status === null));
+  assert.ok(Object.values(board.rows).every((r) => r.status === undefined));
   // It reads on COMM's overview, beside the city feed — not on the Big
   // Screen page, where every control publishes.
   assert.ok(/id="intel-block"/.test(SECTOR_INDEX), 'intelligence has no panel on the overview');
@@ -257,14 +284,13 @@ test('COMM-BS-007: intelligence is COMM\'s, private, and never published by itse
 
 test('COMM-BS-009: a reconnect restores the board and the broadcast, but not an expired focus', () => {
   const game = live();
-  game.setBroadcastRow('MED', { status: 'CRITICAL', med: 2 }, { by: 'COM' });
+  game.setBroadcastRow('MED', { med: 2 }, { by: 'COM' });
   game.setBroadcastAnnouncement({ headline: 'MED NEEDS POWER', message: 'Two units' }, { by: 'COM' });
   game.setSectorFocus('TRN', { by: 'COM' });
 
   // A reconnect is a fresh projection of the same state — no page reload of
   // any kind is involved, which is exactly why this holds.
   const fresh = forBigscreen(game);
-  assert.equal(fresh.broadcast.rows.MED.status, 'CRITICAL');
   assert.equal(fresh.broadcast.rows.MED.med, 2);
   assert.equal(fresh.broadcast.announcement.headline, 'MED NEEDS POWER');
   assert.equal(fresh.broadcast.focus.sector, 'TRN');
@@ -272,7 +298,7 @@ test('COMM-BS-009: a reconnect restores the board and the broadcast, but not an 
   // A restart from snapshot keeps the board and the broadcast.
   const back = newGame({ runId: 'comm-restore' });
   back.restore(JSON.parse(JSON.stringify(game.serialise())));
-  assert.equal(forBigscreen(back).broadcast.rows.MED.status, 'CRITICAL');
+  assert.equal(forBigscreen(back).broadcast.rows.MED.med, 2);
   assert.equal(forBigscreen(back).broadcast.announcement.headline, 'MED NEEDS POWER');
 
   // Once the eight seconds are gone, nothing brings the focus back.
@@ -287,10 +313,10 @@ test('COMM-BS-009: a reconnect restores the board and the broadcast, but not an 
 
 test('Admin authority is not reduced: it can still override every COMM surface', () => {
   const game = live();
-  assert.equal(game.setBroadcastRow('MED', { status: 'DARK' }, { by: 'facilitator' }).ok, true);
+  assert.equal(game.setBroadcastRow('MED', { med: 7 }, { by: 'facilitator' }).ok, true);
   assert.equal(game.setBroadcastAnnouncement({ headline: 'ADMIN' }, { by: 'facilitator' }).ok, true);
   assert.equal(game.setSectorFocus('COM', { by: 'facilitator' }).ok, true);
   assert.ok(logEvents(game, 'facilitator_com_override').length >= 1);
   // And the console still sees the whole board.
-  assert.ok(forControl(game).broadcast.rows.MED.status === 'DARK');
+  assert.equal(forControl(game).broadcast.rows.MED.med, 7);
 });

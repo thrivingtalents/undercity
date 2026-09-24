@@ -370,11 +370,7 @@ button.wide { width: 100%; }
 .bc-ann em, .bc-upd { font-size: 9px; letter-spacing: 0.16em; color: var(--ink-faint); font-style: normal; }
 .bc-ann[data-fresh="OUTDATED"] { border-left-color: var(--red); }
 .bc-rows { display: flex; flex-direction: column; gap: 3px; }
-.bc-row { display: grid; grid-template-columns: 52px 128px 1fr auto; gap: 4px 6px; align-items: center; background: var(--steel); border: 1px solid var(--line); padding: 3px 6px; font-size: 11px; }
-/* The reported condition: a claim about the sector, sitting with the figures
-   it is a claim alongside — never styled like this console's own status. */
-.bc-status { font-size: 10.5px; letter-spacing: 0.08em; padding: 2px 4px; width: 100%; }
-.bc-status[data-status=""] { color: var(--ink-faint); }
+.bc-row { display: grid; grid-template-columns: 52px 1fr auto; gap: 4px 6px; align-items: center; background: var(--steel); border: 1px solid var(--line); padding: 3px 6px; font-size: 11px; }
 .bc-row .bc-code { letter-spacing: 0.1em; color: var(--ink-dim); white-space: nowrap; }
 .bc-cells { display: flex; gap: 6px; }
 .bc-cell { display: inline-flex; align-items: center; gap: 2px; }

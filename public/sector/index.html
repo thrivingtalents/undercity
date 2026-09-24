@@ -332,13 +332,14 @@
     ===== CITY BIG SCREEN CONTROL (COMM only) ==============================
 
     What the city is told, in one place. Three things and no others: the board
-    of reported sector conditions, the one live broadcast, and eight seconds of
+    of reported sector figures, the one live broadcast, and eight seconds of
     emphasis on a single sector.
 
-    Nothing on this page touches the simulation. COMM can report a sector as
-    STABLE while the map draws it CRITICAL — that gap is the exercise, not a
-    bug — but COMM cannot move a sector's health, its stock, its faults or its
-    brownout, and cannot hide what the system insists on showing.
+    Nothing on this page touches the simulation. COMM can leave a sector's
+    figures a cycle out of date while the map draws it CRITICAL — that gap is
+    the exercise, not a bug — but COMM cannot move a sector's health, its
+    stock, its faults or its brownout, cannot put a condition on a sector, and
+    cannot hide what the system insists on showing.
   -->
   <main class="bigscreen-page" id="bigscreen-page" hidden>
     <header class="bsp-head">
@@ -348,7 +349,7 @@
 
     <section class="panel bsp-panel" id="bsp-board">
       <h3 class="ptitle">CITY BOARD</h3>
-      <p class="hint">The condition and the figures the shared screen reports for each sector. Saving a row publishes it; the sector's real state is untouched.</p>
+      <p class="hint">The figures the shared screen reports for each sector. Saving a row publishes it; the sector's real state is untouched. Condition is the system's word, not COMM's — the wall draws it from the sector itself.</p>
       <div class="bc-rows" id="bc-rows"></div>
     </section>
 
