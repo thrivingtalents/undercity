@@ -379,20 +379,37 @@ button.wide { width: 100%; }
 */
 .bc-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .bc-card {
-  display: flex; flex-direction: column; gap: 6px;
-  background: var(--steel); border: 1px solid var(--line); padding: 7px 9px; font-size: 11px;
+  display: flex; flex-direction: column; gap: 7px;
+  background: var(--steel); border: 1px solid var(--line); padding: 8px 10px; font-size: 11px;
 }
 .bc-card .bc-code {
   text-align: center; font-size: 12px; letter-spacing: 0.14em; font-weight: 700;
   color: var(--ink-dim); white-space: nowrap;
 }
-/* a block, not a banner: the four boxes stay together under the nickname
-   however wide the console is, and all four are exactly one width */
-.bc-cells { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 10px; max-width: 240px; margin: 0 auto; width: 100%; }
-.bc-cell { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.bc-glyph { font-size: 12px; flex-shrink: 0; }
-.bc-cells input { width: 100%; min-width: 0; box-sizing: border-box; padding: 3px 5px; font-size: 12px; }
-.bc-cells input:focus { outline: 1px solid var(--accent-bright); outline-offset: 0; }
+/*
+  THE ENTRY AREA, which is what the card is for. A block rather than a banner
+  — the four boxes stay together under the nickname however wide the console
+  is — but a wide block: it takes most of the card's width so the two columns
+  stand apart and the two rows do not read as one. All four boxes are exactly
+  one width and one height on all six cards, because a hand that has learned
+  where MED's parts box is must find AGR's in the same place.
+*/
+.bc-cells { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 22px; max-width: 400px; margin: 0 auto; width: 100%; }
+.bc-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* a fixed box, because the four glyphs are not one width — the medical sign
+   renders as text while the others render as emoji, and an input sized by
+   what is left over would be four different widths */
+.bc-glyph { font-size: 15px; flex-shrink: 0; line-height: 1; width: 20px; text-align: center; }
+.bc-cells input {
+  /* The box grows with the card up to a ceiling and no further. The area is
+     allowed to be wide — that is what puts air between the two columns — but
+     a field for a one or two digit count stops being easier to read once it
+     is a hand's width of empty box. */
+  width: 100%; min-width: 0; max-width: 130px; box-sizing: border-box;
+  padding: 4px 8px; font-size: 15px; font-variant-numeric: tabular-nums;
+}
+/* a bigger field deserves a plainer edge when it has the caret */
+.bc-cells input:focus { outline: 2px solid var(--accent-bright); outline-offset: 0; }
 /* pinned to the bottom, so the button sits in one place on every card */
 .bc-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 /* the round this card's report was filed in — never the round the room is in */
