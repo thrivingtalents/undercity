@@ -343,8 +343,12 @@
       { "offset_s": 660,  "kind": "fault", "fault_code": "F-209", "sector": "AGR", "mode": "MANUAL" },
       { "offset_s": 780,  "kind": "fault", "fault_code": "F-211", "sector": "COM", "mode": "MANUAL" },
       { "offset_s": 900,  "kind": "fault", "fault_code": "F-210", "sector": "AGR", "mode": "MANUAL", "note": "FALSE ALARM — clear by hand once COM confirms" },
+      { "offset_s": 960,  "kind": "fault", "fault_code": "F-204", "sector": "WTR", "mode": "MANUAL" },
+      { "offset_s": 1020, "kind": "fault", "fault_code": "F-206", "sector": "MED", "mode": "MANUAL" },
       { "offset_s": 1080, "kind": "council", "mode": "MANUAL", "note": "Council #1 — information pooling" },
-      { "offset_s": 1440, "kind": "fault", "fault_code": "F-202", "sector": "POW", "mode": "MANUAL" }
+      { "offset_s": 1440, "kind": "fault", "fault_code": "F-202", "sector": "POW", "mode": "MANUAL" },
+      { "offset_s": 1500, "kind": "fault", "fault_code": "F-208", "sector": "TRN", "mode": "MANUAL" },
+      { "offset_s": 1560, "kind": "fault", "fault_code": "F-212", "sector": "COM", "mode": "MANUAL" }
     ],
     "R3": [
       { "offset_s": 0,    "kind": "fault", "fault_code": "F-301", "sector": "POW", "mode": "MANUAL" },
