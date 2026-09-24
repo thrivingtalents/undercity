@@ -26,6 +26,10 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
+# Both the progress lines and the content carry glyphs a cp1252 console
+# cannot encode. Say UTF-8 rather than inherit whatever the machine has.
+sys.stdout.reconfigure(encoding="utf-8")
+
 XLSX = Path(sys.argv[1] if len(sys.argv) > 1 else "undercity-crossref-matrix.xlsx")
 OUT = Path(sys.argv[2] if len(sys.argv) > 2 else "binder_content.json")
 
@@ -253,7 +257,11 @@ for code, b in binders.items():
         if s["binder"] != code and s["value"] in printed:
             sys.exit(f"ABORT: {code} binder prints {s['value']}, which belongs to {s['binder']} ({sid})")
 
-OUT.write_text(json.dumps({"binders": binders}, indent=2, ensure_ascii=False))
+# UTF-8 and LF whatever the machine: the sector lines carry glyphs cp1252
+# cannot encode, and a CRLF copy fingerprints differently from the LF one.
+OUT.parent.mkdir(parents=True, exist_ok=True)
+with OUT.open("w", encoding="utf-8", newline="\n") as fh:
+    fh.write(json.dumps({"binders": binders}, indent=2, ensure_ascii=False))
 print(f"✓ {OUT}")
 for c, b in binders.items():
     print(f"  {c}: {len(b['index_rows'])} index rows "
