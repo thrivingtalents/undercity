@@ -77,7 +77,6 @@
   const IDENTITY = B.SECTOR_COLOUR;                                  // who a sector is — never how it is doing
   // The sector gauge, in its own little coordinate space: a ring drawn from
   // twelve o'clock, filled to the sector's health.
-  const RING = { box: 100, c: 50, r: 42, circ: Math.round(2 * Math.PI * 42 * 10) / 10 };
   const BUILD_ORDER = ['WTR', 'POW', 'COM', 'MED', 'TRN', 'AGR'];   // paint order on the map
   const CORE = { x: 836, y: 398, r: 96, label: { x: 855, y: 295, w: 300 }, tunnel7: [[838, 548], [838, 612]] };
 
@@ -261,8 +260,8 @@
 
   /**
    * Six monitors in a fixed order. Built once; the frame only changes their
-   * text and state. Code, name, HEALTH %, the status word, what COM reported
-   * (or NO REPORT), and how fresh that report is — nothing to press.
+   * text and state. Code, name, HEALTH % over a bar, the status word, what COM
+   * reported and when — nothing to press.
    */
   function buildCards() {
     const host = $('h-cards');
@@ -274,20 +273,24 @@
       card.dataset.state = 'stable';
       card.style.setProperty('--accent', IDENTITY[code] || d.colour);
       card.dataset.report = 'none';
-      // A gauge, the way a monitoring wall draws one: a dark track, an arc of
-      // the sector's condition, and the figure in the middle of it.
+      /*
+        The figure, then a bar under it. An arc was a nice dial and a poor
+        measurement: from the back of a room nobody reads a sector at 58%
+        against one at 71% off two curves, and the number in the middle had to
+        fight the ring for the space. A bar is the same fact in a shape the eye
+        already compares, and it hands the middle of the card back to the
+        number. Under it, what COMM reported, tagged with the round it said it.
+      */
       card.innerHTML =
         `<div class="shc-id"><img class="shc-icon" src="${ART}/icon-${code}.png" alt=""><b class="shc-code">${code}</b></div>` +
         `<div class="shc-name">${d.name}<i class="shc-cap"></i></div>` +
-        '<div class="shc-gauge">' +
-          `<svg class="ring" viewBox="0 0 ${RING.box} ${RING.box}" aria-hidden="true">` +
-            `<circle class="ring-track" cx="${RING.c}" cy="${RING.c}" r="${RING.r}"></circle>` +
-            `<circle class="ring-arc" cx="${RING.c}" cy="${RING.c}" r="${RING.r}" stroke-dasharray="0 ${RING.circ}"></circle>` +
-          '</svg>' +
-          '<div class="shc-health"><span class="shc-num"><b class="shc-pct">—</b><small>%</small></span><span class="k">SYSTEM HEALTH</span></div>' +
+        '<div class="shc-health">' +
+          '<span class="shc-num"><b class="shc-pct">—</b><small>%</small></span>' +
+          '<div class="shc-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><i class="shc-bar-fill"></i></div>' +
         '</div>' +
         '<div class="shc-status"><i class="shc-dot"></i><span class="shc-word">—</span></div>' +
-        '<div class="shc-rep"><span class="k">FIELD REPORT</span><span class="rep-said"></span><span class="rep-fresh" data-fresh="CURRENT"></span><b class="rep-none">AWAITING</b></div>';
+        '<div class="shc-rep"><span class="rep-said"></span><span class="rep-fresh" data-fresh="CURRENT"></span></div>' +
+        '<div class="shc-res"><b class="res-tag"></b><span class="res-vals"></span><b class="rep-none">AWAITING REPORT</b></div>';
       host.appendChild(card);
       cardEls[code] = card;
     }
@@ -554,31 +557,41 @@
       if (card.dataset.state !== state) card.dataset.state = state;
       const value = B.healthValue(s);
       setText(card.querySelector('.shc-pct'), value);   // never a fabricated 100
-      // the arc follows the figure; an unknown health leaves the track empty
-      const pct = value === '—' ? 0 : Number(value);
-      const arc = card.querySelector('.ring-arc');
-      const dash = `${Math.round((pct / 100) * RING.circ * 10) / 10} ${RING.circ}`;
-      if (arc.getAttribute('stroke-dasharray') !== dash) arc.setAttribute('stroke-dasharray', dash);
+      // the bar follows the figure; an unknown health leaves the track empty
+      const pct = B.healthPercent(s);
+      const bar = card.querySelector('.shc-bar');
+      const fill = card.querySelector('.shc-bar-fill');
+      const width = `${pct}%`;
+      if (fill.style.width !== width) fill.style.width = width;
+      if (bar.getAttribute('aria-valuenow') !== String(pct)) bar.setAttribute('aria-valuenow', String(pct));
       setText(card.querySelector('.shc-word'), B.CARD_WORD[state]);
       // what the city has built, where the whole room can weigh it in Council
       const gen = s && s.generator;
       setText(card.querySelector('.shc-cap'), gen ? `L${gen.level}/${gen.max}` : '');
 
-      // whether COM has reported, and how fresh it is — the numbers themselves
-      // live on the sector consoles and the facilitator's screen
-      const rep = B.reportLine(rows[code]);
+      /*
+        What COM reported: the snapshot, in the card's order, under the round it
+        was filed in. These four numbers are the report and nothing else — the
+        wall has no reach into a sector's stock, so a delivery that lands after
+        the report moves the sector and leaves the card exactly where COMM left
+        it. That gap is the whole exercise.
+      */
+      const rep = B.reportLine(rows[code], B.CARD_RES_ORDER);
       if (card.dataset.report !== (rep.none ? 'none' : 'yes')) card.dataset.report = rep.none ? 'none' : 'yes';
+      const tag = B.reportTag(rows[code]);
+      setText(card.querySelector('.res-tag'), tag.text);
+      setText(card.querySelector('.res-vals'), rep.none ? '' : rep.compact);
       const fresh = B.freshnessShort(rows[code]);
       const fe = card.querySelector('.rep-fresh');
       setText(fe, fresh.text);
       if (fe.dataset.fresh !== fresh.level) fe.dataset.fresh = fresh.level;
 
       /*
-        What COMM says the sector's condition is. It sits inside FIELD REPORT,
-        beside the freshness and under the card's own SYSTEM HEALTH — never on
+        What COMM says the sector's condition is. It sits on the report line,
+        beside the freshness and under the card's own figure and bar — never on
         top of them. The gap between the two is the point: a card reading 24%
-        CRITICAL with a field report of STABLE is a finding, and the room can
-        see both at once.
+        CRITICAL with a report of STABLE is a finding, and the room can see
+        both at once.
       */
       const said = (rows[code] || {}).status || '';
       const se = card.querySelector('.rep-said');

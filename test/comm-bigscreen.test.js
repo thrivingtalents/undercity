@@ -124,11 +124,15 @@ test('COMM-BS-002: a reported status moves the board and nothing else', () => {
 
 test('the wall shows the reported word beside the real one, never instead of it', () => {
   assert.ok(/class="rep-said"/.test(WALL_SCRIPT), 'the card has nowhere to print the report');
+  assert.ok(/\.rep-said:empty \{ display: none; \}/.test(WALL_CSS), 'an unreported condition holds a line open');
   assert.ok(/rows\[code\] \|\| \{\}\)\.status/.test(WALL_SCRIPT), 'the card does not read the reported status');
   // The card's own health and status line are still rendered from the sector.
   assert.ok(/setText\(card\.querySelector\('\.shc-word'\), B\.CARD_WORD\[state\]\)/.test(WALL_SCRIPT),
     "the card stopped printing the system's own word");
-  assert.ok(/SYSTEM HEALTH/.test(WALL_SCRIPT), 'the card stopped printing real health');
+  // Since 2026-09-24 real health is the figure and the bar under it, not a
+  // labelled ring — the reported word still sits beneath both.
+  assert.ok(/setText\(card\.querySelector\('\.shc-pct'\), value\)/.test(WALL_SCRIPT), 'the card stopped printing real health');
+  assert.ok(/shc-bar-fill/.test(WALL_SCRIPT), 'the card stopped drawing real health');
   // And the reported word is visually subordinate: it never gets the status colour.
   assert.ok(/\.rep-said \{[^}]*--ink-faint/.test(WALL_CSS), 'the reported word is as loud as the real one');
 });

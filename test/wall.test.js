@@ -218,12 +218,15 @@ test('freshness: CURRENT this cycle, STALE one cycle on, OUTDATED after two, NOT
   game.cycleControl('process');
   assert.deepEqual(B.freshnessLine(wallRows(game).POW), { level: 'OUTDATED', text: 'UPDATED CYCLE 1 · OUTDATED' });
   assert.equal(B.freshnessLine(null).text, 'NOT UPDATED');
-  // On the card the level is one short marker: C1, C1 · STALE, C1 · OUTDATED.
-  // A sector COM never reported has no marker at all — it says AWAITING REPORT once.
-  assert.deepEqual(B.freshnessShort(wallRows(game).POW), { level: 'OUTDATED', text: 'C1 · OUTDATED' });
+  // On the card the level is one word and no number (2026-09-24): the card
+  // now carries the report's own ROUND beside the figures, and a cycle stamp
+  // next to it would be a second answer to the same question. A current
+  // report says nothing at all, and a sector COM never reported says
+  // AWAITING REPORT once. The long UPDATED CYCLE n line above is unchanged.
+  assert.deepEqual(B.freshnessShort(wallRows(game).POW), { level: 'OUTDATED', text: 'OUTDATED' });
   assert.deepEqual(B.freshnessShort(wallRows(game).WTR), { level: 'NOT UPDATED', text: '' });
   game.setBroadcastRow('MED', { med: 1 }, { by: 'COM' });
-  assert.deepEqual(B.freshnessShort(wallRows(game).MED), { level: 'CURRENT', text: 'C3' });
+  assert.deepEqual(B.freshnessShort(wallRows(game).MED), { level: 'CURRENT', text: '' });
   assert.ok(/\.rep-fresh \{[^}]*screen-ink-faint/.test(WALL_CSS), 'a current report is not quiet');
   assert.ok(/\.rep-fresh\[data-fresh="STALE"\] \{[^}]*st-degraded/.test(WALL_CSS));
   assert.ok(/\.rep-fresh\[data-fresh="OUTDATED"\] \{[^}]*st-critical/.test(WALL_CSS));
@@ -232,16 +235,30 @@ test('freshness: CURRENT this cycle, STALE one cycle on, OUTDATED after two, NOT
 
 test('a sector COM has not reported says AWAITING REPORT once, and the panel counts the six', () => {
   const game = running();
-  assert.deepEqual(B.reportLine(wallRows(game).WTR), { none: true, text: 'NO REPORT', values: [] });
+  assert.deepEqual(B.reportLine(wallRows(game).WTR), { none: true, text: 'NO REPORT', compact: 'NO REPORT', values: [] });
   // The card prints one phrase in place of the numbers; the old pair of
   // NO REPORT + NOT UPDATED on every card is gone.
   assert.equal(B.AWAITING_REPORT, 'AWAITING REPORT');
-  assert.ok(/class="k">FIELD REPORT</.test(WALL_SCRIPT) && /rep-none">AWAITING</.test(WALL_SCRIPT), 'the card never says it is waiting for a report');
+  // The standalone FIELD REPORT label went with the v15 card (2026-09-24):
+  // the two lines under the bar ARE the field report — what COMM claimed the
+  // condition is, and the figures it filed with the round it filed them in —
+  // and a 200px card needed the width more than it needed the caption.
+  assert.ok(/rep-none">AWAITING REPORT</.test(WALL_SCRIPT), 'the card never says it is waiting for a report');
+  assert.ok(!/>FIELD REPORT</.test(WALL_SCRIPT), 'the card still carries the label');
   assert.ok(!/NOT UPDATED/.test(WALL_SCRIPT), 'the card still repeats NOT UPDATED');
-  // The per-resource counts are off the card: 11px of data nobody reads from
-  // ten metres. reportLine still decides reported-or-not, and the freshness
-  // marker is hidden until there is something to be fresh about.
-  assert.ok(!/rep-vals/.test(WALL_SCRIPT), 'the card still prints the resource counts');
+  /*
+    The per-resource counts came BACK to the card on 2026-09-24, reversing the
+    v15 decision to keep them off it. They were 11px of unreadable data when
+    they sat under a dial that owned the middle of the card; with the dial
+    gone and the row given the card's full width, a projector can read them —
+    and a room that can see a sector at 8% beside COMM reporting four healthy
+    figures for it learns the thing the exercise is for. They are a snapshot
+    with the round it was filed in, never stock: test/sector-status-card.test.js
+    holds that line. reportLine still decides reported-or-not, and the
+    freshness marker is hidden until there is something to be fresh about.
+  */
+  assert.ok(/class="res-vals"/.test(WALL_SCRIPT), 'the card does not print the reported counts');
+  assert.ok(/class="res-tag"/.test(WALL_SCRIPT), 'the counts carry no round tag');
   assert.ok(/\.shc\[data-report="none"\] \.rep-fresh \{ display: none; \}/.test(WALL_CSS), 'a waiting card shows a freshness marker');
   // the summary the panel head carries instead
   assert.deepEqual(B.reportSummary(wallRows(game)), { reported: 0, total: 6, text: 'REPORTS 0/6' });

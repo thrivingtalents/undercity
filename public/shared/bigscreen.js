@@ -15,6 +15,7 @@
   else root.UndercityBigscreen = factory();
 })(typeof window !== 'undefined' ? window : globalThis, function factory() {
   const RES_ORDER = ['power', 'water', 'med', 'parts'];           // POWER · WATER · MEDICAL · PARTS
+  const CARD_RES_ORDER = ['power', 'water', 'parts', 'med'];      // the Big Screen card's order
   const GLYPH = { power: '⚡', water: '💧', med: '⚕', parts: '🔧' };
   const RES_NAME = { power: 'POWER', water: 'WATER', med: 'MEDICAL', parts: 'PARTS' };
   const STATES = ['stable', 'degraded', 'critical', 'dark', 'brownout'];
@@ -79,11 +80,19 @@
     return { reported: count, total: order.length, text: `REPORTS ${count}/${order.length}` };
   }
 
-  /** The freshness of a report in the width a card has: C2, or C2 · STALE. */
+  /**
+   * The freshness of a report in the width a card has — the word alone.
+   *
+   * The card now carries the report's own round beside the numbers (R1), so a
+   * second stamp counted in cycles would be two different answers to "when".
+   * What is left here is the one thing the tag cannot say: whether the room
+   * has moved on since. A current report says nothing, because a report that
+   * is current needs no mark.
+   */
   function freshnessShort(row) {
     const f = freshnessLine(row);
-    if (f.level === 'NOT UPDATED') return { level: f.level, text: '' };
-    return { level: f.level, text: f.level === 'CURRENT' ? `C${row.round_number}` : `C${row.round_number} · ${f.level}` };
+    if (f.level === 'NOT UPDATED' || f.level === 'CURRENT') return { level: f.level, text: '' };
+    return { level: f.level, text: f.level };
   }
 
   /**
@@ -125,13 +134,43 @@
     return { level, text: `UPDATED CYCLE ${row.round_number} · ${level}` };
   }
 
-  /** What COM reported, in POWER · WATER · MEDICAL · PARTS order — or NO REPORT, alone. */
-  function reportLine(row) {
-    if (!reported(row)) return { none: true, text: 'NO REPORT', values: [] };
-    const values = RES_ORDER.map((key) => ({
+  /**
+   * The ROUND a report was filed in, as the card's tag: R0 … R4.
+   *
+   * It comes off the row's own stamp, so it holds still while the game moves
+   * on — a POW report filed in Round 1 still reads R1 in Round 2, and only a
+   * newer POW report changes it. A row COM never reported has no tag, and a
+   * row from a run saved before the stamp existed has none either.
+   */
+  function reportTag(row) {
+    if (!reported(row)) return { show: false, text: '' };
+    const n = row.report_round_number;
+    if (n === null || n === undefined) return { show: false, text: '' };
+    return { show: true, round: Number(n), text: `R${Number(n)}` };
+  }
+
+  /** The bar's fill, 0-100. An unknown health draws an empty track, never a full one. */
+  function healthPercent(s) {
+    const v = healthValue(s);
+    return v === '—' ? 0 : Number(v);
+  }
+
+  /**
+   * What COM reported, in the given order — or NO REPORT, alone.
+   *
+   * Two spacings, because the two places this is read are different widths.
+   * `text` is the airy one a console or a facilitator's screen can afford;
+   * `compact` is the one that fits a Big Screen card, which is a sixth of a
+   * panel and has to hold four glyphs, four figures and a round tag on one
+   * line at a size a projector can carry to the back of a room.
+   */
+  function reportLine(row, order = RES_ORDER) {
+    if (!reported(row)) return { none: true, text: 'NO REPORT', compact: 'NO REPORT', values: [] };
+    const values = order.map((key) => ({
       key, glyph: GLYPH[key], value: row[key] === null || row[key] === undefined ? '—' : String(row[key]),
     }));
-    return { none: false, text: values.map((v) => `${v.glyph} ${v.value}`).join('   '), values };
+    const pairs = values.map((v) => `${v.glyph} ${v.value}`);
+    return { none: false, text: pairs.join('   '), compact: pairs.join(' '), values };
   }
 
   /** One clear FROM → TO route. Transport approves every transfer; it is not a hop. */
@@ -206,9 +245,9 @@
   }
 
   return {
-    RES_ORDER, GLYPH, RES_NAME, STATES, STATE_WORD, SECTOR_ORDER, CORE_INSUFFICIENT, ANNOUNCEMENT_MAX_AGE_S, MAX_ALERTS,
+    RES_ORDER, CARD_RES_ORDER, GLYPH, RES_NAME, STATES, STATE_WORD, SECTOR_ORDER, CORE_INSUFFICIENT, ANNOUNCEMENT_MAX_AGE_S, MAX_ALERTS,
     SECTOR_COLOUR, STATUS_COLOUR, CARD_WORD, CORE_WORD, AWAITING_REPORT,
-    clamp, healthState, healthWord, reported, freshnessLine, freshnessShort, reportLine, reportSummary,
-    healthValue, coreBand, coreStatus, transferAlert, buildAlerts,
+    clamp, healthState, healthWord, reported, freshnessLine, freshnessShort, reportLine, reportSummary, reportTag,
+    healthValue, healthPercent, coreBand, coreStatus, transferAlert, buildAlerts,
   };
 });

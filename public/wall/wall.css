@@ -469,7 +469,7 @@
 
 .shc {
   position: relative;
-  display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto auto; justify-items: center;
+  display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto auto auto; justify-items: center;
   row-gap: 0.3vh; min-height: 0; overflow: hidden; text-align: center;
   padding: 1.3vh 0.7vw 1.1vh;
   /* L3: a lighter pane floating on the panel. Almost no outline — a stable
@@ -481,8 +481,8 @@
   box-shadow: var(--glass-lift), var(--glass-inner);
   transition: border-color var(--t-normal) var(--ease-ui), box-shadow var(--t-normal) var(--ease-ui), background var(--t-normal) var(--ease-ui);
   --accent: #8D98A1;
-  --arc: var(--st-stable);
-  --arc-glow: rgba(88, 214, 161, 0.18);
+  --bar: var(--st-stable);
+  --bar-glow: rgba(88, 214, 161, 0.18);
 }
 /* a hairline of the sector's own light along the top edge — identity, quietly */
 .shc::before {
@@ -508,45 +508,78 @@
 .shc-cap:empty { display: none; }
 .shc-name { max-width: 100%; font-size: clamp(9px, 1.2vh, 13px); letter-spacing: 0.1em; color: var(--screen-ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* condition */
-/* Sized from the ROW, not the column: a squeezed row must shrink the dial, or
-   a circle sized by card width paints over the lines above and below it. */
-.shc-gauge { position: relative; display: grid; place-items: center; height: 100%; min-height: 0; aspect-ratio: 1; max-height: 11vh; justify-self: center; margin: 0.35vh 0; }
-.ring { width: 100%; height: 100%; transform: rotate(-90deg); }
-.ring-track { fill: none; stroke: rgba(255, 255, 255, 0.07); stroke-width: 4; }
-.ring-arc {
-  fill: none; stroke: var(--arc); stroke-width: 4; stroke-linecap: butt; stroke-opacity: 0.85;
-  /* the glow is named per state, never currentColor — currentColor here is the
-     card's ink, which would light every dial white */
-  filter: drop-shadow(0 0 10px var(--arc-glow));
-  transition: stroke-dasharray var(--t-slow) var(--ease-ui), stroke var(--t-normal) var(--ease-ui);
+/* The figure and its bar, stacked and centred, taking the flexible middle row
+   of the card. Nothing here is sized from a circle any more, so a squeezed row
+   costs the bar a few pixels of height instead of shrinking the number. */
+.shc-health {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 100%; min-height: 0; gap: 0.75vh; line-height: 1;
 }
-.shc-health { position: absolute; display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.shc-bar {
+  width: 78%; height: clamp(7px, 1.15vh, 14px); border-radius: 999px; overflow: hidden;
+  background: rgba(255, 255, 255, 0.07); border: 1px solid var(--glass-edge-soft);
+}
+.shc-bar-fill {
+  display: block; height: 100%; width: 0; border-radius: 999px;
+  background: var(--bar);
+  /* the glow is named per state, never currentColor — currentColor here is the
+     card's ink, which would light every bar white */
+  box-shadow: 0 0 10px var(--bar-glow);
+  transition: width var(--t-slow) var(--ease-ui), background var(--t-normal) var(--ease-ui);
+}
 .shc-status { display: flex; align-items: center; justify-content: center; gap: 0.4vw; }
 .shc-dot { width: 1.1vh; height: 1.1vh; border-radius: 50%; background: var(--st-stable); flex-shrink: 0; }
 .shc-word { font-size: clamp(11px, 1.55vh, 17px); letter-spacing: 0.08em; font-weight: 700; color: var(--st-stable); white-space: nowrap; }
 .shc-num { font-variant-numeric: tabular-nums; line-height: 1; }
 .shc-pct { font-size: clamp(26px, 3.7vh, 42px); font-weight: 700; color: var(--screen-ink); line-height: 0.95; letter-spacing: -0.015em; }
 .shc-num small { font-size: clamp(11px, 1.45vh, 16px); color: var(--screen-ink-faint); margin-left: 2px; font-weight: 400; }
-.shc-health .k { margin-top: 0.3vh; font-size: clamp(6px, 0.82vh, 9px); letter-spacing: 0.12em; font-weight: 500; opacity: 0.62; }
 
-/* what COM reported, and how fresh it is — or, once, that it has not reported */
+/* What COM CLAIMED the condition is, and whether the claim has gone stale.
+   Both parts hide when empty, so a card with neither collapses to nothing
+   rather than holding an empty line open. */
 .shc-rep {
   width: 100%; display: flex; align-items: baseline; justify-content: center; gap: 0.4vw; min-width: 0;
-  margin-top: 0.2vh; padding-top: 0.6vh; border-top: 1px solid var(--hairline);
 }
-/* One small line: has the field reported, and how fresh it is. The counts
-   themselves were 11px of data nobody can read from ten metres. */
+/* One small line: has the field reported, what it said, and whether it has
+   gone stale since. The round it was said in rides with the numbers below. */
 .rep-fresh { font-size: clamp(11px, 1.3vh, 14px); letter-spacing: 0.06em; font-weight: 600; color: var(--screen-ink-faint); white-space: nowrap; }
+.rep-fresh:empty { display: none; }
 .rep-fresh[data-fresh="STALE"] { color: var(--st-degraded); }
 .rep-fresh[data-fresh="OUTDATED"] { color: var(--st-critical); }
 .rep-none { font-size: clamp(11px, 1.3vh, 14px); letter-spacing: 0.06em; color: var(--screen-ink-faint); font-weight: 500; opacity: 0.75; }
 .shc[data-report="yes"] .rep-none { display: none; }
 .shc[data-report="none"] .rep-fresh { display: none; }
 
+/* THE REPORTED SNAPSHOT. A round tag and four figures, held still: they are
+   what COMM last said, not what the sector currently has. Secondary to the
+   health figure on purpose — the bar above is live, this is hearsay.
+
+   It is the line the whole card has to fit: four emoji, four figures and a
+   tag across a sixth of a panel. Everything here is spent on that — the
+   glyphs carry the separation, so the letter-spacing goes to nothing and the
+   figures sit a single space from their glyph. */
+.shc-res {
+  width: 100%; display: flex; align-items: baseline; justify-content: center;
+  gap: 0.35vw; min-width: 0; white-space: nowrap;
+  margin-top: 0.2vh; padding-top: 0.6vh; border-top: 1px solid var(--hairline);
+}
+.res-tag {
+  font-size: clamp(10px, 1.2vh, 14px); letter-spacing: 0.06em; font-weight: 700;
+  color: var(--heading); font-variant-numeric: tabular-nums; flex-shrink: 0;
+  padding: 0 0.3vw; border: 1px solid var(--glass-edge-soft); border-radius: var(--r-ctl);
+}
+.res-tag:empty { display: none; }
+.res-vals {
+  font-size: clamp(11px, 1.4vh, 16px); letter-spacing: 0;
+  color: var(--screen-ink-dim); font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.res-vals:empty { display: none; }
+
 /* Condition lives on the dot, the word, the figure and the dial — never on the
    identity edge. A stable card stays plain glass; only trouble earns an edge. */
 .shc[data-state="degraded"], .shc[data-state="brownout"] {
-  --arc: var(--st-degraded); --arc-glow: rgba(233, 180, 94, 0.20);
+  --bar: var(--st-degraded); --bar-glow: rgba(233, 180, 94, 0.20);
   border-color: rgba(233, 180, 94, 0.28);
   box-shadow: var(--glass-lift), var(--glass-inner), 0 0 20px rgba(233, 180, 94, 0.07);
 }
@@ -555,7 +588,7 @@
 .shc[data-state="brownout"] .shc-word, .shc[data-state="brownout"] .shc-pct { color: var(--st-degraded); }
 
 .shc[data-state="critical"] {
-  --arc: var(--st-critical); --arc-glow: rgba(255, 107, 122, 0.24);
+  --bar: var(--st-critical); --bar-glow: rgba(255, 107, 122, 0.24);
   background: linear-gradient(180deg, rgba(48, 18, 26, 0.50), rgba(26, 26, 38, 0.44));
   border-color: rgba(255, 107, 122, 0.34);
   animation: cardAlarm 3.6s ease-in-out infinite;
@@ -563,7 +596,7 @@
 .shc[data-state="critical"] .shc-dot { background: var(--st-critical); animation: wallPulse 2.6s ease-in-out infinite; }
 .shc[data-state="critical"] .shc-word, .shc[data-state="critical"] .shc-pct { color: var(--st-critical); }
 
-.shc[data-state="dark"] { opacity: 0.55; --arc: var(--st-offline); --arc-glow: transparent; }
+.shc[data-state="dark"] { opacity: 0.55; --bar: var(--st-offline); --bar-glow: transparent; }
 .shc[data-state="dark"] .shc-dot { background: var(--st-offline); }
 .shc[data-state="dark"] .shc-word, .shc[data-state="dark"] .shc-pct { color: var(--st-offline); }
 
