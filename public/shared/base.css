@@ -278,6 +278,15 @@ input, select, textarea {
   transition: border-color var(--t-fast) var(--ease-ui), box-shadow var(--t-fast) var(--ease-ui);
 }
 input::placeholder, textarea::placeholder { color: var(--ui-text-muted); }
+
+/* A select hands its own colour to the list it opens, and Windows draws that
+   list on a white system menu: pale text on white, at the moment someone is
+   reading a number off it. The popup is the one place in this stylesheet that
+   is not ours to theme, so it is named outright. The closed field above keeps
+   the dark glass; only the open list is light. */
+select option { color: #111827; background-color: #ffffff; }
+select option:checked { color: #111827; background-color: #e5e7eb; }
+select option:disabled { color: #9ca3af; }
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--ui-border-highlight);
