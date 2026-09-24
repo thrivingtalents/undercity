@@ -367,21 +367,42 @@ button.wide { width: 100%; }
 .bc-ann { display: flex; flex-direction: column; gap: 2px; border-left: 3px solid var(--accent); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-2); background: rgba(139,92,246,0.08); margin-bottom: 6px; }
 .bc-ann b { font-size: 12px; letter-spacing: 0.04em; color: var(--accent-bright); }
 .bc-ann span { font-size: 11px; }
-.bc-ann em, .bc-upd { font-size: 9px; letter-spacing: 0.16em; color: var(--ink-faint); font-style: normal; }
+.bc-ann em { font-size: 9px; letter-spacing: 0.16em; color: var(--ink-faint); font-style: normal; }
 .bc-ann[data-fresh="OUTDATED"] { border-left-color: var(--red); }
-.bc-rows { display: flex; flex-direction: column; gap: 3px; }
-.bc-row { display: grid; grid-template-columns: 52px 1fr auto; gap: 4px 6px; align-items: center; background: var(--steel); border: 1px solid var(--line); padding: 3px 6px; font-size: 11px; }
-.bc-row .bc-code { letter-spacing: 0.1em; color: var(--ink-dim); white-space: nowrap; }
-.bc-cells { display: flex; gap: 6px; }
-.bc-cell { display: inline-flex; align-items: center; gap: 2px; }
-.bc-glyph { font-size: 11px; }
-.bc-cells input { width: 40px; padding: 2px 4px; font-size: 11px; }
-.bc-meta { grid-column: 1 / -1; display: flex; gap: 8px; }
-.bc-fresh { font-style: normal; font-weight: 700; font-size: 9px; letter-spacing: 0.16em; }
-.bc-fresh[data-fresh="CURRENT"] { color: var(--green); }
-.bc-fresh[data-fresh="STALE"] { color: var(--amber); }
-.bc-fresh[data-fresh="OUTDATED"], .bc-fresh[data-fresh="NOT UPDATED"] { color: var(--red); }
-.bc-save { padding: 2px 8px; font-size: 10px; }
+/*
+  THE CITY BOARD, as six cards two to a row. A single strip of inputs per
+  sector made COMM read along a line to find the one it wanted and count
+  across to find the resource; a card is a place, and the same four boxes in
+  the same two-by-two corner of every one of them are found without reading.
+  Every card is the same width and the same height, and PUBLISH is in the same
+  corner of all six, so the hand learns the board before the eye does.
+*/
+.bc-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.bc-card {
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--steel); border: 1px solid var(--line); padding: 7px 9px; font-size: 11px;
+}
+.bc-card .bc-code {
+  text-align: center; font-size: 12px; letter-spacing: 0.14em; font-weight: 700;
+  color: var(--ink-dim); white-space: nowrap;
+}
+/* a block, not a banner: the four boxes stay together under the nickname
+   however wide the console is, and all four are exactly one width */
+.bc-cells { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 10px; max-width: 240px; margin: 0 auto; width: 100%; }
+.bc-cell { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.bc-glyph { font-size: 12px; flex-shrink: 0; }
+.bc-cells input { width: 100%; min-width: 0; box-sizing: border-box; padding: 3px 5px; font-size: 12px; }
+.bc-cells input:focus { outline: 1px solid var(--accent-bright); outline-offset: 0; }
+/* pinned to the bottom, so the button sits in one place on every card */
+.bc-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* the round this card's report was filed in — never the round the room is in */
+.bc-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; font-variant-numeric: tabular-nums; color: var(--ink-faint); }
+.bc-tag[data-fresh="CURRENT"] { color: var(--green); }
+.bc-tag[data-fresh="STALE"] { color: var(--amber); }
+.bc-tag[data-fresh="OUTDATED"], .bc-tag[data-fresh="NOT UPDATED"] { color: var(--red); }
+.bc-save { padding: 3px 10px; font-size: 10px; }
+/* one column when there is no room for two; nothing else changes */
+@media (max-width: 720px) { .bc-rows { grid-template-columns: minmax(0, 1fr); } }
 .bc-editor { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
 .bc-editor input[type="text"] { width: 100%; box-sizing: border-box; font-size: 11px; padding: 4px 6px; }
 
@@ -660,6 +681,9 @@ body.is-dark .columns, body.is-dark .exchange { filter: grayscale(0.7); opacity:
 .bsp-title { font-size: 15px; letter-spacing: 0.16em; margin: 0; }
 .bsp-note { font-size: 10.5px; color: var(--ink-faint); letter-spacing: 0.02em; }
 .bsp-note em { font-style: normal; color: var(--ink-dim); }
+/* the round the room is in, and how many of the six have been published */
+.bsp-stamp { display: flex; gap: 10px; margin-left: auto; }
+.bsp-stamp em { font-style: normal; font-size: 11px; letter-spacing: 0.14em; font-weight: 700; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
 .bsp-panel { padding: 12px; }
 .bsp-panel .hint { font-size: 10.5px; color: var(--ink-faint); line-height: 1.5; margin: 0 0 8px; }
 .bsp-panel textarea {

@@ -1285,6 +1285,16 @@
   // Any other sector sees just a nudge that an announcement exists.
 
   const BOARD_KEYS = ['power', 'water', 'med', 'parts'];
+  /*
+    The board's CARDS, and only the cards. Two fixed things live here and
+    neither touches what is sent: the order the six cards are laid out in
+    (POW/WTR, MED/TRN, AGR/COM, two to a row), and the order the four inputs
+    are read in inside a card (power, water above parts, medical). The payload
+    is still built from BOARD_KEYS, so rearranging a card cannot change a
+    single value that reaches the server.
+  */
+  const BOARD_CARDS = ['POW', 'WTR', 'MED', 'TRN', 'AGR', 'COM'];
+  const BOARD_CELLS = ['power', 'water', 'parts', 'med'];
   let boardBuilt = false;
 
   function saveBoardRow(code) {
@@ -1310,6 +1320,12 @@
 
   function freshWord(f) { return f || 'NOT UPDATED'; }
 
+  /** The six cards in the order the Big Screen spec lays them out, plus any the scenario adds. */
+  function boardOrder(rows) {
+    const have = Object.keys(rows);
+    return BOARD_CARDS.filter((c) => have.includes(c)).concat(have.filter((c) => !BOARD_CARDS.includes(c)));
+  }
+
   function renderBroadcast() {
     const b = state.broadcast;
     const editable = !!(b && b.editable && b.rows);
@@ -1319,22 +1335,28 @@
     show($('deck-bigscreen'), editable);
     if (!editable) return;
 
-    setText($('bc-round'), `CURRENT CYCLE: ${b.round_number}`);
+    // The round the ROOM is in, which is the sector frame's own number and not
+    // the board's cycle stamp. The counter is the wall's rule verbatim: a
+    // sector counts as published once its row carries a cycle stamp.
+    setText($('bc-round'), state.round_number === undefined ? '—' : `R${state.round_number}`);
+    const codes = boardOrder(b.rows);
+    setText($('bc-reports'), `REPORTS ${codes.filter((c) => b.rows[c].round !== null).length}/${codes.length}`);
+
     const host = $('bc-rows');
-    const codes = Object.keys(b.rows);
     if (!boardBuilt || host.children.length !== codes.length) {
       boardBuilt = true;
       host.innerHTML = codes.map((code) => {
         const row = b.rows[code];
-        const cells = BOARD_KEYS.map((k) => `<label class="bc-cell"><span class="bc-glyph">${U.GLYPH[k]}</span><input type="number" min="0" step="1" id="bc-${code}-${k}" value="${row[k] ?? ''}" placeholder="—" aria-label="${code} ${k}"></label>`).join('');
-        // Four figures and nothing else. A sector's CONDITION is the system's
-        // to say, not COMM's: the wall reads it off the sector, and there is
-        // no control here that could put a different word on it.
-        return `<div class="bc-row" data-code="${code}">
+        // Two by two, so four figures read as four figures rather than a strip
+        // to scan. Nothing else is on the card: no health, no bar, no name.
+        const cells = BOARD_CELLS.map((k) => `<label class="bc-cell"><span class="bc-glyph">${U.GLYPH[k]}</span><input type="number" min="0" step="1" id="bc-${code}-${k}" value="${row[k] ?? ''}" placeholder="—" aria-label="${code} ${k}"></label>`).join('');
+        return `<div class="bc-card" data-code="${code}">
             <span class="bc-code">${U.SECTOR_GLYPH[code] || ''} ${code}</span>
             <span class="bc-cells">${cells}</span>
-            <button type="button" class="bc-save" data-save="${code}">SAVE</button>
-            <span class="bc-meta"><em class="bc-upd"></em> <i class="bc-fresh"></i></span>
+            <span class="bc-foot">
+              <b class="bc-tag">--</b>
+              <button type="button" class="bc-save" data-save="${code}">PUBLISH</button>
+            </span>
           </div>`;
       }).join('');
       for (const btn of host.querySelectorAll('[data-save]')) btn.addEventListener('click', () => saveBoardRow(btn.dataset.save));
@@ -1343,10 +1365,18 @@
       const row = b.rows[code];
       const el = host.querySelector(`[data-code="${code}"]`);
       if (!el) continue;
-      setText(el.querySelector('.bc-upd'), row.round_number === null ? 'NOT PUBLISHED' : `PUBLISHED CYCLE ${row.round_number}`);
-      const fresh = el.querySelector('.bc-fresh');
-      setText(fresh, freshWord(row.freshness));
-      fresh.dataset.fresh = row.freshness;
+      /*
+        The round this card's report was filed in — R1 — or -- when COMM has
+        never filed one. It is the row's own stamp, so it holds still while the
+        room moves on: a POW report filed in Round 1 reads R1 in Round 2 until
+        COMM publishes a newer one. How stale it has become is the tag's
+        colour, and its title for anyone who wants the word.
+      */
+      const tag = el.querySelector('.bc-tag');
+      const n = row.report_round_number;
+      setText(tag, n === null || n === undefined ? '--' : `R${n}`);
+      tag.dataset.fresh = row.freshness;
+      tag.title = freshWord(row.freshness);
     }
 
     // What the wall says right now — the compact preview.
