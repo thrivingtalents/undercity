@@ -38,7 +38,7 @@ function world(game) {
     requests: st.requests, transfers: st.transfers, healing: st.healing,
     council: st.council, continuity: st.continuity_order,
     round: st.round, phase: st.phase, cycle: st.cycle.number,
-    // MASTER TIME is deliberately absent: it moves with every tick whatever
+    // The round timer is deliberately absent: it moves with every tick whatever
     // COMM does, so the clock is asserted on its own terms below.
     effects: st.effects, agr: st.agr,
     alert: st.alert, blackout: st.blackout,
@@ -218,7 +218,7 @@ test('COMM-BS-005: focus emphasises one sector for eight seconds and changes not
   assert.equal(game.focusView(), null, 'focus outlived its eight seconds');
   assert.equal(world(game), before, 'expiry changed the simulation');
   // The clock ran, as it always does, and focus neither stopped nor moved it.
-  assert.equal(Math.round(clockBefore - game.state.round_clock.remaining_s), 9, 'focus touched MASTER TIME');
+  assert.equal(Math.round(clockBefore - game.state.round_clock.remaining_s), 9, 'focus touched the round timer');
   assert.equal(game.state.round_clock.running, true);
   assert.equal(logEvents(game, 'com_sector_focus_started').length, 2);
   assert.ok(logEvents(game, 'com_sector_focus_ended').length >= 1);

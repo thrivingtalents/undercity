@@ -49,6 +49,8 @@
 .hval { font-size: 18px; letter-spacing: 0.1em; line-height: 1.1; white-space: nowrap; }
 .hval.big { font-size: 28px; font-weight: 700; }
 .hval.huge { font-size: 34px; font-weight: 700; letter-spacing: 0.06em; }
+.hval.clock.expired { color: var(--red); animation: rtPulse 1s infinite; }
+@keyframes rtPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 .integrity-row { display: flex; align-items: center; gap: 10px; }
 .integrity-block .bar { width: 120px; height: 12px; }
 .round-block { flex: 1; }

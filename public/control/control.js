@@ -214,11 +214,12 @@
 
   // -- top bar ------------------------------------------------------------------
 
-  $('btn-start').addEventListener('click', () => send({ type: 'clock', which: 'round', action: state && state.round_clock.remaining_s > 0 && !state.round_clock.running && state.phase !== 'SETUP' ? 'resume' : 'start' }));
+  // START runs the round timer, or resumes it: the server treats both as one action and never runs two countdowns.
+  $('btn-start').addEventListener('click', () => send({ type: 'clock', which: 'round', action: 'start' }));
   $('btn-pause').addEventListener('click', togglePause);
   function togglePause() { send({ type: state && state.paused ? 'resume' : 'pause' }); }
 
-  // -- P0: MASTER TIME by the minute, right beside the clock --------------------
+  // -- P0: the round timer by the minute, right beside the clock ----------------
   // One click is one minute, applied at once and never below 00:00. The clock
   // keeps whatever it was doing — running stays running, paused stays paused —
   // and nothing else in the run moves. It still writes its own audit line, so
@@ -233,13 +234,13 @@
         type: 'admin_override',
         action: 'timer_adjust',
         payload: { delta_s: d },
-        reason: `MASTER TIME ${d > 0 ? '+' : '−'}1 MIN (top bar)`,
+        reason: `ROUND TIME ${d > 0 ? '+' : '−'}1 MIN (top bar)`,
         run_id: state.run_id,
       });
     });
   }
   $('btn-end-phase').addEventListener('click', () => {
-    if (!confirm('STOP MASTER TIME at 00:00? The phase stays where it is — NEXT PHASE moves it on.')) return;
+    if (!confirm('STOP the round timer at 00:00? The round stays where it is — NEXT ROUND moves it on.')) return;
     send({ type: 'clock', which: 'round', action: 'end' });
   });
   $('btn-end-sim').addEventListener('click', () => {
@@ -252,7 +253,7 @@
     if (!next) return;
     // Nothing in the city moves with the round: no upkeep pass, no allowance
     // reset, no expiry, no clock. Only which injects are armed changes.
-    if (!confirm(`GO TO ${roundLabel(next)}?\n\nNothing is reset: health, stock, workers, faults, transfers and upgrades all carry over, and MASTER TIME keeps running.`)) return;
+    if (!confirm(`GO TO ${roundLabel(next)}?\n\nNothing is reset: health, stock, workers, faults, transfers and upgrades all carry over. That round's timer loads at its full length and waits for START.`)) return;
     send({ type: 'next_phase' });
   });
 
@@ -315,27 +316,26 @@
   });
   $('urls-close').addEventListener('click', () => $('urls').classList.add('hidden'));
 
-  // -- MASTER TIME — the one shift clock, adjusted by hand; every change asks why ------
+  // -- ROUND TIME — this round's clock, adjusted by hand; every change asks why --------
   $('btn-timer').addEventListener('click', () => { $('timer-pop').classList.toggle('hidden'); if (state) renderClocks(); });
   $('timer-close').addEventListener('click', () => $('timer-pop').classList.add('hidden'));
   const mmssToSeconds = (raw) => { const m = /^(\d{1,3}):([0-5]\d)$/.exec(String(raw || '').trim()); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
   for (const b of document.querySelectorAll('[data-timer-delta]')) {
     b.addEventListener('click', () => {
-      const d = Number(b.dataset.timerDelta); const now = Math.ceil(state.round_clock.remaining_s); const after = Math.max(0, now + d);
-      askOverride({ title: 'ADJUST MASTER TIME', target: 'MASTER TIME', diff: [['REMAINING', U.mmss(now), U.mmss(after)]], action: 'timer_adjust', payload: { delta_s: d }, confirmLabel: 'APPLY TIMER CHANGE' });
+      const d = Number(b.dataset.timerDelta); const now = Math.ceil(U.countdown(state.round_clock, state.frozen)); const after = Math.max(0, now + d);
+      askOverride({ title: 'ADJUST ROUND TIME', target: 'ROUND TIME', diff: [['REMAINING', U.mmss(now), U.mmss(after)]], action: 'timer_adjust', payload: { delta_s: d }, confirmLabel: 'APPLY TIMER CHANGE' });
     });
   }
   $('timer-set').addEventListener('click', () => {
     const secs = mmssToSeconds($('timer-set-input').value);
     if (secs === null) { toast('Enter the time as MM:SS (seconds 00–59)'); return; }
-    askOverride({ title: 'SET MASTER TIME', target: 'MASTER TIME', diff: [['REMAINING', U.mmss(Math.ceil(state.round_clock.remaining_s)), U.mmss(secs)]], action: 'timer_set', payload: { seconds: secs }, confirmLabel: 'APPLY TIMER CHANGE' });
+    askOverride({ title: 'SET ROUND TIME', target: 'ROUND TIME', diff: [['REMAINING', U.mmss(Math.ceil(U.countdown(state.round_clock, state.frozen))), U.mmss(secs)]], action: 'timer_set', payload: { seconds: secs }, confirmLabel: 'APPLY TIMER CHANGE' });
   });
   $('timer-reset').addEventListener('click', () => {
-    askOverride({ title: 'RESET MASTER TIME TO THE SHIFT LENGTH', target: 'MASTER TIME', diff: [['REMAINING', U.mmss(Math.ceil(state.round_clock.remaining_s)), U.mmss(shiftLength())]], extra: '<div class="hint">Time only. The phase, the trays, health, faults, workers, allowances and AGR do not change.</div>', action: 'timer_reset', payload: {}, confirmLabel: 'RESET MASTER TIME' });
+    askOverride({ title: 'RESET ROUND TIME TO THE ROUND LENGTH', target: 'ROUND TIME', diff: [['REMAINING', U.mmss(Math.ceil(U.countdown(state.round_clock, state.frozen))), U.mmss(roundLength())]], extra: '<div class="hint">Time only, and the timer waits READY for START. The round, the trays, health, faults, workers, allowances and AGR do not change.</div>', action: 'timer_reset', payload: {}, confirmLabel: 'RESET ROUND TIME' });
   });
   $('timer-pause').addEventListener('click', () => {
-    const rc = state.round_clock;
-    send({ type: 'clock', which: 'round', action: rc.running ? 'pause' : (rc.started && rc.remaining_s > 0 ? 'resume' : 'start') });
+    send({ type: 'clock', which: 'round', action: state.round_clock.running ? 'pause' : 'start' });
   });
 
   // -- quick actions + picker -----------------------------------------------------
@@ -519,8 +519,8 @@
     $('btn-pause').textContent = state.paused ? 'RESUME' : 'PAUSE';
     $('btn-pause').classList.toggle('on', !!state.paused);
     const rc = state.round_clock;
-    $('btn-start').textContent = rc.running ? 'RUNNING' : rc.started && rc.remaining_s > 0 ? 'RESUME' : 'START';
-    $('btn-start').disabled = !!rc.running;
+    $('btn-start').textContent = rc.running ? 'RUNNING' : rc.status === 'paused' ? 'RESUME' : rc.status === 'expired' ? 'EXPIRED' : 'START';
+    $('btn-start').disabled = !!rc.running || rc.status === 'expired';
     $('btn-end-phase').disabled = !rc.running;
     const next = nextPhase();
     const prev = prevPhase();
@@ -1385,17 +1385,16 @@
     ['dark_at', 'Dark at health', 'n'],
     ['resolve_recovery', 'Health on resolve', 'n'], ['lockout_s', 'Console lockout (s)', 'n'],
     ['lockout_after_consecutive_invalid', 'Lockout after N wrong', 'n'], ['council_clock_s', 'Council clock (s)', 'n'],
-    ['CORE, MASTER TIME & THE OPERATING CYCLE'],
+    ['CORE, ROUND TIME & THE OPERATING CYCLE'],
     ['core_start_output', 'Core output at start (%) — applies on reset', 'n'],
-    ['round_length_s.R0', 'Round 0 length (s) — orientation, before MASTER TIME starts', 'n'], ['round_length_s.R1', 'Round 1 length (s)', 'n'],
+    ['round_length_s.R0', 'Round 0 length (s) — every round has its own timer', 'n'], ['round_length_s.R1', 'Round 1 length (s)', 'n'],
     ['round_length_s.R2', 'Round 2 length (s)', 'n'], ['round_length_s.R3', 'Round 3 length (s)', 'n'],
     ['round_length_s.R4', 'Round 4 length (s)', 'n'],
-    ['live_length_s', 'MASTER TIME override (s) — 0 = Rounds 1 to 4 added together', 'n'],
     ['ECONOMY'],
     ['auto_economy', 'Digital economy on (production, upkeep, stock moves)', 'b'],
     ['deduct_resources_on_resolve', 'Deduct resources on resolve', 'b'],
     ['resolve_requires_resources', 'Refuse resolve when short of stock', 'b'],
-    ['cycle_length_s', 'OPERATING CYCLE length (s) — production, upkeep, allowances', 'n'], ['cycle_autostart', 'The operating cycle runs with MASTER TIME', 'b'],
+    ['cycle_length_s', 'OPERATING CYCLE length (s) — production, upkeep, allowances', 'n'], ['cycle_autostart', 'The operating cycle runs with the round timer', 'b'],
     ['round_output_manual', 'POW / WTR generate output by button, once a cycle', 'b'],
     ['upkeep_shortfall_penalty', 'Penalty per missing upkeep unit', 'n'], ['upkeep_shortfall_penalty_cap', 'Penalty cap per upkeep pass', 'n'],
     ['core_scales_power_production', 'Core output scales POW output', 'b'],
@@ -1600,9 +1599,17 @@
     if (content) renderInjects();
   }
 
-  /** The configured length of the whole live shift — what RESET goes back to. */
-  function shiftLength() {
-    return Number((state && (state.live_length_s || state.round_length_s)) || 0);
+  /** The configured length of the current round — what RESET goes back to. */
+  function roundLength() {
+    return Number((state && state.round_length_s) || 0);
+  }
+  /** The round timer's status, as the facilitator should read it. */
+  function timerStatus() {
+    if (!state) return '—';
+    if (state.mode === 'ENDED') return 'SIMULATION ENDED';
+    if (state.paused) return 'SESSION PAUSED — clock frozen, editable';
+    const s = state.round_clock.status || (state.round_clock.running ? 'running' : 'ready');
+    return s === 'ready' ? 'READY — press START' : s === 'running' ? 'RUNNING' : s === 'paused' ? 'PAUSED' : 'EXPIRED — 00:00';
   }
 
   function renderClocks() {
@@ -1613,26 +1620,20 @@
     // 00:00 is the floor, so the minute off goes quiet when there is none left.
     $('clock-minus').disabled = Math.ceil(rc) <= 0;
     // 00:00 stops the clock and moves nothing; NEXT PHASE ends the round (and charges its upkeep).
-    $('clock-note').textContent = state.mode === 'ENDED' ? '— SIMULATION ENDED' : state.paused ? '— PAUSED' : state.round_clock.running ? '— running' : state.round_clock.started ? '— STOPPED' : '— not started';
+    $('clock-note').textContent = `— ${timerStatus()}`;
+    $('master-clock').classList.toggle('expired', state.round_clock.status === 'expired' && state.mode !== 'ENDED');
     // v18: the timer popover reads the same clock
     $('timer-remaining').textContent = U.mmss(rc);
-    $('timer-status').textContent = state.paused ? 'SESSION PAUSED — clock frozen, editable' : state.round_clock.running ? 'RUNNING' : state.round_clock.started ? (rc > 0 ? 'STOPPED' : 'AT 00:00') : 'NOT STARTED';
-    $('timer-default').textContent = U.mmss(shiftLength());
-    $('timer-pause').textContent = state.round_clock.running ? 'PAUSE TIMER' : (state.round_clock.started && rc > 0 ? 'RESUME TIMER' : 'START TIMER');
-    // The round's own time, beside the round number. Advisory: 00:00 moves
-    // nothing, NEXT ROUND does. Round 0 waits for MASTER TIME to start.
-    const note = $('round-note');
-    if (note) {
-      const rr = state.round_remaining_s == null ? null : U.countdown({ running: !state.frozen, remaining_s: state.round_remaining_s }, state.frozen);
-      if (rr == null || state.mode === 'ENDED') note.textContent = '';
-      else if (rr <= 0) note.textContent = '— TIME UP · NEXT ROUND when ready';
-      else note.textContent = `— ${U.mmss(rr)} of ${U.mmss(state.round_length_s || 0)} left`;
-      note.classList.toggle('low', rr != null && rr <= 60 && !state.frozen && state.mode !== 'ENDED');
-    }
+    $('timer-status').textContent = timerStatus();
+    $('timer-default').textContent = U.mmss(roundLength());
+    $('timer-pause').textContent = state.round_clock.running ? 'PAUSE TIMER' : state.round_clock.status === 'paused' ? 'RESUME TIMER' : 'START TIMER';
     const cc = U.countdown(state.council_clock, state.frozen);
     const big = $('council-big');
     if (big) { big.textContent = U.mmss(cc); big.classList.toggle('low', cc <= 30 && state.council.active); }
-    $('tl-elapsed').textContent = `${U.mmss(Math.max(0, shiftLength() - rc))} elapsed`;
+    // The reset button names the configured sitting, whatever SETTINGS says it is.
+    const cr = $('council-reset');
+    if (cr && state.config) cr.textContent = `RESET ${U.mmss(Number(state.config.council_clock_s) || 0)}`;
+    $('tl-elapsed').textContent = `${U.mmss(Math.max(0, roundLength() - rc))} into the round`;
     for (const el of document.querySelectorAll('[data-cd-effect]')) {
       const e = (state.effects || []).find((x) => x.id === el.dataset.cdEffect);
       if (e && e.remaining_s != null) el.textContent = U.mmss(U.countdown({ running: true, remaining_s: e.remaining_s }, state.frozen));

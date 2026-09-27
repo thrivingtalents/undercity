@@ -791,6 +791,9 @@ function handleMessage(client, msg) {
   const entry = registry.live.get(client.session);
   if (!entry) return send(client.ws, { type: 'error', reason: 'session_gone' });
   entry.lastTouch = Date.now();
+  // The round timer is measured from real time: bring the engine's clock up to
+  // this instant before the intent runs, so a PAUSE or SET lands on the exact second.
+  if (typeof entry.game.syncNow === 'function') entry.game.syncNow(entry.lastTouch);
 
   if (client.role === 'sector') return handleSector(client, entry, msg);
   if (client.role !== 'control') return send(client.ws, { type: 'error', reason: 'forbidden' });
@@ -1433,7 +1436,7 @@ setInterval(() => {
   lastTick = now;
   for (const entry of registry.entries()) {
     const game = entry.game;
-    try { game.tick(elapsed); } catch (err) { console.error('[tick] failed:', err); }
+    try { game.tick(elapsed, now); } catch (err) { console.error('[tick] failed:', err); }
     const heartbeat = Number(game.cfg.broadcast_ms || 10000);
     if (game.changed !== entry.lastChanged || now - (entry.lastBroadcast || 0) >= heartbeat) {
       broadcast(entry);

@@ -216,7 +216,7 @@ Business-card size. Roles per sector: **Sector Chief** (accountable voice), **Li
   "round_clock": { "running": true, "remaining_s": 1140 },
   "core_integrity": 74,
   "mode": "PLAY",                 // PLAY | COUNCIL | BRIEFING | PAUSED | DEBRIEF
-  "council_clock": { "running": false, "remaining_s": 300 },
+  "council_clock": { "running": false, "remaining_s": 180 },
   "sectors": {
     "POW": {
       "integrity": 61,
@@ -323,7 +323,7 @@ Header: run ID, mode, RESET RUN (double-confirm), snapshot-now, export log.
 | R4 Aftershock | 8 min | 6 novel-combination faults (1/sector) + 1 mini-triage | Same systems, fresh crisis | **Post-measurement** — the delta is the product |
 | Debrief 2 | 45 min | — | — | Deltas on big screen; back-at-work transfer plan |
 
-Total: 70 min play (20 min orientation, then a 50 min shift — Rounds 1 to 4 added together is MASTER TIME) + 105 min debrief. Every length is a scenario value the admin can change in SETTINGS; the admin bar counts each round's own time down beside the round number (2026-09-28).
+Total: 70 min play (20 min orientation, then four timed rounds, 50 min) + 105 min debrief. Every length is a scenario value the admin can change in SETTINGS. Each round runs on its own ROUND TIMER (2026-09-28, `undercity_round_timer_spec` v1.0): a round change loads the full length in READY, the admin presses START, and the clock stops at 00:00.
 
 ---
 

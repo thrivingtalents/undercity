@@ -1,5 +1,5 @@
 {
-  "note": "Derived from undercity-spec.md §8 (Round Configuration), converted to CONTINUOUS GAMEFLOW (2026-09-21) and then to the SIMPLIFIED ROUND DISPLAY (2026-09-21): the visible flow is Round 0 → Round 4 and nothing else. One phase per round, so what the engine tracks and what a screen shows are the same thing and no internal pacing name can leak onto a projector. The descriptive names those rounds used to carry — Stable Ops, Interdependence, Core Failure, Aftershock — live in the facilitator's runbook, on paper, and nowhere in this file. A round still carries its own inject timeline and fault pool (timelines[] in the scenario), and still resets NOTHING when it changes: production, upkeep and every allowance ride the OPERATING CYCLE (defaults.cycle_length_s), and MASTER TIME is one countdown for the whole live shift — the Round 1 to Round 4 lengths added together, unless defaults.live_length_s overrides it. Each round's length_s is the round's own time: the Admin bar counts it down beside the round number and says once when it is up, and NEXT ROUND stays the facilitator's call. Balance numbers live in config/scenarios/*.json, which override these defaults.",
+  "note": "Derived from undercity-spec.md §8 (Round Configuration), converted to CONTINUOUS GAMEFLOW (2026-09-21) and then to the SIMPLIFIED ROUND DISPLAY (2026-09-21): the visible flow is Round 0 → Round 4 and nothing else. One phase per round, so what the engine tracks and what a screen shows are the same thing and no internal pacing name can leak onto a projector. The descriptive names those rounds used to carry — Stable Ops, Interdependence, Core Failure, Aftershock — live in the facilitator's runbook, on paper, and nowhere in this file. A round still carries its own inject timeline and fault pool (timelines[] in the scenario), and still resets NOTHING when it changes: production, upkeep and every allowance ride the OPERATING CYCLE (defaults.cycle_length_s), and each round's length_s is its ROUND TIMER (2026-09-28): a round change loads it at its full length in READY, START runs it, it stops at 00:00 and never carries time into the next round. NEXT ROUND stays the facilitator's call. Balance numbers live in config/scenarios/*.json, which override these defaults.",
   "defaults": {
     "upkeep_interval_s": 600,
     "resolve_recovery": 5,
@@ -7,9 +7,9 @@
     "lockout_after_consecutive_invalid": 3,
     "critical_below": 30,
     "brownout_decay_per_min": 0.5,
-    "council_clock_s": 300,
+    "council_clock_s": 180,
     "delay_window_s": 60,
-    "tick_ms": 10000,
+    "tick_ms": 1000,
     "snapshot_ms": 10000,
     "card_shows_dependency": false,
     "cycle_length_s": 600,

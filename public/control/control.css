@@ -58,6 +58,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: none;
 .tb-phase .label em.low { color: var(--red); }
 .tb-clock b { font-size: 30px; letter-spacing: 0.04em; color: var(--ink); }
 .tb-clock b.low { color: var(--red); }
+.tb-clock b.expired { color: var(--red); animation: pulse 1s infinite; }
 /* P0: [−] 15:00 [+] — the minute steps sit on the clock's own line, quiet
    until the pointer is on them, and never push the digits around. */
 .clock-row { display: flex; align-items: center; gap: 8px; }

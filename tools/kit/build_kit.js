@@ -164,7 +164,7 @@ const charter = [
   h2("Clause 2 — Convening"),
   p(t("The Council convenes when the Continuity Authority calls it. Attendance is not optional. A sector that fails to send its Chief forfeits its voice for that sitting.")),
   h2("Clause 3 — Sitting duration"),
-  p(t("A sitting lasts five minutes. It does not run over. Matters unresolved at the close of a sitting stand unresolved.")),
+  p(t("A sitting lasts three minutes. It does not run over. Matters unresolved at the close of a sitting stand unresolved.")),
   h2("Clause 4 — Binding effect"),
   p(t("Decisions of the Council bind every sector, including sectors that opposed them and sectors that abstained. There is no appeal.")),
   h2("Clause 5 — Transfers"),

@@ -140,6 +140,7 @@
 .hud-time.warn b { color: var(--st-degraded); }
 .hud-time.danger b { color: var(--st-critical); }
 .hud-time.final b { color: var(--st-critical); animation: wallPulse 1.2s ease-in-out infinite; }
+.hud-time.expired b { color: var(--st-critical); animation: wallPulse 1.2s ease-in-out infinite; }
 .hud-time.council .k, .hud-time.council b { color: var(--purple); }
 
 .hud-tags { display: flex; gap: 0.6vw; }

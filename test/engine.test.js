@@ -69,12 +69,12 @@ test('CT-001/CT-002/CT-004: an internal phase change interrupts nothing and rese
   };
   game.tick(1000);
   before.integrity = pow.integrity;      // an open fault bleeds; that is gameplay, not a reset
-  for (const id of ['ROUND_3', 'ROUND_4']) {
+  for (const [id, len] of [['ROUND_3', 720], ['ROUND_4', 480]]) {
     assert.equal(game.setPhase(id), true);
-    assert.equal(game.state.round_clock.running, before.running, `${id}: MASTER TIME keeps running`);
     assert.equal(game.frozen, false, `${id}: nothing is frozen`);
+    // the one thing a round change does reset: its own timer, loaded fresh and waiting for START
+    assert.deepEqual([game.state.round_clock.status, game.state.round_clock.remaining_s, game.state.round_clock.running], ['ready', len, false], `${id}: the round timer did not load fresh`);
   }
-  assert.ok(game.state.round_clock.remaining_s <= before.time - 1, 'the clock kept counting across every phase');
   assert.equal(game.state.cycle.number, before.cycle, 'no phase charged an upkeep pass');
   assert.ok(pow.integrity <= before.integrity && pow.integrity < 100, 'health is not restored');
   assert.equal(pow.inventory.parts, before.parts, 'stock is not refilled');
@@ -82,14 +82,14 @@ test('CT-001/CT-002/CT-004: an internal phase change interrupts nothing and rese
   assert.equal(pow.faults.filter((f) => !f.resolved).length, before.faults, 'the fault stays open');
 });
 
-test('START runs MASTER TIME and the operating cycle together; frozen states stop both', () => {
+test('START runs the round timer and the operating cycle together; frozen states stop both', () => {
   const game = newGame();
   game.setPhase('ROUND_1');
   game.clock('start');
   assert.equal(game.state.mode, 'PLAY');
-  assert.equal(game.state.cycle.running, true, 'the operating cycle runs with MASTER TIME');
+  assert.equal(game.state.cycle.running, true, 'the operating cycle runs with the round timer');
   assert.equal(game.state.round_clock.started, true);
-  assert.equal(game.state.round_clock.remaining_s, game.liveLength(), 'MASTER TIME is the whole shift');
+  assert.equal(game.state.round_clock.remaining_s, 900, 'Round 1 runs on its own 15:00');
   const before = { round: game.state.round_clock.remaining_s, cycle: game.state.cycle.remaining_s };
   game.tick(5000);
   assert.equal(game.state.round_clock.remaining_s, before.round - 5);
@@ -114,7 +114,7 @@ test('pause freezes decay and the council clock but not the lockout', () => {
   const integrity = game.state.sectors.POW.integrity;
   game.tick(25000);
   assert.equal(game.state.sectors.POW.integrity, integrity);
-  assert.equal(game.state.council_clock.remaining_s, 300);
+  assert.equal(game.state.council_clock.remaining_s, 180);
   assert.equal(fault.locked_until_s, 0, 'a locked console still unlocks while paused');
   const frame = forSector(game, 'POW');
   assert.equal(frame.paused, true);
@@ -380,7 +380,7 @@ test('the upkeep pass: generated output, upkeep, shortage penalty, recovery, sum
   assert.equal(ev[0].summary.cycle, 1);
 });
 
-test('CT-005/CT-006: the operating cycle runs with MASTER TIME and the emergency pause freezes it', () => {
+test('CT-005/CT-006: the operating cycle runs with the round timer and the emergency pause freezes it', () => {
   const game = running();
   assert.equal(game.state.cycle.running, true, 'the cycle runs as soon as live play starts');
   game.state.cycle.remaining_s = 2;
@@ -1589,7 +1589,7 @@ test('POW, WTR, MED, TRN and AGR are not sent the six-sector board; COM and the 
   assert.equal(forControl(game).broadcast.editable, true, 'the facilitator keeps the override editor');
 });
 
-test('no sector screen is told the round or the phase; it gets MASTER TIME and the cycle', () => {
+test('no sector screen is told the phase; it gets the round number, the round timer and the cycle', () => {
   const game = running();
   for (const code of BOARD_ROLES) {
     const f = forSector(game, code);
@@ -1680,7 +1680,7 @@ test("the sector markup has no city table, no legend, an announcement nudge, and
 const KIT_JS = fs.readFileSync(path.join(__dirname, '..', 'tools', 'kit', 'build_kit.js'), 'utf8');
 const BINDER_JS = fs.readFileSync(path.join(__dirname, '..', 'tools', 'kit', 'build_binders.js'), 'utf8');
 
-test('the sector screen: the round as a number, the cycle and MASTER TIME as clocks', () => {
+test('the sector screen: the round as a number, the cycle and ROUND TIME as clocks', () => {
   // What the room reads: comments and element ids are not on the screen.
   const visible = SECTOR_INDEX.replace(/<!--[\s\S]*?-->/g, '').replace(/\s(?:id|class)="[^"]*"/g, '');
   assert.ok(/Current round/.test(visible), 'the header lost the round');
@@ -1688,7 +1688,7 @@ test('the sector screen: the round as a number, the cycle and MASTER TIME as clo
   for (const bad of ['NEXT ROUND UPKEEP', 'THIS ROUND', 'ROUND OUTPUT', '/ ROUND']) {
     assert.ok(!SECTOR_SCRIPT.includes(bad), `sector.js still carries ${bad}`);
   }
-  for (const good of ['Next operating cycle', 'Master time', 'NEXT CYCLE UPKEEP', 'CYCLE OUTPUT', 'HEALING THIS CYCLE',
+  for (const good of ['Next operating cycle', 'Round time', 'NEXT CYCLE UPKEEP', 'CYCLE OUTPUT', 'HEALING THIS CYCLE',
     'TRANSFER APPROVALS', 'INTERVENTIONS THIS CYCLE', 'CITY BIG SCREEN CONTROL', 'OUTPUT ALREADY GENERATED THIS CYCLE']) {
     assert.ok(SECTOR_INDEX.includes(good), `index.html lacks ${good}`);
   }
@@ -1710,7 +1710,7 @@ test("the charter's history keeps its Cycles; the scenario phases keep their nam
   assert.equal(game.roundConfig('R2').name, 'Interdependence');
 });
 
-test('MED sees MASTER TIME and the time to the next operating cycle, and no production line', () => {
+test('MED sees the round timer and the time to the next operating cycle, and no production line', () => {
   const game = running();
   const f = forSector(game, 'MED');
   assert.equal(f.round, undefined);
@@ -3134,10 +3134,10 @@ test('v18 resource control: a reason is required, the audit line carries before/
   assert.ok(Array.isArray(forControl(game).active_sectors), 'the console cannot tell which sectors are inactive');
 });
 
-test('CT-007/CT-008: add and take minutes, set MM:SS, never below 00:00; reset restores the shift length and touches nothing else', () => {
+test('CT-007/CT-008: add and take minutes, set MM:SS, never below 00:00; reset restores the round length, READY, and touches nothing else', () => {
   const game = running();
   const clk = game.state.round_clock;
-  const len = game.liveLength();
+  const len = clk.duration_s;   // Round 2's own 15:00
   assert.equal(clk.remaining_s, len);
   assert.equal(game.clock('add', 60, 'round', { reason: 'running long' }).ok, true);
   assert.equal(clk.remaining_s, len + 60);
@@ -3161,7 +3161,7 @@ test('CT-007/CT-008: add and take minutes, set MM:SS, never below 00:00; reset r
   game.setIntegrity('AGR', 61);
   const world = everythingBut(game, 'round_clock', 'ticker', 'feed', 'updated_at', 'game_clock_s');
   const res = game.clock('reset', null, 'round', { reason: 'fresh round' });
-  assert.equal(res.ok, true); assert.equal(clk.remaining_s, len); assert.equal(clk.running, true, 'reset stopped a running clock');
+  assert.equal(res.ok, true); assert.equal(clk.remaining_s, len); assert.deepEqual([clk.status, clk.running], ['ready', false], 'reset must leave the timer READY for START');
   assert.deepEqual(everythingBut(game, 'round_clock', 'ticker', 'feed', 'updated_at', 'game_clock_s'), world, 'reset touched more than the time');
   assert.equal(game.state.round, 'R2'); assert.equal(game.state.phase, 'ROUND_2'); assert.equal(game.stampsUsed(), 1); assert.equal(game.state.sectors.AGR.integrity, 61);
   const rs = logEvents(game, 'admin_timer_reset').pop();
@@ -3176,13 +3176,13 @@ test('CT-007/CT-008: add and take minutes, set MM:SS, never below 00:00; reset r
   const snap = override.snapshot(game, 'timer_set', {});
   assert.equal(snap.remaining_ms, len * 1000); assert.equal(snap.default_s, len); assert.equal(snap.round, 'R2');
   assert.equal(snap.phase, 'ROUND_2');
-  assert.equal(override.targetName(game, 'timer_set', {}), 'MASTER TIME');
+  assert.equal(override.targetName(game, 'timer_set', {}), 'ROUND TIME');
 });
 
 test('CT-005/CT-006: the emergency pause freezes the one countdown, the time can be edited while paused and RESUME continues from it; every screen reads the same value', () => {
   const game = running();
   const clk = game.state.round_clock;
-  const len = game.liveLength();
+  const len = clk.duration_s;
   game.tick(10000);
   assert.equal(Math.round(clk.remaining_s), len - 10);
   game.pause();
@@ -3232,21 +3232,22 @@ test('v18 timer control: 00:00 stops nothing but the clock; NEXT PHASE still run
   const again2 = newGame({ runId: 'v18-clock-2' });
   again2.restore(JSON.parse(JSON.stringify(game.serialise())));
   assert.equal(again2.state.round_clock.remaining_s, 30, 'a restart lost the edited time');
-  // NEXT PHASE moves the internal phase and nothing else: no upkeep, no new
-  // clock, no reset. MASTER TIME stays exactly where the facilitator left it.
+  // NEXT PHASE moves the internal phase and charges nothing; the one thing it
+  // resets is the round timer, which loads Round 3's 12:00 and waits for START.
   const upkeep = game.state.cycle.number;
   const was = game.state.round_clock.remaining_s;
   assert.equal(game.nextPhase(), true);
   assert.equal(game.state.phase, 'ROUND_3');
   assert.equal(game.state.cycle.number, upkeep, 'the phase transition charged upkeep');
   assert.equal(clk === game.state.round_clock, true, 'the phase transition replaced the clock');
-  assert.equal(game.state.round_clock.remaining_s, was, 'the phase transition moved MASTER TIME');
+  assert.ok(was >= 0);
+  assert.deepEqual([game.state.round_clock.remaining_s, game.state.round_clock.status], [720, 'ready'], 'the next round did not load its own timer');
   assert.equal(logEvents(game, 'round').length, rounds + 1, 'the next round armed its own injects');
   // the console has what its popover and drawer need
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'control', 'index.html'), 'utf8');
   const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'control', 'control.js'), 'utf8');
   for (const id of ['btn-timer', 'timer-pop', 'timer-set-input', 'timer-reset', 'timer-pause']) assert.ok(html.includes(`id="${id}"`), `console lacks ${id}`);
-  assert.ok(/data-timer-delta="-300"/.test(html) && /data-timer-delta="300"/.test(html));
+  assert.ok(/data-timer-delta="-120"/.test(html) && /data-timer-delta="300"/.test(html));
   assert.ok(/RESOURCE CONTROL/.test(js) && /APPLY RESOURCE OVERRIDE/.test(js) && /SET EXACT VALUES/.test(js) && /'resource_override'/.test(js));
   assert.ok(!/data-ovr-inv/.test(js), 'the per-click inventory steppers are still there');
   assert.ok(!/ADVANCE ROUND/.test(html), 'a second round-advance control appeared');
@@ -3255,19 +3256,19 @@ test('v18 timer control: 00:00 stops nothing but the clock; NEXT PHASE still run
 
 // -- council and the Continuity Order ------------------------------------------------
 
-test('CALL COUNCIL reaches every projection with a running 5:00 clock', () => {
+test('CALL COUNCIL reaches every projection with a running 3:00 clock', () => {
   const game = running();
   game.callCouncil();
   for (const code of SECTORS) {
     const f = forSector(game, code);
     assert.equal(f.mode, 'COUNCIL');
     assert.equal(f.council.active, true);
-    assert.equal(f.council_clock.remaining_s, 300);
+    assert.equal(f.council_clock.remaining_s, 180);
     assert.equal(f.council_clock.running, true);
   }
   assert.equal(forBigscreen(game).council.active, true);
   game.tick(10000);
-  assert.equal(game.state.council_clock.remaining_s, 290);
+  assert.equal(game.state.council_clock.remaining_s, 170);
 });
 
 test('the Continuity Order requires all six sectors once; ranks 5 and 6 go BROWNOUT; council ends', () => {
@@ -4253,7 +4254,8 @@ test('the round script: AUTO fires itself, MANUAL becomes READY TO FIRE, skip an
   assert.equal(game.findFault('POW', 'F-201'), null, 'nothing fired without the facilitator');
 
   const auto = items.find((i) => i.mode === 'AUTO');
-  game.state.timeline_armed_game_s = game.state.game_clock_s - auto.offset_s - 1;
+  // the beats follow the round timer: jump it to one second past the AUTO beat's offset
+  game.clock('set', game.state.round_clock.duration_s - auto.offset_s - 1, 'round', { reason: 'jump' });
   game.tick(1000);
   assert.equal(auto.status, 'FIRED');
   assert.equal(game.state.announcements[0].text, auto.text);
@@ -4323,7 +4325,7 @@ test('the scenario library resolves built-ins, saves copies and shadows by id', 
   lib.save({ id: 'haven9-standard', name: 'HAVEN-9 STANDARD', doc: { ...raw, defaults: { ...raw.defaults, council_clock_s: 240 } } });
   assert.equal(lib.resolve('haven9-standard').defaults.council_clock_s, 240, 'a saved copy shadows the built-in');
   lib.remove('haven9-standard');
-  assert.equal(lib.resolve('haven9-standard').defaults.council_clock_s, 300, 'deleting it reveals the built-in again');
+  assert.equal(lib.resolve('haven9-standard').defaults.council_clock_s, 180, 'deleting it reveals the built-in again');
 
   const game = newGame();
   game.reset('r2', { scenario: lib.resolve('haven-9-hard') });
@@ -4494,58 +4496,146 @@ test('core output at start and round lengths come from the scenario', () => {
   assert.ok(game.state.city_stability < 100, 'stability reflects the lower core from the first frame');
 
   game.setPhase('ROUND_2');
-  assert.equal(game.state.round_clock.remaining_s, game.liveLength(), 'a phase change reset MASTER TIME');
+  assert.equal(game.state.round_clock.remaining_s, 900, 'Round 2 loaded its overridden length');
   const r1 = rounds.rounds.find((r) => r.id === 'R1');
   assert.equal(game.roundConfig('R1').length_s, r1.length_s, 'rounds without an override keep rounds.json');
 
-  // A new shift length applies at once while MASTER TIME has not been started…
-  game.patchConfig({ live_length_s: 600 });
-  assert.equal(game.state.round_clock.remaining_s, 600);
-  // …and never once it is running.
-  game.clock('start');
-  game.patchConfig({ live_length_s: 300 });
-  assert.equal(game.state.round_clock.remaining_s, 600);
-  assert.equal(game.liveLength(), 300, 'the next RESET of MASTER TIME would use it');
-});
-
-test('round lengths: 20 / 15 / 15 / 12 / 8 minutes by default, MASTER TIME is Rounds 1 to 4 added together, and the admin can change both before the start', () => {
-  const game = newGame();
-  assert.deepEqual(['R0', 'R1', 'R2', 'R3', 'R4'].map((r) => game.roundConfig(r).length_s), [1200, 900, 900, 720, 480]);
-  assert.equal(game.liveLength(), 3000, 'no override: the shift is the four live rounds');
-  assert.equal(game.state.round_clock.remaining_s, 3000, 'MASTER TIME starts at the shift length');
+  // A new length for the current round applies at once while its timer is READY…
   game.patchConfig({ round_length_s: { R2: 600 } });
-  assert.equal(game.liveLength(), 2700);
-  assert.equal(game.state.round_clock.remaining_s, 2700, 'a shorter round shortens the unstarted shift');
-  game.patchConfig({ live_length_s: 0 });
-  assert.equal(game.state.round_clock.remaining_s, 2700, 'a blank override falls back to the rounds');
-  game.patchConfig({ live_length_s: 3600 });
-  assert.equal(game.state.round_clock.remaining_s, 3600, 'an explicit override wins');
-  assert.equal(forControl(game).live_length_s, 3600);
-  // the console shows the round's own time beside the round number
-  const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'control', 'index.html'), 'utf8');
-  assert.ok(html.includes('id="round-note"'), 'the admin bar has no place for the round time');
+  assert.equal(game.state.round_clock.remaining_s, 600);
+  // …and never once it is running: the timer keeps its time, RESET learns the new length.
+  game.clock('start');
+  game.patchConfig({ round_length_s: { R2: 300 } });
+  assert.equal(game.state.round_clock.remaining_s, 600);
+  assert.equal(game.state.round_clock.duration_s, 300, 'the next RESET would use it');
 });
 
-test('the round\'s own time counts down beside the round number and is called up once when it runs out; it moves nothing', () => {
+// -- THE ROUND TIMER (undercity_round_timer_spec v1.0, 2026-09-28) ---------------
+//
+// One countdown per round, loaded READY at the round's full length by every
+// round change, run by the facilitator, measured from an end timestamp,
+// stopped at 00:00. The spec's acceptance tests, in its order, plus the rules
+// it states: no carry-over, no auto-start, no second countdown, no drift.
+
+const TIMER = (game) => game.state.round_clock;
+const timerShown = (game) => [forControl(game), forSector(game, 'POW'), forBigscreen(game)].map((f) => f.round_clock.remaining_s);
+
+test('round timer: R0 loads at 20:00 READY; every round change resets to that round\'s length and never starts on its own', () => {
   const game = newGame();
-  assert.equal(forControl(game).round_remaining_s, 1200, 'Round 0 waits at its full length');
-  game.setPhase('ROUND_1');
-  game.clock('start');
-  assert.equal(forControl(game).round_remaining_s, 900);
+  assert.deepEqual([TIMER(game).status, TIMER(game).remaining_s, TIMER(game).duration_s, TIMER(game).running], ['ready', 1200, 1200, false], 'R0 initial load');
+  assert.deepEqual(['R0', 'R1', 'R2', 'R3', 'R4'].map((r) => game.roundConfig(r).length_s), [1200, 900, 900, 720, 480]);
+  game.setPhase('ROUND_1'); game.clock('start'); game.tick(200000);   // 03:20 into Round 1
+  assert.equal(TIMER(game).remaining_s, 700);
+  for (const [phase, len] of [['ROUND_2', 900], ['ROUND_3', 720], ['ROUND_4', 480]]) {
+    game.setPhase(phase);
+    assert.deepEqual([TIMER(game).status, TIMER(game).remaining_s, TIMER(game).duration_s, TIMER(game).running, TIMER(game).target_end_at], ['ready', len, len, false, null], `${phase} did not load fresh`);
+    game.tick(5000);
+    assert.equal(TIMER(game).remaining_s, len, `${phase} started on its own`);
+    assert.deepEqual(timerShown(game), [len, len, len], `${phase}: the screens disagree`);
+    game.clock('start'); game.tick(60000);
+    assert.equal(TIMER(game).remaining_s, len - 60);
+  }
+  // PREV ROUND is a round change too
+  game.setPhase('ROUND_3');
+  assert.deepEqual([TIMER(game).status, TIMER(game).remaining_s], ['ready', 720]);
+});
+
+test('round timer: pause holds the exact time, add moves it without restarting the round, set continues from the new value', () => {
+  const game = newGame();
+  game.setPhase('ROUND_4'); game.clock('start');
+  game.tick(18000);                                             // 08:00 → 07:42
+  assert.equal(TIMER(game).remaining_s, 462);
+  game.clock('pause');
+  assert.deepEqual([TIMER(game).status, TIMER(game).running, TIMER(game).remaining_s], ['paused', false, 462]);
   game.tick(60000);
-  assert.equal(forControl(game).round_remaining_s, 840);
-  game.tick(840000);
-  assert.equal(forControl(game).round_remaining_s, 0);
-  assert.equal(logEvents(game, 'round_time_up').length, 1);
-  assert.ok(game.state.ticker.some((e) => /ROUND 1 TIME IS UP/.test(e.text)), 'the facilitator was not told');
-  game.tick(60000);
-  assert.equal(logEvents(game, 'round_time_up').length, 1, 'told once');
-  assert.equal(game.state.round, 'R1', 'the round moved on its own');
-  assert.ok(game.state.round_clock.running && game.state.round_clock.remaining_s > 0, 'MASTER TIME stopped at the round end');
+  assert.equal(TIMER(game).remaining_s, 462, 'a paused timer moved');
+  assert.deepEqual(timerShown(game), [462, 462, 462]);
+  game.clock('resume'); game.tick(1000);
+  assert.equal(TIMER(game).remaining_s, 461, 'resume did not continue from the exact time');
+  // add 60 while running: exactly +01:00, same round, still running, not restarted
+  const startedAt = TIMER(game).started_at;
+  const rounds = logEvents(game, 'round').length;
+  game.clock('add', 60, 'round', { reason: 'more time' });
+  assert.equal(TIMER(game).remaining_s, 521); assert.equal(TIMER(game).status, 'running');
+  assert.equal(game.state.round, 'R4'); assert.equal(logEvents(game, 'round').length, rounds, 'the round restarted');
+  assert.equal(TIMER(game).started_at, startedAt, 'the start time was rewritten');
+  game.tick(1000);
+  assert.equal(TIMER(game).remaining_s, 520);
+  // take 30, floored at 00:00 further down
+  game.clock('add', -30, 'round', { reason: 'less' });
+  assert.equal(TIMER(game).remaining_s, 490);
+  // set 05:30 and continue from there
+  game.clock('set', 330, 'round', { reason: 'set' });
+  assert.equal(TIMER(game).remaining_s, 330);
+  game.tick(10000);
+  assert.equal(TIMER(game).remaining_s, 320, 'set did not continue accurately');
+  assert.deepEqual(timerShown(game), [320, 320, 320]);
+});
+
+test('round timer: a second START is not a second countdown; the end time is what every screen and every refresh reads', () => {
+  const game = newGame();
   game.setPhase('ROUND_2');
-  assert.equal(forControl(game).round_remaining_s, 900, 'the next round starts with its own time');
-  game.tick(900000);
-  assert.equal(logEvents(game, 'round_time_up').length, 2, 'each round is called up in its turn');
+  const first = game.clock('start');
+  const target = TIMER(game).target_end_at;
+  assert.equal(first.ok, true); assert.ok(Number.isFinite(target));
+  const again = game.clock('start');
+  assert.equal(again.already, true); assert.equal(TIMER(game).target_end_at, target, 'START rearmed a running timer');
+  assert.equal(logEvents(game, 'admin_timer_pause_resume').filter((e) => e.action === 'start').length, 1, 'a second START was logged as a start');
+  game.tick(30000);
+  assert.equal(TIMER(game).remaining_s, 870, 'two countdowns ran');
+  // a client that has just connected (or refreshed) recomputes from the end time it is sent
+  const frame = forSector(game, 'POW').round_clock;
+  assert.equal(frame.status, 'running'); assert.equal(frame.target_end_at, target);
+  assert.equal(Math.ceil((frame.target_end_at - game.nowMs) / 1000), 870, 'the end time and the remaining time disagree');
+  assert.ok(Number.isFinite(forControl(game).server_now_ms), 'frames must say when the server said it');
+  // a restart of the server restores the running timer and keeps counting from its end time
+  const again2 = newGame({ runId: 'timer-restore' });
+  again2.restore(JSON.parse(JSON.stringify(game.serialise())));
+  again2.nowMs = game.nowMs;
+  assert.deepEqual([TIMER(again2).status, TIMER(again2).target_end_at], ['running', target]);
+  again2.tick(10000);
+  assert.equal(TIMER(again2).remaining_s, 860, 'the restore reset the timer');
+});
+
+test('round timer: 00:00 stops the timer, marks it expired, says so once and moves nothing; time added afterwards waits for START', () => {
+  const game = newGame();
+  game.setPhase('ROUND_4'); game.clock('start');
+  game.clock('set', 5, 'round', { reason: 'nearly over' });
+  const round = game.state.round; const passes = game.state.cycle.number;
+  game.tick(10000);
+  assert.deepEqual([TIMER(game).status, TIMER(game).remaining_s, TIMER(game).running, TIMER(game).target_end_at], ['expired', 0, false, null]);
+  assert.equal(logEvents(game, 'round_timer_expired').length, 1);
+  assert.ok(game.state.ticker.some((e) => /ROUND 4 TIME IS UP/.test(e.text)), 'the room was not told');
+  game.tick(60000);
+  assert.equal(TIMER(game).remaining_s, 0, 'went below 00:00');
+  assert.equal(logEvents(game, 'round_timer_expired').length, 1, 'said twice');
+  assert.equal(game.state.round, round); assert.equal(game.state.cycle.number, passes, '00:00 moved the round or charged upkeep');
+  assert.deepEqual(timerShown(game), [0, 0, 0]);
+  assert.equal(forSector(game, 'POW').round_clock.status, 'expired', 'participants are not told it expired');
+  assert.equal(game.clock('start').already, true, 'START ran an expired timer');
+  game.clock('add', 60, 'round', { reason: 'extra' });
+  assert.deepEqual([TIMER(game).status, TIMER(game).remaining_s], ['paused', 60], 'added time started on its own');
+  game.clock('start'); game.tick(1000);
+  assert.equal(TIMER(game).remaining_s, 59);
+});
+
+test('round timer: RESET goes back to the round\'s full length and waits; a round length edited in SETTINGS reaches a READY timer at once', () => {
+  const game = newGame();
+  game.setPhase('ROUND_3'); game.clock('start'); game.tick(100000);
+  assert.equal(TIMER(game).remaining_s, 620);
+  game.clock('reset', null, 'round', { reason: 'again' });
+  assert.deepEqual([TIMER(game).status, TIMER(game).remaining_s, TIMER(game).running], ['ready', 720, false]);
+  game.patchConfig({ round_length_s: { R3: 600 } });
+  assert.deepEqual([TIMER(game).duration_s, TIMER(game).remaining_s], [600, 600], 'a READY timer did not take the new length');
+  game.clock('start'); game.tick(1000);
+  game.patchConfig({ round_length_s: { R3: 300 } });
+  assert.equal(TIMER(game).remaining_s, 599, 'a running timer was yanked by a settings edit');
+  assert.equal(TIMER(game).duration_s, 300);
+  // the console: status beside the clock, presets from the spec, reset to the round length
+  const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'control', 'index.html'), 'utf8');
+  for (const d of ['-120', '-60', '-30', '30', '60', '120', '300']) assert.ok(html.includes(`data-timer-delta="${d}"`), `console lacks the ${d} s preset`);
+  assert.ok(/ROUND TIME/.test(html) && !/MASTER TIME/.test(html), 'the console still says MASTER TIME');
+  assert.ok(/RESET TO ROUND LENGTH/.test(html));
 });
 
 test('per-fault overrides: extra accepted codes; the content answer stays; an old deadline override is ignored', () => {
@@ -4568,6 +4658,16 @@ test('per-fault overrides: extra accepted codes; the content answer stays; an ol
   const again = game.fireFault('F-201', 'POW').fault;
   assert.deepEqual([...again.valid_codes].sort(), ['P-03-290', 'P-03-340']);
   assert.equal(logEvents(game, 'fault_override').length, 2, 'both the override and its removal are logged');
+});
+
+test('RESET on the council clock goes back to the configured sitting, and follows a live edit of it', () => {
+  const game = running();
+  game.callCouncil();
+  game.clock('set', 25, 'council');
+  assert.equal(game.clock('reset', null, 'council').remaining_s, 180);
+  game.patchConfig({ council_clock_s: 240 });
+  game.clock('set', 25, 'council');
+  assert.equal(game.clock('reset', null, 'council').remaining_s, 240, 'the sitting length is a live setting');
 });
 
 test('each Council sitting gets its own 30-second warning', () => {

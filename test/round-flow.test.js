@@ -158,8 +158,9 @@ test('ROUND-003: a round change starts no rest, no debrief, no reflection, and r
   assert.equal(game.state.mode, before.mode, 'the mode changed');
   assert.equal(game.state.mode, 'PLAY');
   assert.equal(game.frozen, false, 'the game froze');
-  assert.equal(game.state.round_clock.running, before.running, 'MASTER TIME stopped');
-  assert.equal(game.state.round_clock.remaining_s, before.clock, 'the clock was reset');
+  // The round timer is the one thing a round change resets: Round 3's own 12:00, READY for START.
+  assert.ok(before.running && before.clock > 0);
+  assert.deepEqual([game.state.round_clock.status, game.state.round_clock.remaining_s, game.state.round_clock.running], ['ready', 720, false], 'the next round did not load its own timer');
   assert.equal(game.state.cycle.number, before.cycle, 'an upkeep pass was charged');
 
   // And nothing in the city moved.

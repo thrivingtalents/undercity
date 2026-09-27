@@ -19,6 +19,7 @@
   const STALE_MS = 30000;
 
   let lastFrameAt = 0;   // performance.now() when the latest state frame arrived
+  let serverOffsetMs = 0;   // the server's clock minus this machine's, from the latest frame
 
   function connect({ hello, onState, onMessage, onStatus }) {
     let ws = null;
@@ -50,6 +51,8 @@
         }
         if (msg.type === 'state') {
           lastFrameAt = performance.now();
+          const serverNow = Number(msg.server_now_ms) || Date.parse(msg.server_time || '');
+          if (Number.isFinite(serverNow)) serverOffsetMs = serverNow - Date.now();
           if (onState) onState(msg);
         }
         if (onMessage) onMessage(msg);
@@ -99,6 +102,14 @@
     if (!clock) return 0;
     const base = Number(clock.remaining_s) || 0;
     if (!clock.running || frozen) return Math.max(0, base);
+    // A running ROUND TIMER carries the server time it reaches 00:00: the
+    // seconds left are measured from that, so a refresh, a reconnect or a
+    // late frame cannot make this screen drift from the server or from any
+    // other screen. Clocks without an end time still count from their frame.
+    const end = Number(clock.target_end_at);
+    if (clock.target_end_at !== null && clock.target_end_at !== undefined && Number.isFinite(end)) {
+      return Math.max(0, (end - (Date.now() + serverOffsetMs)) / 1000);
+    }
     const elapsed = (performance.now() - lastFrameAt) / 1000;
     return Math.max(0, base - elapsed);
   }

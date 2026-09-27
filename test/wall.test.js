@@ -137,7 +137,7 @@ test('a stable or degraded sector never moves; critical breathes slowly; dark is
   for (const r of infinite) {
     assert.ok(!/data-state="(stable|degraded)"/.test(r.sel), `${r.sel} animates a calm state`);
     assert.ok(!/^\.(district|shc)$/.test(r.sel) && !/^\.(district|shc) /.test(r.sel), `${r.sel} animates every sector`);
-    assert.ok(/critical|dark|core-low|final|blackout|breach|unstable|b-crisis|moving|down|live|scan/.test(r.sel), `${r.sel} moves for no state`);
+    assert.ok(/critical|dark|core-low|final|expired|blackout|breach|unstable|b-crisis|moving|down|live|scan/.test(r.sel), `${r.sel} moves for no state`);
   }
   for (const r of infinite.filter((x) => /data-state="critical"/.test(x.sel))) {
     const m = r.body.match(/animation:[^;]*?(\d+(?:\.\d+)?)s/);
@@ -382,7 +382,7 @@ test("the city broadcast is COM's announcement in a readable area, or NO ACTIVE 
 
 // -- The command bar ----------------------------------------------------------------
 
-test('the command bar: the authority and the operating cycle on the left, the Core in the middle, MASTER TIME and LIVE on the right', () => {
+test('the command bar: the authority and the operating cycle on the left, the Core in the middle, ROUND TIME and LIVE on the right', () => {
   const f = forBigscreen(running());
   // SIMPLIFIED ROUND DISPLAY (2026-09-21): the wall IS told the round number
   // — and never its name, nor the phase, which no longer exist separately.
@@ -391,7 +391,7 @@ test('the command bar: the authority and the operating cycle on the left, the Co
   assert.equal(f.phase, undefined, 'the wall was told the phase');
   assert.equal(f.period_number, 1);
   assert.ok(f.round_clock && typeof f.round_clock.remaining_s === 'number');
-  assert.ok(/MASTER TIME/.test(WALL_INDEX) && !/NEXT ROUND IN/.test(WALL_INDEX), 'the clock is still a round clock');
+  assert.ok(/ROUND TIME/.test(WALL_INDEX) && !/NEXT ROUND IN/.test(WALL_INDEX), 'the clock is still a round clock');
   assert.ok(/CURRENT ROUND/.test(WALL_SCRIPT), 'the bar does not label the round');
   assert.ok(/`ROUND \$\{n\}`/.test(WALL_SCRIPT), 'the bar does not print the round number');
   assert.ok(!/BREATHER|DEBRIEF/.test(WALL_INDEX), 'the wall still carries a break screen');
@@ -400,8 +400,8 @@ test('the command bar: the authority and the operating cycle on the left, the Co
   assert.ok(/id="round-clock"/.test(WALL_INDEX) && /id="time-label"/.test(WALL_INDEX));
   assert.ok(/id="live"/.test(WALL_INDEX) && /'LIVE'/.test(WALL_SCRIPT));
   assert.ok(/frame\.round_number/.test(WALL_SCRIPT) && /frame\.round_clock/.test(WALL_SCRIPT));
-  assert.ok(/'MASTER TIME'/.test(WALL_SCRIPT) && /'COUNCIL ENDS IN'/.test(WALL_SCRIPT));
-  assert.ok(!/'ROUND/.test(WALL_SCRIPT), 'the wall script still names a round');
+  assert.ok(/'ROUND TIME'/.test(WALL_SCRIPT) && /'COUNCIL ENDS IN'/.test(WALL_SCRIPT));
+  assert.ok(!/'ROUND(?! TIME')/.test(WALL_SCRIPT), 'the wall script still names a round');
   const briefing = forBigscreen(newGame());          // before live play
   assert.equal(briefing.round_number, 0, 'before live play the city is in Round 0');
   assert.equal(briefing.round_name, undefined, 'the briefing frame carries a round name');

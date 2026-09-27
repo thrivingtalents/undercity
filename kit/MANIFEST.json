@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-27T16:23:53.866Z",
+  "generated_at": "2026-09-27T17:06:58.801Z",
   "sources": {
     "matrix": {
       "file": "undercity-crossref-matrix.xlsx",
@@ -84,8 +84,8 @@
       "file": "UNDERCITY_Facilitator_Guidebook.docx",
       "title": "Facilitator & Administrator Guidebook",
       "audience": "facilitator",
-      "bytes": 31788,
-      "sha256": "505fb68facc6ebffddcb55f1c1271ae5be853e7e4253a2915be765091bcfd12d"
+      "bytes": 31922,
+      "sha256": "af46c0c7cac1a852e624ee3ca0f9827064d486bb92b2bfc3bc6f71db76ea3614"
     },
     {
       "file": "UNDERCITY_FaultCards.docx",

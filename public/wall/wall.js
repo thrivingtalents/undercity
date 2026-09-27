@@ -3,7 +3,7 @@
  * CITY WALL — the participant Big Screen of HAVEN-9. Display-only.
  *
  * Four bands, top to bottom: the command bar (phase, CURRENT ROUND, CORE
- * STABILITY, MASTER TIME, LIVE), an alert strip drawn only while something
+ * STABILITY, ROUND TIME, LIVE), an alert strip drawn only while something
  * needs the room, the city beside its six health monitors, and COM's city
  * broadcast. The city is the hero: the illustration in
  * public/wall/art/haven9-map.png with everything alive drawn over it in an
@@ -341,7 +341,7 @@
     const hudCore = $('hud-core');
     if (hudCore.dataset.state !== cs.state) hudCore.dataset.state = cs.state;
 
-    setText($('time-label'), inCouncil() ? 'COUNCIL ENDS IN' : 'MASTER TIME');
+    setText($('time-label'), inCouncil() ? 'COUNCIL ENDS IN' : 'ROUND TIME');
     show($('tag-blackout'), !!(frame.blackout && frame.blackout.active));
     show($('tag-sensors'), !!frame.telemetry_degraded);
   }
@@ -799,7 +799,9 @@
     const running = !!(clockObj && clockObj.running) && !frozen;
     setText($('round-clock'), U.mmss(secs));
     const urgency = !running ? '' : secs <= 10 ? ' final' : secs <= 20 ? ' danger' : secs <= 60 ? ' warn' : '';
-    const cls = `hud-time${council ? ' council' : ''}${urgency}`;
+    // At 00:00 the round timer stops and the room sees it stop.
+    const expired = !council && !!(frame.round_clock && frame.round_clock.status === 'expired');
+    const cls = `hud-time${council ? ' council' : ''}${expired ? ' expired' : urgency}`;
     const hud = $('hud-time');
     if (hud.className !== cls) hud.className = cls;
 

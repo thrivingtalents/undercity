@@ -2025,12 +2025,14 @@
     if (!state || !mine) return;
     const frozen = !!state.frozen;
 
-    // MASTER TIME: one clock for the whole shift. Upkeep falls due on the
-    // operating cycle beside it, which runs straight through every phase.
+    // THE ROUND TIMER: the admin's clock for this round, read-only here. It is
+    // measured from the server's end time, so a refresh changes nothing; at
+    // 00:00 it stops and shows it. Upkeep falls due on the operating cycle.
     const rc = U.countdown(state.round_clock, frozen);
-    const rcText = state.round_clock && state.round_clock.running === false && !frozen && rc <= 0 ? 'HOLD' : U.mmss(rc);
-    setText($('hdr-round-clock'), rcText);
-    setUrgency($('hdr-round-clock'), rc, true);
+    const expired = !!state.round_clock && state.round_clock.status === 'expired';
+    setText($('hdr-round-clock'), U.mmss(rc));
+    setUrgency($('hdr-round-clock'), rc, !!state.round_clock && !!state.round_clock.running && !frozen);
+    $('hdr-round-clock').classList.toggle('expired', expired);
     const council = U.countdown(state.council_clock, frozen);
     setText($('council-clock'), U.mmss(council));
     setUrgency($('council-clock'), council, true);

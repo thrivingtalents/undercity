@@ -18,7 +18,7 @@
     "resolve_recovery": 5,
     "lockout_s": 20,
     "lockout_after_consecutive_invalid": 3,
-    "council_clock_s": 300,
+    "council_clock_s": 180,
 
     "auto_economy": true,
     "deduct_resources_on_resolve": true,
@@ -356,7 +356,7 @@
       { "offset_s": 180,  "kind": "fault", "fault_code": "F-304", "sector": "TRN", "mode": "MANUAL" },
       { "offset_s": 240,  "kind": "fault", "fault_code": "F-305", "sector": "AGR", "mode": "MANUAL" },
       { "offset_s": 300,  "kind": "fault", "fault_code": "F-306", "sector": "COM", "mode": "MANUAL" },
-      { "offset_s": 420,  "kind": "council", "mode": "MANUAL", "note": "Council #2 — Continuity Order due at 12:00" }
+      { "offset_s": 420,  "kind": "council", "mode": "MANUAL", "note": "Council #2 — Continuity Order due at 10:00" }
     ],
     "R4": [
       { "offset_s": 20,   "kind": "fault", "fault_code": "F-401", "sector": "POW", "mode": "MANUAL" },

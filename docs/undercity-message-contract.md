@@ -56,8 +56,8 @@ The only message that carries game state. Full snapshot every time.
   "run_id": "2026-09-14-clientX-c1",
   "mode": "PLAY",
   "round": "R2",
-  "round_clock": { "running": true, "remaining_s": 1140 },
-  "council_clock": { "running": false, "remaining_s": 300 },
+  "round_clock": { "status": "running", "running": true, "remaining_s": 1140, "duration_s": 900, "target_end_at": 1790000000000, "started_at": "…", "paused_at": null },
+  "council_clock": { "running": false, "remaining_s": 180 },
   "core_integrity": 74,
   "sectors": {
     "POW": {
@@ -179,7 +179,7 @@ Every message requires the token. Grouped by control-panel column (§6.3 of the 
 **Col 3 — Tempo**
 ```json
 { "type": "set_round", "round": "R3" }
-{ "type": "clock", "action": "start" }        // start | pause | add, with "seconds"
+{ "type": "clock", "action": "start" }        // start (= resume) | pause | end | add | set, with "seconds" | reset
 { "type": "set_mode", "mode": "COUNCIL" }     // triggers big-screen takeover + 5:00
 { "type": "announce", "text": "Core output dropping to 60 percent." }
 { "type": "sting", "sound": "klaxon" }        // klaxon | chime | silence
@@ -265,9 +265,9 @@ The Admin page prompts for the token if the URL does not carry one.
 ```json
 {
   "phase": "ROUND_2", "phase_name": "Round 2 — Interdependence",
-  "round": "R2", "round_name": "Interdependence", "round_length_s": 900, "round_remaining_s": 540,   // the round's own time — control frame only
-  "round_clock":   { "running": true,  "remaining_s": 1140 },
-  "council_clock": { "running": false, "remaining_s": 300 },
+  "round": "R2", "round_name": "Interdependence", "round_length_s": 900,   // the round timer's full length — control frame only
+  "round_clock":   { "status": "running", "running": true, "remaining_s": 1140, "duration_s": 900, "target_end_at": 1790000000000 },   // the ROUND TIMER; see §8.7
+  "council_clock": { "running": false, "remaining_s": 180 },
   "cycle": { "number": 3, "length_s": 420, "remaining_s": 267, "running": false },   // legacy timer; see §8.7
   "paused": false, "breather": false, "frozen": false,
   "core_output": 83, "core_integrity": 83,
@@ -464,7 +464,7 @@ requires stock.
 
 ```json
 { "type": "set_phase", "phase": "ROUND_2" }   { "type": "next_phase" }
-{ "type": "clock", "which": "round", "action": "start|pause|resume|end|add|set", "seconds": 120 }
+{ "type": "clock", "which": "round", "action": "start|resume|pause|end|add|set|reset", "seconds": 120 }
 { "type": "cycle", "action": "start|pause|process|set|add", "seconds": 60 }
 { "type": "pause" }  { "type": "resume" }
 { "type": "fire_preset", "preset_id": "r2_wave_a" }
@@ -746,21 +746,33 @@ transfer, spends no Transport allowance, stamps no chit, leaves COM's board
 as reported, and never undoes upkeep or repair costs already paid. The
 reply is `override_result { ok, target, before, after, delta }`.
 
-**GAME TIMER** (TIMER ▾ in the top bar) drives the one round clock every
-screen already shows (`round_clock { running, remaining_s }`, MASTER TIME on
-the admin, NEXT ROUND IN on the wall and sectors). `timer_adjust` and
-`timer_set` call the existing `clock` reducer (add / set, floored at
-00:00); `timer_reset` is the new `clock reset`: the configured length of
-the current round and nothing else. The tick only counts down while the
-clock runs and the session is not frozen, so session PAUSE freezes the
-countdown, the time may be edited while paused, and RESUME continues from
-the edited value; the timer-only PAUSE/RESUME (`clock pause | resume`)
-stays separate. 00:00 stops the clock and moves nothing — NEXT PHASE ends
-the round, as before. Every round-clock change writes `admin_timer_adjust
-{ before_remaining_ms, after_remaining_ms, delta_ms, reason }`,
-`admin_timer_reset { before_remaining_ms, default_remaining_ms, reason }` or
-`admin_timer_pause_resume { action, remaining_ms }` (also on session pause
-and resume), on top of the `clock` event.
+**THE ROUND TIMER** (2026-09-28, `undercity_round_timer_spec` v1.0; TIMER ▾
+in the top bar) is one countdown per round, and the only clock every screen
+shows: `round_clock { status, running, remaining_s, duration_s,
+target_end_at, started_at, paused_at }` with `status` one of `ready |
+running | paused | expired` (the spec's camelCase names map 1:1). Every
+round change — NEXT ROUND, PREV ROUND, `set_phase`, `set_round` — loads the
+new round's configured length in `ready` and never carries time over; the
+admin presses START. `clock start` (= resume) arms `target_end_at` from the
+remaining time and is a no-op while the timer already runs, so a second
+START is never a second countdown; `pause` holds the exact remaining time;
+`add` / `set` (also `timer_adjust` / `timer_set` overrides) move it, floored
+at 00:00, rearming the end time at once while it runs; `reset` (`timer_reset`)
+loads the round's full length again, `ready`; `end` (STOP CLOCK) stops it at
+00:00. The server recomputes `remaining_s` from `target_end_at` on every
+tick, marks the timer `expired` at 00:00 (`round_timer_expired`, a ticker
+line and an `alert` sting) and moves nothing else. Every frame carries
+`server_now_ms`; a client measures the seconds left from `target_end_at`
+against that offset, so a refresh or a reconnect resumes at the accurate
+time and no screen drifts from another. Session PAUSE holds the time (the
+end time is cleared, the status stays `running`), the time may be edited
+while paused, and RESUME arms a fresh end time from the remaining time.
+Participant screens read the timer and cannot touch it. Every hand on it
+writes `admin_timer_adjust { before_remaining_ms, after_remaining_ms,
+delta_ms, reason }`, `admin_timer_reset { before_remaining_ms,
+default_remaining_ms, reason }` or `admin_timer_pause_resume { action,
+remaining_ms }` (also on session pause and resume), on top of the `clock`
+event.
 
 ### 8.11 One door: request-driven transfers (v20, 2026-09-20)
 
