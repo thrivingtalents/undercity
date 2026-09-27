@@ -287,84 +287,23 @@
       "resource_changes": { "power": -1, "water": -1 } }
   ],
 
-  "fault_presets": [
-    { "id": "r1_wave", "name": "ROUND 1 WAVE",
-      "items": [
-        { "fault_code": "F-101", "sector": "POW", "delay_s": 0 },
-        { "fault_code": "F-102", "sector": "WTR", "delay_s": 60 },
-        { "fault_code": "F-103", "sector": "MED", "delay_s": 120 },
-        { "fault_code": "F-104", "sector": "TRN", "delay_s": 180 },
-        { "fault_code": "F-105", "sector": "AGR", "delay_s": 240 },
-        { "fault_code": "F-106", "sector": "COM", "delay_s": 300 } ] },
-    { "id": "r2_wave_a", "name": "ROUND 2 WAVE A",
-      "items": [
-        { "fault_code": "F-201", "sector": "POW", "delay_s": 0 },
-        { "fault_code": "F-203", "sector": "WTR", "delay_s": 90 },
-        { "fault_code": "F-205", "sector": "MED", "delay_s": 180 } ] },
-    { "id": "r2_wave_b", "name": "ROUND 2 WAVE B",
-      "items": [
-        { "fault_code": "F-207", "sector": "TRN", "delay_s": 0 },
-        { "fault_code": "F-209", "sector": "AGR", "delay_s": 60 },
-        { "fault_code": "F-211", "sector": "COM", "delay_s": 120 },
-        { "fault_code": "F-210", "sector": "AGR", "delay_s": 200 } ] },
-    { "id": "r3_stack", "name": "ROUND 3 CRITICAL STACK",
-      "items": [
-        { "fault_code": "F-301", "sector": "POW", "delay_s": 0 },
-        { "fault_code": "F-302", "sector": "WTR", "delay_s": 45 },
-        { "fault_code": "F-303", "sector": "MED", "delay_s": 90 } ] }
-  ],
+  "fault_presets": [],
 
   "timelines": {
     "R0": [
-      { "offset_s": 0,   "kind": "fault", "fault_code": "F-001", "sector": "POW", "mode": "MANUAL" },
-      { "offset_s": 0,   "kind": "fault", "fault_code": "F-002", "sector": "WTR", "mode": "MANUAL" },
-      { "offset_s": 0,   "kind": "fault", "fault_code": "F-003", "sector": "MED", "mode": "MANUAL" },
-      { "offset_s": 0,   "kind": "fault", "fault_code": "F-004", "sector": "TRN", "mode": "MANUAL" },
-      { "offset_s": 0,   "kind": "fault", "fault_code": "F-005", "sector": "AGR", "mode": "MANUAL" },
-      { "offset_s": 0,   "kind": "fault", "fault_code": "F-006", "sector": "COM", "mode": "MANUAL" }
     ],
     "R1": [
-      { "offset_s": 60,  "kind": "fault", "fault_code": "F-101", "sector": "POW", "mode": "MANUAL" },
-      { "offset_s": 150, "kind": "fault", "fault_code": "F-102", "sector": "WTR", "mode": "MANUAL" },
-      { "offset_s": 240, "kind": "fault", "fault_code": "F-103", "sector": "MED", "mode": "MANUAL" },
-      { "offset_s": 330, "kind": "fault", "fault_code": "F-104", "sector": "TRN", "mode": "MANUAL" },
-      { "offset_s": 420, "kind": "fault", "fault_code": "F-105", "sector": "AGR", "mode": "MANUAL" },
-      { "offset_s": 510, "kind": "fault", "fault_code": "F-106", "sector": "COM", "mode": "MANUAL" }
     ],
     "R2": [
-      { "offset_s": 0,    "kind": "fault", "fault_code": "F-201", "sector": "POW", "mode": "MANUAL" },
-      { "offset_s": 60,   "kind": "fault", "fault_code": "F-203", "sector": "WTR", "mode": "MANUAL" },
-      { "offset_s": 120,  "kind": "fault", "fault_code": "F-205", "sector": "MED", "mode": "MANUAL" },
       { "offset_s": 180,  "kind": "announce", "text": "Core output dropping. Council convenes in 5 minutes.", "mode": "AUTO" },
-      { "offset_s": 240,  "kind": "fault", "fault_code": "F-207", "sector": "TRN", "mode": "MANUAL" },
-      { "offset_s": 300,  "kind": "fault", "fault_code": "F-209", "sector": "AGR", "mode": "MANUAL" },
-      { "offset_s": 360,  "kind": "fault", "fault_code": "F-211", "sector": "COM", "mode": "MANUAL" },
-      { "offset_s": 420,  "kind": "fault", "fault_code": "F-210", "sector": "AGR", "mode": "MANUAL" },
-      { "offset_s": 450,  "kind": "fault", "fault_code": "F-204", "sector": "WTR", "mode": "MANUAL" },
-      { "offset_s": 480,  "kind": "fault", "fault_code": "F-206", "sector": "MED", "mode": "MANUAL" },
-      { "offset_s": 510,  "kind": "council", "mode": "MANUAL", "note": "Council #1 — information pooling" },
-      { "offset_s": 810,  "kind": "fault", "fault_code": "F-202", "sector": "POW", "mode": "MANUAL" },
-      { "offset_s": 840,  "kind": "fault", "fault_code": "F-208", "sector": "TRN", "mode": "MANUAL" },
-      { "offset_s": 870,  "kind": "fault", "fault_code": "F-212", "sector": "COM", "mode": "MANUAL" }
+      { "offset_s": 510,  "kind": "council", "mode": "MANUAL", "note": "Council #1 — information pooling" }
     ],
     "R3": [
-      { "offset_s": 0,    "kind": "fault", "fault_code": "F-301", "sector": "POW", "mode": "MANUAL" },
-      { "offset_s": 30,   "kind": "fault", "fault_code": "F-302", "sector": "WTR", "mode": "MANUAL" },
-      { "offset_s": 60,   "kind": "fault", "fault_code": "F-303", "sector": "MED", "mode": "MANUAL" },
       { "offset_s": 120,  "kind": "core",  "value": 60, "mode": "AUTO", "note": "Core drops to 60% — the city can sustain 4 of 6 sectors" },
       { "offset_s": 120,  "kind": "announce", "text": "Core output at 60 percent. Continuity Order will be required.", "mode": "AUTO" },
-      { "offset_s": 180,  "kind": "fault", "fault_code": "F-304", "sector": "TRN", "mode": "MANUAL" },
-      { "offset_s": 240,  "kind": "fault", "fault_code": "F-305", "sector": "AGR", "mode": "MANUAL" },
-      { "offset_s": 300,  "kind": "fault", "fault_code": "F-306", "sector": "COM", "mode": "MANUAL" },
       { "offset_s": 420,  "kind": "council", "mode": "MANUAL", "note": "Council #2 — Continuity Order due at 10:00" }
     ],
     "R4": [
-      { "offset_s": 20,   "kind": "fault", "fault_code": "F-401", "sector": "POW", "mode": "MANUAL" },
-      { "offset_s": 40,   "kind": "fault", "fault_code": "F-402", "sector": "MED", "mode": "MANUAL" },
-      { "offset_s": 60,   "kind": "fault", "fault_code": "F-403", "sector": "WTR", "mode": "MANUAL" },
-      { "offset_s": 80,   "kind": "fault", "fault_code": "F-404", "sector": "TRN", "mode": "MANUAL" },
-      { "offset_s": 100,  "kind": "fault", "fault_code": "F-405", "sector": "AGR", "mode": "MANUAL" },
-      { "offset_s": 120,  "kind": "fault", "fault_code": "F-406", "sector": "COM", "mode": "MANUAL" },
       { "offset_s": 150,  "kind": "core",  "value": 70, "mode": "AUTO" },
       { "offset_s": 180,  "kind": "council", "mode": "MANUAL", "note": "Mini-triage" }
     ]

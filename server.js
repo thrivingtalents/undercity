@@ -1190,6 +1190,13 @@ function handleControl(client, entry, msg) {
     case 'set_sound':          game.setSound(msg.on); return ok();
 
     // -- tempo
+    case 'activate_round': {
+      // ROUND ACTIVATION: the round, its timer READY, and its whole fault set, as one action.
+      const res = game.activateRound(String(msg.round || '').toUpperCase(), { restart: !!msg.restart, by: 'facilitator' });
+      if (!res.ok) return reply({ type: 'error', reason: res.reason, round: res.round });
+      reply({ type: 'round_activated', ...res });
+      return ok();
+    }
     case 'set_phase':   game.setPhase(msg.phase); return ok();
     case 'next_phase':  game.nextPhase(); return ok();
     case 'set_round':   game.setRound(msg.round); return ok();

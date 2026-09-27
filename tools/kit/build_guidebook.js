@@ -280,13 +280,13 @@ C.push(tbl([
   beat("00:00", "Confirm all six recorders and the Council recorder are rolling. Then fire the klaxon sting.", "Nothing yet — this is the audio sync."),
   beat("00:01", "Hand each table its binder, role cards, chit pad, resource tray and tokens. Hand the City Charter to COM only.", "Whether COM tells anyone they have the Charter."),
   beat("00:03", "Two minutes to assign the four roles. Do not advise.", "How they assign. Volunteering, deferring, or the loudest person taking Chief. Tag it — this is your first data point."),
-  beat("00:06", "Fire the six tutorial faults F-001 to F-006, one per sector. Hand the cards.", "Whether the Systems Lead reads the procedure aloud or silently."),
+  beat("00:06", "Activate ROUND 0 on the console: its six tutorial faults F-001 to F-006 land at once, one per sector. Hand the cards.", "Whether the Systems Lead reads the procedure aloud or silently."),
   beat("00:16", "Confirm every sector has resolved its tutorial fault. Help freely here — this is the only part of the day where you may.", "Consoles showing the wrong sector. Fix now, not later."),
   beat("00:19", "Say the one sentence that sets the shift: \"From here it runs until it is over. There is no break in it.\"", "Nobody should be waiting for a pause that is not coming."),
 ], BW));
 
 C.push(H2("5.1 The Shift — starting it (00:00)"));
-C.push(callout("Every round has its own clock.", "Press NEXT ROUND to Round 1, then START. NEXT ROUND loads the round's clock at its full length and waits; START runs it. The pair is pressed four times — Rounds 1, 2, 3 and 4 — and the day ends with END SIMULATION. A clock that reaches 00:00 stops on its own and moves nothing, and the city keeps bleeding until the next START, so do not dawdle between rounds. STOP CLOCK and PAUSE are not part of the script."));
+C.push(callout("Every round has its own clock.", "Press NEXT ROUND to Round 1, then START. NEXT ROUND deals every fault of the round onto the tables at once and loads the round's clock at its full length, waiting; START runs the clock. The pair is pressed four times — Rounds 1, 2, 3 and 4 — and the day ends with END SIMULATION. A clock that reaches 00:00 stops on its own and moves nothing, and the city keeps bleeding until the next START, so do not dawdle between rounds. Pressing the round you are already in offers a restart: the clock reloads and that round's faults go back to active. STOP CLOCK and PAUSE are not part of the script."));
 C.push(p([t("What the room sees from now on: the round number and its clock counting down, their own health and stock, their faults, and the next operating cycle. What they never see: a phase name, a debrief screen, or a screen telling them to rest. "),
   t("The operating cycle", { bold: true }),
   t(" comes round every ten minutes and is when the city produces, pays its upkeep and hands back Transport’s approvals, Medical’s heals and Agriculture’s intervention cards. It is not a round: it interrupts nothing and it pauses nobody.")]));
@@ -295,26 +295,23 @@ C.push(H3("Wave 1 · Stable Operations · Round 1 (00:00 – 15:00)"));
 C.push(callout("This stretch should feel easy.", "It is the baseline measurement. If you make it hard, you have no calm-state reading and the whole delta collapses. Resist the urge to add pressure. Boring is correct.", "E8F5E8", "2E7D32"));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("00:00", "START Round 1's clock. Announce: routine shift, standard faults.", "Baseline talk patterns. Who speaks first at each table."),
-  beat("02:00", "Fire F-101 (POW), F-102 (WTR).", "Procedure read aloud or not."),
-  beat("05:00", "Fire F-103 (MED), F-104 (TRN).", "Crew assignment discussion, or one person deciding."),
-  beat("08:00", "Fire F-105 (AGR), F-106 (COM).", "Every table now holds exactly one fault. Six tables, one load — compare how they carry it."),
-  beat("11:00", "Nothing new fires. Walk the floor.", "Anyone finishing early and offering help to a neighbour — rare and worth tagging."),
-  beat("14:00", "Nothing new. Let the tables clear what they hold.", "Which tables are relaxed and which are already tense at low load."),
+  beat("00:00", "NEXT ROUND → Round 1: its six faults land at once, one per sector. START the clock. Announce: routine shift, standard faults.", "Baseline talk patterns. Who speaks first at each table."),
+  beat("02:00", "Walk the floor. Every table holds exactly one fault.", "Procedure read aloud or not. Crew assignment discussion, or one person deciding."),
+  beat("06:00", "Nothing new fires in this round.", "Six tables, one load — compare how they carry it."),
+  beat("10:00", "Anyone finished? Say nothing.", "Anyone finishing early and offering help to a neighbour — rare and worth tagging."),
+  beat("14:00", "Let the tables clear what they hold.", "Which tables are relaxed and which are already tense at low load."),
 ], BW));
 
 C.push(H3("Wave 2 · Interdependence · Round 2 (00:00 – 11:00)"));
 C.push(p(t("The first cross-sector wave. Every fault now requires a value that lives in another sector’s binder. Liaisons must move; the room gets loud. Press NEXT ROUND and say nothing — the faults are the announcement.")));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("00:00", "NEXT ROUND → Round 2, then START. Announce in-world: \"Core output is fluctuating. Systems are coupling in ways they should not.\"", "How long before the first liaison stands up."),
-  beat("00:30", "Fire F-201 (POW) and F-203 (WTR).", "F-201 is the discrepancy fault. Watch WTR’s table when POW asks for the reservoir figure."),
-  beat("02:00", "Fire F-205 (MED), F-209 (AGR).", "MED’s cold chain has real urgency. Do they escalate or absorb?"),
-  beat("03:00", "Fire F-210 (AGR).", "AGR now holds two faults and needs COM for both. Watch whether the liaison batches the two requests or makes two trips."),
-  beat("04:00", "Fire F-207 (TRN). Move two TRN workforce tokens physically to the MED table.", "The injury is visible and physical. Watch whether TRN asks MED for them back, and how."),
-  beat("05:00", "Fire F-211 (COM), F-202 (POW).", "POW now holds two and is being asked for specs by two others. Classic bottleneck. Watch for hoarding or brusqueness."),
+  beat("00:00", "NEXT ROUND → Round 2: all twelve faults land at once, two per sector. Move two TRN workforce tokens physically to the MED table (F-207’s injury). START. Announce in-world: \"Core output is fluctuating. Systems are coupling in ways they should not.\"", "How long before the first liaison stands up. Every table now needs another table’s binder."),
+  beat("01:00", "Walk the floor. Say nothing.", "F-201 is the discrepancy fault: watch WTR’s table when POW asks for the reservoir figure. MED’s cold chain has real urgency — do they escalate or absorb?"),
+  beat("03:00", "Watch AGR and POW.", "AGR holds two faults and needs COM for both — does the liaison batch the requests or make two trips? POW holds two and is asked for specs by two others: classic bottleneck. Hoarding or brusqueness?"),
+  beat("04:00", "Watch TRN.", "The injury is visible and physical. Watch whether TRN asks MED for the two workers back, and how."),
   beat("06:00", "CALL COUNCIL. Three-minute clock. Chiefs and liaisons to the centre table — the rest of the city keeps running.", "THE KEY OBSERVATION WINDOW. Who speaks, in what order, for how long. Who never speaks. Who runs the meeting without being asked. Also: what happens at the stations while the leaders are away."),
-  beat("09:00", "Council ends. Fire F-204 (WTR), F-206 (MED).", "Whether anything agreed at Council actually changes behaviour."),
+  beat("09:00", "Council ends.", "Whether anything agreed at Council actually changes behaviour."),
 ], BW));
 C.push(callout("Council sittings are your richest data.", "Whole-group, compressed, high stakes, one microphone. If you tag nothing else in the shift, tag the Council. Remember the pressure it creates is that the stations are running short-handed while it sits — it is not a rest for anyone."));
 
@@ -322,7 +319,7 @@ C.push(H3("Wave 3 · Escalation · Round 2 (11:00 – 15:00)"));
 C.push(p(t("No new script: this wave is where you spend the off-script inject library on the tables that are coping, and let the ones that are behind stay behind. Competing priorities are the point.")));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("11:30", "No button — this wave is inside Round 2. Fire F-208 (TRN), F-212 (COM).", "The room is now carrying unresolved work from the last wave into this one. Nobody gets a clean sheet."),
+  beat("11:30", "No button — this wave is inside Round 2. Nothing new is scripted: the twelve faults are already on the tables.", "The room is now carrying unresolved work from the last wave into this one. Nobody gets a clean sheet."),
   beat("13:00", "INJURE WORKER on the busiest sector. Fire one off-script fault at any table that is clear.", "Who asks for help first, and whether anyone offers before being asked."),
   beat("14:00", "Fire one more off-script fault into the loudest sector. Say nothing to the quiet ones.", "Sectors below 50 health. Note them; Core Failure will land on them hardest."),
 ], BW));
@@ -331,11 +328,9 @@ C.push(H3("Wave 4 · Core Failure · Round 3 (00:00 – 10:00)"));
 C.push(p(t("The climax. Two-spec faults, fast decay, and a decision with no right answer — landing on a city that has had no break since the shift began.")));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("00:00", "NEXT ROUND → Round 3, then START. Announce: \"Core integrity is falling. Assume nothing is routine.\"", ""),
-  beat("00:30", "Fire F-301 (POW), F-303 (MED).", "Two specs each now. Coordination cost doubles."),
-  beat("01:30", "Fire F-302 (WTR, 3.0/min decay) and F-305 (AGR).", "Both need their own buried Appendix C. Watch how long before anyone opens the back of the binder."),
+  beat("00:00", "NEXT ROUND → Round 3: its six critical faults land at once, one per sector, two specs each. START. Announce: \"Core integrity is falling. Assume nothing is routine.\"", ""),
+  beat("01:00", "Walk the floor. Say nothing.", "Two specs each now — coordination cost doubles. WTR and AGR need their own buried Appendix C: how long before anyone opens the back of the binder? F-302 bleeds at 3.0/min and F-304 at 2.5/min — watch for panic-guessing at the console."),
   beat("02:00", "Drop Core Integrity to 60. Announce: \"Core output cannot sustain six sectors.\" Klaxon.", "The room changes here. Note who moves first — toward the problem or toward protecting their own sector."),
-  beat("03:00", "Fire F-304 (TRN, 2.5/min decay), F-306 (COM).", "Health is draining fast now. Watch for panic-guessing at the console."),
   beat("05:00", "CALL COUNCIL. Announce the Continuity Order is due. Place the form on the centre table.", "Clause 7 says essential services take precedence and never defines essential. The argument about what essential means IS the exercise."),
   beat("06:30", "Ninety-second warning. Do not offer help or extend.", "Decision paralysis, or one voice bulldozing. Both are common. Tag both."),
   beat("08:00", "If the form is submitted: apply brownout to the two lowest-ranked sectors. If not: announce rolling blackouts across all six.", "Indecision must cost more than any decision. Do not soften this."),
@@ -354,10 +349,8 @@ C.push(H3("Wave 6 · Aftershock · Round 4 (00:00 – 05:00)"));
 C.push(p(t("Same teams, same roles, a fresh crisis onto the city they have left. Every fault needs a value buried in another sector’s Appendix C, so nothing can be solved from memory. Nothing is restored, refilled or healed for this wave — they carry what they built and what they broke. This is where the post-measurement begins.")));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("00:00", "NEXT ROUND → Round 4, then START. Announce in-world: \"Seismic activity detected.\" Restore brownout sectors to active.", "Whether anyone notices that nothing else was given back."),
-  beat("00:30", "Fire F-401 (POW), F-402 (MED).", "Both need buried appendices from other sectors. Watch the asking behaviour — it should look different from the early shift. That difference is the deliverable."),
-  beat("01:30", "Fire F-403 (WTR), F-404 (TRN).", "TRN’s is the mini-triage feed. Decay pressure returns onto tired people."),
-  beat("02:30", "Fire F-405 (AGR), F-406 (COM).", "Six sectors, six raids on six appendices. Watch who is asked twice and how they answer the second time."),
+  beat("00:00", "NEXT ROUND → Round 4: its six faults land at once, each needing another sector’s buried appendix. START. Announce in-world: \"Seismic activity detected.\" Restore brownout sectors to active.", "Whether anyone notices that nothing else was given back."),
+  beat("01:00", "Walk the floor.", "Six sectors, six raids on six appendices. The asking behaviour should look different from the early shift — that difference is the deliverable. Watch who is asked twice and how they answer the second time. TRN’s fault is the mini-triage feed; decay pressure returns onto tired people."),
   beat("03:30", "Optional short Council if the group is coping well. Skip if they are not.", "Compare directly against the first sitting. Same people, same format, measurable difference."),
 ], BW));
 

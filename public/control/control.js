@@ -113,6 +113,7 @@
           location.search = params.toString();
         });
       }
+      if (msg.type === 'error' && msg.reason === 'round_already_active') toast('THAT ROUND IS ALREADY ACTIVE — press its button and confirm to restart it');
       if (msg.type === 'observe_ack') { $('obs-note').value = ''; $('obs2-note').value = ''; obsTag = null; renderObs(); toast('OBSERVATION LOGGED', 'ok'); }
       if (msg.type === 'export_ready') window.open(msg.url, '_blank');
       if (msg.type === 'welcome' && msg.urls) urls = msg.urls;
@@ -248,20 +249,45 @@
       + 'Nothing is cleared, refilled, healed or reset, and no debrief screen is launched at the room.')) return;
     send({ type: 'end_simulation' });
   });
+  // ROUND ACTIVATION: a round button is one action — the round, its timer
+  // loaded READY at full length, and every fault of that round dealt to its
+  // sector at once, each exactly once. The server refuses duplicates; this
+  // side asks before dealing, and asks again before restarting the round the
+  // city is already in.
+  function roundFaultCount(roundId) {
+    const list = content && content.faults ? (content.faults.faults || content.faults) : null;
+    return Array.isArray(list) ? list.filter((f) => f.round === roundId).length : null;
+  }
+  function roundLengthOf(roundId) {
+    const lens = (state && state.config && state.config.round_length_s) || {};
+    return Number(lens[roundId] || 0);
+  }
+  function activateRound(p) {
+    if (!p || !p.round || p.number === null || p.number === undefined) return;
+    const n = roundFaultCount(p.round);
+    const len = roundLengthOf(p.round);
+    const faults = n === null ? 'Its faults land' : n === 1 ? 'Its 1 fault lands' : `Its ${n} faults land`;
+    const timer = len ? `its timer loads at ${U.mmss(len)}` : 'its timer loads at full length';
+    if (!confirm(`GO TO ${roundLabel(p)}?\n\n${faults} on the tables at once and ${timer}, READY for START. Nothing else is reset: health, stock, workers, transfers and earlier faults all carry over.`)) return;
+    send({ type: 'activate_round', round: p.round });
+  }
   $('btn-next-phase').addEventListener('click', () => {
     const next = nextPhase();
     if (!next) return;
-    // Nothing in the city moves with the round: no upkeep pass, no allowance
-    // reset, no expiry, no clock. Only which injects are armed changes.
-    if (!confirm(`GO TO ${roundLabel(next)}?\n\nNothing is reset: health, stock, workers, faults, transfers and upgrades all carry over. That round's timer loads at its full length and waits for START.`)) return;
-    send({ type: 'next_phase' });
+    if (next.number === null || next.number === undefined) {
+      // the last step is the end of the simulation, not a round
+      if (!confirm('GO TO END?\n\nEvery live timer stops and the final city state stands as it is.')) return;
+      send({ type: 'set_phase', phase: next.id });
+      return;
+    }
+    activateRound(next);
   });
 
   $('btn-prev-round').addEventListener('click', () => {
     const prev = prevPhase();
     if (!prev) return;
-    if (!confirm(`GO BACK TO ${roundLabel(prev)}?\n\nNothing is reset or replayed — the city stays exactly as it is. Only that round's inject list is armed again.`)) return;
-    send({ type: 'set_phase', phase: prev.id });
+    if (!confirm(`GO BACK TO ${roundLabel(prev)}?\n\nThat round's timer reloads at full length, READY. Its faults are already on the tables and are not dealt again. Nothing is reset or replayed.`)) return;
+    send({ type: 'activate_round', round: prev.round });
   });
   /** The next round in the visible sequence, or null at the end of it. */
   function nextPhase() {
@@ -544,8 +570,17 @@
       for (const b of $('progress').querySelectorAll('[data-phase]')) {
         b.addEventListener('click', () => {
           const p = phases.find((x) => x.id === b.dataset.phase);
-          if (!p || p.id === state.phase) return;
-          if (confirm(`GO TO ${roundLabel(p)}? Nothing in the city is reset; only that round's injects are armed.`)) send({ type: 'set_phase', phase: p.id });
+          if (!p) return;
+          if (p.number === null || p.number === undefined) {
+            if (p.id !== state.phase && confirm('GO TO END?\n\nEvery live timer stops and the final city state stands as it is.')) send({ type: 'set_phase', phase: p.id });
+            return;
+          }
+          if (p.id === state.phase) {
+            // the round the city is already in: a restart, never a second deal
+            if (confirm(`Restart ${roundLabel(p)}? This will reset the timer and reset this round's faults.`)) send({ type: 'activate_round', round: p.round, restart: true });
+            return;
+          }
+          activateRound(p);
         });
       }
     }

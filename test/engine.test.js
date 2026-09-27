@@ -2478,7 +2478,7 @@ test('the console markup: four destinations, OVERVIEW first, one PAUSE, no city 
   assert.ok(/id="phase-name"/.test(html) && /id="round-value"/.test(html) && /id="master-clock"/.test(html));
   assert.ok(/round_number/.test(js), 'the round number is not printed');
   assert.ok(/id="btn-end-phase"[^>]*>STOP CLOCK/.test(html) && /id="btn-next-phase"/.test(html));
-  assert.ok(/action: 'end' \}/.test(js) && /type: 'next_phase'/.test(js), 'stop-clock and next-phase are different intents');
+  assert.ok(/action: 'end' \}/.test(js) && /type: 'activate_round'/.test(js), 'stop-clock and next-round are different intents');
   assert.ok(!/ADVANCE ROUND|set_round/.test(js), 'no invented round action');
   assert.ok(/id="btn-reset"/.test(html) && /id="more"/.test(html) && !/class="tb-right">[\s\S]*?id="btn-reset"/.test(html.split('id="more"')[0]), 'RESET is still on the top bar');
   assert.ok(/id="rs-typed"/.test(js) && /typed !== 'RESET'/.test(js) && /confirm_text/.test(js), 'RESET does not ask for the typed word');
@@ -3378,6 +3378,10 @@ test('a follow-up event fires after its delay; the biological breach is containm
 
 test('a fault preset fires now and schedules the rest; the queue freezes with the game', () => {
   const game = running();
+  // the round button deals a round's faults now; a preset is an off-script wave a scenario may still carry
+  game.scenario.fault_presets = [{ id: 'r2_wave_a', name: 'TEST WAVE', items: [
+    { fault_code: 'F-201', sector: 'POW', delay_s: 0 }, { fault_code: 'F-203', sector: 'WTR', delay_s: 90 }, { fault_code: 'F-205', sector: 'MED', delay_s: 180 },
+  ] }];
   const res = game.firePreset('r2_wave_a');
   assert.equal(res.ok, true);
   assert.ok(game.findFault('POW', 'F-201'));
@@ -4245,7 +4249,16 @@ test('a disabled card never reaches a balanced hand either', () => {
 // -- timeline ---------------------------------------------------------------------------
 
 test('the round script: AUTO fires itself, MANUAL becomes READY TO FIRE, skip and delay work', () => {
-  const game = running();   // R2 script from the scenario
+  const game = running();
+  // the round button deals a round's faults now; the script still carries beats, so give it scripted ones to prove the mechanism
+  game.scenario.timelines.R2 = [
+    { offset_s: 0, kind: 'fault', fault_code: 'F-201', sector: 'POW', mode: 'MANUAL' },
+    { offset_s: 120, kind: 'fault', fault_code: 'F-203', sector: 'WTR', mode: 'MANUAL' },
+    { offset_s: 180, kind: 'announce', text: 'Core output dropping.', mode: 'AUTO' },
+    { offset_s: 240, kind: 'fault', fault_code: 'F-205', sector: 'MED', mode: 'MANUAL' },
+    { offset_s: 510, kind: 'council', mode: 'MANUAL', note: 'Council #1' },
+  ];
+  game.setRound('R2'); game.clock('start');
   const items = game.state.timeline;
   assert.ok(items.length >= 4);
   assert.equal(items[0].status, 'PENDING');
@@ -4636,6 +4649,115 @@ test('round timer: RESET goes back to the round\'s full length and waits; a roun
   for (const d of ['-120', '-60', '-30', '30', '60', '120', '300']) assert.ok(html.includes(`data-timer-delta="${d}"`), `console lacks the ${d} s preset`);
   assert.ok(/ROUND TIME/.test(html) && !/MASTER TIME/.test(html), 'the console still says MASTER TIME');
   assert.ok(/RESET TO ROUND LENGTH/.test(html));
+});
+
+// -- ROUND ACTIVATION (undercity_round_fault_auto_trigger_spec v1.1, 2026-09-28) ---
+//
+// A round button is one action: the round, its timer READY at full length, and
+// every fault of that round on its sector at once — each exactly once per run.
+// The spec's acceptance tests, in its order, plus its rules.
+
+const allFaultIds = (game) => Object.values(game.state.sectors).flatMap((s) => s.faults.map((f) => f.id)).sort();
+const allFaultCodes = (game) => Object.values(game.state.sectors).flatMap((s) => s.faults.map((f) => f.code)).sort();
+
+test('round activation: R0 to R4 each deal exactly their fault set as one action with the timer READY, and earlier rounds are kept', () => {
+  const game = newGame();
+  const expect = {
+    R0: { len: 1200, faults: { POW: ['F-001'], WTR: ['F-002'], MED: ['F-003'], TRN: ['F-004'], AGR: ['F-005'], COM: ['F-006'] } },
+    R1: { len: 900, faults: { POW: ['F-101'], WTR: ['F-102'], MED: ['F-103'], TRN: ['F-104'], AGR: ['F-105'], COM: ['F-106'] } },
+    R2: { len: 900, faults: { POW: ['F-201', 'F-202'], WTR: ['F-203', 'F-204'], MED: ['F-205', 'F-206'], TRN: ['F-207', 'F-208'], AGR: ['F-209', 'F-210'], COM: ['F-211', 'F-212'] } },
+    R3: { len: 720, faults: { POW: ['F-301'], WTR: ['F-302'], MED: ['F-303'], TRN: ['F-304'], AGR: ['F-305'], COM: ['F-306'] } },
+    R4: { len: 480, faults: { POW: ['F-401'], WTR: ['F-403'], MED: ['F-402'], TRN: ['F-404'], AGR: ['F-405'], COM: ['F-406'] } },
+  };
+  let total = 0;
+  for (const [id, e] of Object.entries(expect)) {
+    const res = game.activateRound(id);
+    assert.equal(res.ok, true, `${id}: ${res.reason}`);
+    const n = Object.values(e.faults).flat().length;
+    assert.equal(res.dealt.length, n, `${id} dealt ${res.dealt.length}`); assert.deepEqual(res.reset, []); assert.deepEqual(res.kept, []);
+    assert.equal(game.state.round, id);
+    assert.deepEqual([game.state.round_clock.status, game.state.round_clock.remaining_s, game.state.round_clock.running], ['ready', e.len, false], `${id}: timer`);
+    for (const [sector, codes] of Object.entries(e.faults)) {
+      for (const code of codes) {
+        const inst = game.state.sectors[sector].faults.filter((f) => f.code === code);
+        assert.equal(inst.length, 1, `${code} instances in ${sector}`);
+        assert.equal(inst[0].resolved, false); assert.equal(inst[0].status, 'ACTIVE');
+        assert.equal(inst[0].fired_at, res.at, `${code} was not stamped with the activation time`);
+        assert.equal(inst[0].triggered_by, `round:${id}`);
+      }
+    }
+    total += n;
+    assert.equal(allFaultCodes(game).length, total, `${id}: earlier rounds' faults were not preserved`);
+    // the faults reach the facilitator and every affected sector at once
+    assert.equal(Object.values(forControl(game).sectors).flatMap((s) => s.faults).length, total);
+    for (const [sector, codes] of Object.entries(e.faults)) {
+      const own = forSector(game, sector).sectors[sector].faults.map((f) => f.code);
+      for (const code of codes) assert.ok(own.includes(code), `${sector} does not see ${code}`);
+    }
+    game.clock('start'); game.tick(30000);   // play a little, then move on with the timer running
+  }
+  assert.equal(total, 36);
+  for (const s of Object.keys(expect.R2.faults)) assert.equal(game.state.sectors[s].faults.filter((f) => f.code.startsWith('F-2')).length, 2, 'R2 is two per sector');
+});
+
+test('round activation: the same round again is refused without restart; a restart resets the timer and this round\'s faults in place, never a second record', () => {
+  const game = newGame();
+  game.activateRound('R2');
+  const ids = allFaultIds(game);
+  game.clock('start'); game.tick(60000);
+  // resolve one, clear one, leave the rest open
+  const def = game.faultsByCode.get('F-201');
+  game.setInventory('POW', { power: 9, water: 9, parts: 9, med: 9 });
+  assert.equal(submitCode(game, { sector: 'POW', fault_code: 'F-201', code: def.valid_codes[0], workers_assigned: def.crew_required }).accepted, true);
+  assert.equal(game.clearFault('WTR', 'F-203', 'cleared by hand'), true);
+  // again, without restart: refused, nothing dealt, timer untouched
+  const again = game.activateRound('R2');
+  assert.equal(again.ok, false); assert.equal(again.reason, 'round_already_active');
+  assert.equal(game.state.round_clock.remaining_s, 840); assert.equal(game.state.round_clock.status, 'running');
+  assert.deepEqual(allFaultIds(game), ids, 'a second click dealt a duplicate');
+  // a refresh, a reconnect, a re-render: frames are read, nothing is written; a server restart keeps the records
+  for (let i = 0; i < 5; i += 1) { forControl(game); forSector(game, 'POW'); forBigscreen(game); }
+  const restored = newGame({ runId: 'activate-restore' });
+  restored.restore(JSON.parse(JSON.stringify(game.serialise())));
+  assert.deepEqual(allFaultIds(restored), ids, 'a restart of the server dealt a duplicate');
+  assert.equal(restored.activateRound('R2').reason, 'round_already_active', 'the restored run forgot the round was dealt');
+  // restart: timer back to 15:00 READY, every R2 fault active again, the same records
+  const restart = game.activateRound('R2', { restart: true });
+  assert.equal(restart.ok, true); assert.equal(restart.restart, true);
+  assert.equal(restart.reset.length, 12); assert.deepEqual(restart.dealt, []);
+  assert.deepEqual([game.state.round_clock.status, game.state.round_clock.remaining_s, game.state.round_clock.running], ['ready', 900, false]);
+  assert.deepEqual(allFaultIds(game), ids, 'the restart created new records');
+  const f201 = game.state.sectors.POW.faults.find((f) => f.code === 'F-201');
+  assert.deepEqual([f201.resolved, f201.status, f201.resolved_at, f201.restarts], [false, 'ACTIVE', null, 1]);
+  assert.equal(game.state.sectors.WTR.faults.find((f) => f.code === 'F-203').resolved, false, 'the cleared fault is not back');
+  assert.equal(game.findFault('POW', 'F-201').id, f201.id);
+  assert.equal(logEvents(game, 'round_activated').length, 2);
+  assert.equal(logEvents(game, 'fault_reset').length, 12);
+});
+
+test('round activation: PREV and NEXT deal nothing twice, a plain phase change deals nothing at all, and the round the game starts in still needs its activation', () => {
+  const game = newGame();
+  assert.equal(game.state.round, 'R0');
+  assert.equal(game.activateRound('R0').dealt.length, 6, 'R0 was not dealt');
+  assert.equal(game.activateRound('R0').reason, 'round_already_active');
+  assert.equal(game.activateRound('R1').dealt.length, 6);
+  const back = game.activateRound('R0');   // PREV ROUND
+  assert.equal(back.ok, true); assert.deepEqual(back.dealt, []); assert.equal(back.kept.length, 6);
+  assert.deepEqual([game.state.round, game.state.round_clock.remaining_s, game.state.round_clock.status], ['R0', 1200, 'ready']);
+  assert.equal(allFaultCodes(game).length, 12);
+  game.setPhase('ROUND_2');                // a phase change on its own arms the script and deals nothing
+  assert.equal(allFaultCodes(game).length, 12);
+  assert.equal(game.activateRound('R2').dealt.length, 12);
+  assert.equal(allFaultCodes(game).length, 24);
+  assert.equal(game.activateRound('R9').reason, 'unknown_round');
+  // no scenario beat deals a fault any more: the round button does
+  for (const items of Object.values(game.scenario.timelines || {})) assert.ok(items.every((it) => it.kind !== 'fault'), 'a timeline still fires faults');
+  assert.deepEqual(game.scenario.fault_presets, []);
+  // the console sends activate_round from every round button, and asks before a restart
+  const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'control', 'control.js'), 'utf8');
+  assert.ok(/type: 'activate_round'/.test(js), 'the console does not activate rounds');
+  assert.ok(/Restart \$\{roundLabel\(p\)\}\? This will reset the timer and reset this round's faults\./.test(js), 'no restart confirmation');
+  assert.ok(!/type: 'next_phase'/.test(js), 'NEXT ROUND still bypasses activation');
 });
 
 test('per-fault overrides: extra accepted codes; the content answer stays; an old deadline override is ignored', () => {

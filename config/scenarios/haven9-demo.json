@@ -24,10 +24,7 @@
 
   "timelines": {
     "R2": [
-      { "offset_s": 5,   "kind": "fault", "fault_code": "F-201", "sector": "POW", "mode": "AUTO", "note": "DEMO — the cross-sector coolant fault; POW needs WTR's reservoir value" },
-      { "offset_s": 60,  "kind": "fault", "fault_code": "F-203", "sector": "WTR", "mode": "AUTO" },
       { "offset_s": 90,  "kind": "announce", "text": "DEMO: core output dropping. Council convenes shortly.", "mode": "AUTO" },
-      { "offset_s": 120, "kind": "fault", "fault_code": "F-205", "sector": "MED", "mode": "AUTO" },
       { "offset_s": 180, "kind": "core",  "value": 60, "mode": "AUTO", "note": "DEMO — the city can sustain 4 of 6 sectors" },
       { "offset_s": 240, "kind": "council", "mode": "MANUAL", "note": "DEMO — Council and the Continuity Order" }
     ]
