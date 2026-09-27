@@ -18,9 +18,9 @@ function flatten(value, out = []) {
 
 function loaded() {
   const game = newGame();
-  game.fireFault('F-201', 'POW');   // valid codes P-04-340 / P-04-290
-  game.fireFault('F-103', 'WTR');
-  game.fireFault('F-210', 'AGR');
+  game.fireFault('F-201', 'POW');   // valid codes P-03-340 / P-03-290
+  game.fireFault('F-102', 'WTR');
+  game.fireFault('F-209', 'AGR');
   game.setIntegrity('WTR', 44);
   return game;
 }
@@ -98,8 +98,8 @@ test('non-COM sectors get full_telemetry false and no foreign fault arrays', () 
 test('valid_codes NEVER appear in a sector payload', () => {
   for (const code of ['POW', 'WTR', 'MED', 'TRN', 'AGR', 'COM']) {
     const strings = flatten(forSector(loaded(), code));
-    assert.ok(!strings.includes('P-04-340'), `${code} payload leaked the answer key`);
-    assert.ok(!strings.includes('P-04-290'), `${code} payload leaked the alternate code`);
+    assert.ok(!strings.includes('P-03-340'), `${code} payload leaked the answer key`);
+    assert.ok(!strings.includes('P-03-290'), `${code} payload leaked the alternate code`);
     assert.ok(!JSON.stringify(forSector(loaded(), code)).includes('valid_codes'),
       `${code} payload contains a valid_codes field`);
   }
@@ -117,7 +117,7 @@ test('the wall names the worst fault and the stock, never the fix', () => {
   assert.equal(typeof pow.unresolved_faults, 'number');
   const json = JSON.stringify(payload);
   assert.ok(!json.includes('valid_codes'));
-  assert.ok(!json.includes('P-04-340'));
+  assert.ok(!json.includes('P-03-340'));
   assert.ok(!/Appendix C/i.test(json));
   assert.ok(payload.feed && payload.telemetry, 'feed and telemetry are public');
 });
@@ -143,16 +143,9 @@ test('control receives the live answer key, undelayed', () => {
   const payload = forControl(game);
 
   const pow = payload.sectors.POW;
-  assert.deepEqual(pow.faults[0].valid_codes, ['P-04-340', 'P-04-290']);
+  assert.deepEqual(pow.faults[0].valid_codes, ['P-03-340', 'P-03-290']);
   assert.equal(payload.sectors.WTR.integrity, 44, 'facilitator sees the present, not a delay');
   assert.ok(pow.inventory && pow.workforce);
-});
-
-test('control sees the empty valid_codes array that marks the false alarm', () => {
-  const payload = forControl(loaded());
-  const ghost = payload.sectors.AGR.faults.find((f) => f.code === 'F-210');
-  assert.deepEqual(ghost.valid_codes, []);
-  assert.equal(ghost.false_alarm, true);
 });
 
 test('the 290 telemetry reaches sectors and big screen and is never reconciled', () => {
@@ -174,10 +167,10 @@ test('the dashboard withholds the dependency half, exactly as the card does', ()
 });
 
 test('no sector payload ever names a buried Appendix C spec', () => {
-  // The six R3/R4 faults that need a buried spec must not advertise it. The
+  // The eight R3/R4 faults that need a buried spec must not advertise it. The
   // binder gives Appendix C no index entry on purpose (spec §4.1 p.10); a
   // dashboard that names it hands over the frustration-tolerance probe.
-  const buried = ['F-302', 'F-305', 'F-401', 'F-402', 'F-403', 'F-404'];
+  const buried = ['F-302', 'F-305', 'F-401', 'F-402', 'F-403', 'F-404', 'F-405', 'F-406'];
   for (const code of buried) {
     const game = newGame();
     const def = game.faultsByCode.get(code);
@@ -191,9 +184,9 @@ test('no sector payload ever names a buried Appendix C spec', () => {
 
 test('a flavour with no dependency clause is left alone', () => {
   const game = newGame();
-  game.fireFault('F-210', 'AGR');   // two plain sentences, no semicolon
-  const fault = forSector(game, 'AGR').sectors.AGR.faults[0];
-  assert.equal(fault.flavour, 'Dashboards show a Bay 3 flood. Fields report dry floors.');
+  game.fireFault('F-001', 'POW');   // one plain sentence, no semicolon
+  const fault = forSector(game, 'POW').sectors.POW.faults[0];
+  assert.equal(fault.flavour, 'Routine diagnostics flag a stuck relay on the main panel.');
 });
 
 test('the facilitator still reads the whole flavour line', () => {

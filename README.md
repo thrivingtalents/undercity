@@ -149,8 +149,9 @@ npm start                                            # http://localhost:3000/adm
    for opening a card, assigning crew or a wrong code. Health is capped at 100
    and never revives a DARK sector; resources still need Transport to leave;
    COM's board stays whatever COM last reported. A facilitator clear pays
-   nothing by default (a switch, logged as an override); clearing the one
-   ghost fault, which has no code, is its real completion and does pay.
+   nothing by default (a switch, logged as an override); clearing a ghost
+   fault, one with no code, is its real completion and does pay (the deck
+   has carried none since 2026-09-27).
    Since v17 a repair is crew + the binder's materials + the code, committed
    at once from the real tray (a refusal consumes nothing; the console says
    MATERIALS NOT READY, never which). Since v17.3 every fault instance is
@@ -388,7 +389,7 @@ Migrations are additive and run at boot (`lib/db.js` → `migrate`).
 - **Tuning one fault for a run** (deadline, expiry penalty, extra accepted
   codes) is a scenario override — Admin → SETTINGS → *Fault overrides*, or
   `fault_overrides: { "F-201": { "deadline_s": 480, "integrity_penalty": 10,
-  "extra_valid_codes": ["P-04-290"] } }` in the file. It applies to faults
+  "extra_valid_codes": ["P-03-290"] } }` in the file. It applies to faults
   fired from then on. An extra code is added *beside* the content answer, never
   instead of it: that lets a facilitator honour a binder misprint mid-session
   without desynchronising paper from server, which is why the answer itself is
@@ -445,14 +446,15 @@ enforced by the generators: a card prints the symptom only; a binder never
 prints another sector's spec values or a complete code; Appendix C gets no
 index entry.
 
-## Two structural edge cases
+## Two structural shapes
 
 - **`F-201` has two valid codes.** The WTR binder prints reservoir pressure
   **340**; the wall shows **290**. The server accepts either. Never reconciled —
   the mismatch *is* the psychological-safety probe (spec §3.7).
-- **`F-210` has zero.** A sensor ghost with no procedure. Every submission
-  returns `no_procedure`; only the facilitator can clear it. Driven off
-  `valid_codes.length === 0`, never off the code.
+- **A fault may have zero.** An empty `valid_codes` array is a false alarm:
+  every submission returns `no_procedure` and only the facilitator can clear
+  it. Driven off `valid_codes.length === 0`, never off a code. The deck has
+  carried no such fault since 2026-09-27 — every card has a procedure.
 
 ## Visibility
 

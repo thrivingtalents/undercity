@@ -10,7 +10,7 @@
 1. **The server is authoritative.** Clients never compute game state. They render what they are told and send intents. No optimistic UI.
 2. **Broadcast full state, always.** ~3–5 KB JSON, 8 clients, human-speed events. Diffing is premature optimisation and a bug factory. One `state` message shape, every client re-renders from it.
 3. **Content is loaded, never coded.** Server reads `content/faults.json`, `content/specs.json`, `content/sectors.json` at boot. Changing the game = re-running `export_faults.py`, not editing source.
-4. **Two edge cases are structural, not exceptions.** `valid_codes` is an *array* (F-201 accepts two codes), and it may be *empty* (F-210 is a false alarm with no code). Any code path that assumes exactly one code is wrong.
+4. **Two edge cases are structural, not exceptions.** `valid_codes` is an *array* (F-201 accepts two codes), and it may be *empty* (a false alarm with no code — the deck has carried none since 2026-09-27, but the shape stays). Any code path that assumes exactly one code is wrong.
 5. **No chat feature, ever.** All inter-sector communication is voice or feet. A chat box would route the diagnostic data into silent text and destroy the product.
 6. **Every state change is logged** to `runlog.jsonl` — this file is joined to audio timestamps in debrief. Logging is a P0 feature, not instrumentation.
 
@@ -117,7 +117,7 @@ The server sends each sector client a **filtered** state. Never send the full pi
 
 ```json
 { "type": "submit_code", "sector": "POW", "fault_code": "F-201",
-  "code": "P-04-340", "workers_assigned": 2 }
+  "code": "P-03-340", "workers_assigned": 2 }
 
 { "type": "set_inventory", "sector": "POW",
   "inventory": { "power": 4, "water": 1, "parts": 2, "med": 0 } }
@@ -142,7 +142,7 @@ still corrects a count from Admin with `adjust_inventory`, which is logged.
 **There is no deadline** (2026-09-17). A fault carries no countdown, expiry or penalty at a moment in time; decay is the only pressure. A sector's fault view carries `code, name, flavour` (the symptom only), `severity, decay_per_min, attempts, locked_until_s, status, reward, reward_claimed` and never `crew_required`, `resources_required`, `procedure` or a deadline field. Old `deadline_*` fields in a snapshot or the content are read and ignored.
 7. **Then the fault's reward** (`lib/fault-rewards.json`, one per fault): resources into the owner's real inventory and/or health capped at 100 (a DARK sector stays at 0), claimed once per run under `faultReward:{run_id}:{code}` and kept in `state.rewards_claimed` so a re-fired fault, a refresh, a reconnect or a duplicate frame can never pay twice. `submit_result` carries `reward { applied, resources, health, health_before, health_after, text }` or `{ applied: false, reason }`. Every sector frame's fault carries `reward { resources, health, text }` (null when the preview is off) and `reward_claimed`. Facilitator `clear_fault` pays nothing unless `reward_on_facilitator_force_resolve` is on (then logged as an override), except for a fault with no procedure, whose clear is its completion. Events: `fault_reward_applied`, `fault_reward_duplicate_blocked`, `fault_reward_force_resolve_skipped`, `fault_reward_admin_override`.
 
-**Empty `valid_codes` (F-210, false alarm):** every submission returns `reject: "no_procedure"` with UI text *"No matching procedure. Verify this alert."* The facilitator clears it manually via `clear_fault` once COM confirms the ghost. Do not special-case F-210 by code — drive it off the empty array, so future false alarms need no code change.
+**Empty `valid_codes` (a false alarm):** every submission returns `reject: "no_procedure"` with UI text *"No matching procedure. Verify this alert."* The facilitator clears it manually via `clear_fault` once the alert is confirmed false. Never special-case a false alarm by code — drive it off the empty array, so a future one needs no code change. The 2026-09-27 deck carries none.
 
 ```json
 // server -> requesting client only
@@ -161,7 +161,7 @@ Every message requires the token. Grouped by control-panel column (§6.3 of the 
 **Col 1 — Runbook / injects**
 ```json
 { "type": "fire_fault",  "fault_code": "F-201", "sector": "POW" }
-{ "type": "clear_fault", "fault_code": "F-210", "sector": "AGR", "reason": "false alarm confirmed" }
+{ "type": "clear_fault", "fault_code": "F-209", "sector": "AGR", "reason": "facilitator cleared" }
 { "type": "runbook_mark", "beat_id": "R2-04", "done": true }
 ```
 `fire_fault` looks the fault up in `faults.json` and instantiates it on the sector, applying `injures_workforce` (tokens move to MED's injured count) — server-side, so the facilitator never has to remember.
@@ -206,8 +206,8 @@ Tags: `DOMINANCE` `WITHDRAWAL` `SAFETY+` `SAFETY-` `DISCREPANCY-SPOTTED`. Writes
 
 ```json
 {"t":"2026-09-14T10:38:00.112Z","ev":"fault_fired","sector":"POW","fault":"F-201","round":"R2"}
-{"t":"2026-09-14T10:41:22.900Z","ev":"submit","sector":"POW","fault":"F-201","code":"P-04-291","accepted":false,"reason":"invalid_code","attempts":2}
-{"t":"2026-09-14T10:42:03.117Z","ev":"submit","sector":"POW","fault":"F-201","code":"P-04-340","accepted":true,"workers":2}
+{"t":"2026-09-14T10:41:22.900Z","ev":"submit","sector":"POW","fault":"F-201","code":"P-03-291","accepted":false,"reason":"invalid_code","attempts":2}
+{"t":"2026-09-14T10:42:03.117Z","ev":"submit","sector":"POW","fault":"F-201","code":"P-03-340","accepted":true,"workers":2}
 {"t":"2026-09-14T10:44:10.004Z","ev":"observe","sector":"POW","tag":"SAFETY-","note":"Engineer flagged 290/340 mismatch, chief dismissed it"}
 {"t":"2026-09-14T10:45:00.000Z","ev":"mode","mode":"COUNCIL"}
 ```
@@ -222,7 +222,7 @@ Log every: fault fired/resolved/cleared, every submit (accepted *and* rejected �
 
 1. **Server skeleton** — Express + `ws`, load the three JSON fixtures, in-memory state, 10 s decay tick, snapshot to disk every 10 s, `runlog.jsonl` appender.
 2. **`hello`/`state` loop + visibility filter** — get the filtering right here; retrofitting it later means auditing every view.
-3. **Sector dashboard** — three columns per spec §6.1. Test against F-201 (two valid codes) and F-210 (empty array) before building anything else.
+3. **Sector dashboard** — three columns per spec §6.1. Test against F-201 (two valid codes) and a fault whose `valid_codes` you empty by hand (the false-alarm shape) before building anything else.
 4. **Control panel** — ugly is fine, complete is not. Runbook column + observation pad first.
 5. **Big screen** — the HAVEN-9 cross-section SVG deserves real design time; everything else on it is bars and a ticker.
 6. **Council mode + brownout/dark states** — the R3 climax path, end to end.
@@ -694,9 +694,10 @@ target (`reward_choose`, below); a choice not made by the round change is
 settled to the lowest-health sector or fastest-decaying fault. The
 facilitator's `clear_fault` pays nothing unless `with_reward: true`, which
 is logged as an override; a refund on such a clear pays nothing because
-nothing was consumed. F-210 keeps no crew, no materials and no code; any
-submit is `no_procedure`; the clear is its completion and pays a
-non-stock reward (SPECIAL_VERIFICATION profile, RVU 2).
+nothing was consumed. A false alarm keeps no crew, no materials and no
+code; any submit is `no_procedure`; the clear is its completion and pays
+a non-stock reward (SPECIAL_VERIFICATION profile). The deck has carried
+none since 2026-09-27.
 
 ```json
 { "type": "reward_choose", "fault_id": "F-0007", "target": { "sector": "MED" } }         // a sector, from the options

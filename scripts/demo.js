@@ -79,16 +79,16 @@ async function main() {
   await wait(6);
 
   say('4. Wrong resolution code, twice — attempts recorded, no lockout yet');
-  send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-201', code: 'P-04-000', workers_assigned: 2 });
+  send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-201', code: 'P-03-000', workers_assigned: 2 });
   await wait(4);
-  send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-201', code: 'P-04-999', workers_assigned: 2 });
+  send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-201', code: 'P-03-999', workers_assigned: 2 });
   await wait(4);
   say('   …and a third — CONSOLE LOCKED 00:20');
-  send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-201', code: 'P-04-111', workers_assigned: 2 });
+  send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-201', code: 'P-03-111', workers_assigned: 2 });
   await waitReal(21);
 
-  say('5. Correct code P-04-340 (the binder value; 290 from the wall also works) — FAULT RESOLVED +5, parts −2 water −1');
-  send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-201', code: 'P-04-340', workers_assigned: 2 });
+  say('5. Correct code P-03-340 (the binder value; 290 from the wall also works) — FAULT RESOLVED +5, parts −2 water −1');
+  send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-201', code: 'P-03-340', workers_assigned: 2 });
   await wait(6);
 
   say('6. POW asks WTR for 2 water — WTR fulfils it, TRN confirms the chit and approves, and stock moves');
@@ -146,15 +146,15 @@ async function main() {
   A({ type: 'clock', which: 'round', action: 'start' });
   A({ type: 'fire_fault', fault_code: 'F-301', sector: 'POW' });
   await wait(4);
-  send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-301', code: 'P-06-000', workers_assigned: 3 });
+  send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-301', code: 'P-05-000', workers_assigned: 3 });
   await wait(3);
-  send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-301', code: 'P-06-142-261', workers_assigned: 3 });
+  send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-301', code: 'P-05-142-261', workers_assigned: 3 });
   await wait(3);
   A({ type: 'set_phase', phase: 'AFTERSHOCK' });
   A({ type: 'clock', which: 'round', action: 'start' });
   A({ type: 'fire_fault', fault_code: 'F-401', sector: 'POW' });
   await wait(4);
-  send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-401', code: 'P-07-243-534', workers_assigned: 2 });
+  send(pow, { type: 'submit_code', sector: 'POW', fault_code: 'F-401', code: 'P-06-243-534', workers_assigned: 2 });
   await wait(3);
   A({ type: 'set_phase', phase: 'DEBRIEF_2' });
   A({ type: 'wall_debrief', on: true });

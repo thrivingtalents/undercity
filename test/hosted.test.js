@@ -241,7 +241,7 @@ test('two concurrent sessions never leak into each other', async (t) => {
   await t.test('resolving in one session leaves the other alone', async () => {
     aPow.ws.send(JSON.stringify({
       type: 'submit_code', sector: 'POW', fault_code: 'F-201',
-      code: 'P-04-290', workers_assigned: 2,
+      code: 'P-03-290', workers_assigned: 2,
     }));
     await wait(400);
     const result = aPow.messages.filter((m) => m.type === 'submit_result').pop();

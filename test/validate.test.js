@@ -28,7 +28,7 @@ test('F-208 reconciles: the card and the answer key name the same row', () => {
   assert.match(f208.flavour, /AGR East/);
   assert.equal(ref.row_label, 'Array East');
   assert.equal(ref.value, 915);
-  assert.deepEqual(f208.valid_codes, ['P-05-915']);
+  assert.deepEqual(f208.valid_codes, ['P-04-915']);
 });
 
 test('the prose detector still fires when a card contradicts the key', () => {
@@ -104,10 +104,10 @@ test('two faults in one sector sharing a code is an error', () => {
 
 test('false_alarm must agree with an empty valid_codes array', () => {
   const content = clone(loadContent());
-  content.faults.faults.find((f) => f.code === 'F-210').false_alarm = false;
+  content.faults.faults.find((f) => f.code === 'F-201').valid_codes = [];
 
   const { errors } = validateContent(content);
-  assert.ok(errors.some((e) => e.includes('F-210') && e.includes('contradicts')));
+  assert.ok(errors.some((e) => e.includes('F-201') && e.includes('contradicts')));
 });
 
 test('a fault referencing an unknown spec id is an error', () => {
@@ -126,13 +126,13 @@ test('meta counts that disagree with the file are an error', () => {
   assert.ok(errors.some((e) => e.includes('fault_count')));
 });
 
-test('content still holds both structural edge cases', () => {
+test('content holds the two-code discrepancy and no codeless fault', () => {
   const { faults } = loadContent();
   const multi = faults.faults.filter((f) => f.valid_codes.length > 1);
   const empty = faults.faults.filter((f) => f.valid_codes.length === 0);
 
   assert.deepEqual(multi.map((f) => f.code), ['F-201'], 'the two-code discrepancy fault');
-  assert.deepEqual(empty.map((f) => f.code), ['F-210'], 'the false alarm');
+  assert.deepEqual(empty.map((f) => f.code), [], 'no false alarm — every card has a code');
 });
 
 test('every binder holds exactly one buried appendix spec', () => {
@@ -152,6 +152,6 @@ test('the discrepancy seed is intact in the content', () => {
   assert.match(w43.flags, /DISCREPANCY/);
 
   const f201 = faults.faults.find((f) => f.code === 'F-201');
-  assert.deepEqual(f201.valid_codes, ['P-04-340', 'P-04-290'],
+  assert.deepEqual(f201.valid_codes, ['P-03-340', 'P-03-290'],
     'the server accepts the binder value and the big screen value alike');
 });

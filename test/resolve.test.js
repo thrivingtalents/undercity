@@ -7,11 +7,11 @@ const { submitCode, normaliseCode } = require('../lib/resolve');
 
 const submit = (game, over = {}) =>
   submitCode(game, {
-    sector: 'POW', fault_code: 'F-201', code: 'P-04-340', workers_assigned: 2, ...over,
+    sector: 'POW', fault_code: 'F-201', code: 'P-03-340', workers_assigned: 2, ...over,
   });
 
 test('F-201 accepts BOTH seeded codes — the discrepancy must never be punished', () => {
-  for (const code of ['P-04-340', 'P-04-290']) {
+  for (const code of ['P-03-340', 'P-03-290']) {
     const game = newGame();
     game.fireFault('F-201', 'POW');
     const res = submit(game, { code });
@@ -36,20 +36,7 @@ test('F-201 resolution stops decay and applies recovery', () => {
   assert.equal(game.state.sectors.POW.integrity, before, 'a resolved fault stops decaying');
 });
 
-test('F-210 has no procedure: every submission is rejected, whatever the code', () => {
-  const game = newGame();
-  game.fireFault('F-210', 'AGR');
-
-  for (const code of ['P-04-401', 'ANYTHING', '', 'P-05-915']) {
-    const res = submitCode(game, {
-      sector: 'AGR', fault_code: 'F-210', code, workers_assigned: 0,
-    });
-    assert.equal(res.accepted, false);
-    assert.equal(res.reason, 'no_procedure', `"${code}" must yield no_procedure`);
-  }
-});
-
-test('no_procedure is driven by the EMPTY ARRAY, not by the fault code F-210', () => {
+test('no_procedure is driven by the EMPTY ARRAY, never by a fault code', () => {
   const game = newGame();
   game.fireFault('F-201', 'POW');
   // A hypothetical future false alarm: same empty-array shape, different code.
@@ -60,11 +47,13 @@ test('no_procedure is driven by the EMPTY ARRAY, not by the fault code F-210', (
     'any fault with an empty valid_codes array behaves as a false alarm');
 });
 
-test('F-210 can only be cleared by the facilitator', () => {
+test('a fault with no procedure can only be cleared by the facilitator', () => {
   const game = newGame();
-  game.fireFault('F-210', 'AGR');
-  assert.equal(game.clearFault('AGR', 'F-210', 'false alarm confirmed'), true);
-  assert.equal(game.findFault('AGR', 'F-210'), null);
+  game.fireFault('F-201', 'POW');
+  game.state.sectors.POW.faults.find((f) => f.code === 'F-201').valid_codes = [];
+  assert.equal(submit(game).reason, 'no_procedure');
+  assert.equal(game.clearFault('POW', 'F-201', 'false alarm confirmed'), true);
+  assert.equal(game.findFault('POW', 'F-201'), null);
 });
 
 test('three consecutive invalid codes trigger a 20s lockout', () => {
@@ -72,7 +61,7 @@ test('three consecutive invalid codes trigger a 20s lockout', () => {
   game.fireFault('F-201', 'POW');
 
   let res;
-  for (let i = 0; i < 3; i += 1) res = submit(game, { code: 'P-04-000' });
+  for (let i = 0; i < 3; i += 1) res = submit(game, { code: 'P-03-000' });
 
   assert.equal(res.reason, 'invalid_code');
   assert.equal(res.locked_until_s, 20);
@@ -85,7 +74,7 @@ test('three consecutive invalid codes trigger a 20s lockout', () => {
 test('lockout expires on the tick and the fault becomes solvable again', () => {
   const game = newGame();
   game.fireFault('F-201', 'POW');
-  for (let i = 0; i < 3; i += 1) submit(game, { code: 'P-04-000' });
+  for (let i = 0; i < 3; i += 1) submit(game, { code: 'P-03-000' });
 
   game.tick(21000);
   assert.equal(submit(game).accepted, true);
@@ -95,8 +84,8 @@ test('attempts is a LIFETIME counter; the lockout counter resets on accept', () 
   const game = newGame();
   game.fireFault('F-201', 'POW');
 
-  submit(game, { code: 'P-04-000' });
-  submit(game, { code: 'P-04-000' });
+  submit(game, { code: 'P-03-000' });
+  submit(game, { code: 'P-03-000' });
   const fault = game.state.sectors.POW.faults.find((f) => f.code === 'F-201');
   assert.equal(fault.consecutive_invalid, 2);
 
@@ -127,7 +116,7 @@ test('a failed crew check does not count as an attempt', () => {
 });
 
 test('code normalisation: case, whitespace and dash variants all accept', () => {
-  for (const code of [' p-04-340 ', 'P–04–340', 'P - 04 - 340', 'p_04_340', 'P--04--340']) {
+  for (const code of [' p-03-340 ', 'P–03–340', 'P - 03 - 340', 'p_03_340', 'P--03--340']) {
     const game = newGame();
     game.fireFault('F-201', 'POW');
     assert.equal(submit(game, { code }).accepted, true, `"${code}" should normalise and accept`);
@@ -135,14 +124,14 @@ test('code normalisation: case, whitespace and dash variants all accept', () => 
 });
 
 test('normaliseCode leaves a canonical code untouched', () => {
-  assert.equal(normaliseCode('P-06-142-261'), 'P-06-142-261');
+  assert.equal(normaliseCode('P-05-142-261'), 'P-05-142-261');
 });
 
 test('two-spec R3 codes resolve as a single composite string', () => {
   const game = newGame();
   game.fireFault('F-301', 'POW');
   const res = submitCode(game, {
-    sector: 'POW', fault_code: 'F-301', code: 'P-06-142-261', workers_assigned: 3,
+    sector: 'POW', fault_code: 'F-301', code: 'P-05-142-261', workers_assigned: 3,
   });
   assert.equal(res.accepted, true);
 });
@@ -211,7 +200,7 @@ test('with resolve_requires_resources off (paper trays), a repair is a declarati
 test('every submission is logged, accepted and rejected alike', () => {
   const game = newGame();
   game.fireFault('F-201', 'POW');
-  submit(game, { code: 'P-04-000' });
+  submit(game, { code: 'P-03-000' });
   submit(game);
 
   const submits = logEvents(game, 'submit');

@@ -207,3 +207,43 @@ and the export will now correctly refuse to run.
 - Both structural edge cases intact: `F-201` carries two valid codes, `F-210` carries zero.
 - Discrepancy seed intact: `W4-3` Lower Reservoir = 340, flagged; big screen telemetry = 290.
 - 21 specs are unreferenced — intentional decoy rows, marked "decoy row" in the matrix.
+
+## 2026-09-27 — The deck is dealt evenly: six faults per sector, no false alarm
+
+**Change.** Every sector now owns exactly six faults — one tutorial (R0), one
+self-contained (R1), two on the ring (R2), one critical two-spec (R3), one
+novel combination raiding another binder's Appendix C (R4). Total still 36.
+The source is `tools/build_crossref.py`, which now refuses an uneven deck.
+
+- R1 lost its two extra faults (POW `F-102` Turbine bearing whine, WTR
+  `F-104` Filter membrane clog) and was renumbered in ring order: `F-101`
+  POW, `F-102` WTR, `F-103` MED, `F-104` TRN, `F-105` AGR, `F-106` COM.
+  `P1-3` and `W3-4` are decoy rows again.
+- `F-210` is a real AGR fault, "Irrigation main breach" (P-04, `C3-1` Grid
+  North, 1×Water 1×Parts, crew 2). The false alarm is retired. The engine
+  still treats an empty `valid_codes` array as facilitator-clear only; the
+  tests now build that shape by hand instead of relying on content.
+- R4 gains `F-405` AGR "Flood-gate lockout" (P-06, `WC-1` + `T6-5`) and
+  `F-406` COM "Perimeter mesh cold restart" (P-06, `AC-1` + `M5-5`). All
+  six buried appendices are raided in R4; WTR and AGR still need their own
+  in R3.
+- Procedures run `P-01`..`P-06` in every binder (P-01 R0, P-02 R1, P-03 and
+  P-04 R2, P-05 R3, P-06 R4), so every resolution code from R2 on moved down
+  one: `F-201` is now `P-03-340` / `P-03-290`. The exporter derives the 290
+  alternate from the binder code instead of hard-wiring `P-04`.
+- `F-305`'s card said "deep-sensor offset" while its spec is `C3-4`
+  Perimeter (the same class of defect as `F-208` above); the card now says
+  "perimeter sensor offset".
+- The binders' foreign "escalate to" rows are fixed data in the generator.
+  They were a seeded shuffle, so any change to the deck would have reshuffled
+  every binder's decoys. Same four rows per binder as before; the label reads
+  "Not an AGR system fault" instead of "Not a AGR".
+- `lib/reward-pools.json` fault records are derived by the new
+  `tools/build_reward_pools.js` (content + `difficultyFor()`; the derivation
+  reproduces every pre-existing record). The tests check the records against
+  `test/fixtures/fault-rewards-balance.json` instead of a file in Downloads.
+
+**Validation (36 faults, 66 specs, 6 sectors):** 22 workbook checks OK,
+including six per-sector counts and "no fault without a code"; round split
+R0:6 · R1:6 · R2:12 · R3:6 · R4:6; one multi-code fault (`F-201`), zero
+codeless faults; the discrepancy seed and the six buried appendices intact.

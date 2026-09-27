@@ -17,7 +17,6 @@ CRITICAL CONTENT RULES ENFORCED HERE:
   2. A binder NEVER prints another sector's spec values. Only its own tables.
   3. WTR Table W-4 row 3 prints 340. The big screen shows 290. Do not reconcile.
   4. Appendix C gets NO index entry. It is findable only by reading the binder.
-  5. AGR's F-210 index entry points to verification, not a procedure (false alarm).
 """
 import json
 import re
@@ -182,19 +181,14 @@ for code, info in SECTOR_INFO.items():
     index_rows = []
     for f in sorted(own, key=lambda x: x["code"]):
         if f["procedure"] in (None, "—"):
-            index_rows.append({
-                "code": f["code"], "name": f["name"],
-                "action": "VERIFY TELEMETRY WITH COM BEFORE COMMITTING RESOURCES",
-                "own": True, "no_procedure": True,
-            })
-        else:
-            index_rows.append({
-                "code": f["code"], "name": f["name"],
-                "action": f"Procedure {f['procedure']}", "own": True, "no_procedure": False,
-            })
+            sys.exit(f"{f['code']}: no procedure — the deck carries no false alarm, so this is a matrix error")
+        index_rows.append({
+            "code": f["code"], "name": f["name"],
+            "action": f"Procedure {f['procedure']}", "own": True, "no_procedure": False,
+        })
     for e in escalate.get(code, []):
         index_rows.append({
-            "code": e["code"], "name": "Not a " + code + " system fault",
+            "code": e["code"], "name": ("Not an " if code[0] in "AEIOU" else "Not a ") + code + " system fault",
             "action": f"ESCALATE TO {e['owner']}", "own": False, "no_procedure": False,
         })
 

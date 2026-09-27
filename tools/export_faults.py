@@ -5,7 +5,7 @@ UNDERCITY — content exporter.
 Reads undercity-crossref-matrix.xlsx (the single source of truth) and emits the
 JSON fixtures the game server loads at boot:
 
-    content/faults.json    all 36 faults, incl. valid_codes arrays and null-code faults
+    content/faults.json    all 36 faults (six per sector) with their valid_codes arrays
     content/specs.json     every spec value (facilitator/answer-key reference + binder gen)
     content/sectors.json   sector definitions, starting inventory, upkeep
 
@@ -37,7 +37,9 @@ OUTDIR = Path(sys.argv[2] if len(sys.argv) > 2 else "content")
 # Faults that legitimately accept more than one resolution code.
 # F-201 is the seeded discrepancy: WTR binder prints 340, big screen shows 290.
 # The game must never punish either answer — only the transcript reveals who noticed.
-ALT_CODES = {"F-201": ["P-04-290"]}
+# The alternate is the binder code with the big-screen figure in place of 340, so
+# it follows the procedure number wherever the matrix puts it.
+ALT_CODES = {"F-201": lambda rescode: [rescode.replace("-340", "-290")]}
 
 # Faults that injure workforce when fired (tokens physically move to MED).
 INJURIES = {"F-207": 2, "F-303": 1, "F-304": 1}
@@ -172,7 +174,7 @@ for row in wb["Faults"].iter_rows(min_row=2, values_only=True):
         continue
     is_false_alarm = "NO CODE" in rescode
 
-    valid_codes = [] if is_false_alarm else [rescode] + ALT_CODES.get(code, [])
+    valid_codes = [] if is_false_alarm else [rescode] + (ALT_CODES[code](rescode) if code in ALT_CODES else [])
 
     spec_refs = []
     for sid in (clean(s1), clean(s2)):
@@ -197,8 +199,8 @@ for row in wb["Faults"].iter_rows(min_row=2, values_only=True):
         "resources_required": parse_resources(resources),
         "procedure": clean(proc),
         "spec_refs": spec_refs,
-        # NULLABLE BY DESIGN: F-210 (false alarm) has no code. Server treats an
-        # empty array as "facilitator-clear only" — do not assume length >= 1.
+        # An empty array would mean a false alarm (facilitator-clear only). The
+        # current deck has none; the server still never assumes length >= 1.
         "valid_codes": valid_codes,
         "false_alarm": is_false_alarm,
         "deadline_s": parse_deadline(deadline),

@@ -136,26 +136,17 @@ test('a full R1→R4 dry run, six sectors on one server', async (t) => {
 
     sectors.POW.ws.send(JSON.stringify({
       type: 'submit_code', sector: 'POW', fault_code: 'F-201',
-      code: 'P-04-290', workers_assigned: 2,
+      code: 'P-03-290', workers_assigned: 2,
     }));
     await wait(300);
     const result = sectors.POW.messages.filter((m) => m.type === 'submit_result').pop();
     assert.equal(result.accepted, true, 'the big screen\'s 290 resolves it');
   });
 
-  await t.test('R2: the false alarm is unsolvable and cleared by hand', async () => {
-    say({ type: 'fire_fault', fault_code: 'F-210', sector: 'AGR' });
+  await t.test('R2: the facilitator can clear a fault by hand', async () => {
+    say({ type: 'fire_fault', fault_code: 'F-209', sector: 'AGR' });
     await wait(300);
-
-    sectors.AGR.ws.send(JSON.stringify({
-      type: 'submit_code', sector: 'AGR', fault_code: 'F-210',
-      code: 'P-04-401', workers_assigned: 0,
-    }));
-    await wait(300);
-    const result = sectors.AGR.messages.filter((m) => m.type === 'submit_result').pop();
-    assert.equal(result.reason, 'no_procedure');
-
-    say({ type: 'clear_fault', sector: 'AGR', fault_code: 'F-210', reason: 'false alarm confirmed' });
+    say({ type: 'clear_fault', sector: 'AGR', fault_code: 'F-209', reason: 'facilitator cleared' });
     await wait(300);
     assert.equal(sectors.AGR.state.sectors.AGR.faults.length, 0);
   });
@@ -206,7 +197,7 @@ test('a full R1→R4 dry run, six sectors on one server', async (t) => {
     await wait(300);
     sectors.TRN.ws.send(JSON.stringify({
       type: 'submit_code', sector: 'TRN', fault_code: 'F-304',
-      code: 'P-06-793-509', workers_assigned: 2,
+      code: 'P-05-793-509', workers_assigned: 2,
     }));
     await wait(300);
     const result = sectors.TRN.messages.filter((m) => m.type === 'submit_result').pop();
@@ -221,7 +212,7 @@ test('a full R1→R4 dry run, six sectors on one server', async (t) => {
 
     sectors.WTR.ws.send(JSON.stringify({
       type: 'submit_code', sector: 'WTR', fault_code: 'F-403',
-      code: 'P-07-490-795', workers_assigned: 2,
+      code: 'P-06-490-795', workers_assigned: 2,
     }));
     await wait(400);
 
@@ -245,8 +236,8 @@ test('a full R1→R4 dry run, six sectors on one server', async (t) => {
       for (const frame of frames) {
         const json = JSON.stringify(frame);
         assert.ok(!json.includes('valid_codes'), `${code} received valid_codes`);
-        assert.ok(!json.includes('P-04-340'), `${code} received an answer key`);
-        assert.ok(!json.includes('P-07-490-795'), `${code} received an R4 answer key`);
+        assert.ok(!json.includes('P-03-340'), `${code} received an answer key`);
+        assert.ok(!json.includes('P-06-490-795'), `${code} received an R4 answer key`);
       }
     }
     const bigJson = JSON.stringify(big.messages.filter((m) => m.type === 'state'));

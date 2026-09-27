@@ -228,15 +228,13 @@ C.push(p([t("The waves named in Part 5 are ", { bold: true }), t("yours and the 
   t(". A title like “Core Failure” on a console is one screenshot away from the room, and a table that can name what is coming stops behaving like a table under pressure. So the runbook below names the waves, the console counts them, and only four of them are a button.")]));
 C.push(callout("The only full stop is an emergency.", "PAUSE freezes every clock and every decay for a technical failure, a safety issue or an equipment problem. It is not a pacing tool and it is not a rest. Resume continues from the exact frozen state — nothing is replenished, nothing is cleared."));
 
-C.push(H2("3.4 The three seeded probes"));
-C.push(p(t("Three things in this simulation are not what they appear. Know all three cold; participants will challenge you on them in the debrief.")));
+C.push(H2("3.4 The two seeded probes"));
+C.push(p(t("Two things in this simulation are not what they appear. Know both cold; participants will challenge you on them in the debrief.")));
 C.push(H3("The discrepancy — Water's reservoir pressure"));
 C.push(p([t("The WTR binder prints the Lower Reservoir at "), mono("340"), t(". The big screen telemetry shows "), mono("290"),
   t(". Both are accepted by the console, so the game never punishes either. The question is purely whether anyone notices, whether they say so, and how the group treats them when they do. The binder also carries a line saying printed values take precedence over instrumentation, which gives a dissenter a basis to stand on. Tag every mention.")]));
-C.push(H3("The false alarm — F-210"));
-C.push(p([t("Agriculture receives a fault card for a flooded bay. There is no flood and there is no resolution code. Their index tells them to verify telemetry with Comms before committing resources. If they burn resources on it, that is the finding. Clear the fault manually from the control panel once COM confirms the ghost — or once AGR has wasted enough to make the point.")]));
 C.push(H3("The buried appendices"));
-C.push(p(t("Every binder holds one Appendix C value that appears in no index. Water and Agriculture need their own during Core Failure; the rest are raided by other sectors in the late shift. Teams that never open the back of the binder will stall. That stall is a finding about how people behave when the documentation fights back.")));
+C.push(p(t("Every binder holds one Appendix C value that appears in no index. Water and Agriculture need their own during Core Failure; every one of the six is raided by another sector in the late shift. Teams that never open the back of the binder will stall. That stall is a finding about how people behave when the documentation fights back.")));
 C.push(brk());
 
 // ---------------------------------------------------------------- 4. day shape
@@ -298,10 +296,10 @@ C.push(callout("This stretch should feel easy.", "It is the baseline measurement
 C.push(tbl([
   headRow(["MASTER TIME", "DO THIS", "WATCH FOR"], BW),
   beat("00:00", "START. Announce: routine shift, standard faults.", "Baseline talk patterns. Who speaks first at each table."),
-  beat("02:00", "Fire F-101 (POW), F-103 (WTR).", "Procedure read aloud or not."),
-  beat("05:00", "Fire F-105 (MED), F-106 (TRN).", "Crew assignment discussion, or one person deciding."),
-  beat("08:00", "Fire F-102 (POW), F-107 (AGR).", "POW now has two faults. First hint of load."),
-  beat("11:00", "Fire F-104 (WTR), F-108 (COM).", "Anyone finishing early and offering help to a neighbour — rare and worth tagging."),
+  beat("02:00", "Fire F-101 (POW), F-102 (WTR).", "Procedure read aloud or not."),
+  beat("05:00", "Fire F-103 (MED), F-104 (TRN).", "Crew assignment discussion, or one person deciding."),
+  beat("08:00", "Fire F-105 (AGR), F-106 (COM).", "Every table now holds exactly one fault. Six tables, one load — compare how they carry it."),
+  beat("11:00", "Nothing new fires. Walk the floor.", "Anyone finishing early and offering help to a neighbour — rare and worth tagging."),
   beat("14:00", "Nothing new. Let the tables clear what they hold.", "Which tables are relaxed and which are already tense at low load."),
 ], BW));
 
@@ -312,7 +310,7 @@ C.push(tbl([
   beat("15:00", "NEXT ROUND → Round 2. Announce in-world: \"Core output is fluctuating. Systems are coupling in ways they should not.\"", "How long before the first liaison stands up."),
   beat("16:00", "Fire F-201 (POW) and F-203 (WTR).", "F-201 is the discrepancy fault. Watch WTR’s table when POW asks for the reservoir figure."),
   beat("20:00", "Fire F-205 (MED), F-209 (AGR).", "MED’s cold chain has real urgency. Do they escalate or absorb?"),
-  beat("23:00", "Fire F-210 (AGR) — the false alarm.", "Do they check with COM, or spend resources on a ghost? Tag either way."),
+  beat("23:00", "Fire F-210 (AGR).", "AGR now holds two faults and needs COM for both. Watch whether the liaison batches the two requests or makes two trips."),
   beat("26:00", "Fire F-207 (TRN). Move two TRN workforce tokens physically to the MED table.", "The injury is visible and physical. Watch whether TRN asks MED for them back, and how."),
   beat("29:00", "Fire F-211 (COM), F-202 (POW).", "POW now holds two and is being asked for specs by two others. Classic bottleneck. Watch for hoarding or brusqueness."),
   beat("32:00", "CALL COUNCIL. Five-minute clock. Chiefs and liaisons to the centre table — the rest of the city keeps running.", "THE KEY OBSERVATION WINDOW. Who speaks, in what order, for how long. Who never speaks. Who runs the meeting without being asked. Also: what happens at the stations while the leaders are away."),
@@ -359,7 +357,8 @@ C.push(tbl([
   beat("1:25:00", "NEXT ROUND → Round 4. Announce in-world: \"Seismic activity detected.\" Restore brownout sectors to active.", "Whether anyone notices that nothing else was given back."),
   beat("1:26:00", "Fire F-401 (POW), F-402 (MED).", "Both need buried appendices from other sectors. Watch the asking behaviour — it should look different from the early shift. That difference is the deliverable."),
   beat("1:30:00", "Fire F-403 (WTR), F-404 (TRN).", "TRN’s is the mini-triage feed. Decay pressure returns onto tired people."),
-  beat("1:34:00", "Optional short Council if the group is coping well. Skip if they are not.", "Compare directly against the first sitting. Same people, same format, measurable difference."),
+  beat("1:33:00", "Fire F-405 (AGR), F-406 (COM).", "Six sectors, six raids on six appendices. Watch who is asked twice and how they answer the second time."),
+  beat("1:35:00", "Optional short Council if the group is coping well. Skip if they are not.", "Compare directly against the first sitting. Same people, same format, measurable difference."),
 ], BW));
 
 C.push(H3("Wave 7 · Final Crisis (1:37:00 – 1:45:00) · Round 4"));
@@ -383,7 +382,7 @@ C.push(tbl([
   beat("15:00", "Pairs. \"What surprised you in your numbers?\"", "Deflection onto the game design is normal at first. Let it pass once, then redirect."),
   beat("25:00", "Trigger work in sector groups. \"Go back to the moment your behaviour changed. What was happening? What did you feel just before?\"", "Specificity. \"I get stressed\" is not a trigger. \"When two people talk at once and a clock is running\" is."),
   beat("40:00", "Name the reactive-to-creative distinction. Reactive is what the trigger does to you. Creative is what you choose next.", "Participants trying to make this abstract. Keep pulling it back to their transcript."),
-  beat("50:00", "Reveal the three probes only if they have not surfaced: discrepancy, false alarm, buried appendices.", "Reactions to the discrepancy tell you as much as the original moment did."),
+  beat("50:00", "Reveal the two probes only if they have not surfaced: discrepancy, buried appendices.", "Reactions to the discrepancy tell you as much as the original moment did."),
   beat("55:00", "Ask the question the continuous shift earns you: \"There was no break. When did you notice that, and what did you do about it?\"", "The honest answers here are the best material in the day. Nobody was given permission to recover; some took it anyway, and some did not."),
 ], BW));
 

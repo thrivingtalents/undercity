@@ -101,9 +101,9 @@ Cohort sizing: 3–6 participants per sector. 18 = minimum viable cohort; 36 = m
 - Wrong code: dashboard shows "REJECTED — verify procedure" and logs the attempt (failed-attempt count is itself debrief data: who bulldozed a guess vs who verified?).
 
 ### 3.3 Resolution code scheme (build-simple, cheat-resistant)
-`[Procedure]-[SpecValue]` or `[Procedure]-[Spec1]-[Spec2]` for R3/R4 two-spec faults. Example: F-201 resolves as `P-04-340`, where 340 is the Lower Reservoir pressure rating in WTR Manual Table W-4.
+`[Procedure]-[SpecValue]` or `[Procedure]-[Spec1]-[Spec2]` for R3/R4 two-spec faults. Example: F-201 resolves as `P-03-340`, where 340 is the Lower Reservoir pressure rating in WTR Manual Table W-4.
 - Server holds a lookup table (`content/faults.json`, generated from the crossref matrix) of fault → **array** of valid codes. No parsing logic needed.
-- Two structural edge cases, both live in the built content: F-201 has **two** valid codes (the discrepancy seed), and F-210 has **zero** (the false alarm). Any code path assuming exactly one code is wrong.
+- One structural edge case lives in the built content: F-201 has **two** valid codes (the discrepancy seed). The array may also be **empty** for a false alarm; the deck has carried none since 2026-09-27, and any code path assuming exactly one code is still wrong.
 - Spec values are 3-digit numbers unique per table cell, so overheard numbers are useless without knowing which table they came from.
 
 ### 3.4 Workforce mechanic
@@ -164,7 +164,7 @@ Discrepancy seed: WTR binder Table W-4 row 3 = **340** (vs big screen 290). Flag
 A6 cards, sector-coloured border, printed 4-per-A4 and cut. Each card:
 - Front: fault code (large), fault name, flavour line (1 sentence), severity icon (▲ minor / ▲▲ major / ▲▲▲ critical), "LOOK UP IN YOUR FAULT INDEX."
 - Back: blank (no answers on cards — answers live in binders).
-- Deck composition (as built, see matrix): 6 R0 tutorial cards (one per sector), 8 R1 (self-contained, minor), 12 R2 (cross-sector ring, incl. one false alarm), 6 R3 (critical, two-spec), 4 R4 (novel combinations raiding other binders' buried appendices — tests transfer, not memory). Total 36.
+- Deck composition (as built, see matrix; evened out 2026-09-27): 6 R0 tutorial cards (one per sector), 6 R1 (self-contained, minor, one per sector), 12 R2 (cross-sector ring, two per sector), 6 R3 (critical, two-spec, one per sector), 6 R4 (novel combinations raiding other binders' buried appendices — tests transfer, not memory; one per sector). Total 36, six per sector, no false alarm.
 - Facilitator's copy of each card lists the valid resolution code + spec source (printed as a separate answer-key sheet, never enters the room).
 
 ### 4.3 Transfer Chits — pad of 100
@@ -314,13 +314,13 @@ Header: run ID, mode, RESET RUN (double-confirm), snapshot-now, export log.
 | Round | Length | Injects | Mechanics active | Measurement purpose |
 |-------|--------|---------|------------------|---------------------|
 | R0 Onboarding | 15 min | 1 tutorial fault/sector (self-contained) | Everything, zero stakes | Interface fluency; role self-assignment observation |
-| R1 Stable Ops | 20 min | 1–2 minor/sector, staggered | Intra-sector only | **Baseline capture** — must feel comfortably manageable |
+| R1 Stable Ops | 20 min | 1 minor/sector, staggered | Intra-sector only | **Baseline capture** — must feel comfortably manageable |
 | — breather 5 min | | | decay paused | contrast |
-| R2 Interdependence | 30 min | Cross-sector cascades ×4–5; 1 false alarm; discrepancy live | Transfers, liaisons, Council #1 at ~18:00 | First stress delta; information-sharing latency |
+| R2 Interdependence | 30 min | Cross-sector cascades, 2/sector; discrepancy live | Transfers, liaisons, Council #1 at ~18:00 | First stress delta; information-sharing latency |
 | — breather 5 min | | | | |
 | R3 Core Failure | 30 min | Critical stack ×3; Core drops to 60% at 05:00; Continuity Order due 25:00 | Triage, irreversibility, brownouts | Peak stress; values conflict; decision under deadline |
 | Debrief 1 | 60 min | — | — | Individual headline metrics; trigger identification; 1 written behavioural commitment each |
-| R4 Aftershock | 25 min | 4 novel-combination faults + 1 mini-triage | Same systems, fresh crisis | **Post-measurement** — the delta is the product |
+| R4 Aftershock | 25 min | 6 novel-combination faults (1/sector) + 1 mini-triage | Same systems, fresh crisis | **Post-measurement** — the delta is the product |
 | Debrief 2 | 45 min | — | — | Deltas on big screen; back-at-work transfer plan |
 
 Total: ~4.5 h play + debrief → full-day format with lunch after R3.

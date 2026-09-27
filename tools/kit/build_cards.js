@@ -108,7 +108,7 @@ function cardCell(f) {
   }));
 
 
-  // instruction footer — identical on every card, including the false alarm
+  // instruction footer — identical on every card
   kids.push(new Paragraph({
     spacing: { before: 60 },
     border: { top: { style: BorderStyle.SINGLE, size: 4, color: "CCCCCC" } },
@@ -247,7 +247,7 @@ const keyDoc = new Document({
       new Paragraph({
         spacing: { before: 240 },
         children: [new TextRun({
-          text: "Shaded rows are the two structural exceptions: F-201 accepts either 340 (WTR binder) or 290 (big screen telemetry) — never reconcile these. F-210 has no code at all; clear it manually once COM confirms the ghost.",
+          text: "The shaded row is the one structural exception: F-201 accepts either 340 (WTR binder) or 290 (big screen telemetry) — never reconcile these.",
           font: "Arial", size: 16, italics: true, color: MUTED,
         })],
       }),

@@ -234,37 +234,6 @@
     {
       "code": "F-102",
       "round": "R1",
-      "sector": "POW",
-      "name": "Turbine bearing whine",
-      "flavour": "Turbine C runs hot; re-rate output before the bearing seizes.",
-      "severity": 1,
-      "decay_per_min": 0.5,
-      "crew_required": 2,
-      "resources_required": {
-        "parts": 1
-      },
-      "procedure": "P-03",
-      "spec_refs": [
-        {
-          "spec_id": "P1-3",
-          "binder": "POW",
-          "table": "P-1",
-          "row_label": "Turbine C",
-          "buried": false
-        }
-      ],
-      "valid_codes": [
-        "P-03-485"
-      ],
-      "false_alarm": false,
-      "deadline_s": null,
-      "injures_workforce": 0,
-      "triggered_by": null,
-      "facilitator_notes": null
-    },
-    {
-      "code": "F-103",
-      "round": "R1",
       "sector": "WTR",
       "name": "Pump cavitation",
       "flavour": "Pump Station 2 cavitates; throttle to rated flow to clear it.",
@@ -294,39 +263,7 @@
       "facilitator_notes": null
     },
     {
-      "code": "F-104",
-      "round": "R1",
-      "sector": "WTR",
-      "name": "Filter membrane clog",
-      "flavour": "Backwash cycle needs the Station 4 flow rate to run safely.",
-      "severity": 1,
-      "decay_per_min": 0.5,
-      "crew_required": 2,
-      "resources_required": {
-        "parts": 1,
-        "power": 1
-      },
-      "procedure": "P-03",
-      "spec_refs": [
-        {
-          "spec_id": "W3-4",
-          "binder": "WTR",
-          "table": "W-3",
-          "row_label": "Pump Station 4",
-          "buried": false
-        }
-      ],
-      "valid_codes": [
-        "P-03-183"
-      ],
-      "false_alarm": false,
-      "deadline_s": null,
-      "injures_workforce": 0,
-      "triggered_by": null,
-      "facilitator_notes": null
-    },
-    {
-      "code": "F-105",
+      "code": "F-103",
       "round": "R1",
       "sector": "MED",
       "name": "HVAC contamination alert",
@@ -358,7 +295,7 @@
       "facilitator_notes": null
     },
     {
-      "code": "F-106",
+      "code": "F-104",
       "round": "R1",
       "sector": "TRN",
       "name": "Track sensor drift",
@@ -389,7 +326,7 @@
       "facilitator_notes": null
     },
     {
-      "code": "F-107",
+      "code": "F-105",
       "round": "R1",
       "sector": "AGR",
       "name": "Nutrient pump airlock",
@@ -420,7 +357,7 @@
       "facilitator_notes": null
     },
     {
-      "code": "F-108",
+      "code": "F-106",
       "round": "R1",
       "sector": "COM",
       "name": "Antenna array desync",
@@ -463,7 +400,7 @@
         "parts": 2,
         "water": 1
       },
-      "procedure": "P-04",
+      "procedure": "P-03",
       "spec_refs": [
         {
           "spec_id": "W4-3",
@@ -474,14 +411,14 @@
         }
       ],
       "valid_codes": [
-        "P-04-340",
-        "P-04-290"
+        "P-03-340",
+        "P-03-290"
       ],
       "false_alarm": false,
       "deadline_s": null,
       "injures_workforce": 0,
       "triggered_by": null,
-      "facilitator_notes": "DISCREPANCY LIVE: binder says 340, big screen says 290 — server accepts P-04-340 OR P-04-290"
+      "facilitator_notes": "DISCREPANCY LIVE: binder says 340, big screen says 290 — server accepts P-03-340 OR P-03-290"
     },
     {
       "code": "F-202",
@@ -496,7 +433,7 @@
         "parts": 1,
         "water": 1
       },
-      "procedure": "P-05",
+      "procedure": "P-04",
       "spec_refs": [
         {
           "spec_id": "W3-5",
@@ -507,7 +444,7 @@
         }
       ],
       "valid_codes": [
-        "P-05-445"
+        "P-04-445"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -528,7 +465,7 @@
         "power": 1,
         "med": 1
       },
-      "procedure": "P-04",
+      "procedure": "P-03",
       "spec_refs": [
         {
           "spec_id": "M2-3",
@@ -539,7 +476,7 @@
         }
       ],
       "valid_codes": [
-        "P-04-274"
+        "P-03-274"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -559,7 +496,7 @@
       "resources_required": {
         "parts": 2
       },
-      "procedure": "P-05",
+      "procedure": "P-04",
       "spec_refs": [
         {
           "spec_id": "M5-4",
@@ -570,7 +507,7 @@
         }
       ],
       "valid_codes": [
-        "P-05-273"
+        "P-04-273"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -591,7 +528,7 @@
         "power": 1,
         "med": 1
       },
-      "procedure": "P-04",
+      "procedure": "P-03",
       "spec_refs": [
         {
           "spec_id": "T1-4",
@@ -602,7 +539,7 @@
         }
       ],
       "valid_codes": [
-        "P-04-621"
+        "P-03-621"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -623,7 +560,7 @@
         "power": 1,
         "parts": 1
       },
-      "procedure": "P-05",
+      "procedure": "P-04",
       "spec_refs": [
         {
           "spec_id": "T6-2",
@@ -634,7 +571,7 @@
         }
       ],
       "valid_codes": [
-        "P-05-895"
+        "P-04-895"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -655,7 +592,7 @@
         "parts": 2,
         "water": 1
       },
-      "procedure": "P-04",
+      "procedure": "P-03",
       "spec_refs": [
         {
           "spec_id": "A2-4",
@@ -666,7 +603,7 @@
         }
       ],
       "valid_codes": [
-        "P-04-311"
+        "P-03-311"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -687,7 +624,7 @@
         "power": 1,
         "parts": 1
       },
-      "procedure": "P-05",
+      "procedure": "P-04",
       "spec_refs": [
         {
           "spec_id": "A4-3",
@@ -698,7 +635,7 @@
         }
       ],
       "valid_codes": [
-        "P-05-915"
+        "P-04-915"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -719,7 +656,7 @@
         "power": 1,
         "parts": 1
       },
-      "procedure": "P-04",
+      "procedure": "P-03",
       "spec_refs": [
         {
           "spec_id": "C3-2",
@@ -730,7 +667,7 @@
         }
       ],
       "valid_codes": [
-        "P-04-931"
+        "P-03-931"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -742,20 +679,33 @@
       "code": "F-210",
       "round": "R2",
       "sector": "AGR",
-      "name": "Sensor ghost: irrigation breach",
-      "flavour": "Dashboards show a Bay 3 flood. Fields report dry floors.",
+      "name": "Irrigation main breach",
+      "flavour": "Bay 3 irrigation main ruptures; isolating the line needs COM Grid North calibration offset.",
       "severity": 2,
-      "decay_per_min": 0.0,
-      "crew_required": 0,
-      "resources_required": {},
-      "procedure": null,
-      "spec_refs": [],
-      "valid_codes": [],
-      "false_alarm": true,
+      "decay_per_min": 1.0,
+      "crew_required": 2,
+      "resources_required": {
+        "water": 1,
+        "parts": 1
+      },
+      "procedure": "P-04",
+      "spec_refs": [
+        {
+          "spec_id": "C3-1",
+          "binder": "COM",
+          "table": "C-3",
+          "row_label": "Grid North",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-04-452"
+      ],
+      "false_alarm": false,
       "deadline_s": null,
       "injures_workforce": 0,
       "triggered_by": null,
-      "facilitator_notes": "FALSE ALARM — binder index: 'verify telemetry with COM before committing resources'. No code exists; COM liaison confirms ghost to facilitator, who clears it"
+      "facilitator_notes": null
     },
     {
       "code": "F-211",
@@ -770,7 +720,7 @@
         "power": 1,
         "parts": 1
       },
-      "procedure": "P-04",
+      "procedure": "P-03",
       "spec_refs": [
         {
           "spec_id": "P2-4",
@@ -781,7 +731,7 @@
         }
       ],
       "valid_codes": [
-        "P-04-107"
+        "P-03-107"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -801,7 +751,7 @@
       "resources_required": {
         "power": 1
       },
-      "procedure": "P-05",
+      "procedure": "P-04",
       "spec_refs": [
         {
           "spec_id": "P1-4",
@@ -812,7 +762,7 @@
         }
       ],
       "valid_codes": [
-        "P-05-376"
+        "P-04-376"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -833,7 +783,7 @@
         "parts": 3,
         "water": 2
       },
-      "procedure": "P-06",
+      "procedure": "P-05",
       "spec_refs": [
         {
           "spec_id": "W4-5",
@@ -851,7 +801,7 @@
         }
       ],
       "valid_codes": [
-        "P-06-142-261"
+        "P-05-142-261"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -872,7 +822,7 @@
         "parts": 2,
         "power": 1
       },
-      "procedure": "P-06",
+      "procedure": "P-05",
       "spec_refs": [
         {
           "spec_id": "M2-5",
@@ -890,7 +840,7 @@
         }
       ],
       "valid_codes": [
-        "P-06-565-524"
+        "P-05-565-524"
       ],
       "false_alarm": false,
       "deadline_s": 480,
@@ -911,7 +861,7 @@
         "power": 2,
         "med": 1
       },
-      "procedure": "P-06",
+      "procedure": "P-05",
       "spec_refs": [
         {
           "spec_id": "T1-5",
@@ -929,7 +879,7 @@
         }
       ],
       "valid_codes": [
-        "P-06-707-449"
+        "P-05-707-449"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -950,7 +900,7 @@
         "parts": 2,
         "power": 1
       },
-      "procedure": "P-06",
+      "procedure": "P-05",
       "spec_refs": [
         {
           "spec_id": "A2-5",
@@ -968,7 +918,7 @@
         }
       ],
       "valid_codes": [
-        "P-06-793-509"
+        "P-05-793-509"
       ],
       "false_alarm": false,
       "deadline_s": 360,
@@ -981,7 +931,7 @@
       "round": "R3",
       "sector": "AGR",
       "name": "Hydroponic root-rot bloom",
-      "flavour": "Rot spreading bay to bay; needs COM deep-sensor offset AND the vault setpoint buried in your own Appendix C.",
+      "flavour": "Rot spreading bay to bay; needs COM perimeter sensor offset AND the vault setpoint buried in your own Appendix C.",
       "severity": 3,
       "decay_per_min": 2.0,
       "crew_required": 2,
@@ -989,7 +939,7 @@
         "water": 2,
         "med": 1
       },
-      "procedure": "P-06",
+      "procedure": "P-05",
       "spec_refs": [
         {
           "spec_id": "C3-4",
@@ -1007,7 +957,7 @@
         }
       ],
       "valid_codes": [
-        "P-06-306-606"
+        "P-05-306-606"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -1028,7 +978,7 @@
         "power": 2,
         "parts": 1
       },
-      "procedure": "P-06",
+      "procedure": "P-05",
       "spec_refs": [
         {
           "spec_id": "P1-5",
@@ -1046,7 +996,7 @@
         }
       ],
       "valid_codes": [
-        "P-06-242-495"
+        "P-05-242-495"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -1067,7 +1017,7 @@
         "power": 2,
         "parts": 1
       },
-      "procedure": "P-07",
+      "procedure": "P-06",
       "spec_refs": [
         {
           "spec_id": "CC-1",
@@ -1085,7 +1035,7 @@
         }
       ],
       "valid_codes": [
-        "P-07-243-534"
+        "P-06-243-534"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -1106,7 +1056,7 @@
         "power": 1,
         "med": 2
       },
-      "procedure": "P-07",
+      "procedure": "P-06",
       "spec_refs": [
         {
           "spec_id": "PC-1",
@@ -1124,7 +1074,7 @@
         }
       ],
       "valid_codes": [
-        "P-07-106-722"
+        "P-06-106-722"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -1144,7 +1094,7 @@
       "resources_required": {
         "parts": 2
       },
-      "procedure": "P-07",
+      "procedure": "P-06",
       "spec_refs": [
         {
           "spec_id": "TC-1",
@@ -1162,7 +1112,7 @@
         }
       ],
       "valid_codes": [
-        "P-07-490-795"
+        "P-06-490-795"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -1183,7 +1133,7 @@
         "power": 1,
         "parts": 1
       },
-      "procedure": "P-07",
+      "procedure": "P-06",
       "spec_refs": [
         {
           "spec_id": "MC-1",
@@ -1201,13 +1151,91 @@
         }
       ],
       "valid_codes": [
-        "P-07-157-390"
+        "P-06-157-390"
       ],
       "false_alarm": false,
       "deadline_s": 600,
       "injures_workforce": 0,
       "triggered_by": null,
       "facilitator_notes": "Uses MED buried appendix — feeds the R4 mini-triage"
+    },
+    {
+      "code": "F-405",
+      "round": "R4",
+      "sector": "AGR",
+      "name": "Flood-gate lockout",
+      "flavour": "Aftershock jams the Bay 3 flood gates open; the reset needs WTR's buried sluice override AND TRN Emergency Line voltage.",
+      "severity": 2,
+      "decay_per_min": 2.0,
+      "crew_required": 2,
+      "resources_required": {
+        "water": 2,
+        "parts": 1
+      },
+      "procedure": "P-06",
+      "spec_refs": [
+        {
+          "spec_id": "WC-1",
+          "binder": "WTR",
+          "table": "App-C",
+          "row_label": "Emergency Sluice Override",
+          "buried": true
+        },
+        {
+          "spec_id": "T6-5",
+          "binder": "TRN",
+          "table": "T-6",
+          "row_label": "Emergency Line",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-06-524-911"
+      ],
+      "false_alarm": false,
+      "deadline_s": null,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Uses WTR buried appendix"
+    },
+    {
+      "code": "F-406",
+      "round": "R4",
+      "sector": "COM",
+      "name": "Perimeter mesh cold restart",
+      "flavour": "Aftershock drops the perimeter sensor mesh; the cold restart needs AGR's buried vault setpoint AND MED Scrubber Unit rating.",
+      "severity": 2,
+      "decay_per_min": 2.0,
+      "crew_required": 2,
+      "resources_required": {
+        "power": 2,
+        "parts": 1
+      },
+      "procedure": "P-06",
+      "spec_refs": [
+        {
+          "spec_id": "AC-1",
+          "binder": "AGR",
+          "table": "App-C",
+          "row_label": "Seed Vault Humidity Setpoint",
+          "buried": true
+        },
+        {
+          "spec_id": "M5-5",
+          "binder": "MED",
+          "table": "M-5",
+          "row_label": "Scrubber Unit",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-06-606-346"
+      ],
+      "false_alarm": false,
+      "deadline_s": null,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Uses AGR buried appendix"
     }
   ]
 }
