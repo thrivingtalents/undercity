@@ -265,7 +265,7 @@ The Admin page prompts for the token if the URL does not carry one.
 ```json
 {
   "phase": "ROUND_2", "phase_name": "Round 2 — Interdependence",
-  "round": "R2", "round_name": "Interdependence", "round_length_s": 1800,
+  "round": "R2", "round_name": "Interdependence", "round_length_s": 900, "round_remaining_s": 540,   // the round's own time — control frame only
   "round_clock":   { "running": true,  "remaining_s": 1140 },
   "council_clock": { "running": false, "remaining_s": 300 },
   "cycle": { "number": 3, "length_s": 420, "remaining_s": 267, "running": false },   // legacy timer; see §8.7

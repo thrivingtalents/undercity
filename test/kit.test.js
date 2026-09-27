@@ -35,7 +35,8 @@ test('the manifest describes every document that exists', () => {
   assert.equal(summary.counts.documents, 13);
   assert.ok(summary.files.every((f) => f.present), 'every listed document is on disk');
 
-  const onDisk = fs.readdirSync(KIT_DIR).filter((f) => f.endsWith('.docx')).sort();
+  // Word's owner files (~$name.docx) are locks, not documents.
+  const onDisk = fs.readdirSync(KIT_DIR).filter((f) => f.endsWith('.docx') && !f.startsWith('~$')).sort();
   assert.deepEqual(summary.files.map((f) => f.file).sort(), onDisk,
     'the manifest and the directory agree — no ghost or unlisted document');
 });

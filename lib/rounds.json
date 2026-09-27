@@ -1,5 +1,5 @@
 {
-  "note": "Derived from undercity-spec.md §8 (Round Configuration), converted to CONTINUOUS GAMEFLOW (2026-09-21) and then to the SIMPLIFIED ROUND DISPLAY (2026-09-21): the visible flow is Round 0 → Round 4 and nothing else. One phase per round, so what the engine tracks and what a screen shows are the same thing and no internal pacing name can leak onto a projector. The descriptive names those rounds used to carry — Stable Ops, Interdependence, Core Failure, Aftershock — live in the facilitator's runbook, on paper, and nowhere in this file. A round still carries its own inject timeline and fault pool (timelines[] in the scenario), and still resets NOTHING when it changes: production, upkeep and every allowance ride the OPERATING CYCLE (defaults.cycle_length_s), and MASTER TIME is one countdown for the whole live shift (defaults.live_length_s). Balance numbers live in config/scenarios/*.json, which override these defaults.",
+  "note": "Derived from undercity-spec.md §8 (Round Configuration), converted to CONTINUOUS GAMEFLOW (2026-09-21) and then to the SIMPLIFIED ROUND DISPLAY (2026-09-21): the visible flow is Round 0 → Round 4 and nothing else. One phase per round, so what the engine tracks and what a screen shows are the same thing and no internal pacing name can leak onto a projector. The descriptive names those rounds used to carry — Stable Ops, Interdependence, Core Failure, Aftershock — live in the facilitator's runbook, on paper, and nowhere in this file. A round still carries its own inject timeline and fault pool (timelines[] in the scenario), and still resets NOTHING when it changes: production, upkeep and every allowance ride the OPERATING CYCLE (defaults.cycle_length_s), and MASTER TIME is one countdown for the whole live shift — the Round 1 to Round 4 lengths added together, unless defaults.live_length_s overrides it. Each round's length_s is the round's own time: the Admin bar counts it down beside the round number and says once when it is up, and NEXT ROUND stays the facilitator's call. Balance numbers live in config/scenarios/*.json, which override these defaults.",
   "defaults": {
     "upkeep_interval_s": 600,
     "resolve_recovery": 5,
@@ -12,7 +12,6 @@
     "tick_ms": 10000,
     "snapshot_ms": 10000,
     "card_shows_dependency": false,
-    "live_length_s": 6300,
     "cycle_length_s": 600,
     "cycle_autostart": true,
     "transfer_limit_basis": "cycle",
@@ -26,7 +25,7 @@
     {
       "id": "R0",
       "name": "Onboarding",
-      "length_s": 900,
+      "length_s": 1200,
       "injects": "1 tutorial fault per sector (self-contained)",
       "mechanics": "Everything, zero stakes",
       "purpose": "Interface fluency; role self-assignment observation",
@@ -36,7 +35,7 @@
     {
       "id": "R1",
       "name": "Stable Ops",
-      "length_s": 1200,
+      "length_s": 900,
       "injects": "1 minor per sector, staggered",
       "mechanics": "Intra-sector only",
       "purpose": "Baseline capture — must feel comfortably manageable",
@@ -46,7 +45,7 @@
     {
       "id": "R2",
       "name": "Interdependence",
-      "length_s": 1800,
+      "length_s": 900,
       "injects": "Cross-sector cascades, two per sector; discrepancy live",
       "mechanics": "Transfers, liaisons, Council #1 at ~18:00",
       "purpose": "First stress delta; information-sharing latency",
@@ -56,7 +55,7 @@
     {
       "id": "R3",
       "name": "Core Failure",
-      "length_s": 1800,
+      "length_s": 720,
       "injects": "Critical stack x3; Core drops to 60% at 05:00; Continuity Order due 25:00",
       "mechanics": "Triage, irreversibility, brownouts",
       "purpose": "Peak stress; values conflict; decision under deadline",
@@ -66,7 +65,7 @@
     {
       "id": "R4",
       "name": "Aftershock",
-      "length_s": 1500,
+      "length_s": 480,
       "injects": "6 novel-combination faults, one per sector, + 1 mini-triage",
       "mechanics": "Same systems, fresh crisis",
       "purpose": "Post-measurement — the delta is the product",

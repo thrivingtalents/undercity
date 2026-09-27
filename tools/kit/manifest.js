@@ -53,8 +53,10 @@ function describe(file) {
   return TITLES[file] || (m ? binderTitle(m[1]) : file.replace(/^UNDERCITY_|\.docx$/g, ''));
 }
 
+// Word leaves an owner file (~$name.docx) beside any document it has open;
+// it is a lock, not a document, and must never be counted or fingerprinted.
 const files = fs.readdirSync(KIT)
-  .filter((f) => f.endsWith('.docx'))
+  .filter((f) => f.endsWith('.docx') && !f.startsWith('~$'))
   .sort()
   .map((file) => {
     const full = path.join(KIT, file);

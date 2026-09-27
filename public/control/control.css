@@ -55,6 +55,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: none;
 .tb-phase { flex-direction: row; align-items: center; gap: 8px; }
 .tb-phase .label { align-self: center; }
 .tb-phase b { font-size: 15px; letter-spacing: 0.06em; }
+.tb-phase .label em.low { color: var(--red); }
 .tb-clock b { font-size: 30px; letter-spacing: 0.04em; color: var(--ink); }
 .tb-clock b.low { color: var(--red); }
 /* P0: [−] 15:00 [+] — the minute steps sit on the clock's own line, quiet

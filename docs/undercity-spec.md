@@ -313,17 +313,17 @@ Header: run ID, mode, RESET RUN (double-confirm), snapshot-now, export log.
 
 | Round | Length | Injects | Mechanics active | Measurement purpose |
 |-------|--------|---------|------------------|---------------------|
-| R0 Onboarding | 15 min | 1 tutorial fault/sector (self-contained) | Everything, zero stakes | Interface fluency; role self-assignment observation |
-| R1 Stable Ops | 20 min | 1 minor/sector, staggered | Intra-sector only | **Baseline capture** — must feel comfortably manageable |
+| R0 Onboarding | 20 min | 1 tutorial fault/sector (self-contained) | Everything, zero stakes | Interface fluency; role self-assignment observation |
+| R1 Stable Ops | 15 min | 1 minor/sector, staggered | Intra-sector only | **Baseline capture** — must feel comfortably manageable |
 | — breather 5 min | | | decay paused | contrast |
-| R2 Interdependence | 30 min | Cross-sector cascades, 2/sector; discrepancy live | Transfers, liaisons, Council #1 at ~18:00 | First stress delta; information-sharing latency |
+| R2 Interdependence | 15 min | Cross-sector cascades, 2/sector; discrepancy live | Transfers, liaisons, Council #1 at ~18:00 | First stress delta; information-sharing latency |
 | — breather 5 min | | | | |
-| R3 Core Failure | 30 min | Critical stack ×3; Core drops to 60% at 05:00; Continuity Order due 25:00 | Triage, irreversibility, brownouts | Peak stress; values conflict; decision under deadline |
+| R3 Core Failure | 12 min | Critical stack ×3; Core drops to 60% at 05:00; Continuity Order due 25:00 | Triage, irreversibility, brownouts | Peak stress; values conflict; decision under deadline |
 | Debrief 1 | 60 min | — | — | Individual headline metrics; trigger identification; 1 written behavioural commitment each |
-| R4 Aftershock | 25 min | 6 novel-combination faults (1/sector) + 1 mini-triage | Same systems, fresh crisis | **Post-measurement** — the delta is the product |
+| R4 Aftershock | 8 min | 6 novel-combination faults (1/sector) + 1 mini-triage | Same systems, fresh crisis | **Post-measurement** — the delta is the product |
 | Debrief 2 | 45 min | — | — | Deltas on big screen; back-at-work transfer plan |
 
-Total: ~4.5 h play + debrief → full-day format with lunch after R3.
+Total: 70 min play (20 min orientation, then a 50 min shift — Rounds 1 to 4 added together is MASTER TIME) + 105 min debrief. Every length is a scenario value the admin can change in SETTINGS; the admin bar counts each round's own time down beside the round number (2026-09-28).
 
 ---
 

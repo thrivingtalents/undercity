@@ -4508,6 +4508,46 @@ test('core output at start and round lengths come from the scenario', () => {
   assert.equal(game.liveLength(), 300, 'the next RESET of MASTER TIME would use it');
 });
 
+test('round lengths: 20 / 15 / 15 / 12 / 8 minutes by default, MASTER TIME is Rounds 1 to 4 added together, and the admin can change both before the start', () => {
+  const game = newGame();
+  assert.deepEqual(['R0', 'R1', 'R2', 'R3', 'R4'].map((r) => game.roundConfig(r).length_s), [1200, 900, 900, 720, 480]);
+  assert.equal(game.liveLength(), 3000, 'no override: the shift is the four live rounds');
+  assert.equal(game.state.round_clock.remaining_s, 3000, 'MASTER TIME starts at the shift length');
+  game.patchConfig({ round_length_s: { R2: 600 } });
+  assert.equal(game.liveLength(), 2700);
+  assert.equal(game.state.round_clock.remaining_s, 2700, 'a shorter round shortens the unstarted shift');
+  game.patchConfig({ live_length_s: 0 });
+  assert.equal(game.state.round_clock.remaining_s, 2700, 'a blank override falls back to the rounds');
+  game.patchConfig({ live_length_s: 3600 });
+  assert.equal(game.state.round_clock.remaining_s, 3600, 'an explicit override wins');
+  assert.equal(forControl(game).live_length_s, 3600);
+  // the console shows the round's own time beside the round number
+  const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'control', 'index.html'), 'utf8');
+  assert.ok(html.includes('id="round-note"'), 'the admin bar has no place for the round time');
+});
+
+test('the round\'s own time counts down beside the round number and is called up once when it runs out; it moves nothing', () => {
+  const game = newGame();
+  assert.equal(forControl(game).round_remaining_s, 1200, 'Round 0 waits at its full length');
+  game.setPhase('ROUND_1');
+  game.clock('start');
+  assert.equal(forControl(game).round_remaining_s, 900);
+  game.tick(60000);
+  assert.equal(forControl(game).round_remaining_s, 840);
+  game.tick(840000);
+  assert.equal(forControl(game).round_remaining_s, 0);
+  assert.equal(logEvents(game, 'round_time_up').length, 1);
+  assert.ok(game.state.ticker.some((e) => /ROUND 1 TIME IS UP/.test(e.text)), 'the facilitator was not told');
+  game.tick(60000);
+  assert.equal(logEvents(game, 'round_time_up').length, 1, 'told once');
+  assert.equal(game.state.round, 'R1', 'the round moved on its own');
+  assert.ok(game.state.round_clock.running && game.state.round_clock.remaining_s > 0, 'MASTER TIME stopped at the round end');
+  game.setPhase('ROUND_2');
+  assert.equal(forControl(game).round_remaining_s, 900, 'the next round starts with its own time');
+  game.tick(900000);
+  assert.equal(logEvents(game, 'round_time_up').length, 2, 'each round is called up in its turn');
+});
+
 test('per-fault overrides: extra accepted codes; the content answer stays; an old deadline override is ignored', () => {
   const game = running();
   assert.equal(game.setFaultOverride('F-999', { extra_valid_codes: ['X'] }).ok, false);

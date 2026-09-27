@@ -1387,10 +1387,10 @@
     ['lockout_after_consecutive_invalid', 'Lockout after N wrong', 'n'], ['council_clock_s', 'Council clock (s)', 'n'],
     ['CORE, MASTER TIME & THE OPERATING CYCLE'],
     ['core_start_output', 'Core output at start (%) — applies on reset', 'n'],
-    ['round_length_s.R0', 'Round 0 inject window (s)', 'n'], ['round_length_s.R1', 'Round 1 inject window (s)', 'n'],
-    ['round_length_s.R2', 'Round 2 inject window (s)', 'n'], ['round_length_s.R3', 'Round 3 inject window (s)', 'n'],
-    ['round_length_s.R4', 'Round 4 inject window (s)', 'n'],
-    ['live_length_s', 'MASTER TIME — length of the whole live shift (s)', 'n'],
+    ['round_length_s.R0', 'Round 0 length (s) — orientation, before MASTER TIME starts', 'n'], ['round_length_s.R1', 'Round 1 length (s)', 'n'],
+    ['round_length_s.R2', 'Round 2 length (s)', 'n'], ['round_length_s.R3', 'Round 3 length (s)', 'n'],
+    ['round_length_s.R4', 'Round 4 length (s)', 'n'],
+    ['live_length_s', 'MASTER TIME override (s) — 0 = Rounds 1 to 4 added together', 'n'],
     ['ECONOMY'],
     ['auto_economy', 'Digital economy on (production, upkeep, stock moves)', 'b'],
     ['deduct_resources_on_resolve', 'Deduct resources on resolve', 'b'],
@@ -1619,6 +1619,16 @@
     $('timer-status').textContent = state.paused ? 'SESSION PAUSED — clock frozen, editable' : state.round_clock.running ? 'RUNNING' : state.round_clock.started ? (rc > 0 ? 'STOPPED' : 'AT 00:00') : 'NOT STARTED';
     $('timer-default').textContent = U.mmss(shiftLength());
     $('timer-pause').textContent = state.round_clock.running ? 'PAUSE TIMER' : (state.round_clock.started && rc > 0 ? 'RESUME TIMER' : 'START TIMER');
+    // The round's own time, beside the round number. Advisory: 00:00 moves
+    // nothing, NEXT ROUND does. Round 0 waits for MASTER TIME to start.
+    const note = $('round-note');
+    if (note) {
+      const rr = state.round_remaining_s == null ? null : U.countdown({ running: !state.frozen, remaining_s: state.round_remaining_s }, state.frozen);
+      if (rr == null || state.mode === 'ENDED') note.textContent = '';
+      else if (rr <= 0) note.textContent = '— TIME UP · NEXT ROUND when ready';
+      else note.textContent = `— ${U.mmss(rr)} of ${U.mmss(state.round_length_s || 0)} left`;
+      note.classList.toggle('low', rr != null && rr <= 60 && !state.frozen && state.mode !== 'ENDED');
+    }
     const cc = U.countdown(state.council_clock, state.frozen);
     const big = $('council-big');
     if (big) { big.textContent = U.mmss(cc); big.classList.toggle('low', cc <= 30 && state.council.active); }
