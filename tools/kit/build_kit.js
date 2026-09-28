@@ -164,7 +164,7 @@ const charter = [
   h2("Clause 2 — Convening"),
   p(t("The Council convenes when the Continuity Authority calls it. Attendance is not optional. A sector that fails to send its Chief forfeits its voice for that sitting.")),
   h2("Clause 3 — Sitting duration"),
-  p(t("A sitting lasts three minutes. It does not run over. Matters unresolved at the close of a sitting stand unresolved.")),
+  p(t("A sitting lasts five minutes. It does not run over. Matters unresolved at the close of a sitting stand unresolved.")),
   h2("Clause 4 — Binding effect"),
   p(t("Decisions of the Council bind every sector, including sectors that opposed them and sectors that abstained. There is no appeal.")),
   h2("Clause 5 — Transfers"),
@@ -183,7 +183,7 @@ const charter = [
       text: "In the event of Core insufficiency, continuity of essential services shall take precedence, as determined by the Council.",
       font: "Arial", size: 22, italics: true, color: INK })],
   }),
-  p(t("Where Core output cannot sustain all sectors, the Council shall submit a Continuity Order ranking every sector. Sectors ranked in the lowest positions shall be placed in brownout for the duration of the insufficiency. A Continuity Order takes effect on submission and cannot be recalled.")),
+  p(t("Where Core output cannot sustain all sectors, every sector shall first nominate, privately and without abstention, two sectors for temporary brownout; the nominations shall be published in aggregate only, and the two most nominated shall stand as provisional. The Council shall then submit a Continuity Order naming exactly two sectors, which need not be the provisional two. A Continuity Order is locked on submission, cannot be recalled, and takes effect at the start of the next operating period. Sectors placed in brownout remain in operation, retain their seat and their voice, and operate at reduced capability.")),
   p(t("Failure to submit a Continuity Order before the close of the sitting shall be treated as no determination having been made, and the Authority shall impose rolling blackouts across all sectors without regard to function.", { bold: true })),
 
   h2("Clause 8 — Personnel"),
@@ -197,12 +197,12 @@ const charter = [
   brk(),
 
   h1("CONTINUITY ORDER"),
-  p(t("Submitted under Clause 7. One form per sitting. Rank every sector from 1 (sustain first) to 6 (brownout first). Incomplete forms are void.")),
-  p([t("Core output is insufficient to sustain all six sectors. The two lowest-ranked sectors will be placed in brownout.", { bold: true })]),
+  p(t("Submitted under Clause 7. One form per sitting. Mark exactly TWO sectors for brownout — any two, the provisional two or not. Forms naming more or fewer than two are void.")),
+  p([t("Core output is insufficient to sustain all six sectors. The two marked sectors will be placed in brownout when the next operating period begins.", { bold: true })]),
   new Paragraph({ text: "", spacing: { after: 160 } }),
   tbl([
     new TableRow({ children: [
-      cell("RANK", { width: 1200, shade: "1F3864", bold: true, align: AlignmentType.CENTER }),
+      cell("BROWNOUT", { width: 1200, shade: "1F3864", bold: true, align: AlignmentType.CENTER }),
       cell("SECTOR", { width: 3000, shade: "1F3864", bold: true }),
       cell("POPULATION / FUNCTION AT RISK IN BROWNOUT", { width: W - 4200, shade: "1F3864", bold: true }),
     ].map((c) => { c.root.forEach?.(() => {}); return c; })}),

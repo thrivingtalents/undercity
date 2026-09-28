@@ -119,7 +119,7 @@ test('pause freezes decay and the council clock but not the lockout', () => {
   const integrity = game.state.sectors.POW.integrity;
   game.tick(25000);
   assert.equal(game.state.sectors.POW.integrity, integrity);
-  assert.equal(game.state.council_clock.remaining_s, 180);
+  assert.equal(game.state.council_clock.remaining_s, 60, 'the nomination clock ran while paused');
   assert.equal(fault.locked_until_s, 0, 'a locked console still unlocks while paused');
   const frame = forSector(game, 'POW');
   assert.equal(frame.paused, true);
@@ -2510,9 +2510,10 @@ test('the console markup: attention, observational cards, drawer, overrides, fau
   assert.ok(/let faultView = 'active'/.test(js) && /data-fv="active" class="on"/.test(html));
   assert.ok(/function confirmTrigger/.test(js) && /function previewPreset/.test(js) && /FIRE WAVE/.test(js));
   assert.ok(/data-quick="fault"/.test(html) && /data-quick="injure"/.test(html) && /data-quick="brownout"/.test(html) && /data-quick="announce"/.test(html) && /data-quick="alert"/.test(html), 'a routine event trigger is gone');
-  // The Council is run on the floor (2026-09-28): no call, no sitting clock, no order form and no summons on the console.
-  assert.ok(!/data-quick="council"|data-sub="council"|data-dial="council"|btn-call-council|order-pick|council-status/.test(html), 'a Council control is still on the console');
-  assert.ok(!/call_council|end_council|continuity_order|renderCouncil|orderDraft/.test(js), 'the console still drives the Council');
+  // THE R2 COUNCIL (2026-09-28): the facilitator opens the nomination, sees every vote live, closes it and can record the final two.
+  assert.ok(/data-sub="council"/.test(html) && /id="btn-call-council"/.test(html) && /id="btn-close-nominations"/.test(html) && /id="nom-grid"/.test(html) && /id="order-pick"/.test(html) && /id="btn-order-submit"/.test(html), 'a Council control is missing from the console');
+  assert.ok(/type: 'call_council'/.test(js) && /type: 'council_close_nominations'/.test(js) && /type: 'continuity_order'/.test(js) && /which: 'council'/.test(js), 'the console does not drive the Council');
+  assert.ok(!/data-quick="council"|data-dial="council"/.test(html), 'a stray CALL COUNCIL shortcut is back');
   assert.ok(/data-dial="blackout"/.test(html) && /id="btn-end-blackout"/.test(html) && /type: 'rolling_blackout'/.test(js) && /type: 'end_blackout'/.test(js), 'the rolling blackout lost its controls');
   assert.ok(!/data-quick="core"/.test(html), 'CORE −10% is still a quick action');
   assert.ok(/state\.ticker\.slice\(0, 5\)/.test(js) && /id="btn-expand-log"/.test(html) && /data-lf="ADMIN"/.test(html));
@@ -3268,78 +3269,302 @@ test('v18 timer control: 00:00 stops nothing but the clock; NEXT PHASE still run
 
 // -- council and the Continuity Order ------------------------------------------------
 
-test('CALL COUNCIL reaches every projection with a running 3:00 clock', () => {
-  const game = running();
-  game.callCouncil();
+// -- THE R2 COUNCIL (undercity_r2_council_brownout_spec v1.0, 2026-09-28) ----------------
+// A private nomination on every table, the aggregate and a provisional two,
+// a five-minute sitting, and a final two that lock and brown out at Round 3.
+
+/** Six private nominations, one per table. Totals: COM 5 · AGR 3 · the rest 1 → provisional COM + AGR. */
+const NOMS = { POW: ['COM', 'AGR'], WTR: ['COM', 'AGR'], MED: ['COM', 'TRN'], TRN: ['COM', 'MED'], AGR: ['COM', 'WTR'], COM: ['POW', 'AGR'] };
+function nominateAll(game, noms = NOMS) {
+  for (const [s, ch] of Object.entries(noms)) assert.equal(game.submitNomination(s, ch).ok, true, `${s} could not nominate`);
+}
+
+test('R2 Council starts: every table receives the private nomination screen and a 60-second clock', () => {
+  const game = running();                                   // Round 2
+  const res = game.callCouncil({ by: 'facilitator' });
+  assert.equal(res.ok, true);
+  assert.equal(res.stage, 'nomination');
+  assert.equal(game.state.mode, 'COUNCIL');
   for (const code of SECTORS) {
     const f = forSector(game, code);
-    assert.equal(f.mode, 'COUNCIL');
     assert.equal(f.council.active, true);
-    assert.equal(f.council_clock.remaining_s, 180);
+    assert.equal(f.council.stage, 'nomination');
+    assert.equal(f.council_clock.remaining_s, 60);
     assert.equal(f.council_clock.running, true);
+    assert.equal(f.council.nomination_s, 60);
+    assert.equal(f.council.deliberation_s, 300);
+    assert.equal(f.my_nomination, null);
+    assert.equal(f.council.aggregate, null, 'totals before nominations close');
+    assert.equal(f.council.nominations, undefined, 'a table is sent the votes');
   }
-  assert.equal(forBigscreen(game).council.active, true);
+  assert.equal(forBigscreen(game).council.stage, 'nomination');
+  assert.equal(game.callCouncil().reason, 'council_already_active', 'a second call restarted the sitting');
+  assert.equal(game.state.council.count, 1);
+  // the screen: the private vote panel — its title, the six cards, the countdown, one submit button
+  assert.ok(/id="council-stage"/.test(SECTOR_INDEX) && /id="nom-view"/.test(SECTOR_INDEX) && /CORE INSUFFICIENCY - PRIVATE NOMINATION/.test(SECTOR_INDEX));
+  assert.ok(/id="nom-cards"/.test(SECTOR_INDEX) && /id="nom-clock"/.test(SECTOR_INDEX) && /id="nom-submit"/.test(SECTOR_INDEX));
+  assert.ok(/type: 'council_nomination'/.test(SECTOR_SCRIPT));
   game.tick(10000);
-  assert.equal(game.state.council_clock.remaining_s, 170);
+  assert.equal(game.state.council_clock.remaining_s, 50);
 });
 
-test('the Continuity Order requires all six sectors once; ranks 5 and 6 go BROWNOUT; council ends', () => {
+test('one choice is not a nomination: SUBMIT stays disabled and the engine refuses it', () => {
   const game = running();
   game.callCouncil();
-  game.tick(47000);
-  assert.equal(game.submitContinuityOrder(['POW', 'MED']).reason, 'order_incomplete');
-  assert.equal(game.submitContinuityOrder(['POW', 'POW', 'WTR', 'TRN', 'COM', 'AGR']).reason, 'order_incomplete');
+  assert.equal(game.submitNomination('POW', ['WTR']).reason, 'nomination_invalid');
+  assert.equal(game.submitNomination('POW', ['WTR', 'WTR']).reason, 'nomination_invalid');
+  assert.equal(game.submitNomination('POW', ['WTR', 'XXX']).reason, 'nomination_invalid');
+  assert.equal(game.submitNomination('POW', []).reason, 'nomination_invalid');
+  assert.deepEqual(game.state.council.nominations, {}, 'a void nomination was stored');
+  assert.ok(/nomDraft\.size !== 2/.test(SECTOR_SCRIPT), 'the screen enables SUBMIT before two unique choices');
+});
 
-  const res = game.submitContinuityOrder(['POW', 'MED', 'WTR', 'TRN', 'COM', 'AGR']);
+test('a sector may nominate itself', () => {
+  const game = running();
+  game.callCouncil();
+  const res = game.submitNomination('POW', ['POW', 'AGR']);
   assert.equal(res.ok, true);
-  assert.deepEqual(res.order.brownout, ['COM', 'AGR']);
-  assert.equal(res.order.time_used_s, 47);
-  assert.equal(game.state.sectors.COM.status, 'BROWNOUT');
-  assert.equal(game.state.sectors.AGR.status, 'BROWNOUT');
-  assert.equal(game.state.sectors.POW.status, 'ACTIVE');
+  assert.deepEqual(res.choices, ['POW', 'AGR']);
+  assert.deepEqual(forSector(game, 'POW').my_nomination.choices, ['POW', 'AGR']);
+  assert.equal(forSector(game, 'WTR').my_nomination, null, 'another table saw it');
+  assert.ok(!JSON.stringify(forSector(game, 'WTR')).includes('"choices"'), 'choices leaked into another frame');
+  assert.ok(!JSON.stringify(forBigscreen(game)).includes('"choices"'), 'choices leaked onto the wall');
+  assert.deepEqual(forControl(game).council_detail.nominations.POW.choices, ['POW', 'AGR'], 'the facilitator sees it live');
+});
+
+test('a nomination can be changed until the close; the same pair again changes nothing', () => {
+  const game = running();
+  game.callCouncil();
+  game.submitNomination('POW', ['COM', 'AGR']);
+  assert.equal(game.submitNomination('POW', ['AGR', 'COM']).unchanged, true, 'the same pair in another order is a change');
+  assert.equal(logEvents(game, 'council_nomination').length, 1, 'a repeat became a second record');
+  const res = game.submitNomination('POW', ['COM', 'MED']);
+  assert.equal(res.ok, true);
+  assert.equal(game.state.council.nominations.POW.revisions, 1);
+  assert.equal(Object.keys(game.state.council.nominations).length, 1, 'more than one record per sector');
+  game.closeNominations({ by: 'facilitator' });
+  assert.equal(game.submitNomination('POW', ['COM', 'AGR']).reason, 'nomination_closed');
+  assert.equal(forSector(game, 'POW').my_nomination.locked, true);
+});
+
+test('all six valid nominations in: totals are computed and the provisional two go to every screen', () => {
+  const game = running();
+  game.callCouncil();
+  nominateAll(game);
+  const c = game.state.council;
+  assert.equal(c.stage, 'deliberation', 'the sixth nomination did not close the vote');
+  assert.deepEqual(c.aggregate.totals, { POW: 1, WTR: 1, MED: 1, TRN: 1, AGR: 3, COM: 5 });
+  assert.deepEqual(c.aggregate.provisional, ['COM', 'AGR']);
+  assert.deepEqual(c.aggregate.ties, []);
+  assert.deepEqual(c.aggregate.unresolved, []);
+  assert.equal(c.aggregate.valid_count, 6);
+  assert.equal(game.state.council_clock.remaining_s, 300);
+  assert.equal(game.state.council_clock.running, true);
+  for (const code of SECTORS) {
+    const f = forSector(game, code);
+    assert.equal(f.council.stage, 'deliberation');
+    assert.deepEqual(f.council.aggregate.totals, c.aggregate.totals);
+    assert.deepEqual(f.council.aggregate.provisional, ['COM', 'AGR']);
+    assert.equal(f.council.nominations, undefined, 'who voted for whom reached a table');
+    assert.ok(f.council.consequences.POW.text.length > 0, 'the consequences of brownout are missing');
+  }
+  assert.deepEqual(forBigscreen(game).council.aggregate.provisional, ['COM', 'AGR']);
+  assert.equal(logEvents(game, 'council_aggregate').length, 1);
+  assert.ok(/CORE INSUFFICIENCY - COUNCIL/.test(SECTOR_INDEX) && /id="cnl-totals"/.test(SECTOR_INDEX) && /id="cnl-consequences"/.test(SECTOR_INDEX) && /id="final-submit"/.test(SECTOR_INDEX));
+});
+
+test('a tie for second place is shown as unresolved and never broken by chance', () => {
+  const game = running();
+  game.callCouncil();
+  // COM 4 · AGR 2 · POW 2 · WTR 2 · MED 1 · TRN 1 → three tied for the second position
+  nominateAll(game, { POW: ['COM', 'AGR'], WTR: ['COM', 'POW'], MED: ['COM', 'WTR'], TRN: ['COM', 'MED'], AGR: ['WTR', 'TRN'], COM: ['POW', 'AGR'] });
+  const a = game.state.council.aggregate;
+  assert.deepEqual(a.totals, { POW: 2, WTR: 2, MED: 1, TRN: 1, AGR: 2, COM: 4 });
+  assert.deepEqual(a.provisional, ['COM']);
+  assert.deepEqual(a.unresolved, [2]);
+  assert.deepEqual(a.ties, ['AGR', 'POW', 'WTR']);
+  assert.deepEqual(forSector(game, 'MED').council.aggregate.ties, ['AGR', 'POW', 'WTR']);
+  assert.deepEqual(forSector(game, 'MED').council.aggregate.unresolved, [2]);
+  // a three-way tie at the top leaves both positions open
+  const g2 = running();
+  g2.callCouncil();
+  nominateAll(g2, { POW: ['COM', 'AGR'], WTR: ['COM', 'AGR'], MED: ['TRN', 'COM'], TRN: ['AGR', 'TRN'], AGR: ['TRN', 'COM'], COM: ['AGR', 'TRN'] });
+  const b = g2.state.council.aggregate;
+  assert.deepEqual(b.totals, { POW: 0, WTR: 0, MED: 0, TRN: 4, AGR: 4, COM: 4 });
+  assert.deepEqual(b.provisional, []);
+  assert.deepEqual(b.unresolved, [1, 2]);
+  assert.deepEqual(b.ties, ['AGR', 'COM', 'TRN']);
+  // two sharing the top total are simply the two
+  const g3 = running();
+  g3.callCouncil();
+  nominateAll(g3, { POW: ['COM', 'AGR'], WTR: ['COM', 'AGR'], MED: ['COM', 'AGR'], TRN: ['COM', 'AGR'], AGR: ['COM', 'AGR'], COM: ['COM', 'AGR'] });
+  assert.deepEqual(g3.state.council.aggregate.provisional, ['AGR', 'COM']);
+  assert.deepEqual(g3.state.council.aggregate.unresolved, []);
+});
+
+test('the Council may change both provisional sectors, and the final two are accepted', () => {
+  const game = running();
+  game.callCouncil();
+  nominateAll(game);
+  assert.deepEqual(game.state.council.aggregate.provisional, ['COM', 'AGR']);
+  game.tick(90000);
+  const res = game.submitContinuityOrder(['MED', 'TRN'], { by: 'facilitator' });
+  assert.equal(res.ok, true);
+  assert.deepEqual(res.order.brownout, ['MED', 'TRN']);
+  assert.equal(res.order.changed_from_provisional, true);
+  assert.deepEqual(res.order.provisional, ['COM', 'AGR']);
+  assert.equal(res.order.time_used_s, 90);
+  assert.equal(res.order.submitted_by, 'facilitator');
+  assert.ok(res.order.submitted_at);
+  // Round 2: nothing browns out yet — the order waits for Round 3
+  assert.deepEqual(game.state.brownout_pending.sectors, ['MED', 'TRN']);
+  assert.ok(SECTORS.every((k) => game.state.sectors[k].status === 'ACTIVE'), 'a brownout landed before Round 3');
   assert.equal(game.state.council.active, false);
   assert.equal(game.state.mode, 'PLAY');
+  assert.equal(game.state.council.stage, 'decided');
   assert.equal(game.state.alert.title, 'CONTINUITY ORDER ACCEPTED');
-  const ev = logEvents(game, 'continuity_order')[0];
-  assert.deepEqual(ev.order, ['POW', 'MED', 'WTR', 'TRN', 'COM', 'AGR']);
-  assert.equal(logEvents(game, 'council_ended')[0].order_submitted, true);
-  assert.deepEqual(forSector(game, 'WTR').continuity_order.brownout, ['COM', 'AGR'], 'the order is public');
+  assert.deepEqual(forSector(game, 'WTR').brownout_pending.sectors, ['MED', 'TRN']);
+  assert.deepEqual(forBigscreen(game).council.final.brownout, ['MED', 'TRN']);
+  // a legacy six-rank order names its bottom two; a station may record the Council's decision too
+  const g2 = running();
+  g2.callCouncil();
+  nominateAll(g2);
+  assert.deepEqual(g2.submitContinuityOrder(['POW', 'MED', 'WTR', 'TRN', 'COM', 'AGR'], { by: 'COM' }).order.brownout, ['COM', 'AGR']);
+  assert.equal(g2.state.council.final.submitted_by, 'COM');
+  assert.equal(g2.state.council.final.changed_from_provisional, false);
 });
 
-test('no order at 00:00 raises the prompt; rolling blackout rotates brownout through the city', () => {
+test('a submitted order locks at once and cannot be edited or recalled', () => {
   const game = running();
   game.callCouncil();
-  game.tick(301000);
-  assert.equal(game.state.council.no_order, true);
-  assert.equal(game.state.blackout.active, false, 'automatic blackout is off by default');
-  assert.equal(forControl(game).council.no_order, true);
+  nominateAll(game);
+  assert.equal(game.submitContinuityOrder(['MED']).reason, 'order_incomplete');
+  assert.equal(game.submitContinuityOrder(['MED', 'MED']).reason, 'order_incomplete');
+  assert.equal(game.submitContinuityOrder(['COM', 'AGR']).ok, true);
+  assert.equal(game.submitContinuityOrder(['MED', 'TRN']).reason, 'order_locked');
+  assert.equal(game.submitContinuityOrder(['COM', 'AGR']).reason, 'order_locked', 'the same pair again was accepted');
+  assert.deepEqual(game.state.council.final.brownout, ['COM', 'AGR']);
+  assert.equal(game.state.council.final.locked, true);
+  assert.equal(logEvents(game, 'continuity_order').length, 1);
+  assert.equal(forSector(game, 'POW').council.locked, true);
+  // before the Council sits, nothing can be submitted
+  const g2 = running();
+  g2.callCouncil();
+  assert.equal(g2.submitContinuityOrder(['COM', 'AGR']).reason, 'nominations_open');
+  const g3 = running();
+  assert.equal(g3.submitContinuityOrder(['COM', 'AGR']).reason, 'council_not_sitting');
+});
 
-  game.startRollingBlackout();
-  const b = game.state.blackout;
-  assert.equal(b.active, true);
-  assert.deepEqual(b.current, ['POW', 'WTR']);
-  assert.equal(game.state.sectors.POW.status, 'BROWNOUT');
-  assert.equal(game.state.sectors.MED.status, 'ACTIVE');
+test('the Council clock reaches zero without a valid order: the rolling blackout starts by itself', () => {
+  const game = running();
+  game.callCouncil();
+  nominateAll(game);
+  game.tick(299000);
+  assert.equal(game.state.council.no_order, false);
+  assert.equal(game.state.council.warned_30, true);
+  game.tick(2000);
+  assert.equal(game.state.council.no_order, true);
+  assert.equal(game.state.council.stage, 'no_order');
+  assert.equal(game.state.council.active, false);
+  assert.equal(game.state.blackout.active, true);
+  assert.equal(logEvents(game, 'blackout_started')[0].by, 'council');
+  assert.deepEqual(game.state.blackout.current, ['POW', 'WTR']);
+  assert.equal(game.state.brownout_pending, null);
+  assert.equal(forControl(game).council.no_order, true);
   game.tick(game.cfg.rolling_blackout.interval_s * 1000 + 1000);
   assert.deepEqual(game.state.blackout.current, ['MED', 'TRN']);
   assert.equal(game.state.sectors.POW.status, 'ACTIVE', 'the previous pair is restored');
-  assert.equal(game.state.sectors.MED.status, 'BROWNOUT');
   game.endRollingBlackout();
-  assert.ok(SECTORS.every((c) => game.state.sectors[c].status === 'ACTIVE'));
+  assert.ok(SECTORS.every((k) => game.state.sectors[k].status === 'ACTIVE'));
 });
 
-test('auto_blackout_on_no_order starts the blackout by itself', () => {
+test('the nomination clock reaches zero: missing nominations are void, never auto-filled, and the Council sits', () => {
   const game = running();
-  game.patchConfig({ auto_blackout_on_no_order: true });
   game.callCouncil();
-  game.tick(301000);
-  assert.equal(game.state.blackout.active, true);
-  assert.equal(logEvents(game, 'blackout_started')[0].by, 'auto');
+  nominateAll(game, { POW: ['COM', 'AGR'], WTR: ['COM', 'AGR'], MED: ['COM', 'TRN'], TRN: ['COM', 'MED'], AGR: ['COM', 'WTR'] });
+  game.tick(61000);
+  const a = game.state.council.aggregate;
+  assert.equal(game.state.council.stage, 'deliberation');
+  assert.equal(a.valid_count, 5);
+  assert.deepEqual(a.void, ['COM']);
+  assert.deepEqual(a.totals, { POW: 0, WTR: 1, MED: 1, TRN: 1, AGR: 2, COM: 5 });
+  assert.equal(a.closed_by, 'timer');
+  assert.equal(game.state.council_clock.remaining_s, 300);
+  assert.equal(forSector(game, 'COM').council.aggregate.valid_count, 5);
+  // the facilitator can close early too
+  const g2 = running();
+  g2.callCouncil();
+  g2.submitNomination('POW', ['COM', 'AGR']);
+  assert.equal(g2.closeNominations({ by: 'facilitator' }).ok, true);
+  assert.equal(g2.state.council.aggregate.valid_count, 1);
+  assert.equal(g2.closeNominations().reason, 'nominations_not_open');
+});
+
+test('Round 3 begins after a valid order: only the two named sectors enter brownout, and both stay in play', () => {
+  const game = running();
+  game.callCouncil();
+  nominateAll(game);
+  game.submitContinuityOrder(['COM', 'AGR']);
+  game.setPhase('ROUND_2');   // still Round 2: nothing yet
+  assert.equal(game.state.sectors.COM.status, 'ACTIVE');
+  const res = game.activateRound('R3');
+  assert.equal(res.ok, true);
+  assert.equal(game.state.sectors.COM.status, 'BROWNOUT');
+  assert.equal(game.state.sectors.AGR.status, 'BROWNOUT');
+  for (const k of ['POW', 'WTR', 'MED', 'TRN']) assert.equal(game.state.sectors[k].status, 'ACTIVE', `${k} browned out too`);
+  assert.equal(game.state.brownout_pending, null);
+  assert.ok(game.state.council.final.applied_at, 'the order does not record when it took effect');
+  assert.equal(logEvents(game, 'brownout_applied')[0].round, 'R3');
+  // playable: a browned-out table still works its faults, and still has its voice next time
+  game.clock('start');
+  assert.ok(game.state.sectors.COM.faults.some((x) => !x.resolved), 'Round 3 dealt COM nothing to work on');
+  assert.equal(game.requestTransfer({ from: 'POW', to: 'COM', resource: 'power', amount: 1, by: 'COM' }).ok, true, 'a browned-out table cannot even ask for stock');
+  assert.equal(forSector(game, 'COM').sectors.COM.status_word, 'BROWNOUT');
+  assert.equal(game.callCouncil().ok, true);
+  assert.equal(game.state.council.count, 2);
+  // a browned-out sector keeps its voice; an order decided once Round 3 has begun does not wait
+  nominateAll(game, { COM: ['MED', 'TRN'], POW: ['MED', 'TRN'], WTR: ['MED', 'TRN'], MED: ['MED', 'TRN'], TRN: ['MED', 'TRN'], AGR: ['MED', 'TRN'] });
+  assert.deepEqual(game.state.council.nominations.COM.choices, ['MED', 'TRN'], 'a browned-out sector lost its voice');
+  game.submitContinuityOrder(['MED', 'TRN']);
+  assert.equal(game.state.sectors.MED.status, 'BROWNOUT');
+  assert.equal(game.state.brownout_pending, null);
+});
+
+test('a refresh, a reconnect or a restart keeps the votes, the totals and the final decision — nothing is duplicated', () => {
+  const game = running();
+  game.callCouncil();
+  nominateAll(game);
+  game.submitContinuityOrder(['COM', 'AGR']);
+  const snapshot = JSON.stringify(game.serialise());
+  const again = newGame({ runId: 'council-restore' });
+  again.restore(JSON.parse(snapshot));
+  assert.deepEqual(again.state.council.nominations, game.state.council.nominations);
+  assert.deepEqual(again.state.council.aggregate.totals, game.state.council.aggregate.totals);
+  assert.deepEqual(again.state.council.final.brownout, ['COM', 'AGR']);
+  assert.deepEqual(again.state.brownout_pending.sectors, ['COM', 'AGR']);
+  assert.equal(again.state.council.history.length, 1);
+  assert.equal(again.submitContinuityOrder(['MED', 'TRN']).reason, 'order_locked', 'a restart reopened the decision');
+  // a re-render is a new projection of the same state
+  for (let i = 0; i < 3; i += 1) assert.deepEqual(forSector(again, 'POW').my_nomination.choices, ['COM', 'AGR']);
+  assert.deepEqual(forSector(again, 'WTR').council.final.brownout, ['COM', 'AGR']);
+  // and a snapshot from before the R2 Council restores with the sitting's records in place
+  const old = JSON.parse(snapshot);
+  old.state.council = { active: false, started_at: null, ended_at: null, order: null, order_at: null, no_order: false, count: 0 };
+  delete old.state.brownout_pending;
+  const legacy = newGame({ runId: 'council-legacy' });
+  legacy.restore(old);
+  assert.deepEqual(legacy.state.council.nominations, {});
+  assert.deepEqual(legacy.state.council.history, []);
+  assert.equal(legacy.state.brownout_pending, null);
+  assert.equal(legacy.callCouncil().ok, true);
 });
 
 test('a blackout never lifts a brownout the Continuity Order imposed', () => {
   const game = running();
-  game.submitContinuityOrder(['POW', 'MED', 'WTR', 'TRN', 'COM', 'AGR']);
+  game.callCouncil();
+  nominateAll(game);
+  game.submitContinuityOrder(['COM', 'AGR']);
+  game.activateRound('R3');
   game.startRollingBlackout();
   for (let i = 0; i < 4; i += 1) game.tick(game.cfg.rolling_blackout.interval_s * 1000 + 1000);
   game.endRollingBlackout();
@@ -4337,7 +4562,7 @@ test('the scenario library resolves built-ins, saves copies and shadows by id', 
   assert.ok(lib.list().some((s) => s.id === 'haven9-standard' && s.builtin));
 
   const std = lib.resolve('haven9-standard');
-  assert.equal(std.defaults.council_clock_s, 180);
+  assert.equal(std.defaults.council_clock_s, 300);
   assert.deepEqual(std.sectors.POW.production, { power: 3 });
 
   const raw = lib.raw('haven9-standard');
@@ -4350,7 +4575,7 @@ test('the scenario library resolves built-ins, saves copies and shadows by id', 
   lib.save({ id: 'haven9-standard', name: 'HAVEN-9 STANDARD', doc: { ...raw, defaults: { ...raw.defaults, council_clock_s: 240 } } });
   assert.equal(lib.resolve('haven9-standard').defaults.council_clock_s, 240, 'a saved copy shadows the built-in');
   lib.remove('haven9-standard');
-  assert.equal(lib.resolve('haven9-standard').defaults.council_clock_s, 180, 'deleting it reveals the built-in again');
+  assert.equal(lib.resolve('haven9-standard').defaults.council_clock_s, 300, 'deleting it reveals the built-in again');
 
   const game = newGame();
   game.reset('r2', { scenario: lib.resolve('haven-9-hard') });
@@ -4419,8 +4644,9 @@ test('the debrief folds the log into per-round figures and a Round 3 vs Aftersho
   game.tick(20000);
   game.stampTransfer(t.id);
   game.callCouncil();
+  for (const [s, ch] of Object.entries({ POW: ['COM', 'AGR'], WTR: ['COM', 'AGR'], MED: ['COM', 'AGR'], TRN: ['COM', 'AGR'], AGR: ['COM', 'AGR'], COM: ['COM', 'AGR'] })) game.submitNomination(s, ch);
   game.tick(120000);
-  game.submitContinuityOrder(['POW', 'MED', 'WTR', 'TRN', 'COM', 'AGR']);
+  game.submitContinuityOrder(['COM', 'AGR']);
   game.tick(2000);
 
   game.setPhase('DEBRIEF_1');
@@ -4794,11 +5020,14 @@ test('per-fault overrides: extra accepted codes; the content answer stays; an ol
   assert.equal(logEvents(game, 'fault_override').length, 2, 'both the override and its removal are logged');
 });
 
-test('RESET on the council clock goes back to the configured sitting, and follows a live edit of it', () => {
+test('RESET on the council clock goes back to the beat\'s configured length, and follows a live edit of it', () => {
   const game = running();
   game.callCouncil();
   game.clock('set', 25, 'council');
-  assert.equal(game.clock('reset', null, 'council').remaining_s, 180);
+  assert.equal(game.clock('reset', null, 'council').remaining_s, 60, 'the nomination is 60 seconds');
+  game.closeNominations();
+  game.clock('set', 25, 'council');
+  assert.equal(game.clock('reset', null, 'council').remaining_s, 300, 'the sitting is five minutes');
   game.patchConfig({ council_clock_s: 240 });
   game.clock('set', 25, 'council');
   assert.equal(game.clock('reset', null, 'council').remaining_s, 240, 'the sitting length is a live setting');
@@ -4807,12 +5036,14 @@ test('RESET on the council clock goes back to the configured sitting, and follow
 test('each Council sitting gets its own 30-second warning', () => {
   const game = running();
   game.callCouncil();
+  game.closeNominations();
   game.clock('set', 25, 'council');
   game.tick(1000);
   assert.equal(game.state.council.warned_30, true);
-  assert.equal(game.submitContinuityOrder(['POW', 'WTR', 'MED', 'TRN', 'AGR', 'COM']).ok, true);
+  assert.equal(game.submitContinuityOrder(['POW', 'WTR']).ok, true);
   game.callCouncil();
   assert.equal(game.state.council.warned_30, false);
+  game.closeNominations();
   game.clock('set', 25, 'council');
   game.tick(1000);
   assert.equal(game.state.council.warned_30, true, 'the second sitting warns too');
@@ -4869,7 +5100,7 @@ test('the session registry opens a session on its chosen scenario; RESET RUN WIT
 
   registry.resetRun(row.code, { runId: 'reg-2', scenarioId: 'haven9-standard' });
   assert.equal(entry.game.state.scenario_id, 'haven9-standard');
-  assert.equal(entry.game.cfg.council_clock_s, 180);
+  assert.equal(entry.game.cfg.council_clock_s, 300);
   assert.equal(store.sessionById(row.id).scenario_id, 'haven9-standard', 'the choice is persisted');
 
   // A restart restores the run, keeps live edits, and fills settings the snapshot predates.

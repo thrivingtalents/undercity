@@ -124,16 +124,22 @@ async function main() {
   A({ type: 'fire_event', event_id: 'core_output_drop' });
   await wait(8);
 
-  say('9. CALL COUNCIL — every screen shows the 5:00 summons');
+  say('9. CALL COUNCIL — every table gets the private nomination screen (20 seconds in the demo)');
   A({ type: 'call_council' });
-  await wait(10);
+  await wait(4);
 
-  say('10. Continuity Order POW › MED › WTR › TRN › COM › AGR — ranks 5 and 6 enter brownout');
-  A({ type: 'continuity_order', order: ['POW', 'MED', 'WTR', 'TRN', 'COM', 'AGR'], confirm: true });
+  say('9b. Six private nominations land (the facilitator may enter one for a dead laptop); the sixth closes the vote and the Council sits');
+  for (const [s, ch] of Object.entries({ POW: ['COM', 'AGR'], WTR: ['COM', 'AGR'], MED: ['COM', 'AGR'], TRN: ['COM', 'AGR'], AGR: ['COM', 'AGR'], COM: ['COM', 'AGR'] })) {
+    A({ type: 'council_nomination', sector: s, choices: ch });
+  }
   await wait(8);
 
-  say('11. Brownout — COM loses telemetry, AGR production halves; a core cycle is processed');
-  A({ type: 'cycle', action: 'process' });
+  say('10. Continuity Order COM + AGR — locked at once; they brown out when Round 3 begins');
+  A({ type: 'continuity_order', brownout: ['COM', 'AGR'], confirm: true });
+  await wait(6);
+
+  say('11. Round 3 — the two named sectors enter brownout: COM loses telemetry, AGR production halves');
+  A({ type: 'activate_round', round: 'R3' });
   await wait(8);
 
   say('12. Sector DARK — TRN goes offline; its console locks, the wall shows SECTOR DARK');

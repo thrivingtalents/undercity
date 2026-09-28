@@ -226,14 +226,26 @@
       out.push({ kind: 'core', accent: 'amber', key: 'core',
         head: `⚠ CORE STABILITY ${clamp(f.core_output)}%`, detail: 'CAPACITY INSUFFICIENT · SECTORS MUST ENTER BROWNOUT' });
     }
+    // THE R2 COUNCIL (2026-09-28): the beat the room is in, and the provisional two once nominations close.
     if ((f.council && f.council.active) || f.mode === 'COUNCIL') {
       const c = f.council || {};
-      const order_ = f.continuity_order && Array.isArray(f.continuity_order.order) ? f.continuity_order : null;
-      const detail = order_
-        ? `CONTINUITY ORDER ${order_.order.join(' › ')}${order_.brownout && order_.brownout.length ? ` · BROWNOUT ${order_.brownout.join(' ')}` : ''}`
-        : 'CHIEFS + LIAISONS REPORT TO CENTRAL COUNCIL';
-      out.push({ kind: 'council', accent: 'purple', key: `council:${c.count || 0}:${c.no_order ? 'no' : ''}:${order_ ? 'o' : ''}`,
-        head: c.no_order ? 'NO CONTINUITY ORDER RECEIVED' : 'COUNCIL IN SESSION', detail });
+      const a = c.aggregate;
+      let head = 'COUNCIL IN SESSION';
+      let detail = 'CHIEFS + LIAISONS REPORT TO CENTRAL COUNCIL';
+      if (c.stage === 'nomination') {
+        head = 'COUNCIL SUMMONED · PRIVATE NOMINATION';
+        detail = `EVERY SECTOR NAMES TWO FOR BROWNOUT · ${c.submitted_count || 0}/${c.of || 6} IN`;
+      } else if (c.stage === 'deliberation' && a) {
+        detail = a.unresolved && a.unresolved.length
+          ? `PROVISIONAL ${a.provisional.join(' + ') || '—'} · ${a.unresolved.length === 2 ? 'BOTH POSITIONS' : 'SECOND POSITION'} UNRESOLVED${a.ties && a.ties.length ? ` (${a.ties.join(' / ')})` : ''}`
+          : `PROVISIONAL BROWNOUT ${a.provisional.join(' + ')} · THE COUNCIL DECIDES`;
+      }
+      if (c.no_order) head = 'NO CONTINUITY ORDER RECEIVED';
+      out.push({ kind: 'council', accent: 'purple', key: `council:${c.count || 0}:${c.stage || ''}:${c.submitted_count || 0}:${c.no_order ? 'no' : ''}`, head, detail });
+    }
+    if (f.brownout_pending && Array.isArray(f.brownout_pending.sectors) && f.brownout_pending.sectors.length) {
+      out.push({ kind: 'order', accent: 'amber', key: `order:${f.brownout_pending.sectors.join('+')}`,
+        head: `CONTINUITY ORDER · ${f.brownout_pending.sectors.join(' + ')}`, detail: `BROWNOUT FROM ROUND ${f.brownout_pending.apply_round_number}` });
     }
     const t = transferAlert(f.transfers);
     if (t) out.push(t);

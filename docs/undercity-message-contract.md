@@ -180,7 +180,7 @@ Every message requires the token. Grouped by control-panel column (§6.3 of the 
 ```json
 { "type": "set_round", "round": "R3" }
 { "type": "clock", "action": "start" }        // start (= resume) | pause | end | add | set, with "seconds" | reset
-{ "type": "set_mode", "mode": "COUNCIL" }     // triggers big-screen takeover + 5:00
+{ "type": "set_mode", "mode": "COUNCIL" }     // = call_council: the R2 private nomination, then the sitting
 { "type": "announce", "text": "Core output dropping to 60 percent." }
 { "type": "sting", "sound": "klaxon" }        // klaxon | chime | silence
 { "type": "breather", "on": true }            // pauses ALL decay and clocks
@@ -476,8 +476,11 @@ requires stock.
 { "type": "set_sound", "on": false }
 { "type": "alert", "title": "COUNCIL SUMMONED", "subtitle": "CHIEFS + LIAISONS REPORT IMMEDIATELY" }
 { "type": "dismiss_alert" }
-{ "type": "call_council" }   { "type": "end_council" }   // scripts and tests only since 2026-09-28
-{ "type": "continuity_order", "order": ["POW","MED","WTR","TRN","COM","AGR"], "confirm": true }
+{ "type": "call_council" }                       // R2: opens the 60-second private nomination
+{ "type": "council_close_nominations" }          // close early: the aggregate, then the five-minute sitting
+{ "type": "council_nomination", "sector": "POW", "choices": ["COM", "AGR"] }   // a table's vote, entered for it
+{ "type": "continuity_order", "brownout": ["COM", "AGR"], "confirm": true }    // the Council's final two, locked
+{ "type": "end_council" }                        // abandon the sitting
 { "type": "rolling_blackout", "confirm": true }   { "type": "end_blackout" }
 { "type": "fire_event", "event_id": "tunnel_collapse", "target": "TRN" }
 { "type": "cancel_scheduled", "id": "S-0004" }
@@ -501,10 +504,37 @@ requires stock.
 { "type": "reset_run", "run_id": "…", "scenario_id": "haven9-hard", "confirm": true }
 ```
 
-`set_mode: "COUNCIL"` still works and is equivalent to `call_council`. The admin
-console no longer sends `call_council`, `end_council`, `continuity_order` or the
-council clock (2026-09-28): the Council is run on the floor. The console keeps
-`rolling_blackout` / `end_blackout` on its PRESSURE dial.
+`set_mode: "COUNCIL"` still works and is equivalent to `call_council`.
+
+**THE R2 COUNCIL (2026-09-28, `undercity_r2_council_brownout_spec` v1.0).**
+`call_council` opens a PRIVATE NOMINATION: `council_clock` runs
+`nomination_clock_s` (60) and every sector frame carries
+`council { stage: "nomination", submitted_count, of, nomination_s, deliberation_s }`.
+A table sends `{ "type": "council_nomination", "choices": ["COM", "AGR"] }` —
+exactly two unique sectors, itself allowed, editable until the close — and
+gets `nomination_result { ok, sector, choices, submitted_at, submitted, of }`
+(`unchanged: true` for the same pair again; `nomination_invalid`,
+`nomination_closed`). Its frame carries `my_nomination { choices, submitted_at,
+revisions, locked }` and nobody else's; the control frame's `council_detail`
+carries every nomination live. The sixth nomination, the clock or
+`council_close_nominations` closes the vote (missing ones are void, never
+auto-filled): `council.aggregate { totals, ranked, provisional, ties,
+unresolved, valid_count }` goes to every screen — the top two are provisional
+only, a tie affecting a position is listed under `ties` with that position in
+`unresolved` — and the sitting runs `council_clock_s` (300) as
+`stage: "deliberation"`. `council.consequences` carries each sector's brownout
+consequence text. The final order is `{ "type": "continuity_order",
+"brownout": [a, b], "confirm": true }` from a sector connection (the Council's
+recorder) or from control; reply `order_result { ok, order }` or
+`order_incomplete` / `nominations_open` / `council_not_sitting` /
+`order_locked`. It locks at once (`council.final`, `council.locked`), ends the
+sitting and sets `brownout_pending { sectors, apply_round_number }`; the two
+sectors enter BROWNOUT when Round 3 begins (`brownout_applied`), or at once if
+it has. 00:00 with no order: `council_no_order`, the sitting ends and
+`rolling_blackout` starts by itself (`blackout_started { by: "council" }`).
+Log: `council_called`, `council_nomination`, `council_nominations_closed`,
+`council_aggregate`, `continuity_order` (the full record), `council_ended`,
+`council_no_order`, `brownout_applied`; `council.history` keeps every sitting.
 Replies: `fire_result`, `event_result`, `order_result`, `timeline_result`,
 `transfer_result`, `cycle_summary`.
 

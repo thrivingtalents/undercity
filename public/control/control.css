@@ -284,6 +284,27 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: none;
 
 /* core */
 .cycle-summary { margin-top: 6px; font-size: 10.5px; }
+/* -- THE R2 COUNCIL (2026-09-28) ------------------------------------------------- */
+.council-status { border: 1px solid var(--line); background: var(--panel-2); padding: 10px; text-align: center; margin-bottom: 8px; }
+.council-status b { font-size: 34px; display: block; color: var(--purple); line-height: 1; }
+.council-status b.low { color: var(--red); animation: pulse 1s infinite; }
+.council-status .st { font-size: 10px; letter-spacing: 0.2em; color: var(--ink-dim); margin-top: 6px; }
+.nom-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.nom { display: flex; justify-content: space-between; gap: 8px; border: 1px solid var(--line); background: var(--panel-2); padding: 6px 8px; font-size: 11px; }
+.nom.in { border-color: var(--green); }
+.nom.void { border-color: var(--red); color: var(--red); }
+.nom.pending { color: var(--ink-dim); }
+.nom em { color: var(--ink-faint); font-style: normal; }
+.agg-totals { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+.agg { border: 1px solid var(--line); padding: 4px 8px; font-size: 11px; }
+.agg.prov { border-color: var(--amber); color: var(--amber); }
+.agg.tie { border-color: var(--purple); color: var(--purple); }
+.order-pick { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin-bottom: 6px; }
+.order-pick button { padding: 10px 4px; font-weight: 700; font-size: 13px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.order-pick button small { font-size: 8px; letter-spacing: 0.16em; color: var(--amber); }
+.order-pick button.on { background: var(--ui-active); color: var(--accent-ink); }
+.order-pick button:disabled { opacity: 0.35; }
+
 .cycle-summary table { width: 100%; border-collapse: collapse; }
 .cycle-summary td, .cycle-summary th { border-bottom: 1px solid var(--line); padding: 3px 4px; text-align: left; vertical-align: top; }
 .cycle-summary th { color: var(--ink-faint); font-weight: 400; letter-spacing: 0.1em; font-size: 9px; }

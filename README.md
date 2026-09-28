@@ -220,14 +220,25 @@ npm start                                            # http://localhost:3000/adm
    Medical's allowance for the round, but Transport still approves and
    Medical still heals. The facilitator can write the board, reroll the hand,
    force a card or bench one, each logged as an override.
-7. **Council.** The Council is called on the floor, not from the console
-   (2026-09-28): the facilitator summons the Chiefs out loud (the COUNCIL
-   SUMMONED alert preset puts it on every screen), runs the three minutes on
-   their own clock, and applies the **Continuity Order** by hand — the two
-   lowest-ranked sectors go into BROWNOUT with the quick action, or the
-   one-click **rolling blackout** (EVENTS › PRESSURE) rotates brownout through
-   the city when no order arrives. The engine's council mode, `call_council`,
-   `continuity_order` and the council clock remain for scripts and tests.
+7. **Council.** THE R2 COUNCIL (2026-09-28, `undercity_r2_council_brownout_spec`
+   v1.0). The facilitator calls it in Round 2 from EVENTS › COUNCIL and every
+   table gets a **private nomination** screen with a 60-second clock: name
+   exactly two sectors for a temporary brownout — itself allowed, no
+   abstention, an incomplete submission is void, a nomination may be changed
+   until the close, and no table ever sees another's (the facilitator sees
+   them all, live). The sixth nomination, the clock or the facilitator closes
+   the vote; the totals are counted and the top two become **provisional**
+   only — a tie affecting either position is shown as unresolved, never broken
+   by chance. Then the **Council sits for five minutes** with the totals, the
+   provisional two and the consequences of brownout for all six on every
+   screen, and submits its **final Continuity Order**: exactly two sectors,
+   any two, entered by the Council's recorder on a station laptop or by the
+   facilitator; it locks on submission and is never recalled. At 00:00 with no
+   order the **rolling blackout** starts by itself. The two named sectors enter
+   BROWNOUT when **Round 3 begins** (or at once if it already has): they stay in
+   play, keep their seat and their voice, and only their capability drops.
+   Every vote, the aggregate, the provisional two and the final two are kept
+   for the debrief (`council.history`, the log).
 8. **Pressure.** Quick actions (TRIGGER FAULT · CORE −10% · INJURE WORKER ·
    BROWNOUT · ANNOUNCEMENT · ALERT · PAUSE) are always on
    screen. The pressure dial and configurable **events** (supply delay,

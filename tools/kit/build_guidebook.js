@@ -255,9 +255,9 @@ C.push(p(t("These are internal phases in the control panel. Participants never s
 C.push(tbl([
   headRow(["WAVE", "ROUND · TIME", "WHAT IT IS FOR"], [3400, 1600, W - 5000]),
   row(["Stable Operations", "R1 00:00–15:00", "Baseline capture. Intra-sector faults only. Comfortable on purpose."], [3400, 1600, W - 5000]),
-  row(["Interdependence", "R2 00:00–11:00", "Sectors collide. Cross-sector specs, transfers, Council sitting one."], [3400, 1600, W - 5000]),
+  row(["Interdependence", "R2 00:00–11:00", "Sectors collide. Cross-sector specs, transfers, the Council's brownout decision."], [3400, 1600, W - 5000]),
   row(["Escalation", "R2 11:00–15:00", "Simultaneous faults and competing priorities. Off-script injects live here."], [3400, 1600, W - 5000]),
-  row(["Core Failure", "R3 00:00–10:00", "Peak pressure. Core decline, Continuity Order, brownouts."], [3400, 1600, W - 5000]),
+  row(["Core Failure", "R3 00:00–10:00", "Peak pressure. The Council's two sectors brown out; core decline."], [3400, 1600, W - 5000]),
   row(["Temporary Stabilisation", "R3 10:00–12:00", "Fewer NEW majors so tables can catch up operationally. NOT a break. Say nothing."], [3400, 1600, W - 5000]),
   row(["Aftershock", "R4 00:00–05:00", "A late wave onto the city they are already carrying. POST-MEASUREMENT begins."], [3400, 1600, W - 5000]),
   row(["Final Crisis", "R4 05:00–08:00", "The last sustained push into the end state."], [3400, 1600, W - 5000]),
@@ -310,8 +310,9 @@ C.push(tbl([
   beat("01:00", "Walk the floor. Say nothing.", "F-201 is the discrepancy fault: watch WTR’s table when POW asks for the reservoir figure. MED’s cold chain has real urgency — do they escalate or absorb?"),
   beat("03:00", "Watch AGR and POW.", "AGR holds two faults and needs COM for both — does the liaison batch the requests or make two trips? POW holds two and is asked for specs by two others: classic bottleneck. Hoarding or brusqueness?"),
   beat("04:00", "Watch TRN.", "The injury is visible and physical. Watch whether TRN asks MED for the two workers back, and how."),
-  beat("06:00", "Call Council out loud and put the COUNCIL SUMMONED alert on every screen. Run the three minutes on your own clock. Chiefs and liaisons to the centre table — the rest of the city keeps running.", "THE KEY OBSERVATION WINDOW. Who speaks, in what order, for how long. Who never speaks. Who runs the meeting without being asked. Also: what happens at the stations while the leaders are away."),
-  beat("09:00", "Council ends. Dismiss the alert.", "Whether anything agreed at Council actually changes behaviour."),
+  beat("06:00", "CALL COUNCIL from EVENTS › COUNCIL. Every laptop shows CORE INSUFFICIENCY — PRIVATE NOMINATION with a 60-second clock: each table names exactly TWO sectors for a temporary brownout, itself allowed. Say nothing about what the numbers mean.", "Who at each table decides the two names, and how fast. A table that names itself. A table that argues past the clock — its nomination is void, and that is data."),
+  beat("07:00", "The sixth nomination, the clock or CLOSE NOMINATIONS closes the vote. Every screen shows the totals and the PROVISIONAL two (a tie is shown as unresolved, never broken), and the five-minute Council starts. Chiefs and liaisons to the centre table — the rest of the city keeps running.", "THE KEY OBSERVATION WINDOW. Who speaks, in what order, for how long. Who never speaks. Who runs the meeting without being asked. Whether the Council follows the room's provisional two or overrules them, and who argues for the change."),
+  beat("12:00", "The Council's recorder enters the final two on a station laptop (or you record it on the console): SUBMIT CONTINUITY ORDER. It locks at once; the two sectors brown out when Round 3 begins. At 00:00 with no order the rolling blackout starts by itself — do not extend.", "Decision paralysis, or one voice bulldozing. Both are common. Tag both. Then: how the two named sectors are treated by the others for the rest of the round."),
 ], BW));
 C.push(callout("Council sittings are your richest data.", "Whole-group, compressed, high stakes, one microphone. If you tag nothing else in the shift, tag the Council. Remember the pressure it creates is that the stations are running short-handed while it sits — it is not a rest for anyone."));
 
@@ -328,12 +329,11 @@ C.push(H3("Wave 4 · Core Failure · Round 3 (00:00 – 10:00)"));
 C.push(p(t("The climax. Two-spec faults, fast decay, and a decision with no right answer — landing on a city that has had no break since the shift began.")));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("00:00", "NEXT ROUND → Round 3: its six critical faults land at once, one per sector, two specs each. START. Announce: \"Core integrity is falling. Assume nothing is routine.\"", ""),
+  beat("00:00", "NEXT ROUND → Round 3: the Council's two sectors enter BROWNOUT as the round begins, and its six critical faults land at once, one per sector, two specs each. START. Announce: \"Core integrity is falling. Assume nothing is routine.\"", "The two browned-out tables: do they fold, or do they trade harder? Nobody sits out — brownout is reduced capability, not elimination."),
   beat("01:00", "Walk the floor. Say nothing.", "Two specs each now — coordination cost doubles. WTR and AGR need their own buried Appendix C: how long before anyone opens the back of the binder? F-302 bleeds at 3.0/min and F-304 at 2.5/min — watch for panic-guessing at the console."),
   beat("02:00", "Drop Core Integrity to 60. Announce: \"Core output cannot sustain six sectors.\" Klaxon.", "The room changes here. Note who moves first — toward the problem or toward protecting their own sector."),
-  beat("05:00", "Call Council out loud, alert CONTINUITY ORDER REQUIRED, and run the three minutes on your own clock. Announce the Continuity Order is due. Place the form on the centre table.", "Clause 7 says essential services take precedence and never defines essential. The argument about what essential means IS the exercise."),
-  beat("06:30", "Ninety-second warning. Do not offer help or extend.", "Decision paralysis, or one voice bulldozing. Both are common. Tag both."),
-  beat("08:00", "If the form is submitted: put the two lowest-ranked sectors into BROWNOUT (the quick action, one sector at a time). If not: announce rolling blackouts and start ROLLING BLACKOUT from EVENTS › PRESSURE.", "Indecision must cost more than any decision. Do not soften this."),
+  beat("05:00", "Walk the two browned-out tables. Say nothing. If the Council never submitted an order, the rolling blackout is rotating through the city — do not end it before 08:00.", "Clause 7 says essential services take precedence and never defines essential. The argument about what essential meant, in Round 2, is what the room is now living with."),
+  beat("06:30", "Ninety-second reminder that Core output is still at 60. Do not offer help.", "Indecision in Round 2 must cost more than any decision did. Do not soften this."),
   beat("08:30", "Redeploy brownout sectors as aid crews to other tables. Nobody sits out.", "How brownout participants are treated by the sectors they join."),
 ], BW));
 
@@ -351,7 +351,7 @@ C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
   beat("00:00", "NEXT ROUND → Round 4: its six faults land at once, each needing another sector’s buried appendix. START. Announce in-world: \"Seismic activity detected.\" Restore brownout sectors to active.", "Whether anyone notices that nothing else was given back."),
   beat("01:00", "Walk the floor.", "Six sectors, six raids on six appendices. The asking behaviour should look different from the early shift — that difference is the deliverable. Watch who is asked twice and how they answer the second time. TRN’s fault is the mini-triage feed; decay pressure returns onto tired people."),
-  beat("03:30", "Optional short Council if the group is coping well. Skip if they are not.", "Compare directly against the first sitting. Same people, same format, measurable difference."),
+  beat("03:30", "Optional: CALL COUNCIL again if the group is coping well — the same private nomination and five-minute sitting; this time the order applies at once. Skip if they are not.", "Compare directly against the first sitting. Same people, same format, measurable difference."),
 ], BW));
 
 C.push(H3("Wave 7 · Final Crisis · Round 4 (05:00 – 08:00)"));

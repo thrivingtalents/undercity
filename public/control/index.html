@@ -157,6 +157,7 @@
         <button data-sub="faults" class="on">FAULTS</button>
         <button data-sub="timeline">TIMELINE</button>
         <button data-sub="pressure">PRESSURE</button>
+        <button data-sub="council">COUNCIL</button>
       </nav>
 
       <div class="sub on panel" id="sub-faults">
@@ -255,6 +256,48 @@
             <button data-sting="silence">SILENCE</button>
           </div>
           <div class="hint">R0 klaxon is the audio join key — fire it once, on the record.</div>
+        </div>
+      </div>
+
+      <!-- THE R2 COUNCIL (2026-09-28): the facilitator opens the private nomination, watches every
+           table's vote live, closes it, and records the Council's final two — or watches a station do it. -->
+      <div class="sub panel" id="sub-council">
+        <div class="council-status" id="council-status"></div>
+        <div class="row">
+          <button id="btn-call-council" class="primary">CALL COUNCIL — PRIVATE NOMINATION</button>
+          <button id="btn-close-nominations">CLOSE NOMINATIONS · OPEN COUNCIL</button>
+          <button id="btn-end-council">END SITTING</button>
+          <button data-council="pause">HOLD</button>
+          <button data-council="start">RUN</button>
+          <button data-council="add" data-sec="60">+1:00</button>
+          <button data-council="add" data-sec="-60">−1:00</button>
+          <button data-council="reset" id="council-reset">RESET</button>
+        </div>
+        <div class="hint">Round 2. Every table gets 60 seconds to name two sectors for brownout; the sixth nomination — or the clock, or you — closes the vote. The aggregate and the provisional two go to every screen, and the Council has five minutes to submit its final two. At 00:00 with no order, the rolling blackout starts by itself. The two named sectors brown out when Round 3 begins.</div>
+        <div class="block">
+          <span class="label">Private nominations <em>— live, every table, facilitator only</em></span>
+          <div class="nom-grid" id="nom-grid"><div class="hint">No sitting.</div></div>
+        </div>
+        <div class="block">
+          <span class="label">Aggregate <em>— what the room sees</em></span>
+          <div class="council-aggregate" id="council-aggregate"><div class="hint">Nominations not closed.</div></div>
+        </div>
+        <div class="block">
+          <span class="label">Final Continuity Order <em>— the Council's two; record it for them if they ask</em></span>
+          <div class="order-pick" id="order-pick"></div>
+          <div class="row">
+            <button id="btn-order-clear">CLEAR</button>
+            <button id="btn-order-submit" class="primary" disabled>SUBMIT CONTINUITY ORDER</button>
+          </div>
+          <div class="hint" id="final-order">None this sitting.</div>
+        </div>
+        <div class="block">
+          <span class="label">Brownout</span>
+          <div class="hint" id="council-brownout">Nothing pending.</div>
+        </div>
+        <div class="block">
+          <span class="label">Sittings this run</span>
+          <div class="feed" id="council-history"><div class="hint">None yet.</div></div>
         </div>
       </div>
 
