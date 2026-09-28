@@ -2509,7 +2509,11 @@ test('the console markup: attention, observational cards, drawer, overrides, fau
   assert.ok(!/send\(\{ type: 'adjust_integrity'|send\(\{ type: 'set_integrity'|send\(\{ type: 'adjust_inventory'|send\(\{ type: 'adjust_core'|send\(\{ type: 'transfer_approve'|send\(\{ type: 'heal_worker'|send\(\{ type: 'agr_reroll'|send\(\{ type: 'reset_run'/.test(js), 'a direct mutation bypasses the override wrapper');
   assert.ok(/let faultView = 'active'/.test(js) && /data-fv="active" class="on"/.test(html));
   assert.ok(/function confirmTrigger/.test(js) && /function previewPreset/.test(js) && /FIRE WAVE/.test(js));
-  assert.ok(/data-quick="fault"/.test(html) && /data-quick="injure"/.test(html) && /data-quick="brownout"/.test(html) && /data-quick="announce"/.test(html) && /data-quick="alert"/.test(html) && /data-quick="council"/.test(html), 'a routine event trigger is gone');
+  assert.ok(/data-quick="fault"/.test(html) && /data-quick="injure"/.test(html) && /data-quick="brownout"/.test(html) && /data-quick="announce"/.test(html) && /data-quick="alert"/.test(html), 'a routine event trigger is gone');
+  // The Council is run on the floor (2026-09-28): no call, no sitting clock, no order form and no summons on the console.
+  assert.ok(!/data-quick="council"|data-sub="council"|data-dial="council"|btn-call-council|order-pick|council-status/.test(html), 'a Council control is still on the console');
+  assert.ok(!/call_council|end_council|continuity_order|renderCouncil|orderDraft/.test(js), 'the console still drives the Council');
+  assert.ok(/data-dial="blackout"/.test(html) && /id="btn-end-blackout"/.test(html) && /type: 'rolling_blackout'/.test(js) && /type: 'end_blackout'/.test(js), 'the rolling blackout lost its controls');
   assert.ok(!/data-quick="core"/.test(html), 'CORE −10% is still a quick action');
   assert.ok(/state\.ticker\.slice\(0, 5\)/.test(js) && /id="btn-expand-log"/.test(html) && /data-lf="ADMIN"/.test(html));
   // The observation pad left the console on 2026-09-28: no pad on the overview, no OBSERVATIONS tab, no intent.

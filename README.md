@@ -31,7 +31,7 @@ control extension). Where the two differ, **the contract wins**.
 |---|---|---|---|
 | **Wall** | projector, whole room | `/wall` | The participant Big Screen (contract v15), display-only, in four bands: a command bar (phase · CURRENT ROUND · CORE STABILITY · NEXT ROUND IN · LIVE, the timer going amber under 2:00, red under 1:00, pulsing in the last ten seconds); an alert strip drawn only while something needs the room (the facilitator's emergency, DARK sectors, CRITICAL sectors with their health, core insufficiency, the Council, transfers waiting for TRN — one FROM → TO route and item, or a count — then a recent facilitator announcement, in that order); the full HAVEN-9 illustration (`Asset/Map reference`, prepared into `public/wall/art` by `node tools/prepare-wall-art.js`) with live labels, state tints, a CRITICAL / DARK / BROWNOUT word under the label, one fault badge per district, transfer routes that light only while something moves, and a Core that glows with its stability; six fixed-order SECTOR HEALTH cards beside it (icon, code, name, HEALTH %, STABLE / DEGRADED / CRITICAL / BROWNOUT / DARK, what COM reported or NO REPORT, and UPDATED ROUND n · CURRENT / STALE / OUTDATED or NOT UPDATED); and COM's CITY BROADCAST, readable from the back of the room, or NO ACTIVE CITY BROADCAST. STABLE and DEGRADED never move; only CRITICAL breathes. Nothing to press; never real inventory, an aggregate city score, an answer key or a procedure |
 | **Sector** | the Systems Lead | `/sector/POW` … `/sector/COM` | What's wrong · how long · what we have · what to enter. Fault list → open card → resolution console with 3-strike 20 s lockout. All six get RESOURCE REQUESTS & TRANSFERS — REQUEST RESOURCE / TRANSFER RESOURCE on top, then ACTIVE (one card per movement, oldest first, ALL / INCOMING / OUTGOING, FULFILL or DECLINE on a request for our stock) and a folded HISTORY — and an injured-worker panel that asks Medical for healing. TRN alone gets the resource approval queue with APPROVE; MED alone gets the healing queue with HEAL; COM gets City Intelligence and CITY BROADCAST CONTROL (the only editable big screen); AGR gets its three intervention cards. The city's reported board lives on the wall, not on the laptops: a table sees only a CITY ANNOUNCEMENT UPDATED nudge |
-| **Admin** | the facilitator | `/admin?token=haven9` | The command centre (v16): a top bar with PHASE · ROUND · ROUND TIME · CORE and START / PAUSE / NEXT PHASE (STOP CLOCK beside it; audio, URLs, snapshot, export, settings and RESET SESSION behind •••); four destinations — OVERVIEW (session progress, grouped quick actions, NEEDS ATTENTION, six observational sector cards with real inventory · HEALTH · workers · faults · next-round readiness · each role's round capability, five system summaries, five rows of recent activity), EVENTS (faults ACTIVE · SCHEDULED · LIBRARY with a confirm on every trigger — a round button deals that round's whole fault set at once — timeline, pressure, council), CITY SYSTEMS (transfers, workforce · MED, COM real-vs-reported, AGR, core, ADMIN OVERRIDES), DEBRIEF (filtered event log, override log, analysis and export). OPEN SECTOR slides a drawer with the detail and, folded, the admin actions. Every direct change to authoritative state shows current → proposed, asks for a reason, and writes an admin_override audit event; RESET asks for the typed word |
+| **Admin** | the facilitator | `/admin?token=haven9` | The command centre (v16): a top bar with PHASE · ROUND · ROUND TIME · CORE and START / PAUSE / NEXT PHASE (STOP CLOCK beside it; audio, URLs, snapshot, export, settings and RESET SESSION behind •••); four destinations — OVERVIEW (session progress, grouped quick actions, NEEDS ATTENTION, six observational sector cards with real inventory · HEALTH · workers · faults · next-round readiness · each role's round capability, five system summaries, five rows of recent activity), EVENTS (faults ACTIVE · SCHEDULED · LIBRARY with a confirm on every trigger — a round button deals that round's whole fault set at once — timeline, pressure), CITY SYSTEMS (transfers, workforce · MED, COM real-vs-reported, AGR, core, ADMIN OVERRIDES), DEBRIEF (filtered event log, override log, analysis and export). OPEN SECTOR slides a drawer with the detail and, folded, the admin actions. Every direct change to authoritative state shows current → proposed, asks for a reason, and writes an admin_override audit event; RESET asks for the typed word |
 
 Every screen updates in real time over one websocket; no refresh, ever. A
 laptop that drops and rejoins gets the current state and its timers continue
@@ -220,14 +220,16 @@ npm start                                            # http://localhost:3000/adm
    Medical's allowance for the round, but Transport still approves and
    Medical still heals. The facilitator can write the board, reroll the hand,
    force a card or bench one, each logged as an override.
-7. **Council.** CALL COUNCIL puts the 5:00 summons on every screen. Admin
-   records the **Continuity Order** by clicking sectors in rank order; it
-   confirms ("This decision cannot be recalled."), ranks 5 and 6 enter
-   BROWNOUT, the wall announces CONTINUITY ORDER ACCEPTED. No order at 00:00
-   → NO CONTINUITY ORDER RECEIVED and a one-click **rolling blackout**, which
-   rotates brownout through the city until Admin ends it.
+7. **Council.** The Council is called on the floor, not from the console
+   (2026-09-28): the facilitator summons the Chiefs out loud (the COUNCIL
+   SUMMONED alert preset puts it on every screen), runs the three minutes on
+   their own clock, and applies the **Continuity Order** by hand — the two
+   lowest-ranked sectors go into BROWNOUT with the quick action, or the
+   one-click **rolling blackout** (EVENTS › PRESSURE) rotates brownout through
+   the city when no order arrives. The engine's council mode, `call_council`,
+   `continuity_order` and the council clock remain for scripts and tests.
 8. **Pressure.** Quick actions (TRIGGER FAULT · CORE −10% · INJURE WORKER ·
-   CALL COUNCIL · BROWNOUT · ANNOUNCEMENT · ALERT · PAUSE) are always on
+   BROWNOUT · ANNOUNCEMENT · ALERT · PAUSE) are always on
    screen. The pressure dial and configurable **events** (supply delay,
    transport gridlock, false sensor reading, power surge, tunnel collapse,
    communication blackout, biological breach…) each have a visibility:

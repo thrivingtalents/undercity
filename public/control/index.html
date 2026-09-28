@@ -112,10 +112,6 @@
 
       <div class="quick-groups">
         <div class="qg">
-          <span class="qg-title">SESSION</span>
-          <button data-quick="council" class="q-council">CALL COUNCIL</button>
-        </div>
-        <div class="qg">
           <span class="qg-title">CITY EVENTS</span>
           <button data-quick="fault" class="q-fault">TRIGGER FAULT</button>
           <button data-quick="injure">INJURE WORKER</button>
@@ -161,7 +157,6 @@
         <button data-sub="faults" class="on">FAULTS</button>
         <button data-sub="timeline">TIMELINE</button>
         <button data-sub="pressure">PRESSURE</button>
-        <button data-sub="council">COUNCIL</button>
       </nav>
 
       <div class="sub on panel" id="sub-faults">
@@ -218,11 +213,14 @@
             <button data-dial="cancel_supply">CANCEL SUPPLY</button>
             <button data-dial="transport_gridlock">TRANSPORT DELAY</button>
             <button data-dial="communication_blackout">COMMS FAILURE</button>
-            <button data-dial="council">CALL COUNCIL</button>
             <button data-dial="blackout" class="danger-ish">ROLLING BLACKOUT</button>
             <button data-dial="biological_breach" class="danger-ish">BIOLOGICAL BREACH</button>
           </div>
           <div class="hint">CORE −10% is a direct state change: CITY SYSTEMS › CORE, logged as an override.</div>
+          <div class="row">
+            <span id="blackout-status" class="hint">Rolling blackout: not active.</span>
+            <button id="btn-end-blackout" class="hidden">END BLACKOUT</button>
+          </div>
         </div>
         <div class="block">
           <span class="label">Event presets <em>— configurable in the scenario</em></span>
@@ -260,43 +258,6 @@
         </div>
       </div>
 
-      <div class="sub panel" id="sub-council">
-        <div class="council-status" id="council-status"></div>
-        <div class="row">
-          <button id="btn-call-council" class="primary">CALL COUNCIL</button>
-          <button id="btn-end-council">COUNCIL ENDED</button>
-          <button data-council="add" data-sec="60">+1:00</button>
-          <button data-council="reset" id="council-reset" title="Back to the configured sitting length (SETTINGS › Council clock)">RESET 3:00</button>
-          <button data-council="pause">HOLD</button>
-          <button data-council="start">RUN</button>
-        </div>
-        <div class="block">
-          <span class="label">Continuity Order <em>— click sectors in rank order 1 → 6</em></span>
-          <div class="order-pick" id="order-pick"></div>
-          <div class="order-slots" id="order-slots"></div>
-          <div class="row">
-            <button id="btn-order-clear">CLEAR</button>
-            <button id="btn-order-submit" class="primary" disabled>SUBMIT CONTINUITY ORDER</button>
-          </div>
-          <div class="hint">Ranks 5 and 6 enter BROWNOUT. Confirmation required; the decision cannot be recalled.</div>
-        </div>
-        <div class="no-order hidden" id="no-order">
-          <b>NO CONTINUITY ORDER RECEIVED</b>
-          <button id="btn-blackout" class="danger">INITIATE ROLLING BLACKOUT</button>
-        </div>
-        <div class="block">
-          <span class="label">Blackout</span>
-          <div class="row">
-            <span id="blackout-status">Not active.</span>
-            <button id="btn-blackout-2">START ROLLING BLACKOUT</button>
-            <button id="btn-end-blackout">END BLACKOUT</button>
-          </div>
-        </div>
-        <div class="block">
-          <span class="label">Last order</span>
-          <div id="last-order" class="hint">None yet.</div>
-        </div>
-      </div>
     </section>
 
     <!-- ================= CITY SYSTEMS ================= -->

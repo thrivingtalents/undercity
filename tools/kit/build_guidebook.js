@@ -310,8 +310,8 @@ C.push(tbl([
   beat("01:00", "Walk the floor. Say nothing.", "F-201 is the discrepancy fault: watch WTR’s table when POW asks for the reservoir figure. MED’s cold chain has real urgency — do they escalate or absorb?"),
   beat("03:00", "Watch AGR and POW.", "AGR holds two faults and needs COM for both — does the liaison batch the requests or make two trips? POW holds two and is asked for specs by two others: classic bottleneck. Hoarding or brusqueness?"),
   beat("04:00", "Watch TRN.", "The injury is visible and physical. Watch whether TRN asks MED for the two workers back, and how."),
-  beat("06:00", "CALL COUNCIL. Three-minute clock. Chiefs and liaisons to the centre table — the rest of the city keeps running.", "THE KEY OBSERVATION WINDOW. Who speaks, in what order, for how long. Who never speaks. Who runs the meeting without being asked. Also: what happens at the stations while the leaders are away."),
-  beat("09:00", "Council ends.", "Whether anything agreed at Council actually changes behaviour."),
+  beat("06:00", "Call Council out loud and put the COUNCIL SUMMONED alert on every screen. Run the three minutes on your own clock. Chiefs and liaisons to the centre table — the rest of the city keeps running.", "THE KEY OBSERVATION WINDOW. Who speaks, in what order, for how long. Who never speaks. Who runs the meeting without being asked. Also: what happens at the stations while the leaders are away."),
+  beat("09:00", "Council ends. Dismiss the alert.", "Whether anything agreed at Council actually changes behaviour."),
 ], BW));
 C.push(callout("Council sittings are your richest data.", "Whole-group, compressed, high stakes, one microphone. If you tag nothing else in the shift, tag the Council. Remember the pressure it creates is that the stations are running short-handed while it sits — it is not a rest for anyone."));
 
@@ -331,9 +331,9 @@ C.push(tbl([
   beat("00:00", "NEXT ROUND → Round 3: its six critical faults land at once, one per sector, two specs each. START. Announce: \"Core integrity is falling. Assume nothing is routine.\"", ""),
   beat("01:00", "Walk the floor. Say nothing.", "Two specs each now — coordination cost doubles. WTR and AGR need their own buried Appendix C: how long before anyone opens the back of the binder? F-302 bleeds at 3.0/min and F-304 at 2.5/min — watch for panic-guessing at the console."),
   beat("02:00", "Drop Core Integrity to 60. Announce: \"Core output cannot sustain six sectors.\" Klaxon.", "The room changes here. Note who moves first — toward the problem or toward protecting their own sector."),
-  beat("05:00", "CALL COUNCIL. Announce the Continuity Order is due. Place the form on the centre table.", "Clause 7 says essential services take precedence and never defines essential. The argument about what essential means IS the exercise."),
+  beat("05:00", "Call Council out loud, alert CONTINUITY ORDER REQUIRED, and run the three minutes on your own clock. Announce the Continuity Order is due. Place the form on the centre table.", "Clause 7 says essential services take precedence and never defines essential. The argument about what essential means IS the exercise."),
   beat("06:30", "Ninety-second warning. Do not offer help or extend.", "Decision paralysis, or one voice bulldozing. Both are common. Tag both."),
-  beat("08:00", "If the form is submitted: apply brownout to the two lowest-ranked sectors. If not: announce rolling blackouts across all six.", "Indecision must cost more than any decision. Do not soften this."),
+  beat("08:00", "If the form is submitted: put the two lowest-ranked sectors into BROWNOUT (the quick action, one sector at a time). If not: announce rolling blackouts and start ROLLING BLACKOUT from EVENTS › PRESSURE.", "Indecision must cost more than any decision. Do not soften this."),
   beat("08:30", "Redeploy brownout sectors as aid crews to other tables. Nobody sits out.", "How brownout participants are treated by the sectors they join."),
 ], BW));
 

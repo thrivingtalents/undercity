@@ -476,7 +476,7 @@ requires stock.
 { "type": "set_sound", "on": false }
 { "type": "alert", "title": "COUNCIL SUMMONED", "subtitle": "CHIEFS + LIAISONS REPORT IMMEDIATELY" }
 { "type": "dismiss_alert" }
-{ "type": "call_council" }   { "type": "end_council" }
+{ "type": "call_council" }   { "type": "end_council" }   // scripts and tests only since 2026-09-28
 { "type": "continuity_order", "order": ["POW","MED","WTR","TRN","COM","AGR"], "confirm": true }
 { "type": "rolling_blackout", "confirm": true }   { "type": "end_blackout" }
 { "type": "fire_event", "event_id": "tunnel_collapse", "target": "TRN" }
@@ -501,7 +501,10 @@ requires stock.
 { "type": "reset_run", "run_id": "…", "scenario_id": "haven9-hard", "confirm": true }
 ```
 
-`set_mode: "COUNCIL"` still works and is equivalent to `call_council`.
+`set_mode: "COUNCIL"` still works and is equivalent to `call_council`. The admin
+console no longer sends `call_council`, `end_council`, `continuity_order` or the
+council clock (2026-09-28): the Council is run on the floor. The console keeps
+`rolling_blackout` / `end_blackout` on its PRESSURE dial.
 Replies: `fire_result`, `event_result`, `order_result`, `timeline_result`,
 `transfer_result`, `cycle_summary`.
 
@@ -791,7 +794,7 @@ puts this round's existing instances back to active in place (`fault_reset`,
 `restarts` counted) — no new records. Earlier rounds' faults are never
 touched. A plain `set_phase` / `next_phase` / `set_round` still arms the
 script and the timer but deals nothing; the scenario timelines carry only
-announcements, core drops and council sittings now. The reply is
+announcements and core drops now. The reply is
 `round_activated { round, restart, dealt, reset, kept, at, timer }`; the log
 gets `round_activated`.
 

@@ -292,17 +292,14 @@
     "R1": [
     ],
     "R2": [
-      { "offset_s": 180,  "kind": "announce", "text": "Core output dropping. Council convenes in 5 minutes.", "mode": "AUTO" },
-      { "offset_s": 510,  "kind": "council", "mode": "MANUAL", "note": "Council #1 — information pooling" }
+      { "offset_s": 180,  "kind": "announce", "text": "Core output dropping. Council convenes in 5 minutes.", "mode": "AUTO" }
     ],
     "R3": [
       { "offset_s": 120,  "kind": "core",  "value": 60, "mode": "AUTO", "note": "Core drops to 60% — the city can sustain 4 of 6 sectors" },
-      { "offset_s": 120,  "kind": "announce", "text": "Core output at 60 percent. Continuity Order will be required.", "mode": "AUTO" },
-      { "offset_s": 420,  "kind": "council", "mode": "MANUAL", "note": "Council #2 — Continuity Order due at 10:00" }
+      { "offset_s": 120,  "kind": "announce", "text": "Core output at 60 percent. Continuity Order will be required.", "mode": "AUTO" }
     ],
     "R4": [
-      { "offset_s": 150,  "kind": "core",  "value": 70, "mode": "AUTO" },
-      { "offset_s": 180,  "kind": "council", "mode": "MANUAL", "note": "Mini-triage" }
+      { "offset_s": 150,  "kind": "core",  "value": 70, "mode": "AUTO" }
     ]
   }
 }

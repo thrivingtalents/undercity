@@ -24,8 +24,7 @@
   "timelines": {
     "R2": [
       { "offset_s": 90,  "kind": "announce", "text": "DEMO: core output dropping. Council convenes shortly.", "mode": "AUTO" },
-      { "offset_s": 180, "kind": "core",  "value": 60, "mode": "AUTO", "note": "DEMO — the city can sustain 4 of 6 sectors" },
-      { "offset_s": 240, "kind": "council", "mode": "MANUAL", "note": "DEMO — Council and the Continuity Order" }
+      { "offset_s": 180, "kind": "core",  "value": 60, "mode": "AUTO", "note": "DEMO — the city can sustain 4 of 6 sectors" }
     ]
   }
 }

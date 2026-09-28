@@ -71,7 +71,6 @@
   let drawerAdmin = false;
   let logFilter = 'ALL';
   let attnAll = false;
-  let orderDraft = [];
   let lastConfigJson = null;
   let debriefData = null;
   let pendingOverride = null;
@@ -375,7 +374,6 @@
       case 'fault': return pickFault();
       case 'injure': return pickSector('INJURE WORKER — which sector?', (s) => send({ type: 'injure_worker', sector: s, count: 1 }),
         (s) => `👤 ${state.sectors[s].workforce.active} active`);
-      case 'council': return send({ type: 'call_council' });
       case 'brownout': return pickSector('BROWNOUT — toggle a sector', (s) => {
         const st = state.sectors[s];
         send({ type: 'set_status', sector: s, value: st.status === 'BROWNOUT' ? 'ACTIVE' : 'BROWNOUT' });
@@ -1010,7 +1008,6 @@
       const k = btn.dataset.dial;
       if (k === 'fault' || k === 'second') return pickFault();
       if (k === 'injure') return quick('injure');
-      if (k === 'council') return send({ type: 'call_council' });
       if (k === 'blackout') return startBlackout();
       if (k === 'cancel_supply') return pickSector('CANCEL SUPPLY — which sector?', (s) => send({ type: 'fire_event', event_id: 'cancel_supply', target: s }));
       return send({ type: 'fire_event', event_id: k });
@@ -1020,8 +1017,6 @@
     if (!confirm('INITIATE ROLLING BLACKOUT — brownout rotates through every sector until you end it. Continue?')) return;
     send({ type: 'rolling_blackout', confirm: true });
   }
-  $('btn-blackout').addEventListener('click', startBlackout);
-  $('btn-blackout-2').addEventListener('click', startBlackout);
   $('btn-end-blackout').addEventListener('click', () => send({ type: 'end_blackout' }));
 
   function renderEvents() {
@@ -1063,50 +1058,13 @@
   $('announce-text').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-announce').click(); });
   for (const btn of document.querySelectorAll('[data-sting]')) btn.addEventListener('click', () => send({ type: 'sting', sound: btn.dataset.sting }));
 
-  // -- EVENTS: council ----------------------------------------------------------------------
+  // -- EVENTS: rolling blackout status. The Council itself is run on the floor (2026-09-28):
+  // the console has no call, no sitting clock and no Continuity Order form.
 
-  $('btn-call-council').addEventListener('click', () => send({ type: 'call_council' }));
-  $('btn-end-council').addEventListener('click', () => send({ type: 'end_council' }));
-  for (const btn of document.querySelectorAll('[data-council]')) {
-    btn.addEventListener('click', () => send({ type: 'clock', which: 'council', action: btn.dataset.council, seconds: Number(btn.dataset.sec || 0) }));
-  }
-  $('btn-order-clear').addEventListener('click', () => { orderDraft = []; renderOrder(); });
-  $('btn-order-submit').addEventListener('click', () => {
-    if (orderDraft.length !== sectorCodes().length) return;
-    const bottom = orderDraft.slice(-2).join(' and ');
-    if (!confirm(`SUBMIT CONTINUITY ORDER\n\n${orderDraft.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\n${bottom} enter BROWNOUT.\nThis decision cannot be recalled.`)) return;
-    send({ type: 'continuity_order', order: orderDraft, confirm: true });
-    orderDraft = [];
-    renderOrder();
-  });
-
-  function renderOrder() {
-    const codes = sectorCodes();
-    $('order-pick').innerHTML = codes.map((c) => `<button data-o="${c}" ${orderDraft.includes(c) ? 'disabled' : ''} style="border-color:${state.sectors[c].colour}">${c}</button>`).join('');
-    for (const b of $('order-pick').querySelectorAll('button')) b.addEventListener('click', () => { orderDraft.push(b.dataset.o); renderOrder(); });
-    $('order-slots').innerHTML = codes.map((_, i) => {
-      const c = orderDraft[i];
-      return `<div class="slot${c ? ' filled' : ''}${i >= codes.length - 2 ? ' brown' : ''}"><span class="rk">${i + 1}${i >= codes.length - 2 ? ' · BROWNOUT' : ''}</span>${c || '—'}</div>`;
-    }).join('');
-    $('btn-order-submit').disabled = orderDraft.length !== codes.length;
-  }
-
-  function renderCouncil() {
-    const c = state.council;
-    const clk = $('council-status');
-    clk.innerHTML = `<b id="council-big" class="${state.council_clock.remaining_s <= 30 && c.active ? 'low' : ''}">${U.mmss(U.countdown(state.council_clock, state.frozen))}</b>
-      <div class="st">${c.active ? 'COUNCIL IN SESSION' : 'NO COUNCIL IN SESSION'} · SITTING ${c.count}${c.order_submitted ? ' · ORDER SUBMITTED' : ''}</div>`;
-    $('no-order').classList.toggle('hidden', !c.no_order);
-    $('btn-call-council').disabled = c.active;
-    $('btn-end-council').disabled = !c.active;
-    const b = state.blackout;
-    $('blackout-status').textContent = b.active ? `ACTIVE — ${b.current.join(' + ')} browned out now` : 'Not active.';
-    $('btn-blackout-2').classList.toggle('hidden', b.active);
+  function renderBlackout() {
+    const b = state.blackout || {};
+    $('blackout-status').textContent = b.active ? `ROLLING BLACKOUT ACTIVE — ${(b.current || []).join(' + ')} browned out now` : 'Rolling blackout: not active.';
     $('btn-end-blackout').classList.toggle('hidden', !b.active);
-    const o = state.continuity_order_detail;
-    $('last-order').innerHTML = o ? `${o.order.map((c2, i) => `${i + 1}. ${c2}`).join(' · ')}<br><span class="hint">${new Date(o.t).toLocaleTimeString()} · council #${o.council_count} · ${o.time_used_s != null ? U.mmss(o.time_used_s) + ' used' : ''} · ${o.brownout.join(' + ')} BROWNOUT</span>` : 'None yet.';
-    document.querySelector('.subnav[data-for="events"] [data-sub="council"]').classList.toggle('attn', c.active || c.no_order);
-    if (!$('order-pick').children.length) renderOrder();
   }
 
   // -- CITY SYSTEMS: transfers -------------------------------------------------------------
@@ -1377,7 +1335,7 @@
     ['critical_below', 'Critical below health', 'n'], ['degraded_below', 'Degraded below health', 'n'],
     ['dark_at', 'Dark at health', 'n'],
     ['resolve_recovery', 'Health on resolve', 'n'], ['lockout_s', 'Console lockout (s)', 'n'],
-    ['lockout_after_consecutive_invalid', 'Lockout after N wrong', 'n'], ['council_clock_s', 'Council clock (s)', 'n'],
+    ['lockout_after_consecutive_invalid', 'Lockout after N wrong', 'n'],
     ['CORE, ROUND TIME & UPKEEP'],
     ['core_start_output', 'Core output at start (%) — applies on reset', 'n'],
     ['round_length_s.R0', 'Round 0 length (s) — every round has its own timer', 'n'], ['round_length_s.R1', 'Round 1 length (s)', 'n'],
@@ -1420,7 +1378,6 @@
     ['brownout_effects.per_sector.TRN.transfer_capacity', 'TRN capacity under brownout', 'n'],
     ['brownout_effects.per_sector.COM.lose_telemetry', 'COM loses telemetry', 'b'],
     ['rolling_blackout.interval_s', 'Blackout rotation (s)', 'n'], ['rolling_blackout.sectors_at_a_time', 'Sectors browned out at a time', 'n'],
-    ['auto_blackout_on_no_order', 'Auto blackout when no order', 'b'],
     ['STABILITY FORMULA'],
     ['stability.weights.integrity', 'Weight: avg health', 'f'], ['stability.weights.core_output', 'Weight: core output', 'f'],
     ['stability.weights.critical_fault', '− per critical fault', 'n'], ['stability.weights.dark_sector', '− per dark sector', 'n'],
@@ -1575,7 +1532,7 @@
     renderPresets();
     renderTimeline();
     renderEvents();
-    renderCouncil();
+    renderBlackout();
     renderTransfersView();
     renderWorkforce();
     renderCom();
@@ -1616,12 +1573,6 @@
     $('timer-status').textContent = timerStatus();
     $('timer-default').textContent = U.mmss(roundLength());
     $('timer-pause').textContent = state.round_clock.running ? 'PAUSE TIMER' : state.round_clock.status === 'paused' ? 'RESUME TIMER' : 'START TIMER';
-    const cc = U.countdown(state.council_clock, state.frozen);
-    const big = $('council-big');
-    if (big) { big.textContent = U.mmss(cc); big.classList.toggle('low', cc <= 30 && state.council.active); }
-    // The reset button names the configured sitting, whatever SETTINGS says it is.
-    const cr = $('council-reset');
-    if (cr && state.config) cr.textContent = `RESET ${U.mmss(Number(state.config.council_clock_s) || 0)}`;
     $('tl-elapsed').textContent = `${U.mmss(Math.max(0, roundLength() - rc))} into the round`;
     for (const el of document.querySelectorAll('[data-cd-effect]')) {
       const e = (state.effects || []).find((x) => x.id === el.dataset.cdEffect);

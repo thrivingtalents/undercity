@@ -123,7 +123,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: none;
 .qg-title { font-size: 9px; letter-spacing: 0.2em; color: var(--ink-faint); min-width: 92px; }
 .qg button { flex: 1; font-size: 11px; font-weight: 700; padding: 10px 6px; letter-spacing: 0.08em; }
 .q-fault { background: rgba(255,107,122,0.14); border-color: rgba(255,107,122,0.42); color: #FFD6D6; }
-.q-council { background: rgba(139,92,246,0.16); border-color: var(--ui-border-highlight); color: #E8D6FF; }
 
 .attention { border-color: var(--line); }
 .attention.hot { border-color: var(--red); }
@@ -282,21 +281,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: none;
 .tl.FIRED { opacity: 0.45; }
 .tl.SKIPPED { opacity: 0.35; text-decoration: line-through; }
 
-/* council */
-.council-status { border: 1px solid var(--line); background: var(--panel-2); padding: 10px; text-align: center; margin-bottom: 8px; }
-.council-status b { font-size: 34px; display: block; color: var(--purple); line-height: 1; }
-.council-status b.low { color: var(--red); animation: pulse 1s infinite; }
-.council-status .st { font-size: 10px; letter-spacing: 0.2em; color: var(--ink-dim); margin-top: 6px; }
-.order-pick { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin-bottom: 6px; }
-.order-pick button { padding: 12px 4px; font-weight: 700; font-size: 13px; }
-.order-pick button:disabled { opacity: 0.25; }
-.order-slots { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
-.slot { border: 1px dashed var(--line); padding: 8px 4px; text-align: center; font-size: 12px; }
-.slot .rk { display: block; font-size: 9px; color: var(--ink-faint); }
-.slot.filled { border-style: solid; }
-.slot.brown { border-color: var(--amber); color: var(--amber); }
-.no-order { border: 2px solid var(--red); background: #2a0f0f; padding: 12px; text-align: center; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-.no-order b { color: var(--red); letter-spacing: 0.16em; }
 
 /* core */
 .cycle-summary { margin-top: 6px; font-size: 10.5px; }
