@@ -220,25 +220,17 @@ npm start                                            # http://localhost:3000/adm
    Medical's allowance for the round, but Transport still approves and
    Medical still heals. The facilitator can write the board, reroll the hand,
    force a card or bench one, each logged as an override.
-7. **Council.** THE R2 COUNCIL (2026-09-28, `undercity_r2_council_brownout_spec`
-   v1.0). The facilitator calls it in Round 2 from EVENTS › COUNCIL and every
-   table gets a **private nomination** screen with a 60-second clock: name
-   exactly two sectors for a temporary brownout — itself allowed, no
-   abstention, an incomplete submission is void, a nomination may be changed
-   until the close, and no table ever sees another's (the facilitator sees
-   them all, live). The sixth nomination, the clock or the facilitator closes
-   the vote; the totals are counted and the top two become **provisional**
-   only — a tie affecting either position is shown as unresolved, never broken
-   by chance. Then the **Council sits for five minutes** with the totals, the
-   provisional two and the consequences of brownout for all six on every
-   screen, and submits its **final Continuity Order**: exactly two sectors,
-   any two, entered by the Council's recorder on a station laptop or by the
-   facilitator; it locks on submission and is never recalled. At 00:00 with no
-   order the **rolling blackout** starts by itself. The two named sectors enter
-   BROWNOUT when **Round 3 begins** (or at once if it already has): they stay in
-   play, keep their seat and their voice, and only their capability drops.
-   Every vote, the aggregate, the provisional two and the final two are kept
-   for the debrief (`council.history`, the log).
+7. **Council.** THE COUNCIL is a discussion timer (2026-09-29,
+   `undercity_simple_call_council_timer_spec` v1.0), nothing more. CALL
+   COUNCIL on the Overview opens one sitting and starts a one-minute clock on
+   every screen — COUNCIL IN SESSION on the console, the summons banner on the
+   tables, COUNCIL ENDS IN on the wall. The facilitator can PAUSE / RUN it,
+   move it −0:30 / +0:30 (never below 00:00), RESET it to 01:00 and CLOSE
+   COUNCIL; at 00:00 it stops, says COUNCIL TIME EXPIRED and triggers nothing.
+   A second CALL while it sits changes nothing, and the clock carries the
+   server time it reaches 00:00, so a refresh or a reconnect shows the exact
+   remaining time. Brownout stays the facilitator's own BROWNOUT control on
+   the Overview, used by hand after the discussion.
 8. **Pressure.** Quick actions (TRIGGER FAULT · CORE −10% · INJURE WORKER ·
    BROWNOUT · ANNOUNCEMENT · ALERT · PAUSE) are always on
    screen. The pressure dial and configurable **events** (supply delay,

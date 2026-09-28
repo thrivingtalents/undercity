@@ -18,18 +18,7 @@
     "resolve_recovery": 5,
     "lockout_s": 20,
     "lockout_after_consecutive_invalid": 3,
-    "council_clock_s": 300,
-    "nomination_clock_s": 60,
-    "council_round": "R2",
-    "brownout_apply_round": "R3",
-    "sector_consequences": {
-      "POW": { "name": "Power Grid", "brownout_consequence": "Ring main degrades. All sectors lose 40% of delivered power. No sector is unaffected." },
-      "WTR": { "name": "Water & Filtration", "brownout_consequence": "Reclaim plant offline. 11,000 residents move to rationed water within one cycle." },
-      "MED": { "name": "Medical Bay", "brownout_consequence": "Life support operates at reduced capacity. 3,000 patients are affected, including 40 on ventilation." },
-      "TRN": { "name": "Transport & Tunnels", "brownout_consequence": "Galleries become unlit and unpowered. Transfers slow and evacuation routes become unusable." },
-      "AGR": { "name": "Agriculture", "brownout_consequence": "Grow arrays go dark. Food stocks last 9 cycles and the seed vault environment becomes unstable." },
-      "COM": { "name": "Comms & Sensors", "brownout_consequence": "Sensor grid goes blind. No sector receives fault telemetry." }
-    },
+    "council_clock_s": 60,
 
     "auto_economy": true,
     "deduct_resources_on_resolve": true,

@@ -341,7 +341,7 @@
     const hudCore = $('hud-core');
     if (hudCore.dataset.state !== cs.state) hudCore.dataset.state = cs.state;
 
-    setText($('time-label'), inCouncil() ? (frame.council && frame.council.stage === 'nomination' ? 'NOMINATIONS CLOSE IN' : 'COUNCIL ENDS IN') : 'ROUND TIME');
+    setText($('time-label'), inCouncil() ? 'COUNCIL ENDS IN' : 'ROUND TIME');
     show($('tag-blackout'), !!(frame.blackout && frame.blackout.active));
     show($('tag-sensors'), !!frame.telemetry_degraded);
   }

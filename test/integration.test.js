@@ -171,8 +171,9 @@ test('a full R1→R4 dry run, six sectors on one server', async (t) => {
     await wait(300);
     assert.equal(big.state.mode, 'COUNCIL');
     assert.equal(sectors.POW.state.mode, 'COUNCIL');
-    assert.equal(sectors.POW.state.council_clock.remaining_s, 60, 'CALL COUNCIL opens the 60-second nomination');
-    assert.equal(sectors.POW.state.council.stage, 'nomination');
+    assert.equal(sectors.POW.state.council_clock.remaining_s, 60, 'CALL COUNCIL starts the one-minute discussion clock');
+    assert.equal(sectors.POW.state.council.status, 'active');
+    assert.ok(sectors.POW.state.council_clock.target_end_at, 'the clock carries no end time');
     say({ type: 'set_mode', mode: 'PLAY' });
     await wait(200);
   });

@@ -82,13 +82,6 @@
   let resultBanner = null;    // { until }
   let pendingTransferAction = null; // 'transfer' | 'stamp' — routes transfer_result to a panel
   let lastDisabled = null;
-  // THE R2 COUNCIL (2026-09-28): this table's draft nomination and the Council's draft order.
-  const nomDraft = new Set();
-  const finalDraft = new Set();
-  let councilCardsBuilt = false;
-  let councilSitting = null;       // the sitting number the drafts belong to
-  let nomSyncedFor = null;         // the sitting whose submitted nomination seeded the draft
-
   // -- connection -------------------------------------------------------------
 
   const socket = U.connect({
@@ -104,8 +97,6 @@
         el.hidden = false;
       }
       if (msg.type === 'submit_result') handleResult(msg);
-      if (msg.type === 'nomination_result') handleNominationResult(msg);
-      if (msg.type === 'order_result') handleOrderResult(msg);
       if (msg.type === 'reward_result') handleRewardResult(msg);
       if (['transfer_result', 'heal_result', 'broadcast_result', 'agr_result', 'output_result'].includes(msg.type)) handleTransferResult(msg);
       if (msg.type === 'sting') U.playSting(msg.sound);
@@ -229,8 +220,6 @@
     $('btn-gen-start').addEventListener('click', startUpgrade);
     $('btn-gen-cancel').addEventListener('click', cancelUpgrade);
     $('btn-gen-support').addEventListener('click', confirmSupport);
-    $('nom-submit').addEventListener('click', submitNomination);
-    $('final-submit').addEventListener('click', submitFinalOrder);
 
     // Console.
     const input = $('code-input');
@@ -619,15 +608,13 @@
     show($('dark-overlay'), word === 'DARK');
     show($('pause-overlay'), !!state.paused);
 
-    // THE R2 COUNCIL: the summons banner, and the nomination or the sitting
-    // above the columns; the rest of the screen keeps working.
+    // THE COUNCIL (2026-09-29): a summons banner with the facilitator's discussion
+    // clock and nothing to press; the rest of the screen keeps working.
     const council = !!(state.council && state.council.active) || state.mode === 'COUNCIL';
-    const cstate = state.council || {};
-    const afterglow = !council && (cstate.stage === 'decided' || cstate.stage === 'no_order') && cstate.round_number === state.round_number;
-    show($('banner-council'), council || afterglow);
-    setText($('banner-council-text'), councilBannerText(council));
-    show($('banner-council-clock'), council);
-    renderCouncilStage();
+    const councilExpired = !!(state.council && state.council.status === 'expired');
+    show($('banner-council'), council);
+    setText($('banner-council-text'), councilExpired ? 'COUNCIL TIME EXPIRED' : 'COUNCIL IN SESSION — CHIEF + LIAISON REPORT TO CENTRAL COUNCIL');
+    show($('banner-council-clock'), council && !councilExpired);
     // The city feed is COM's product — its sensors, undelayed. Every other table reads the wall.
     show($('city-block'), SECTOR === 'COM' && !council);
     // Intelligence sits with it: the same job, the slower half of it.
@@ -648,158 +635,6 @@
       show($('alert-full'), false);
       show($('banner-alert'), false);
     }
-  }
-
-  // -- THE R2 COUNCIL (2026-09-28) ------------------------------------------------
-  // Beat 1 is private: the table picks two sectors and submits; the frame
-  // carries back only its own choice. Beat 2 is public: totals, the
-  // provisional two, the consequences, and the final order the Council's
-  // recorder may enter here. Everything renders from the frame — a refresh
-  // shows the submitted nomination, never a second one.
-
-  function councilBannerText(live) {
-    const c = state.council || {};
-    if (live) {
-      return c.stage === 'nomination'
-        ? 'COUNCIL SUMMONED — PRIVATE NOMINATION · SELECT TWO SECTORS BELOW'
-        : 'COUNCIL IN SESSION — CHIEF + LIAISON REPORT TO CENTRAL COUNCIL';
-    }
-    if (c.final) return `CONTINUITY ORDER LOCKED — ${c.final.brownout.join(' + ')} · BROWNOUT FROM ROUND ${c.final.apply_round_number}`;
-    if (c.no_order) return 'NO CONTINUITY ORDER — ROLLING BLACKOUT';
-    return 'COUNCIL ENDED';
-  }
-
-  function buildCouncilCards() {
-    if (councilCardsBuilt || !state.sectors) return;
-    councilCardsBuilt = true;
-    for (const [hostId, draft, onPick] of [['nom-cards', nomDraft, renderNomination], ['final-cards', finalDraft, renderFinal]]) {
-      const host = $(hostId);
-      host.innerHTML = '';
-      for (const [code, s] of Object.entries(state.sectors)) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'cs-card';
-        b.dataset.code = code;
-        b.innerHTML = `<span class="cs-glyph">${esc(U.SECTOR_GLYPH[code] || '')}</span><b class="cs-code">${esc(code)}</b><span class="cs-name">${esc(s.name || code)}</span>${code === SECTOR ? '<span class="cs-mine">THIS SECTOR</span>' : ''}`;
-        b.addEventListener('click', () => {
-          if (b.disabled) return;
-          if (draft.has(code)) draft.delete(code);
-          else if (draft.size < 2) draft.add(code);
-          onPick();
-        });
-        host.appendChild(b);
-      }
-    }
-  }
-
-  function renderCouncilStage() {
-    const c = state.council || {};
-    if (councilSitting !== c.count) {
-      // A new sitting: fresh drafts. (A refresh keeps the sitting number, so nothing is lost.)
-      councilSitting = c.count;
-      nomDraft.clear();
-      finalDraft.clear();
-      nomSyncedFor = null;
-    }
-    const live = !!c.active && (c.stage === 'nomination' || c.stage === 'deliberation');
-    show($('council-stage'), live);
-    if (!live) return;
-    buildCouncilCards();
-    show($('nom-view'), c.stage === 'nomination');
-    show($('cnl-view'), c.stage === 'deliberation');
-    if (c.stage === 'nomination') renderNomination();
-    else renderFinal();
-  }
-
-  function renderNomination() {
-    const c = state.council || {};
-    const mineNom = state.my_nomination;
-    // The submitted nomination seeds the draft once per sitting — after a refresh
-    // or a reconnect the screen shows what was sent, and sends nothing again.
-    if (mineNom && nomSyncedFor !== c.count) {
-      nomDraft.clear();
-      for (const x of mineNom.choices) nomDraft.add(x);
-      nomSyncedFor = c.count;
-    }
-    for (const b of $('nom-cards').querySelectorAll('.cs-card')) {
-      const on = nomDraft.has(b.dataset.code);
-      b.classList.toggle('on', on);
-      b.disabled = !on && nomDraft.size >= 2;
-    }
-    const same = !!mineNom && mineNom.choices.length === 2 && mineNom.choices.every((x) => nomDraft.has(x));
-    setText($('nom-status'), mineNom
-      ? (same ? `NOMINATION SUBMITTED — ${mineNom.choices.join(' + ')} · CHANGE IT UNTIL THE CLOSE` : `${nomDraft.size} OF 2 SELECTED · SUBMITTED ${mineNom.choices.join(' + ')}`)
-      : `${nomDraft.size} OF 2 SELECTED`);
-    // SUBMIT needs exactly two unique choices, and something new to send.
-    $('nom-submit').disabled = nomDraft.size !== 2 || same;
-    setText($('nom-submit'), mineNom ? 'UPDATE NOMINATION' : 'SUBMIT NOMINATION');
-  }
-
-  function submitNomination() {
-    if (nomDraft.size !== 2) return;
-    socket.send({ type: 'council_nomination', choices: [...nomDraft] });
-  }
-
-  function handleNominationResult(msg) {
-    if (msg.ok) {
-      transientMsg('nom-msg', msg.unchanged ? 'NOMINATION ALREADY SUBMITTED — UNCHANGED' : `NOMINATION SUBMITTED — ${(msg.choices || []).join(' + ')}`, 'ok');
-      return;
-    }
-    const why = { nomination_closed: 'NOMINATIONS ARE CLOSED', nomination_invalid: 'SELECT EXACTLY TWO DIFFERENT SECTORS', unknown_sector: 'UNKNOWN SECTOR' };
-    transientMsg('nom-msg', why[msg.reason] || String(msg.reason || 'REFUSED').toUpperCase().replace(/_/g, ' '), 'bad');
-  }
-
-  function renderFinal() {
-    const c = state.council || {};
-    const a = c.aggregate;
-    const fin = c.final;
-    const ranked = (a && a.ranked) || [];
-    const max = Math.max(1, ...ranked.map((r) => r.total));
-    const totals = ranked.map((r) => `<div class="cs-total${a.provisional.includes(r.code) ? ' prov' : ''}${a.ties.includes(r.code) ? ' tie' : ''}"><span class="cs-tcode">${esc(r.code)}</span><span class="cs-tbar"><i style="width:${Math.round((100 * r.total) / max)}%"></i></span><b class="cs-tnum">${r.total}</b></div>`).join('');
-    if ($('cnl-totals').dataset.sig !== totals) { $('cnl-totals').dataset.sig = totals; $('cnl-totals').innerHTML = totals; }
-    let prov = '';
-    if (a) {
-      const slots = [1, 2].map((pos) => {
-        if (a.unresolved.includes(pos)) return `<div class="cs-slot unresolved"><span class="cs-pos">${pos}</span><b>UNRESOLVED</b><span class="cs-tie">TIE · ${a.ties.join(' / ') || '—'}</span></div>`;
-        return `<div class="cs-slot"><span class="cs-pos">${pos}</span><b>${esc(a.provisional[pos - 1] || '—')}</b><span class="cs-tie">PROVISIONAL</span></div>`;
-      }).join('');
-      prov = `<div class="cs-prov-title">PROVISIONAL BROWNOUT <span class="cs-note">— ${a.valid_count} of ${c.of} nominations counted · the Council decides</span></div><div class="cs-slots">${slots}</div>`;
-    }
-    if ($('cnl-provisional').dataset.sig !== prov) { $('cnl-provisional').dataset.sig = prov; $('cnl-provisional').innerHTML = prov; }
-    const cons = Object.entries(c.consequences || {}).map(([code, v]) => `<div class="cs-cons"><b>${esc(code)} <span>${esc(v.name || '')}</span></b><p>${esc(v.text || '')}</p></div>`).join('');
-    if ($('cnl-consequences').dataset.sig !== cons) { $('cnl-consequences').dataset.sig = cons; $('cnl-consequences').innerHTML = cons; }
-    const locked = !!fin;
-    show($('cnl-final-block'), !locked);
-    show($('cnl-locked'), locked);
-    if (locked) {
-      setText($('cnl-locked'), `CONTINUITY ORDER LOCKED — ${fin.brownout.join(' + ')} · BROWNOUT FROM ROUND ${fin.apply_round_number}${fin.changed_from_provisional ? ' · CHANGED FROM THE PROVISIONAL TWO' : ''}`);
-      return;
-    }
-    for (const b of $('final-cards').querySelectorAll('.cs-card')) {
-      const on = finalDraft.has(b.dataset.code);
-      b.classList.toggle('on', on);
-      b.classList.toggle('prov', !!a && a.provisional.includes(b.dataset.code));
-      b.disabled = !on && finalDraft.size >= 2;
-    }
-    setText($('final-status'), `${finalDraft.size} OF 2 SELECTED`);
-    $('final-submit').disabled = finalDraft.size !== 2;
-  }
-
-  function submitFinalOrder() {
-    if (finalDraft.size !== 2) return;
-    const list = [...finalDraft];
-    const n = (state.council && state.council.apply_round_number) || 3;
-    if (!window.confirm(`SUBMIT THE COUNCIL'S CONTINUITY ORDER\n\n${list.join(' + ')} enter BROWNOUT when Round ${n} begins.\n\nThis decision locks on submission and cannot be recalled.`)) return;
-    socket.send({ type: 'continuity_order', brownout: list, confirm: true });
-  }
-
-  function handleOrderResult(msg) {
-    if (msg.ok) { transientMsg('final-msg', 'CONTINUITY ORDER LOCKED', 'ok'); return; }
-    const why = {
-      order_locked: 'THE CONTINUITY ORDER IS ALREADY LOCKED', council_not_sitting: 'THE COUNCIL IS NOT SITTING',
-      nominations_open: 'NOMINATIONS ARE STILL OPEN', order_incomplete: 'SELECT EXACTLY TWO DIFFERENT SECTORS', confirm_required: 'CONFIRMATION REQUIRED',
-    };
-    transientMsg('final-msg', why[msg.reason] || String(msg.reason || 'REFUSED').toUpperCase().replace(/_/g, ' '), 'bad');
   }
 
   function renderResources() {
@@ -2190,12 +2025,8 @@
     setText($('hdr-round-clock'), U.mmss(rc));
     setUrgency($('hdr-round-clock'), rc, !!state.round_clock && !!state.round_clock.running && !frozen);
     $('hdr-round-clock').classList.toggle('expired', expired);
-    // The Council's clock: the nomination's 60 seconds, then the sitting's five minutes.
-    const councilSecs = U.countdown(state.council_clock, frozen);
-    const stageClock = state.council && state.council.stage === 'nomination' ? $('nom-clock') : $('cnl-clock');
-    setText(stageClock, U.mmss(councilSecs));
-    setUrgency(stageClock, councilSecs, !!(state.council && state.council.active) && !frozen);
-    setText($('banner-council-clock'), U.mmss(councilSecs));
+    // The Council's clock, counted from the server's end time like the round timer.
+    setText($('banner-council-clock'), U.mmss(U.countdown(state.council_clock, frozen)));
 
     // The open card's console: the lockout count and the verdict.
     const f = selectedFault();

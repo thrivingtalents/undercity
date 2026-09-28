@@ -872,21 +872,6 @@ function handleSector(client, entry, msg) {
       return broadcast(entry);
 
     /**
-     * THE R2 COUNCIL (2026-09-28). A table's private nomination: its own,
-     * exactly two sectors, editable until the close; and the Council's final
-     * order, entered by its recorder at a station — two sectors, locked on
-     * arrival. Both are validated and de-duplicated in the engine.
-     */
-    case 'council_nomination':
-      send(client.ws, { type: 'nomination_result', ...game.submitNomination(mine, msg.choices, { by: mine }) });
-      return broadcast(entry);
-    case 'continuity_order': {
-      if (!msg.confirm) return send(client.ws, { type: 'error', reason: 'confirm_required' });
-      send(client.ws, { type: 'order_result', ...game.submitContinuityOrder(msg.brownout, { by: mine }) });
-      return broadcast(entry);
-    }
-
-    /**
      * A sector cannot write its own stock. It moves on production, upkeep, a
      * solved fault, and a transfer Transport approved — and nowhere else, or
      * the supplier's consent and Transport's three approvals a round mean
@@ -1246,20 +1231,10 @@ function handleControl(client, entry, msg) {
     }
 
     // -- crisis
-    // THE R2 COUNCIL (2026-09-28): the facilitator opens the private nomination,
-    // may close it early, may enter a table's nomination for it (a dead
-    // laptop) and may record the Council's final two as its recorder.
+    // THE COUNCIL (2026-09-29): a discussion timer the facilitator opens and closes;
+    // its clock is driven by `clock { which: 'council' }`.
     case 'call_council':   reply({ type: 'council_result', action: 'call', ...game.callCouncil({ by: 'facilitator' }) }); return ok();
     case 'end_council':    game.endCouncil(msg.reason || 'facilitator'); return ok();
-    case 'council_close_nominations': reply({ type: 'council_result', action: 'close', ...game.closeNominations({ by: 'facilitator' }) }); return ok();
-    case 'council_nomination':
-      reply({ type: 'nomination_result', ...game.submitNomination(msg.sector, msg.choices, { by: 'facilitator' }) });
-      return ok();
-    case 'continuity_order': {
-      if (!msg.confirm) return reply({ type: 'error', reason: 'confirm_required' });
-      reply({ type: 'order_result', ...game.submitContinuityOrder(msg.brownout || msg.order, { by: 'facilitator' }) });
-      return ok();
-    }
     case 'rolling_blackout': {
       if (!msg.confirm) return reply({ type: 'error', reason: 'confirm_required' });
       game.startRollingBlackout();

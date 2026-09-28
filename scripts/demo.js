@@ -6,7 +6,7 @@
  *
  *   1 normal state · 2 trigger fault · 3 countdown · 4 wrong resolution ·
  *   5 correct resolution · 6 resource transfer · 7 integrity reduction ·
- *   8 critical state · 9 council · 10 continuity order · 11 brownout ·
+ *   8 critical state · 9 council · 10 brownout by hand · 11 brownout ·
  *   12 sector dark · 13 aftershock comparison
  *
  *   npm run demo                      # against http://localhost:3000, token haven9
@@ -124,22 +124,18 @@ async function main() {
   A({ type: 'fire_event', event_id: 'core_output_drop' });
   await wait(8);
 
-  say('9. CALL COUNCIL — every table gets the private nomination screen (20 seconds in the demo)');
+  say('9. CALL COUNCIL — the one-minute discussion clock shows on every screen');
   A({ type: 'call_council' });
-  await wait(4);
+  await wait(10);
 
-  say('9b. Six private nominations land (the facilitator may enter one for a dead laptop); the sixth closes the vote and the Council sits');
-  for (const [s, ch] of Object.entries({ POW: ['COM', 'AGR'], WTR: ['COM', 'AGR'], MED: ['COM', 'AGR'], TRN: ['COM', 'AGR'], AGR: ['COM', 'AGR'], COM: ['COM', 'AGR'] })) {
-    A({ type: 'council_nomination', sector: s, choices: ch });
-  }
+  say('10. CLOSE COUNCIL — then the facilitator applies the room\'s decision by hand: COM and AGR enter brownout');
+  A({ type: 'end_council' });
+  A({ type: 'set_status', sector: 'COM', value: 'BROWNOUT' });
+  A({ type: 'set_status', sector: 'AGR', value: 'BROWNOUT' });
   await wait(8);
 
-  say('10. Continuity Order COM + AGR — locked at once; they brown out when Round 3 begins');
-  A({ type: 'continuity_order', brownout: ['COM', 'AGR'], confirm: true });
-  await wait(6);
-
-  say('11. Round 3 — the two named sectors enter brownout: COM loses telemetry, AGR production halves');
-  A({ type: 'activate_round', round: 'R3' });
+  say('11. Brownout — COM loses telemetry, AGR production halves; the round\'s upkeep is charged by hand');
+  A({ type: 'cycle', action: 'process' });
   await wait(8);
 
   say('12. Sector DARK — TRN goes offline; its console locks, the wall shows SECTOR DARK');

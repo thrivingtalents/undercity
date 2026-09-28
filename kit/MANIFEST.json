@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-28T09:22:53.700Z",
+  "generated_at": "2026-09-28T23:31:49.957Z",
   "sources": {
     "matrix": {
       "file": "undercity-crossref-matrix.xlsx",
@@ -70,8 +70,8 @@
       "file": "UNDERCITY_CityCharter.docx",
       "title": "City Charter + Continuity Order ballot",
       "audience": "participant",
-      "bytes": 11352,
-      "sha256": "6eddee66f31d68c31794bed343d0e88beefdea3ed13f701cbf9d6ace030e5873"
+      "bytes": 11185,
+      "sha256": "28d664f103b1c79464c28f4d5fdb3369d301b98a970ccbe318b6edd3ff6f1418"
     },
     {
       "file": "UNDERCITY_ConsentPack_TableTents.docx",
@@ -84,8 +84,8 @@
       "file": "UNDERCITY_Facilitator_Guidebook.docx",
       "title": "Facilitator & Administrator Guidebook",
       "audience": "facilitator",
-      "bytes": 32332,
-      "sha256": "1cccb64a2af0c83ea6169bc2495c4af75d3597f1b6573e01813e8c7a3b08799e"
+      "bytes": 32012,
+      "sha256": "b3821ca43bc0d3d42e74be20c86430af53b08f8ac0c3f6b6b35adef09f9ebe7f"
     },
     {
       "file": "UNDERCITY_FaultCards.docx",

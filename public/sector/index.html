@@ -84,54 +84,6 @@
     <div class="banner banner-result" id="banner-result" hidden></div>
   </div>
 
-  <!-- ===== THE R2 COUNCIL (2026-09-28): the private nomination, then the sitting =====
-       Beat 1: every table names exactly two sectors for a temporary brownout — its own
-       choice only, nobody else's, editable until the close. Beat 2: the aggregate, the
-       provisional two (a tie is shown, never broken), the consequences for all six, and
-       the Council's final two, locked on submission. The rest of the screen keeps working. -->
-  <section class="council-stage" id="council-stage" hidden>
-    <div class="cs-view" id="nom-view" hidden>
-      <div class="cs-head">
-        <div class="cs-title">CORE INSUFFICIENCY - PRIVATE NOMINATION</div>
-        <div class="cs-clock"><span class="label">Nominations close in</span><b class="clock" id="nom-clock">01:00</b></div>
-      </div>
-      <p class="cs-instruction">Select exactly TWO sectors whose temporary brownout would create the most survivable city-wide outcome.</p>
-      <div class="cs-cards" id="nom-cards"></div>
-      <div class="cs-actions">
-        <span class="cs-status" id="nom-status">0 OF 2 SELECTED</span>
-        <button type="button" class="primary" id="nom-submit" disabled>SUBMIT NOMINATION</button>
-      </div>
-      <div class="msg" id="nom-msg" hidden></div>
-    </div>
-    <div class="cs-view" id="cnl-view" hidden>
-      <div class="cs-head">
-        <div class="cs-title">CORE INSUFFICIENCY - COUNCIL</div>
-        <div class="cs-clock"><span class="label">Council ends in</span><b class="clock" id="cnl-clock">05:00</b></div>
-      </div>
-      <div class="cs-grid">
-        <div class="cs-block">
-          <h3 class="cs-sub">AGGREGATE NOMINATIONS</h3>
-          <div class="cs-totals" id="cnl-totals"></div>
-          <div class="cs-provisional" id="cnl-provisional"></div>
-        </div>
-        <div class="cs-block">
-          <h3 class="cs-sub">CONSEQUENCES OF BROWNOUT</h3>
-          <div class="cs-consequences" id="cnl-consequences"></div>
-        </div>
-      </div>
-      <div class="cs-block cs-final" id="cnl-final-block">
-        <h3 class="cs-sub">FINAL CONTINUITY ORDER <span class="cs-note">— the Council's two: any two, the provisional two or not</span></h3>
-        <div class="cs-cards" id="final-cards"></div>
-        <div class="cs-actions">
-          <span class="cs-status" id="final-status">0 OF 2 SELECTED</span>
-          <button type="button" class="primary" id="final-submit" disabled>SUBMIT CONTINUITY ORDER</button>
-        </div>
-        <div class="msg" id="final-msg" hidden></div>
-      </div>
-      <div class="cs-locked" id="cnl-locked" hidden></div>
-    </div>
-  </section>
-
   <!-- ===== MAIN ============================================================ -->
   <main class="columns" id="columns">
 

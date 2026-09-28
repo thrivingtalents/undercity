@@ -1066,110 +1066,49 @@
     $('btn-end-blackout').classList.toggle('hidden', !b.active);
   }
 
-  // -- EVENTS: THE R2 COUNCIL (2026-09-28) ------------------------------------------------
-  // The facilitator opens the private nomination, sees every table's vote as it
-  // lands, may close the vote early, may record the Council's final two, and
-  // holds the clock. Every record renders from the frame: nothing here is state.
+  // -- OVERVIEW: THE COUNCIL, a discussion timer (2026-09-29) ------------------------------
+  // CALL COUNCIL opens one sitting and the minute starts by itself; PAUSE / RUN,
+  // −0:30, +0:30, RESET 01:00 and CLOSE COUNCIL drive the server's clock. The
+  // panel renders from the frame and counts from the server's end time, so a
+  // refresh, a reconnect or a re-render never starts a second clock. It never
+  // touches the round timer, and it never touches brownout.
 
-  let orderDraft = [];
   $('btn-call-council').addEventListener('click', () => {
-    const councilRound = (state.config && state.config.council_round) || 'R2';
-    if (state.round !== councilRound && !confirm(`The Council is Round 2's decision. Call it now, in ROUND ${state.round_number}?`)) return;
+    if (state && state.council && state.council.active) return;
     send({ type: 'call_council' });
   });
-  $('btn-close-nominations').addEventListener('click', () => {
-    const n = (state.council_detail && state.council_detail.status) || { count: 0, of: 6 };
-    if (n.count < n.of && !confirm(`CLOSE NOMINATIONS NOW — ${n.of - n.count} table(s) have not submitted and will count as void. Open the Council?`)) return;
-    send({ type: 'council_close_nominations' });
-  });
-  $('btn-end-council').addEventListener('click', () => {
-    if (!confirm('END THE SITTING without a Continuity Order? The room gets no brownout decision and no blackout. Continue?')) return;
-    send({ type: 'end_council', reason: 'facilitator' });
+  $('council-pause').addEventListener('click', () => {
+    const clk = (state && state.council_clock) || {};
+    send({ type: 'clock', which: 'council', action: clk.status === 'running' ? 'pause' : 'start' });
   });
   for (const btn of document.querySelectorAll('[data-council]')) {
     btn.addEventListener('click', () => send({ type: 'clock', which: 'council', action: btn.dataset.council, seconds: Number(btn.dataset.sec || 0) }));
   }
-  $('btn-order-clear').addEventListener('click', () => { orderDraft = []; renderOrder(); });
-  $('btn-order-submit').addEventListener('click', () => {
-    if (orderDraft.length !== 2) return;
-    const n = (state.council && state.council.apply_round_number) || 3;
-    if (!confirm(`SUBMIT THE COUNCIL'S CONTINUITY ORDER\n\n${orderDraft.join(' + ')} enter BROWNOUT when Round ${n} begins.\n\nThis decision locks on submission and cannot be recalled.`)) return;
-    send({ type: 'continuity_order', brownout: orderDraft, confirm: true });
-    orderDraft = [];
-    renderOrder();
-  });
-
-  function renderOrder() {
-    const codes = sectorCodes();
-    const c = state.council || {};
-    const a = c.aggregate;
-    const live = !!c.active && c.stage === 'deliberation' && !c.final;
-    const html = codes.map((k) => {
-      const prov = !!a && a.provisional.includes(k);
-      const on = orderDraft.includes(k);
-      const off = !live || (!on && orderDraft.length >= 2);
-      return `<button data-o="${k}" class="${on ? 'on' : ''}${prov ? ' prov' : ''}" ${off ? 'disabled' : ''} style="border-color:${(state.sectors[k] || {}).colour || ''}">${k}${prov ? '<small>PROVISIONAL</small>' : ''}</button>`;
-    }).join('');
-    if ($('order-pick').dataset.sig !== html) {
-      $('order-pick').dataset.sig = html;
-      $('order-pick').innerHTML = html;
-      for (const b of $('order-pick').querySelectorAll('button')) {
-        b.addEventListener('click', () => {
-          const k = b.dataset.o;
-          if (orderDraft.includes(k)) orderDraft = orderDraft.filter((x) => x !== k);
-          else if (orderDraft.length < 2) orderDraft.push(k);
-          renderOrder();
-        });
-      }
-    }
-    $('btn-order-submit').disabled = !live || orderDraft.length !== 2;
-    $('btn-order-clear').disabled = !live;
-  }
+  $('btn-end-council').addEventListener('click', () => send({ type: 'end_council', reason: 'facilitator' }));
 
   function renderCouncil() {
     const c = state.council || {};
-    const d = state.council_detail || {};
     const clk = state.council_clock || {};
-    const stageWord = { nomination: 'PRIVATE NOMINATION', deliberation: 'COUNCIL IN SESSION', decided: 'CONTINUITY ORDER LOCKED', no_order: 'NO ORDER — ROLLING BLACKOUT', abandoned: 'SITTING ENDED' }[c.stage] || 'NO SITTING';
-    $('council-status').innerHTML = `<b id="council-big" class="${clk.remaining_s <= 30 && c.active ? 'low' : ''}">${U.mmss(U.countdown(clk, state.frozen))}</b>
-      <div class="st">${stageWord}${c.count ? ` · SITTING ${c.count}` : ''}${c.stage === 'nomination' ? ` · ${c.submitted_count}/${c.of} NOMINATIONS IN` : ''}${c.active && c.round_number != null ? ` · ROUND ${c.round_number}` : ''}</div>`;
-    $('btn-call-council').disabled = !!c.active;
-    $('btn-close-nominations').disabled = !(c.active && c.stage === 'nomination');
-    $('btn-end-council').disabled = !c.active;
-    $('council-reset').textContent = `RESET ${U.mmss(c.stage === 'nomination' ? c.nomination_s : c.deliberation_s)}`;
-    // every table's private vote, live — the facilitator's alone
-    const noms = d.nominations || {};
-    const codes = sectorCodes();
-    const nomHtml = c.count
-      ? codes.map((k) => {
-        const n = noms[k];
-        const voided = !n && c.stage !== 'nomination';
-        return `<div class="nom ${n ? 'in' : voided ? 'void' : 'pending'}"><b>${k}</b><span>${n ? esc(n.choices.join(' + ')) + (n.revisions ? ` <em>(changed ×${n.revisions})</em>` : '') : voided ? 'VOID — not submitted' : 'PENDING'}</span></div>`;
-      }).join('')
-      : '<div class="hint">No sitting.</div>';
-    if ($('nom-grid').dataset.sig !== nomHtml) { $('nom-grid').dataset.sig = nomHtml; $('nom-grid').innerHTML = nomHtml; }
-    // the aggregate the room sees
-    const a = c.aggregate;
-    const aggHtml = a
-      ? `<div class="agg-totals">${a.ranked.map((r) => `<span class="agg${a.provisional.includes(r.code) ? ' prov' : ''}${a.ties.includes(r.code) ? ' tie' : ''}"><b>${r.code}</b> ${r.total}</span>`).join('')}</div><div class="hint">PROVISIONAL ${a.provisional.join(' + ') || '—'}${a.unresolved.length ? ` · ${a.unresolved.length === 2 ? 'BOTH POSITIONS' : 'SECOND POSITION'} UNRESOLVED (tie: ${a.ties.join(' / ')})` : ''} · ${a.valid_count} of ${c.of} counted</div>`
-      : '<div class="hint">Nominations not closed.</div>';
-    if ($('council-aggregate').dataset.sig !== aggHtml) { $('council-aggregate').dataset.sig = aggHtml; $('council-aggregate').innerHTML = aggHtml; }
-    renderOrder();
-    const f = c.final;
-    $('final-order').textContent = f
-      ? `LOCKED — ${f.brownout.join(' + ')} · by ${f.submitted_by} at ${new Date(f.submitted_at).toLocaleTimeString([], { hour12: false })}${f.changed_from_provisional ? ' · changed from the provisional two' : ' · the provisional two confirmed'}${f.applied_at ? ' · brownout in force' : ` · brownout from Round ${f.apply_round_number}`}`
-      : c.no_order ? 'NO CONTINUITY ORDER — the rolling blackout started by itself.' : 'None this sitting.';
-    const p = state.brownout_pending;
-    const b = state.blackout || {};
-    $('council-brownout').textContent = p
-      ? `PENDING — ${p.sectors.join(' + ')} enter BROWNOUT when Round ${p.apply_round_number} begins.`
-      : b.active ? `ROLLING BLACKOUT ACTIVE — ${(b.current || []).join(' + ')} browned out now (END BLACKOUT is on the PRESSURE tab).` : 'Nothing pending.';
-    const hist = d.history || [];
-    const hHtml = hist.length
-      ? hist.slice().reverse().map((h) => `<div class="feed-row council"><span class="ft">${new Date(h.ended_at || h.started_at).toLocaleTimeString([], { hour12: false })}</span><span class="fx">Sitting ${h.count} · Round ${h.round ? String(h.round).replace('R', '') : '?'} · ${h.final ? `ORDER ${h.final.brownout.join(' + ')}` : h.no_order ? 'NO ORDER' : esc(h.reason || 'ended')}${h.aggregate ? ` · provisional ${h.aggregate.provisional.join(' + ') || 'unresolved'}` : ''}</span></div>`).join('')
-      : '<div class="hint">None yet.</div>';
-    if ($('council-history').dataset.sig !== hHtml) { $('council-history').dataset.sig = hHtml; $('council-history').innerHTML = hHtml; }
-    document.querySelector('.subnav[data-for="events"] [data-sub="council"]').classList.toggle('attn', !!c.active || !!c.no_order);
+    const active = !!c.active;
+    $('btn-call-council').classList.toggle('hidden', active);
+    $('council-live').classList.toggle('hidden', !active);
+    $('council-qg').classList.toggle('on', active);
+    if (!active) return;
+    const expired = clk.status === 'expired';
+    $('council-title').textContent = expired ? 'COUNCIL TIME EXPIRED' : 'COUNCIL IN SESSION';
+    $('council-live').classList.toggle('expired', expired);
+    $('council-pause').textContent = clk.status === 'running' ? 'PAUSE' : 'RUN';
+    $('council-pause').disabled = expired;
+    $('council-reset').textContent = `RESET ${U.mmss(Number((state.config && state.config.council_clock_s) || clk.duration_s || 60))}`;
+    renderCouncilClock();
+  }
+
+  function renderCouncilClock() {
+    const clk = state.council_clock || {};
+    const secs = U.countdown(clk, state.frozen);
+    const el = $('council-time');
+    el.textContent = U.mmss(secs);
+    el.classList.toggle('low', secs <= 10 && clk.status === 'running');
   }
 
   // -- CITY SYSTEMS: transfers -------------------------------------------------------------
@@ -1441,7 +1380,7 @@
     ['dark_at', 'Dark at health', 'n'],
     ['resolve_recovery', 'Health on resolve', 'n'], ['lockout_s', 'Console lockout (s)', 'n'],
     ['lockout_after_consecutive_invalid', 'Lockout after N wrong', 'n'],
-    ['nomination_clock_s', 'Council: private nomination (s)', 'n'], ['council_clock_s', 'Council: deliberation (s)', 'n'],
+    ['council_clock_s', 'Council timer (s)', 'n'],
     ['CORE, ROUND TIME & UPKEEP'],
     ['core_start_output', 'Core output at start (%) — applies on reset', 'n'],
     ['round_length_s.R0', 'Round 0 length (s) — every round has its own timer', 'n'], ['round_length_s.R1', 'Round 1 length (s)', 'n'],
@@ -1680,9 +1619,7 @@
     $('timer-status').textContent = timerStatus();
     $('timer-default').textContent = U.mmss(roundLength());
     $('timer-pause').textContent = state.round_clock.running ? 'PAUSE TIMER' : state.round_clock.status === 'paused' ? 'RESUME TIMER' : 'START TIMER';
-    const cc = U.countdown(state.council_clock, state.frozen);
-    const big = $('council-big');
-    if (big) { big.textContent = U.mmss(cc); big.classList.toggle('low', cc <= 30 && !!(state.council && state.council.active)); }
+    if (state.council && state.council.active) renderCouncilClock();
     $('tl-elapsed').textContent = `${U.mmss(Math.max(0, roundLength() - rc))} into the round`;
     for (const el of document.querySelectorAll('[data-cd-effect]')) {
       const e = (state.effects || []).find((x) => x.id === el.dataset.cdEffect);

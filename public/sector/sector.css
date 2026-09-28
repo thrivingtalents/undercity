@@ -13,7 +13,7 @@
 
 .shell {
   display: grid;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr);   /* topbar · deck · banners · the R2 Council stage · the columns */
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   height: 100vh;
   background:
     repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,0.010) 3px 4px),
@@ -576,47 +576,7 @@ button.wide { width: 100%; }
 
 /* -- right: specials -------------------------------------------------------- */
 
-/* -- THE R2 COUNCIL (2026-09-28): the private nomination and the sitting, above the columns -- */
-.council-stage { margin: 8px 12px 0; padding: 12px 14px; border: 2px solid var(--amber); background: #1a1410; max-height: 58vh; overflow-y: auto; }
-.cs-view { display: flex; flex-direction: column; gap: 10px; }
-.cs-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.cs-title { font-size: 15px; letter-spacing: 0.3em; font-weight: 700; color: var(--amber); }
-.cs-clock { display: flex; align-items: baseline; gap: 10px; }
-.cs-clock .clock { font-size: 34px; font-weight: 700; line-height: 1; color: var(--amber); }
-.cs-instruction { margin: 0; font-size: 13px; letter-spacing: 0.04em; }
-.cs-cards { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
-.cs-card { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; border: 1px solid var(--line); background: var(--panel-2); font-size: 11px; letter-spacing: 0.08em; }
-.cs-card .cs-glyph { font-size: 18px; }
-.cs-card .cs-code { font-size: 15px; }
-.cs-card .cs-name { font-size: 10px; color: var(--ink-dim); }
-.cs-card .cs-mine { font-size: 9px; color: var(--amber); letter-spacing: 0.16em; }
-.cs-card.on { border-color: var(--amber); background: #3a2a10; color: #fff; }
-.cs-card.prov { box-shadow: inset 0 0 0 1px var(--purple); }
-.cs-card:disabled { opacity: 0.35; }
-.cs-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.cs-status { font-size: 12px; letter-spacing: 0.12em; color: var(--ink-dim); }
-.cs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.cs-block { display: flex; flex-direction: column; gap: 6px; }
-.cs-sub { margin: 0; font-size: 11px; letter-spacing: 0.24em; color: var(--amber); }
-.cs-note { font-weight: 400; letter-spacing: 0.04em; color: var(--ink-dim); }
-.cs-total { display: grid; grid-template-columns: 44px 1fr 28px; gap: 8px; align-items: center; font-size: 12px; }
-.cs-total.prov .cs-tcode { color: var(--amber); font-weight: 700; }
-.cs-total.tie .cs-tcode { color: var(--purple); font-weight: 700; }
-.cs-tbar { height: 8px; background: var(--panel-2); border: 1px solid var(--line); }
-.cs-tbar i { display: block; height: 100%; background: var(--amber); }
-.cs-tnum { text-align: right; }
-.cs-prov-title { font-size: 11px; letter-spacing: 0.2em; margin-top: 4px; }
-.cs-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.cs-slot { border: 1px solid var(--amber); padding: 8px; display: flex; align-items: baseline; gap: 8px; }
-.cs-slot b { font-size: 18px; }
-.cs-slot.unresolved { border-style: dashed; border-color: var(--purple); }
-.cs-slot.unresolved b { color: var(--purple); }
-.cs-pos { font-size: 10px; color: var(--ink-dim); }
-.cs-tie { font-size: 10px; letter-spacing: 0.12em; color: var(--ink-dim); }
-.cs-cons { display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
-.cs-cons b span { font-weight: 400; color: var(--ink-dim); }
-.cs-cons p { margin: 0; }
-.cs-locked { border: 2px solid var(--green); padding: 10px; text-align: center; font-weight: 700; letter-spacing: 0.12em; }
+/* THE COUNCIL (2026-09-29) is a summons banner with a clock (.banner-council above); nothing to press here. */
 
 .effects { display: flex; flex-direction: column; gap: 3px; }
 .effect { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: 0.1em; color: var(--amber); }
