@@ -202,7 +202,7 @@ C.push(script([
 C.push(H3("3. Throttle to the room, not to the clock"));
 C.push(p(t("The runbook is a script, not a metronome. A team coasting gets an extra fault. A table genuinely drowning — not struggling, drowning — gets a fault paused or a resource grant. You are managing a stress curve, and the target is pressure that is uncomfortable and survivable, never chaotic. Chaos produces noise, not diagnosis.")));
 C.push(H3("4. Tag as you go"));
-C.push(p(t("Every observation you type into the control panel is timestamped alongside the game events, and the debrief timeline assembles itself from those tags. Untagged observations are lost by lunchtime. Aim for at least twenty tags across the day.")));
+C.push(p(t("Every observation goes on your paper pad with the time from the wall clock — the console has no observation pad. In the debrief you lay those notes beside the exported event log, which carries the same clock, and the timeline assembles itself from the two. Untagged observations are lost by lunchtime. Aim for at least twenty tags across the day.")));
 C.push(H3("5. Protect the pressure, then protect the person"));
 C.push(p(t("Discomfort is the point. Distress is not. If a participant is visibly overwhelmed rather than engaged, quietly move them to a support role, tell them why in one sentence, and note it. Do not make it a moment in front of the room.")));
 

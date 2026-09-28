@@ -186,12 +186,9 @@ Every message requires the token. Grouped by control-panel column (§6.3 of the 
 { "type": "breather", "on": true }            // pauses ALL decay and clocks
 ```
 
-**Col 4 — Observation pad**
-```json
-{ "type": "observe", "sector": "POW", "tag": "DOMINANCE",
-  "note": "Chief cut off liaison twice during transfer negotiation" }
-```
-Tags: `DOMINANCE` `WITHDRAWAL` `SAFETY+` `SAFETY-` `DISCREPANCY-SPOTTED`. Writes straight to `runlog.jsonl` — this is how the debrief timeline builds itself. **This is the highest-value feature in the control panel; build it early, not last.**
+**Col 4 — Observation pad.** Removed from the console on 2026-09-28: there is
+no `observe` intent and no `observe_ack`. Facilitators keep their observation
+tags on paper, against the wall clock, and lay them beside the exported log.
 
 **Run control**
 ```json
@@ -208,11 +205,10 @@ Tags: `DOMINANCE` `WITHDRAWAL` `SAFETY+` `SAFETY-` `DISCREPANCY-SPOTTED`. Writes
 {"t":"2026-09-14T10:38:00.112Z","ev":"fault_fired","sector":"POW","fault":"F-201","round":"R2"}
 {"t":"2026-09-14T10:41:22.900Z","ev":"submit","sector":"POW","fault":"F-201","code":"P-03-291","accepted":false,"reason":"invalid_code","attempts":2}
 {"t":"2026-09-14T10:42:03.117Z","ev":"submit","sector":"POW","fault":"F-201","code":"P-03-340","accepted":true,"workers":2}
-{"t":"2026-09-14T10:44:10.004Z","ev":"observe","sector":"POW","tag":"SAFETY-","note":"Engineer flagged 290/340 mismatch, chief dismissed it"}
 {"t":"2026-09-14T10:45:00.000Z","ev":"mode","mode":"COUNCIL"}
 ```
 
-Log every: fault fired/resolved/cleared, every submit (accepted *and* rejected — failed attempts are diagnostic), inventory declarations, mode/round/clock changes, announcements, facilitator overrides, observation tags, connect/disconnect.
+Log every: fault fired/resolved/cleared, every submit (accepted *and* rejected — failed attempts are diagnostic), inventory declarations, mode/round/clock changes, announcements, facilitator overrides, connect/disconnect.
 
 **Clock sync:** at R0 the facilitator fires `sting: klaxon`; the audio spike aligns every recording to this log. Log the sting with its timestamp — it is the join key for the entire analytics pipeline.
 
@@ -223,7 +219,7 @@ Log every: fault fired/resolved/cleared, every submit (accepted *and* rejected �
 1. **Server skeleton** — Express + `ws`, load the three JSON fixtures, in-memory state, 10 s decay tick, snapshot to disk every 10 s, `runlog.jsonl` appender.
 2. **`hello`/`state` loop + visibility filter** — get the filtering right here; retrofitting it later means auditing every view.
 3. **Sector dashboard** — three columns per spec §6.1. Test against F-201 (two valid codes) and a fault whose `valid_codes` you empty by hand (the false-alarm shape) before building anything else.
-4. **Control panel** — ugly is fine, complete is not. Runbook column + observation pad first.
+4. **Control panel** — ugly is fine, complete is not. Runbook column first.
 5. **Big screen** — the HAVEN-9 cross-section SVG deserves real design time; everything else on it is bars and a ticker.
 6. **Council mode + brownout/dark states** — the R3 climax path, end to end.
 

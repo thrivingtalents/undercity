@@ -222,9 +222,7 @@ test('a full R1→R4 dry run, six sectors on one server', async (t) => {
       'the resolve is credited on the public ticker');
   });
 
-  await t.test('facilitator observations land in the log beside game events', async () => {
-    say({ type: 'observe', sector: 'POW', tag: 'DISCREPANCY-SPOTTED',
-          note: 'Engineer flagged 290/340 mismatch, chief dismissed it' });
+  await t.test('a facilitator announcement reaches the tables', async () => {
     say({ type: 'announce', text: 'Core output stabilising.' });
     await wait(400);
     assert.equal(sectors.POW.state.announcements[0].text, 'Core output stabilising.');
@@ -265,7 +263,7 @@ test('a full R1→R4 dry run, six sectors on one server', async (t) => {
     const kinds = new Set(lines.map((e) => e.ev));
     for (const required of [
       'run_reset', 'connect', 'mode', 'round', 'sting', 'fault_fired',
-      'submit', 'fault_cleared', 'observe', 'announce', 'set_status',
+      'submit', 'fault_cleared', 'announce', 'set_status',
       'set_core_integrity', 'clock',
     ]) {
       assert.ok(kinds.has(required), `runlog is missing "${required}" events`);
@@ -285,9 +283,7 @@ test('a full R1→R4 dry run, six sectors on one server', async (t) => {
     const accepted = lines.filter((e) => e.ev === 'submit' && e.accepted === true);
     assert.ok(accepted.length >= 3, 'accepted submissions are logged with their workers');
 
-    const obs = lines.find((e) => e.ev === 'observe');
-    assert.equal(obs.tag, 'DISCREPANCY-SPOTTED');
-    assert.equal(obs.sector, 'POW');
+    assert.ok(!lines.some((e) => e.ev === 'observe'), 'the observation pad is gone, and so is its event');
   });
 
   for (const c of [control, big, ...Object.values(sectors)]) c.ws.close();

@@ -3,7 +3,7 @@
  * UNDERSTAND → DECIDE → INTERVENE. The frame from the server is the whole
  * truth; this file only decides what to show first. OVERVIEW is the default:
  * session state, NEEDS ATTENTION, six observational sector cards, five
- * system summaries, a short activity feed and the observation pad. EVENTS
+ * system summaries and a short activity feed. EVENTS
  * runs the scenario, CITY SYSTEMS inspects authoritative state, DEBRIEF
  * looks back. A change to authoritative state — a health value, a tray, a
  * worker, a forced approval — goes through askOverride(): current → proposed,
@@ -17,7 +17,6 @@
   const params = new URLSearchParams(location.search);
   const TOKEN = params.get('token') || '';
 
-  const TAGS = ['DOMINANCE', 'WITHDRAWAL', 'SAFETY+', 'SAFETY-', 'DISCREPANCY-SPOTTED'];
   const RESOURCES = ['power', 'water', 'parts', 'med'];
   const RES_NAME = { power: 'POWER', water: 'WATER', parts: 'PARTS', med: 'MEDICAL', workers: 'WORKERS' };
   const ANNOUNCE_PRESETS = [
@@ -41,7 +40,7 @@
     TRANSFERS: ['transfer'],
     RESOURCES: ['cycle', 'output', 'core'],
     WORKERS: ['injury'],
-    ADMIN: ['override', 'obs', 'announce', 'pause', 'status', 'event', 'council', 'order', 'blackout', 'round', 'phase'],
+    ADMIN: ['override', 'announce', 'pause', 'status', 'event', 'council', 'order', 'blackout', 'round', 'phase'],
   };
   const REQ_WORD = { REQUESTED: 'WAITING FOR SUPPLIER', TRANSFER_CREATED: 'SUPPLIER ACCEPTED', DECLINED_BY_SUPPLIER: 'DECLINED', CANCELLED: 'CANCELLED', EXPIRED: 'EXPIRED' };
   const TR_WORD = { PENDING_TRN_APPROVAL: 'WAITING FOR TRN', APPROVED: 'APPROVED BY TRN', DELIVERED: 'DELIVERED', DECLINED_BY_TRN: 'TRN DECLINED', CANCELLED: 'CANCELLED', EXPIRED: 'EXPIRED' };
@@ -65,15 +64,13 @@
   let content = null;
   let urls = null;
   let view = 'overview';
-  const sub = { events: 'faults', systems: 'transfers', debrief: 'observations' };
+  const sub = { events: 'faults', systems: 'transfers', debrief: 'log' };
   let faultView = 'active';
   let faultDebug = false;
   let drawerSector = null;
   let drawerAdmin = false;
   let logFilter = 'ALL';
   let attnAll = false;
-  let obsSector = null;
-  let obsTag = null;
   let orderDraft = [];
   let lastConfigJson = null;
   let debriefData = null;
@@ -114,7 +111,6 @@
         });
       }
       if (msg.type === 'error' && msg.reason === 'round_already_active') toast('THAT ROUND IS ALREADY ACTIVE — press its button and confirm to restart it');
-      if (msg.type === 'observe_ack') { $('obs-note').value = ''; $('obs2-note').value = ''; obsTag = null; renderObs(); toast('OBSERVATION LOGGED', 'ok'); }
       if (msg.type === 'export_ready') window.open(msg.url, '_blank');
       if (msg.type === 'welcome' && msg.urls) urls = msg.urls;
       if (msg.type === 'order_result' && !msg.ok) toast(`Order refused: ${msg.reason}`);
@@ -155,12 +151,6 @@
     for (const id of ['f-round', 'f-sector', 'f-sev']) $(id).addEventListener('change', renderInjects);
     $('f-text').addEventListener('input', renderInjects);
 
-    for (const host of ['obs-sectors', 'obs2-sectors']) {
-      $(host).innerHTML = codes.map((s) => `<button data-sector="${s}">${s}</button>`).join('');
-      for (const btn of $(host).querySelectorAll('button')) {
-        btn.addEventListener('click', () => { obsSector = obsSector === btn.dataset.sector ? null : btn.dataset.sector; renderObs(); });
-      }
-    }
     $('ovr-sectors').innerHTML = codes.map((s) => `<button data-ovr-sector="${s}">${U.SECTOR_GLYPH[s] || ''} ${s}</button>`).join('');
     for (const b of $('ovr-sectors').querySelectorAll('button')) b.addEventListener('click', () => openSector(b.dataset.ovrSector, { admin: true }));
 
@@ -1360,7 +1350,7 @@
   for (const btn of document.querySelectorAll('[data-cycle]')) btn.addEventListener('click', () => askOverride({ title: 'PROCESS UPKEEP NOW', target: 'CORE', diff: [['UPKEEP PASSES', state.cycle.number - 1, state.cycle.number]], extra: '<div class="hint">Charges every sector\'s upkeep now, off schedule, with penalties for a shortfall. The next round activation will charge it again.</div>', action: 'cycle', payload: { action: 'process' } }));
   $('btn-tel-set').addEventListener('click', () => send({ type: 'set_telemetry', telemetry: { wtr_reservoir_pressure: Number($('tel-wtr').value) } }));
 
-  // -- activity, logs, observations -----------------------------------------------------------
+  // -- activity and logs ------------------------------------------------------------------
 
   const feedRow = (e) => `<div class="feed-row ${esc(e.kind)}"><span class="ft">${new Date(e.t).toLocaleTimeString([], { hour12: false })}</span><span class="fx">${esc(e.text)}</span></div>`;
 
@@ -1379,33 +1369,6 @@
     $('override-log').innerHTML = html;
     $('override-log-2').innerHTML = html;
   }
-
-  for (const host of ['obs-tags', 'obs2-tags']) {
-    $(host).innerHTML = TAGS.map((t) => `<button data-tag="${t}">${t}</button>`).join('');
-    for (const btn of $(host).querySelectorAll('button')) {
-      btn.addEventListener('click', () => { obsTag = obsTag === btn.dataset.tag ? null : btn.dataset.tag; renderObs(); });
-    }
-  }
-  function renderObs() {
-    for (const host of ['obs-tags', 'obs2-tags']) for (const btn of $(host).querySelectorAll('button')) btn.classList.toggle('on', btn.dataset.tag === obsTag);
-    for (const host of ['obs-sectors', 'obs2-sectors']) {
-      for (const btn of $(host).querySelectorAll('button')) {
-        const on = btn.dataset.sector === obsSector;
-        btn.classList.toggle('on', on);
-        if (on && state) btn.style.setProperty('--sector-on', state.sectors[btn.dataset.sector].colour);
-      }
-    }
-    if (state) $('obs-list').innerHTML = state.ticker.filter((e) => e.kind === 'obs').map(feedRow).join('') || '<div class="hint">Nothing logged yet.</div>';
-  }
-  function logObservation(noteId) {
-    const note = $(noteId).value.trim();
-    if (!note && !obsTag) return;
-    send({ type: 'observe', sector: obsSector, tag: obsTag, note });
-  }
-  $('btn-observe').addEventListener('click', () => logObservation('obs-note'));
-  $('btn-observe2').addEventListener('click', () => logObservation('obs2-note'));
-  $('obs-note').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); logObservation('obs-note'); } });
-  $('obs2-note').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); logObservation('obs2-note'); } });
 
   // -- settings (••• › SETTINGS) ---------------------------------------------------------------
 
@@ -1607,7 +1570,6 @@
     renderSectors();
     renderSummaries();
     renderRecent();
-    renderObs();
     if (drawerSector) renderDrawer();
     renderFaults();
     renderPresets();

@@ -1347,14 +1347,6 @@ function handleControl(client, entry, msg) {
     // ever turns into a debrief. The comparison lives in Admin's own review
     // view and in /api/debrief, which are the facilitator's, not the room's.
 
-    case 'observe':
-      entry.log.write('observe', {
-        sector: msg.sector || null, tag: msg.tag || null, note: msg.note || '',
-      });
-      game.ticker('obs', `${msg.tag || 'NOTE'}${msg.sector ? ' ' + msg.sector : ''}: ${msg.note || ''}`, { scope: 'admin' });
-      reply({ type: 'observe_ack', t: new Date().toISOString() });
-      return ok();
-
     /**
      * ADMIN OVERRIDE (v16): the facilitator's hand on authoritative state,
      * made deliberate. The inner intent goes through this same handler with

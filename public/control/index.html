@@ -152,15 +152,6 @@
           <h2 class="col-title">RECENT ACTIVITY <button class="ghost tiny" id="btn-expand-log">EXPAND LOG</button></h2>
           <div class="feed" id="recent"></div>
         </section>
-        <section class="panel obs">
-          <h2 class="col-title">OBSERVATION PAD <span class="hint">tag first, type later</span></h2>
-          <div class="obs-sectors" id="obs-sectors"></div>
-          <div class="obs-tags" id="obs-tags"></div>
-          <div class="row">
-            <input type="text" id="obs-note" placeholder="note… (Enter to log)" autocomplete="off">
-            <button id="btn-observe" class="primary">LOG OBSERVATION</button>
-          </div>
-        </section>
       </div>
     </section>
 
@@ -477,27 +468,12 @@
     <!-- ================= SESSION REVIEW (facilitator only) ================= -->
     <section class="view" id="view-debrief">
       <nav class="subnav" data-for="debrief">
-        <button data-sub="observations" class="on">OBSERVATIONS</button>
-        <button data-sub="log">EVENT LOG</button>
+        <button data-sub="log" class="on">EVENT LOG</button>
         <button data-sub="overrides">OVERRIDE LOG</button>
         <button data-sub="analysis">ANALYSIS &amp; EXPORT</button>
       </nav>
 
-      <div class="sub on panel obs" id="sub-observations">
-        <h2 class="col-title">OBSERVATION PAD <span class="hint">eyes on the room</span></h2>
-        <div class="obs-sectors" id="obs2-sectors"></div>
-        <div class="obs-tags" id="obs2-tags"></div>
-        <div class="row">
-          <input type="text" id="obs2-note" placeholder="note… (Enter to log)" autocomplete="off">
-          <button id="btn-observe2" class="primary">LOG OBSERVATION</button>
-        </div>
-        <div class="block">
-          <span class="label">Logged this run</span>
-          <div class="feed" id="obs-list"></div>
-        </div>
-      </div>
-
-      <div class="sub panel" id="sub-log">
+      <div class="sub on panel" id="sub-log">
         <h2 class="col-title">EVENT LOG
           <span class="seg" id="log-filters">
             <button data-lf="ALL" class="on">ALL</button><button data-lf="FAULTS">FAULTS</button><button data-lf="TRANSFERS">TRANSFERS</button>

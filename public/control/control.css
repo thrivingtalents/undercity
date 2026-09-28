@@ -167,7 +167,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: none;
 .sec-res span.low { color: var(--red); font-weight: 700; }
 .sec-open { margin-top: 4px; align-self: flex-end; font-size: 10px; padding: 5px 12px; letter-spacing: 0.12em; }
 
-/* -- summaries, recent, observation -------------------------------------------- */
+/* -- summaries, recent ---------------------------------------------------------- */
 
 .summaries { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 .sum { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; font-size: 11px; cursor: pointer; }
@@ -175,31 +175,19 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: none;
 .sum .sum-body b { display: block; font-size: 13px; }
 .sum .sum-body div { color: var(--ink-dim); }
 .sum button { margin-top: auto; align-self: flex-end; font-size: 9px; padding: 3px 8px; }
-.bottom-row { display: grid; grid-template-columns: 1fr 460px; gap: 8px; }
-.recent, .obs { display: flex; flex-direction: column; padding: 8px 10px; min-height: 0; }
+.bottom-row { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.recent { display: flex; flex-direction: column; padding: 8px 10px; min-height: 0; }
 .feed { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; font-size: 10.5px; max-height: 150px; }
 .feed.tall { max-height: none; }
 .feed-row { display: flex; gap: 8px; line-height: 1.45; }
 .feed-row .ft { color: var(--ink-faint); min-width: 58px; }
 .feed-row .fx { flex: 1; color: var(--ink-dim); }
-.feed-row.obs .fx { color: var(--amber); }
 .feed-row.override .fx { color: #ffd6d6; font-weight: 700; }
 .feed-row.resolve .fx { color: var(--green); }
 .feed-row.fault .fx, .feed-row.expired .fx, .feed-row.lockout .fx { color: var(--red); }
 .feed-row.council .fx, .feed-row.order .fx { color: var(--purple); }
 .feed-row.transfer .fx { color: var(--blue); }
 .feed-row.status .fx, .feed-row.blackout .fx, .feed-row.core .fx { color: var(--amber); }
-.obs { background: #14100c; border-color: #2e2415; }
-.obs-sectors, .obs-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; }
-.obs-sectors button { flex: 1; font-size: 11px; padding: 6px 2px; font-weight: 700; }
-.obs-sectors button.on { background: var(--sector-on, var(--ui-active)); color: var(--accent-ink); }
-.obs-tags button { font-size: 10px; padding: 5px 7px; }
-.obs-tags button.on { font-weight: 700; }
-.obs-tags button[data-tag="DOMINANCE"].on  { background: var(--red);   color: #1a0c0c; border-color: var(--red); }
-.obs-tags button[data-tag="WITHDRAWAL"].on { background: var(--blue);  color: #08131f; border-color: var(--blue); }
-.obs-tags button[data-tag="SAFETY+"].on    { background: var(--green); color: #0a1a0d; border-color: var(--green); }
-.obs-tags button[data-tag="SAFETY-"].on    { background: #E8853A;      color: #1a0f06; border-color: #E8853A; }
-.obs-tags button[data-tag="DISCREPANCY-SPOTTED"].on { background: var(--purple); color: #150a1c; border-color: var(--purple); }
 
 /* -- shared bits inside views ------------------------------------------------- */
 

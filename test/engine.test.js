@@ -2464,11 +2464,11 @@ test('override snapshots name every target kind, and the debrief counts override
   assert.ok(d.timeline.some((e) => e.kind === 'override' && /OVERRIDE ADJUST INTEGRITY · POW — test/.test(e.text)));
 });
 
-test('an observation carries phase, round and time, and reaches the facilitator alone', () => {
+test('a log entry carries phase, round and time', () => {
   const game = running();
-  game.log.write('observe', { sector: 'POW', tag: 'DOMINANCE', note: 'chief talks over liaison' });
-  const ev = logEvents(game, 'observe')[0];
-  assert.equal(ev.round, 'R2'); assert.equal(ev.phase, 'ROUND_2'); assert.ok(ev.t); assert.equal(ev.tag, 'DOMINANCE');
+  game.log.write('facilitator_note', { sector: 'POW', note: 'chief talks over liaison' });
+  const ev = logEvents(game, 'facilitator_note')[0];
+  assert.equal(ev.round, 'R2'); assert.equal(ev.phase, 'ROUND_2'); assert.ok(ev.t); assert.equal(ev.sector, 'POW');
 });
 
 test('the console markup: four destinations, OVERVIEW first, one PAUSE, no city figure, phase and round shown, STOP CLOCK ≠ NEXT PHASE', () => {
@@ -2490,7 +2490,7 @@ test('the console markup: four destinations, OVERVIEW first, one PAUSE, no city 
   assert.ok(/id="progress"/.test(html) && /state\.phases/.test(js), 'no session progress from the configured phases');
 });
 
-test('the console markup: attention, observational cards, drawer, overrides, faults default ACTIVE, compact log, pad', () => {
+test('the console markup: attention, observational cards, drawer, overrides, faults default ACTIVE, compact log, no observation pad', () => {
   const html = CONTROL_INDEX; const js = CONTROL_SCRIPT;
   assert.ok(/id="attention"/.test(html) && /NO CRITICAL ISSUES/.test(js) && /needs_attention/.test(js));
   assert.ok(/a\.target\.sector\) \{ go\('overview'\); openSector\(a\.target\.sector\)/.test(js), 'an attention item does not open its sector');
@@ -2512,7 +2512,10 @@ test('the console markup: attention, observational cards, drawer, overrides, fau
   assert.ok(/data-quick="fault"/.test(html) && /data-quick="injure"/.test(html) && /data-quick="brownout"/.test(html) && /data-quick="announce"/.test(html) && /data-quick="alert"/.test(html) && /data-quick="council"/.test(html), 'a routine event trigger is gone');
   assert.ok(!/data-quick="core"/.test(html), 'CORE −10% is still a quick action');
   assert.ok(/state\.ticker\.slice\(0, 5\)/.test(js) && /id="btn-expand-log"/.test(html) && /data-lf="ADMIN"/.test(html));
-  assert.ok(/id="obs-note"/.test(html) && /id="obs2-note"/.test(html) && /type: 'observe'/.test(js));
+  // The observation pad left the console on 2026-09-28: no pad on the overview, no OBSERVATIONS tab, no intent.
+  assert.ok(!/obs-note|obs2-note|OBSERVATION PAD|data-sub="observations"|id="obs-list"/.test(html), 'an observation pad is still on the console');
+  assert.ok(!/type: 'observe'|renderObs|observe_ack/.test(js), 'the console still sends observations');
+  assert.ok(/data-sub="log" class="on"/.test(html) && /debrief: 'log'/.test(js), 'SESSION REVIEW does not open on the event log');
   assert.ok(/id="drawer"/.test(html) && /override-box/.test(html));
   const subnavs = [...html.matchAll(/<nav class="subnav" data-for="([a-z]+)">([\s\S]*?)<\/nav>/g)];
   assert.deepEqual(subnavs.map((m) => m[1]), ['events', 'systems', 'debrief']);
