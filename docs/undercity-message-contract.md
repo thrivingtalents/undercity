@@ -268,7 +268,7 @@ The Admin page prompts for the token if the URL does not carry one.
   "round": "R2", "round_name": "Interdependence", "round_length_s": 900,   // the round timer's full length — control frame only
   "round_clock":   { "status": "running", "running": true, "remaining_s": 1140, "duration_s": 900, "target_end_at": 1790000000000 },   // the ROUND TIMER; see §8.7
   "council_clock": { "running": false, "remaining_s": 180 },
-  "cycle": { "number": 3, "length_s": 420, "remaining_s": 267, "running": false },   // legacy timer; see §8.7
+  "cycle": { "number": 3, "running": false },   // economy passes; no clock — see §8.7
   "paused": false, "breather": false, "frozen": false,
   "core_output": 83, "core_integrity": 83,
   "city_stability": 71, "stability_mode": "auto",   // control frame ONLY — no participant frame carries an aggregate city figure (v15)
@@ -466,7 +466,7 @@ requires stock.
 { "type": "set_phase", "phase": "ROUND_2" }   { "type": "next_phase" }
 { "type": "clock", "which": "round", "action": "start|resume|pause|end|add|set|reset", "seconds": 120 }
 { "type": "activate_round", "round": "R2", "restart": false }   // the round button: round + timer READY + its whole fault set, as one action
-{ "type": "cycle", "action": "start|pause|process|set|add", "seconds": 60 }
+{ "type": "cycle", "action": "process" }   // the economy pass by hand; the old clock actions are refused
 { "type": "pause" }  { "type": "resume" }
 { "type": "fire_preset", "preset_id": "r2_wave_a" }
 { "type": "fault_add_time", "sector": "POW", "fault_code": "F-201", "seconds": 60 }
@@ -475,7 +475,7 @@ requires stock.
 { "type": "set_core_output", "value": 60 }   { "type": "adjust_core", "delta": -10 }
 { "type": "set_stability", "mode": "manual", "value": 55 }
 { "type": "set_intel", "key": "water_pressure", "value": "DEGRADING" }
-{ "type": "set_config", "patch": { "cycle_length_s": 300, "brownout_effects": { "production_multiplier": 0.4 } } }
+{ "type": "set_config", "patch": { "council_clock_s": 180, "brownout_effects": { "production_multiplier": 0.4 } } }
 { "type": "set_sector_config", "sector": "AGR", "patch": { "production": { "water": 1 } } }
 { "type": "set_sound", "on": false }
 { "type": "alert", "title": "COUNCIL SUMMONED", "subtitle": "CHIEFS + LIAISONS REPORT IMMEDIATELY" }
@@ -546,14 +546,19 @@ exists, else a synthesised placeholder.
 
 ### 8.7 One clock: the round's (2026-09-18)
 
-The free-running core cycle is retired. `round_clock` is the only clock a
-table sees, and **upkeep falls due when a played round ends**: the
-facilitator advancing the phase runs one economy pass for the outgoing round
-(`cycle_processed {cycle, round, summary}`; a round whose clock never
-started is not charged). The `cycle` object stays in every frame for
-compatibility — `number` now counts upkeep passes, and `running` is false
-unless a scenario turns the legacy timer back on with `cycle_autostart`.
-Admin's PROCESS UPKEEP NOW (`cycle {action:"process"}`) still forces a pass.
+The operating cycle is gone (2026-09-28): the round is the period. `round_clock`
+is the only clock a table sees, and **upkeep falls due when the next round is
+activated**: `activate_round` runs one economy pass for the outgoing round
+(`cycle_processed {cycle, round, summary}`) — never for Round 0, never for a
+round whose clock was not started, never when going back — and then hands
+every allowance back for the new round (approvals, heals, AGR's hand, the
+"this round" effects; `trn_approval_counter_reset {by:"round"}`).
+`period_number` is the round number and every stamp (`round` on COM's rows,
+AGR's hand, a sector's output) carries the round id. The `cycle` object stays
+in every frame for compatibility — `number` counts economy passes and nothing
+counts down. Admin's PROCESS UPKEEP NOW (`cycle {action:"process"}`) still
+forces a pass, without a refresh; the old start/pause/set/add actions are
+refused.
 
 Own sector adds `round_output` — `null` for a sector with no production
 line, else `{ manual, used, base, amount, added, reduced, core_output,

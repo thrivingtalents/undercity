@@ -47,14 +47,6 @@
       <span class="pill" id="mode-pill">—</span>
     </div>
 
-    <!-- Continuous gameflow: no round on any screen. Admin watches the
-         operating cycle — the beat that produces, charges upkeep and hands
-         the allowances back — and the internal phase, below the bar. -->
-    <div class="tb-stat">
-      <span class="label">CYCLE <em id="cycle-note"></em></span>
-      <b id="round-value">—</b>
-    </div>
-
     <div class="tb-stat tb-clock">
       <span class="label">ROUND TIME <em id="clock-note"></em></span>
       <!-- P0: one minute a click, right beside the clock. Admin only — no
@@ -421,7 +413,7 @@
         <h2 class="col-title">CORE</h2>
         <div class="stat-row" id="core-summary"></div>
         <div class="block">
-          <span class="label">Cycle upkeep <em>— charged at the end of each operating cycle</em></span>
+          <span class="label">Round upkeep <em>— charged when the next round is activated</em></span>
           <div class="cycle-summary" id="cycle-summary"><div class="hint">No upkeep pass yet.</div></div>
         </div>
         <div class="block">
@@ -469,7 +461,7 @@
         <h2 class="col-title">ADMIN OVERRIDES <span class="hint">direct changes to authoritative state — every one shows current → proposed, asks why, and is logged</span></h2>
         <div class="ovr-index">
           <div class="ovr-card"><h3>SECTOR</h3><p>Health, inventory, workers, force DARK, force-resolve a fault, generate a table's output.</p><div class="ovr-pick" id="ovr-sectors"></div></div>
-          <div class="ovr-card"><h3>CAPACITY</h3><p>Reset the cycle allowances.</p><button id="ovr-reset-stamps">RESET TRN APPROVALS</button><button id="ovr-reset-heals">RESET MED HEALS</button></div>
+          <div class="ovr-card"><h3>CAPACITY</h3><p>Reset the round allowances.</p><button id="ovr-reset-stamps">RESET TRN APPROVALS</button><button id="ovr-reset-heals">RESET MED HEALS</button></div>
           <div class="ovr-card"><h3>CORE</h3><p>Core output, an upkeep pass, the stability score.</p><button data-go="systems:core">OPEN CORE</button></div>
           <div class="ovr-card"><h3>TRANSFERS · HEALING</h3><p>Force an approval or a heal, decline, cancel.</p><button data-go="systems:transfers">OPEN TRANSFERS</button><button data-go="systems:workforce">OPEN WORKFORCE</button></div>
           <div class="ovr-card"><h3>AGR · COM</h3><p>Reroll or force a card; write the board.</p><button data-go="systems:agr">OPEN AGR</button><button data-go="systems:com">OPEN COM</button></div>
@@ -547,7 +539,7 @@
         <div class="hint">Nothing here is playtested. Every field applies live to this run; SAVE to keep it.</div>
         <div class="settings" id="settings"></div>
         <div class="block">
-          <span class="label">Sector economy <em>— per operating cycle</em></span>
+          <span class="label">Sector economy <em>— per round</em></span>
           <div class="sector-config" id="sector-config"></div>
         </div>
         <div class="block">

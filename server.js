@@ -1203,7 +1203,7 @@ function handleControl(client, entry, msg) {
     case 'set_mode':    game.setMode(msg.mode); return ok();
     case 'clock':       game.clock(msg.action, msg.seconds, msg.which); return ok();
     case 'cycle': {
-      const summary = game.cycleControl(msg.action, msg.seconds);
+      const summary = game.cycleControl(msg.action);
       if (summary) reply({ type: 'cycle_summary', summary });
       return ok();
     }

@@ -5,7 +5,6 @@
   "notes": "DEMO SCENARIO (spec §50) — every value in this file is a DEMO value, not game balance. Clocks are short so the whole arc (fault → lockout → resolve → transfer → council → Continuity Order → brownout → dark → Aftershock comparison) can be rehearsed in minutes, and the six sectors start with deliberately different integrity and stock so each screen looks distinct. Anything not set here is inherited from HAVEN-9 STANDARD. Run `npm run demo` against a LAN server to drive it.",
 
   "defaults": {
-    "cycle_length_s": 120,
     "council_clock_s": 90,
     "round_length_s": { "R0": 300, "R1": 480, "R2": 600, "R3": 600, "R4": 480 },
     "alert_full_screen_s": 5,

@@ -154,7 +154,9 @@ test('CITYBOARD-LAYOUT-005: the round advances and the card still reads R1', () 
   game.setPhase('ROUND_2');
   assert.equal(forSector(game, 'COM').round_number, 2, 'the room did not move');
   assert.equal(tag(game, 'POW'), 'R1', 'the card followed the room');
-  assert.equal(JSON.stringify(board(game).rows.POW), before, 'the round change moved the snapshot');
+  // The round is the period: the figures hold still, only the freshness word moves.
+  assert.equal(JSON.stringify({ ...board(game).rows.POW, freshness: null }), JSON.stringify({ ...JSON.parse(before), freshness: null }), 'the round change moved the snapshot');
+  assert.equal(board(game).rows.POW.freshness, 'STALE', 'a report from last round is not stale');
 
   // The header shows the room's round; the card shows its own. Two different
   // numbers from two different places, and the code says which is which.

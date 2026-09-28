@@ -48,7 +48,7 @@ SECTOR_INFO = {
             "Council authorisation. Power cannot be manufactured faster than the turbines allow, "
             "so every commitment you make to another sector is a commitment taken from somewhere else."
         ),
-        "produces": "Power Cells (⚡) — 3 per cycle, distributed at your discretion",
+        "produces": "Power Cells (⚡) — 3 per round, distributed at your discretion",
     },
     "WTR": {
         "name": "Water & Filtration",
@@ -64,7 +64,7 @@ SECTOR_INFO = {
             "station dry. Filtration failures are not immediately visible to anyone else in the city, "
             "which means the decision to report a problem early is yours alone to make."
         ),
-        "produces": "Water Units (💧) — 3 per cycle, distributed at your discretion",
+        "produces": "Water Units (💧) — 3 per round, distributed at your discretion",
     },
     "MED": {
         "name": "Medical Bay",
@@ -132,7 +132,7 @@ SECTOR_INFO = {
 }
 
 START_INVENTORY = "3 ⚡ Power Cells · 3 💧 Water Units · 3 🔧 Spare Parts · 1 ⚕ Med Supply"
-UPKEEP = "2 ⚡ Power Cells + 1 💧 Water Unit per cycle"
+UPKEEP = "2 ⚡ Power Cells + 1 💧 Water Unit per round"
 
 wb = load_workbook(XLSX, data_only=True)
 

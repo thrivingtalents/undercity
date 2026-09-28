@@ -321,7 +321,7 @@
   /**
    * The command bar. Continuous gameflow (2026-09-21): the wall never names a
    * round or a phase. Before live play it says BRIEFING; once the shift is
-   * running it counts OPERATING CYCLES, and the clock beside it is MASTER
+   * running it counts ROUNDS, and the clock beside it is ROUND
    * TIME. The Core keeps the middle and the largest type on the bar.
    */
   function renderHud() {
@@ -723,7 +723,7 @@
     if (live) {
       setText($('bc-head'), String(a.headline || a.message));
       setText($('bc-msg'), a.headline ? String(a.message || '') : '');
-      setText($('bc-by'), `— COMMS & SENSORS · CYCLE ${a.round_number} · ${a.freshness}`);
+      setText($('bc-by'), `— COMMS & SENSORS · ROUND ${a.round_number} · ${a.freshness}`);
     } else {
       setText($('bc-head'), 'STANDBY');      // compact: the band is quiet until COM speaks
       setText($('bc-msg'), '');
@@ -753,7 +753,6 @@
 
   function renderPaused() { show($('paused'), !!frame.paused); }
 
-  /** The operating cycle: 3.5 seconds of UPKEEP PROCESSED, with what it cost. */
   /**
    * THE ROUND MARKER (2026-09-21). When the round number changes the wall says
    * so for three seconds and then stops saying it. No title, no objective, no
@@ -771,13 +770,14 @@
     prevRound = n;
   }
 
+  /** The economy pass: 3.5 seconds of UPKEEP CHARGED, with what it cost. */
   function renderCycle() {
     const n = Number(frame.cycle && frame.cycle.number);
     if (prevCycle !== null && Number.isFinite(n) && n > prevCycle) {
       const feed = Array.isArray(frame.ticker) ? frame.ticker : (frame.feed || []);
       const cost = feed.filter((e) => e.kind === 'cycle' && ageOf(e.t) < 6 && /missed upkeep/i.test(e.text))
         .map((e) => `${e.text.slice(0, 3)} MISSED UPKEEP`);
-      setText($('cycle-flash-title'), 'OPERATING CYCLE — UPKEEP PROCESSED');
+      setText($('cycle-flash-title'), 'UPKEEP CHARGED');
       setText($('cycle-flash-sub'), cost.length ? cost.join('  ·  ') : '');
       cycleFlashUntil = performance.now() + CYCLE_FLASH_MS;
       show($('cycle-flash'), true);

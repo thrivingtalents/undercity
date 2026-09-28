@@ -126,15 +126,13 @@ test('ROUND-004: Round 4 is a number on every screen; its mechanics still run', 
 
 // -- the transition -------------------------------------------------------------
 
-test('ROUND-003: a round change starts no rest, no debrief, no reflection, and resets nothing', () => {
+test('ROUND-003: a round change starts no rest, no debrief, no reflection, and resets nothing but the period', () => {
   const game = live('ROUND_2');
   game.fireFault('F-201', 'POW');
   game.injure('MED', 2);
   game.setInventory('POW', { power: 7, water: 1, parts: 0, med: 2 });
   game.setIntegrity('WTR', 38);
   game.state.sectors.POW.inventory.parts = 3;
-  const upgrade = game.startGeneratorUpgrade('POW');
-  assert.equal(upgrade.ok, true, upgrade.reason);
   const request = game.requestTransfer({ from: 'WTR', to: 'MED', resource: 'water', amount: 1, by: 'MED' });
   const transfer = game.createTransfer({ from: 'AGR', to: 'MED', resource: 'parts', amount: 1, by: 'AGR' });
   game.tick(2000);
@@ -168,12 +166,11 @@ test('ROUND-003: a round change starts no rest, no debrief, no reflection, and r
     'health, stock, workers, injuries, generators or upgrades changed');
   assert.equal(game.state.requests.map((r) => r.status).join(','), before.requests, 'a request was swept');
   assert.equal(game.state.transfers.map((t) => t.status).join(','), before.transfers, 'a transfer was swept');
-  assert.equal(JSON.stringify(game.state.agr), before.agr, 'AGR was dealt again');
+  assert.notEqual(JSON.stringify(game.state.agr), before.agr, 'the new round did not deal AGR its hand');
   assert.equal(JSON.stringify(game.state.council), before.council, 'Council state moved');
   assert.ok(game.findFault('POW', 'F-201'), 'the open fault was cleared');
   assert.equal(game.findRequest(request.request.id).status, 'REQUESTED');
   assert.equal(game.findTransfer(transfer.transfer.id).status, 'PENDING_TRN_APPROVAL');
-  assert.ok(game.generatorFor('POW').pending, 'the upgrade in progress was cancelled');
 
   // No screen has a rest, debrief or reflection to show, because none exists.
   for (const src of [SECTOR_INDEX, WALL_INDEX, CONTROL_INDEX]) {

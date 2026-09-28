@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-27T17:37:33.033Z",
+  "generated_at": "2026-09-27T23:56:27.182Z",
   "sources": {
     "matrix": {
       "file": "undercity-crossref-matrix.xlsx",
@@ -28,43 +28,43 @@
       "file": "UNDERCITY_Binder_AGR.docx",
       "title": "Sector binder — AGR",
       "audience": "facilitator",
-      "bytes": 17520,
-      "sha256": "ff1cb92ccb8f20b42550372eed2321415a4b801d17a76836e343c304fdc4e3e6"
+      "bytes": 17521,
+      "sha256": "ed431e5dd208505cbf723d67f6186392821d765d9980127843102ae07cec9fbc"
     },
     {
       "file": "UNDERCITY_Binder_COM.docx",
       "title": "Sector binder — COM",
       "audience": "facilitator",
-      "bytes": 17534,
-      "sha256": "36e18b93c2d8dc53d25a144fa339aa0ca8ae996bf06943c131852880b8d48a67"
+      "bytes": 17536,
+      "sha256": "0a5576ecf63389dcfb6cd21528f255a9bf71bd54049886b7caae3f2251ebb409"
     },
     {
       "file": "UNDERCITY_Binder_MED.docx",
       "title": "Sector binder — MED",
       "audience": "facilitator",
-      "bytes": 17636,
-      "sha256": "b96d92e6bcb877b44da809468449d256908020382f4e8cda0a7be45e33f8ef23"
+      "bytes": 17640,
+      "sha256": "14ec121ec2324a42cb8b93656fb772eb2e44fcc8926ac527f9dad35fd0c7f0dd"
     },
     {
       "file": "UNDERCITY_Binder_POW.docx",
       "title": "Sector binder — POW",
       "audience": "facilitator",
-      "bytes": 17550,
-      "sha256": "5700a8b817e8b68ddfebfb706629db646b8011555172c6a18568e6a07ec31e9e"
+      "bytes": 17552,
+      "sha256": "0f0075ecd750c6c5ca170b1cd97d6addae68098add240e39018d09cdcc46ce5e"
     },
     {
       "file": "UNDERCITY_Binder_TRN.docx",
       "title": "Sector binder — TRN",
       "audience": "facilitator",
-      "bytes": 17514,
-      "sha256": "581c745b8ba21862f5510f8503127ec77f7208a17260c9a02ae31cdcfb23ea48"
+      "bytes": 17516,
+      "sha256": "77a9b48d41d065a6c5f7464d8629ccb06d197db74d23a54e139367d961fa4f9c"
     },
     {
       "file": "UNDERCITY_Binder_WTR.docx",
       "title": "Sector binder — WTR",
       "audience": "facilitator",
-      "bytes": 17543,
-      "sha256": "168b502245fcbfc90e498e2fba829b0457aa3d73e7a35b987f97378af1db2844"
+      "bytes": 17544,
+      "sha256": "bdf11e4795f8c74f07e148258ef6b379b0d9d806fdf3ce760df2f02bc57ebbde"
     },
     {
       "file": "UNDERCITY_CityCharter.docx",
@@ -84,8 +84,8 @@
       "file": "UNDERCITY_Facilitator_Guidebook.docx",
       "title": "Facilitator & Administrator Guidebook",
       "audience": "facilitator",
-      "bytes": 31787,
-      "sha256": "9f0f873fcb12c944f9d405ebb66f82cc1b3c1c647e1bcf0e5f3969af6959783a"
+      "bytes": 31801,
+      "sha256": "1e5d406e9823345e6bbe7c392e5005872ef25f90b966868a2b5736a2cadf42af"
     },
     {
       "file": "UNDERCITY_FaultCards.docx",

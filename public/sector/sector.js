@@ -407,7 +407,7 @@
     const res = (RES[msg.resource] || { name: String(msg.resource || '').toUpperCase() }).name;
     switch (msg.reason) {
       case 'capacity':
-        return `TRANSPORT HAS USED ALL ${msg.capacity} STAMPS FOR THIS ${String(msg.basis || 'cycle').toUpperCase()}`;
+        return `TRANSPORT HAS USED ALL ${msg.capacity} STAMPS FOR THIS ${String(msg.basis || 'round').toUpperCase()}`;
       case 'not_supplier':     return `ONLY ${msg.supplier || 'THE SUPPLYING SECTOR'} CAN ACCEPT OR DECLINE THIS REQUEST`;
       case 'approval_trn_only': return 'ONLY TRANSPORT & TUNNELS CAN APPROVE RESOURCE TRANSFERS';
       case 'insufficient_stock_accept':
@@ -433,7 +433,7 @@
       case 'invalid_amount':   return 'AMOUNT MUST BE GREATER THAN ZERO';
       // healing
       case 'heal_med_only':    return 'ONLY MEDICAL BAY CAN HEAL INJURED WORKERS';
-      case 'med_capacity':     return `MEDICAL HAS USED ALL ${msg.capacity} HEALS FOR THIS CYCLE`;
+      case 'med_capacity':     return `MEDICAL HAS USED ALL ${msg.capacity} HEALS FOR THIS ROUND`;
       case 'worker_not_injured': return 'THAT WORKER IS NOT CURRENTLY INJURED';
       case 'not_own_sector':   return 'A SECTOR MAY ONLY ASK FOR ITS OWN WORKERS';
       case 'healing_closed':   return 'THAT HEALING REQUEST IS ALREADY ANSWERED';
@@ -442,9 +442,9 @@
       case 'empty_announcement': return 'WRITE A HEADLINE OR A MESSAGE FIRST';
       // AGR interventions
       case 'agr_only':               return 'ONLY AGRICULTURE CAN PLAY AN INTERVENTION';
-      case 'agr_offer_not_ready':    return 'INTERVENTION CARDS HAVE NOT BEEN DEALT FOR THIS CYCLE';
-      case 'agr_card_not_in_offer':  return 'THAT CARD IS NOT IN THIS CYCLE\'S HAND';
-      case 'agr_card_already_used':  return 'INTERVENTION ALREADY USED THIS CYCLE — NEW CARDS NEXT CYCLE';
+      case 'agr_offer_not_ready':    return 'INTERVENTION CARDS HAVE NOT BEEN DEALT FOR THIS ROUND';
+      case 'agr_card_not_in_offer':  return 'THAT CARD IS NOT IN THIS ROUND\'S HAND';
+      case 'agr_card_already_used':  return 'INTERVENTION ALREADY USED THIS ROUND — NEW CARDS NEXT ROUND';
       case 'agr_target_required':    return 'CHOOSE A VALID TARGET BEFORE ACTIVATING';
       case 'agr_invalid_target':     return 'THAT TARGET IS NOT VALID FOR THIS INTERVENTION';
       case 'agr_injured_worker_blocked': return 'INJURED WORKERS MUST BE HEALED BY MEDICAL BAY';
@@ -466,11 +466,11 @@
       return;
     }
     if (msg.ok && msg.type === 'agr_result') {
-      if (msg.action === 'activate') { agrPick = null; transientMsg(target, 'INTERVENTION ACTIVATED — LOCKED UNTIL NEXT CYCLE', 'ok', 8000); }
+      if (msg.action === 'activate') { agrPick = null; transientMsg(target, 'INTERVENTION ACTIVATED — LOCKED UNTIL NEXT ROUND', 'ok', 8000); }
       return;
     }
     if (msg.ok && msg.type === 'broadcast_result') {
-      const word = msg.action === 'row' ? `ROW SAVED — LAST UPDATED: CYCLE ${state ? state.broadcast.round_number : ''}`
+      const word = msg.action === 'row' ? `ROW SAVED — LAST UPDATED: ROUND ${state ? state.broadcast.round_number : ''}`
         : msg.action === 'announce' ? 'ANNOUNCEMENT PUBLISHED' : 'ANNOUNCEMENT CLEARED';
       if (msg.action === 'announce') { $('bc-head').value = ''; $('bc-msg').value = ''; }
       transientMsg(target, word, 'ok', 5000);
@@ -526,7 +526,7 @@
   function queueRefusal(msg) {
     switch (msg.reason) {
       case 'chit_required':            return 'CHIT REQUIRED BEFORE APPROVAL';
-      case 'capacity':                 return 'APPROVAL CAPACITY REACHED — NEW APPROVALS AVAILABLE NEXT CYCLE';
+      case 'capacity':                 return 'APPROVAL CAPACITY REACHED — NEW APPROVALS AVAILABLE NEXT ROUND';
       case 'insufficient_stock_stamp': return 'SUPPLIER SHORT OF STOCK — NOTHING MOVED';
       case 'expired': case 'transfer_closed': case 'already_stamped': case 'unknown_transfer':
         return 'REQUEST NO LONGER AVAILABLE';
@@ -593,17 +593,8 @@
     if (bar.className !== cls) bar.className = cls;
     bar.firstElementChild.style.width = `${Math.max(0, Math.min(100, value))}%`;
 
-    // The round as one number, the cycle as a countdown, the shift as a clock.
-    // Nothing on this screen names a round or a phase.
+    // The round as one number and its clock. Nothing on this screen names a phase.
     setText($('hdr-round'), state.round_number === undefined ? '—' : `Round ${state.round_number}`);
-    setText($('hdr-phase'), U.mmss(cycleRemaining()));
-  }
-
-  /** Seconds to the next operating cycle — production, upkeep, allowances. */
-  function cycleRemaining() {
-    const c = state && state.cycle;
-    if (!c) return 0;
-    return U.countdown({ running: c.running, remaining_s: c.remaining_s }, !!(state && state.frozen));
   }
 
   function renderModes() {
@@ -696,12 +687,12 @@
     status.dataset.status = word;
   }
 
-  // -- CYCLE OUTPUT: a producing table generates its own stock, once a cycle --
+  // -- ROUND OUTPUT: a producing table generates its own stock, once a round --
 
   const OUTPUT_WORD = {
-    already_generated: 'OUTPUT ALREADY GENERATED THIS CYCLE',
+    already_generated: 'OUTPUT ALREADY GENERATED THIS ROUND',
     sector_dark: 'SECTOR DARK — NO OUTPUT',
-    no_output_now: 'NO OUTPUT AVAILABLE THIS CYCLE',
+    no_output_now: 'NO OUTPUT AVAILABLE THIS ROUND',
     no_output: 'THIS SECTOR HAS NO OUTPUT',
     frozen: 'CLOCKS FROZEN',
     output_automatic: 'OUTPUT IS AUTOMATIC IN THIS SCENARIO',
@@ -723,15 +714,15 @@
     if (!ro) return;
     const resKey = Object.keys(ro.base)[0];
     const resName = (RES[resKey] || { name: resKey }).name;
-    setText($('output-round'), `CYCLE ${state.period_number || ''}`);
+    setText($('output-round'), `ROUND ${state.period_number || ''}`);
     setText($('output-amount'), ro.used ? fmtAdded(ro.added) : (fmtAdded(ro.amount) || `+0 ${resName}`));
     $('output-amount').classList.toggle('reduced', !ro.used && ro.reduced);
     const note = [];
-    if (!ro.manual) note.push('GENERATED AUTOMATICALLY ON THE OPERATING CYCLE');
+    if (!ro.manual) note.push('GENERATED AUTOMATICALLY AT THE NEXT ROUND');
     else if (!ro.used && ro.reduced) {
       if (mine.brownout) note.push('BROWNOUT — OUTPUT HALVED');
       if (resKey === 'power' && ro.core_output < 100) note.push(`CORE AT ${ro.core_output}% — OUTPUT SCALED`);
-      if (!Object.values(ro.amount).some((v) => v > 0)) note.push('NO OUTPUT THIS CYCLE');
+      if (!Object.values(ro.amount).some((v) => v > 0)) note.push('NO OUTPUT THIS ROUND');
       if (!note.length) note.push(`ENTITLEMENT ${fmtAdded(ro.base)}`);
     }
     setText($('output-note'), note.join(' · '));
@@ -761,7 +752,7 @@
       .map(([k, v]) => `${v} ${resName(k)}`).join(' · ');
     setText($('rs-health'), String(r.health_after));
     setText($('rs-cost'), costText);
-    setText($('rs-crew'), `${r.workers_required} WORKER${r.workers_required === 1 ? '' : 'S'}, HELD UNTIL THE NEXT OPERATING CYCLE`);
+    setText($('rs-crew'), `${r.workers_required} WORKER${r.workers_required === 1 ? '' : 'S'}, HELD UNTIL THE NEXT ROUND`);
     setText($('rs-have'), Object.keys(r.cost)
       .map((k) => `${ourStock(k)} ${resName(k)}`).concat(`${r.workers_available} AVAILABLE`).join(' · '));
     const shortText = Object.entries(r.short).map(([k, v]) => `${v} MORE ${resName(k)}`).join(' · ');
@@ -779,7 +770,7 @@
     not_open_yet: 'UPGRADES OPEN ONCE LIVE PLAY BEGINS',
     sector_dark: 'SECTOR DARK — NO UPGRADE',
     upgrade_pending: 'UPGRADE ALREADY RUNNING',
-    used_this_round: 'UPGRADE ALREADY USED THIS CYCLE',
+    used_this_round: 'UPGRADE ALREADY USED THIS ROUND',
     at_maximum: 'GENERATOR AT MAXIMUM LEVEL',
     insufficient_parts: 'NOT ENOUGH PARTS',
     insufficient_crew: 'NOT ENOUGH AVAILABLE WORKERS',
@@ -803,7 +794,7 @@
     setText($('gen-cap'), `L${g.level} / ${g.max_level}`);
     setText($('gen-level'), `L${g.level}`);
     setText($('gen-name'), g.level_name || '');
-    setText($('gen-output'), `${g.output_now} / CYCLE`);
+    setText($('gen-output'), `${g.output_now} / ROUND`);
 
     const pending = g.pending;
     show($('gen-pending'), !!pending);
@@ -817,7 +808,7 @@
     const offer = !pending && g.next_level;
     show($('gen-next'), !!offer);
     if (offer) {
-      setText($('gen-next-level'), `L${g.next_level} ${g.next_level_name} — ${g.output_next} / CYCLE`);
+      setText($('gen-next-level'), `L${g.next_level} ${g.next_level_name} — ${g.output_next} / ROUND`);
       setText($('gen-cost'), `${plural(g.parts_required, 'PART')} · ${plural(g.workers_required, 'WORKER')}`);
       setText($('gen-have'), `${plural(g.parts_available, 'PART')} · ${plural(g.workers_available, 'WORKER')} AVAILABLE`);
       show($('gen-support-row'), !!g.support_from);
@@ -827,7 +818,7 @@
       }
       // the sentence the table must read before it commits
       const warn = g.can_start
-        ? `${plural(g.workers_after, 'WORKER')} WILL REMAIN. COMMITTED WORKERS CANNOT REPAIR FAULTS UNTIL THE NEXT OPERATING CYCLE.`
+        ? `${plural(g.workers_after, 'WORKER')} WILL REMAIN. COMMITTED WORKERS CANNOT REPAIR FAULTS UNTIL THE NEXT ROUND.`
         : '';
       setText($('gen-warn'), warn);
       show($('gen-warn'), !!warn);
@@ -957,7 +948,7 @@
 
   /**
    * FULFILMENT FIGURES. What is in the tray, what would leave it, what would
-   * be left, and what the next cycle asks for. Numbers only: whether to send
+   * be left, and what the next round asks for. Numbers only: whether to send
    * is the table's call and the screen does not have an opinion.
    */
   function rxFigures(c) {
@@ -1258,7 +1249,7 @@
           <span class="q-n">${i + 1}.</span>
           <span class="q-text">${esc(sectorLabel(h.sector))} · ${esc(h.worker_label)}${gone ? ' · NO LONGER INJURED' : ''}</span>
           <button type="button" class="q-stamp" data-heal="${esc(h.id)}"${blocked ? ' disabled' : ''}
-            title="${gone ? 'This worker is no longer injured' : full ? 'No heals left this cycle' : !q.can_heal ? 'Medical is dark' : 'Heal this worker'}">HEAL</button>
+            title="${gone ? 'This worker is no longer injured' : full ? 'No heals left this round' : !q.can_heal ? 'Medical is dark' : 'Heal this worker'}">HEAL</button>
           <button type="button" class="q-chit" data-hdecline="${esc(h.id)}">DECLINE</button>
         </div>`;
     }).join('') || `<div class="empty">Queue empty.</div>`;
@@ -1336,8 +1327,8 @@
     if (!editable) return;
 
     // The round the ROOM is in, which is the sector frame's own number and not
-    // the board's cycle stamp. The counter is the wall's rule verbatim: a
-    // sector counts as published once its row carries a cycle stamp.
+    // the board's round stamp. The counter is the wall's rule verbatim: a
+    // sector counts as published once its row carries a round stamp.
     setText($('bc-round'), state.round_number === undefined ? '—' : `R${state.round_number}`);
     const codes = boardOrder(b.rows);
     setText($('bc-reports'), `REPORTS ${codes.filter((c) => b.rows[c].round !== null).length}/${codes.length}`);
@@ -1385,7 +1376,7 @@
     if (a) {
       setText($('bc-ann-head'), a.headline);
       setText($('bc-ann-msg'), a.message);
-      setText($('bc-ann-meta'), `ON THE WALL · CYCLE ${a.round_number} · ${freshWord(a.freshness)}`);
+      setText($('bc-ann-meta'), `ON THE WALL · ROUND ${a.round_number} · ${freshWord(a.freshness)}`);
       $('bc-ann').dataset.fresh = a.freshness;
     }
     show($('bc-ann-none'), !a);
@@ -1426,9 +1417,9 @@
     }
   }
 
-  // -- AGR: the cycle's three interventions -------------------------------------
+  // -- AGR: the round's three interventions -------------------------------------
   //
-  // Three cards, dealt by the server once per operating cycle, to AGR alone.
+  // Three cards, dealt by the server once per round, to AGR alone.
   // This screen never rolls anything: a refresh shows the same three. One
   // SELECT opens a target choice where the card needs one, then CONFIRM.
 
@@ -1471,8 +1462,8 @@
     const a = state.agr_cards;
     show($('agr-panel'), !!a);
     if (!a) return;
-    setText($('agr-round'), `CYCLE ${a.round_number}`);
-    setText($('agr-cap'), a.used ? 'INTERVENTION USED — LOCKED UNTIL NEXT CYCLE' : '3 RANDOM CARDS · CHOOSE 1');
+    setText($('agr-round'), `ROUND ${a.round_number}`);
+    setText($('agr-cap'), a.used ? 'INTERVENTION USED — LOCKED UNTIL NEXT ROUND' : '3 RANDOM CARDS · CHOOSE 1');
     $('agr-cap').classList.toggle('warn', !!a.used);
     setText($('agr-instruction'), a.message);
     $('agr-panel').classList.toggle('used', !!a.used);
@@ -1492,7 +1483,7 @@
           ${needs}
           ${body}
         </div>`;
-    }).join('') || '<div class="empty">No cards dealt for this cycle yet.</div>';
+    }).join('') || '<div class="empty">No cards dealt for this round yet.</div>';
     if (host.dataset.sig !== html) {
       host.dataset.sig = html;
       host.innerHTML = html;
@@ -1807,7 +1798,7 @@
 
   function effectLabel(e) {
     switch (e.kind) {
-      case 'no_production': return 'NO CYCLE OUTPUT';
+      case 'no_production': return 'NO ROUND OUTPUT';
       case 'trn_capacity':  return 'TRANSPORT CAPACITY REDUCED';
       case 'com_blind':     return 'TELEMETRY OFFLINE';
       default:              return String(e.kind || 'EFFECT').toUpperCase().replace(/_/g, ' ');
@@ -1819,7 +1810,7 @@
     const host = $('effects');
     const html = list.map((e) =>
       `<div class="effect" data-id="${esc(e.id)}"><span>${effectLabel(e)}</span>` +
-      `<b class="clock ef-clock">${e.cycles_remaining !== undefined && e.remaining_s == null ? esc(`${e.cycles_remaining} CYCLE${e.cycles_remaining === 1 ? '' : 'S'}`) : ''}</b></div>`).join('');
+      `<b class="clock ef-clock">${e.cycles_remaining !== undefined && e.remaining_s == null ? esc(`${e.cycles_remaining} ROUND${e.cycles_remaining === 1 ? '' : 'S'}`) : ''}</b></div>`).join('');
     if (host.dataset.sig !== html) { host.dataset.sig = html; host.innerHTML = html; }
     show($('effects-panel'), list.length > 0);
   }
@@ -1827,7 +1818,7 @@
   /**
    * RESOURCE APPROVAL QUEUE — Transport only. The server sends this to nobody
    * else, so no other screen can render an APPROVE control. Transfers waiting
-   * on us, the approvals left this cycle, and the two gates before approval:
+   * on us, the approvals left this round, and the two gates before approval:
    * the paper chit in our hand, and the supplier still holding the goods.
    */
   /** "Waiting 27s" / "Waiting 1m 12s": elapsed, in words — never a clock. */
@@ -1863,20 +1854,20 @@
     const used = Math.max(0, Number(q.used) || 0);
     const full = used >= cap;
     const left = Math.max(0, (q.remaining !== undefined ? q.remaining : cap - used));
-    const period = String(q.basis || 'cycle').toUpperCase();
+    const period = String(q.basis || 'round').toUpperCase();
 
     // The allowance: dots you can count, then the words.
     const dots = Array.from({ length: cap }, (_, i) => (i < used ? '●' : '○')).join(' ');
     setText($('queue-dots'), dots);
     setText($('queue-cap'), `${used} OF ${cap} USED`);
-    setText($('queue-left'), full ? 'APPROVAL CAPACITY REACHED' : period === 'CYCLE' ? `${left} LEFT THIS CYCLE` : `${left} LEFT`);
+    setText($('queue-left'), full ? 'APPROVAL CAPACITY REACHED' : `${left} LEFT THIS ${period}`);
     $('queue-cap').classList.toggle('warn', full);
     $('queue-left').classList.toggle('warn', full);
     $('queue-dots').classList.toggle('warn', full);
     // The allowance again in the page's own header, so it is readable from
     // every view of TRANSFER CONTROL.
     setText($('rx-cap-used'), `${used} / ${cap} USED`);
-    setText($('rx-cap-left'), full ? 'CAPACITY REACHED' : period === 'CYCLE' ? `${left} LEFT THIS CYCLE` : `${left} LEFT`);
+    setText($('rx-cap-left'), full ? 'CAPACITY REACHED' : `${left} LEFT THIS ${period}`);
     $('rx-cap').classList.toggle('warn', full);
     show($('rx-cap'), true);
 
@@ -2027,7 +2018,7 @@
 
     // THE ROUND TIMER: the admin's clock for this round, read-only here. It is
     // measured from the server's end time, so a refresh changes nothing; at
-    // 00:00 it stops and shows it. Upkeep falls due on the operating cycle.
+    // 00:00 it stops and shows it. Upkeep falls due on the round.
     const rc = U.countdown(state.round_clock, frozen);
     const expired = !!state.round_clock && state.round_clock.status === 'expired';
     setText($('hdr-round-clock'), U.mmss(rc));

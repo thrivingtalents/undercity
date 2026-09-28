@@ -262,9 +262,9 @@ test('the card carries one stamp, and it is the round — freshness keeps only i
   const game = running('ROUND_1');
   game.setBroadcastRow('POW', { power: 1 }, { by: 'COM' });
   assert.deepEqual(B.freshnessShort(rows(game).POW), { level: 'CURRENT', text: '' });
-  game.cycleControl('process');
+  game.setPhase('ROUND_2');
   assert.deepEqual(B.freshnessShort(rows(game).POW), { level: 'STALE', text: 'STALE' });
-  game.cycleControl('process');
+  game.setPhase('ROUND_3');
   assert.deepEqual(B.freshnessShort(rows(game).POW), { level: 'OUTDATED', text: 'OUTDATED' });
   assert.deepEqual(B.freshnessShort(rows(game).WTR), { level: 'NOT UPDATED', text: '' });
   // No cycle number anywhere on the card: R1 answers "when", the word answers

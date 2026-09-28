@@ -81,7 +81,7 @@ npm run demo                 # DEMO_FAST=1 for a quicker run; DEMO_URL / DEMO_TO
 ```
 
 It resets the run to the **HAVEN-9 DEMO** scenario
-(`config/scenarios/haven9-demo.json`: two-minute cycles, a 90-second council,
+(`config/scenarios/haven9-demo.json`: a 90-second council,
 short deadlines, six sectors that start at visibly different integrity and
 stock, and an R2 script that fires itself) and walks the thirteen beats of
 spec §50 — normal state, fault, countdown, wrong code, lockout, correct code
@@ -131,7 +131,7 @@ npm start                                            # http://localhost:3000/adm
    AFTERSHOCK → DEBRIEF_2 → FINISHED` (`lib/rounds.json`). Each phase maps to a
    round and a mode; every change is timestamped. Admin: START / PAUSE /
    RESUME / END PHASE / NEXT PHASE. PAUSE freezes every timer (master clock,
-   fault countdowns, council, core cycle, temporary effects) and the wall and
+   fault countdowns, council, temporary effects) and the wall and
    sectors say SIMULATION PAUSED. RESUME continues from the exact remaining
    times. RESET requires confirmation.
 2. **Faults.** Admin fires one from the picker (one click), a preset ("ROUND 2
@@ -176,8 +176,8 @@ npm start                                            # http://localhost:3000/adm
    round ends the server runs one economy pass for it: upkeep → shortage
    penalties → worker recovery (MED spends med supplies) → brownout effects →
    city stability. Admin sees a per-sector summary and can force a pass
-   (PROCESS UPKEEP NOW); the old 7-minute cycle timer is off by default
-   (`cycle_autostart`). Every sector screen shows NEXT ROUND UPKEEP with
+   (PROCESS UPKEEP NOW). There is no cycle timer: the round is the period
+   (2026-09-28). Every sector screen shows NEXT ROUND UPKEEP with
    READY / SHORTFALL from real stock, its own role as the main panel, and
    nothing city-wide but a nudge to the wall.
 4. **Transfers.** The Transfer Chit stays physical, the negotiation stays face
@@ -193,13 +193,13 @@ npm start                                            # http://localhost:3000/adm
    stock move, in full or not at all, re-checking the supplier's shelf first.
    **Only Transport approves**, at both the router and the reducer; no other
    screen is even sent the queue. Transport gets **three approvals per round**:
-   a cycle boundary hands nothing back, a round change restores all three and
+   an economy pass hands nothing back, a round change restores all three and
    voids everything unfinished. A refusal costs nothing.
 5. **Healing.** A separate chain that Transport has no part in. Any sector with
    an injured worker presses **REQUEST MED HEALING**; the target is always
    Medical Bay and there is no sector to choose. **Only Medical heals**, from
    its own queue, and it gets **three heals per round** on the same terms: a
-   cycle changes nothing, a round change resets it, a refusal costs nothing,
+   pass changes nothing, a round change resets it, a refusal costs nothing,
    and a worker healed by someone else in the meantime is re-checked and
    refused. Every gate on both chains is a setting, and the facilitator can
    force an approval or a heal, reset either counter and expire the queues;
@@ -213,7 +213,7 @@ npm start                                            # http://localhost:3000/adm
    information is the exercise. Editing it never touches real inventory.
    **AGR** is dealt **three random, unique intervention cards** at the start
    of every round from `lib/agr-cards.json`, server-side and kept in state, so
-   a refresh, a reconnect or a cycle boundary shows the same three; last
+   a refresh, a reconnect or an economy pass shows the same three; last
    round's cards sit the next draw out while the pool allows. AGR activates
    **one**: the effect is validated against the live world and the round's
    choice is spent only when it lands. Cards can widen Transport's or
@@ -249,7 +249,7 @@ Anything involving balance lives in a **scenario**
 (`config/scenarios/haven9-standard.json`) and is editable live from Admin →
 SETTINGS: the status thresholds (`critical_below`, `degraded_below`,
 `dark_at`), lockout, council clock, core output at start, the length of every
-round, cycle length, production and upkeep per sector, deadline defaults and
+round, production and upkeep per sector, deadline defaults and
 penalties by severity, per-fault overrides (a deadline, an expiry penalty and
 extra accepted codes for one fault), brownout effects (with per-sector
 specials: COM loses telemetry, TRN capacity drops, POW production collapses),
@@ -265,7 +265,7 @@ The transfer and healing rules are these keys, all in the same place:
 |---|---|---|
 | `trn_approval_limit` | `3` | Transfers Transport may approve per round |
 | `med_healing_limit` | `3` | Workers Medical may heal per round |
-| `transfer_limit_basis` | `round` | Whether Transport's allowance is counted per round or per cycle |
+| `transfer_limit_basis` | `round` | Legacy switch; both values now count Transport's allowance per round (an economy pass is one a round) |
 | `require_supplier_acceptance` | `true` | Transport sees only what a supplier fulfilled |
 | `enforce_supplier_stock` | `true` | Stock is checked on fulfil and again at approval |
 | `insufficient_stock_behavior` | `refuse` | `legacy_partial_if_supported` restores the old part-delivery |
@@ -287,9 +287,8 @@ The transfer and healing rules are these keys, all in the same place:
 | `reward_health_cap` | `100` | Ceiling for reward health points |
 | `fault_reward_overrides` | `{}` | Per-fault overrides of the reward table, e.g. `{ "F-002": { "resources": { "power": 3 }, "rvu": 3 } }` |
 
-`trn_capacity_per_cycle` is still read when the basis is `cycle`. Who may
-approve and who may heal are **not** configurable: Transport and Medical
-respectively, enforced in the intent router and again in the reducer.
+Who may approve and who may heal are **not** configurable: Transport and
+Medical respectively, enforced in the intent router and again in the reducer.
 
 **SAVE AS SCENARIO** stores the running configuration in SQLite under a name
 (`HAVEN-9 HARD`, `HAVEN-9 CLIENT TEST`…); a saved copy with a built-in's id
@@ -323,7 +322,7 @@ content/*.json           faults · specs · sectors — generated from the matri
 lib/
   config.js              ScenarioLibrary: built-ins + saved copies, deep merge, resolve for play
   state.js               authoritative state and every reducer; economy + crisis mixed in
-  economy.js             pure functions: city stability formula, production/upkeep, PROCESS CYCLE
+  economy.js             pure functions: city stability formula, production/upkeep, the economy pass
   crisis.js              council, Continuity Order, rolling blackout, events, scheduled queue, timeline
   resolve.js             submit_code, in the contract's exact order (deduction is a switch)
   visibility.js          per-role filtering — THE SECURITY BOUNDARY
@@ -399,13 +398,13 @@ Migrations are additive and run at boot (`lib/db.js` → `migrate`).
   `visibility`, and any of `integrity_changes {SECTOR|TARGET: delta}`,
   `resource_changes {…}` (per target), `resource_changes_all {…}`,
   `worker_changes { injure, sectors? }`, `core_delta`, `intel_changes {key: value}`,
-  `effects [{ kind: trn_capacity|com_blind|no_production, value|delta, duration_s|cycles }]`,
+  `effects [{ kind: trn_capacity|com_blind|no_production, value|delta, duration_s|rounds }]`,
   `alert { title subtitle big }`, `announce` (`{target}` is substituted),
   `followups [{ event_id, delay_s }]`. It appears on the PRESSURE tab at once.
 - **A fault preset**: `fault_presets[]` → `{ id, name, items: [{ fault_code, sector, delay_s }] }`.
 - **A round timeline**: `timelines.R2[]` → `{ offset_s, kind, mode }` where kind
   is `fault` (`fault_code`, `sector`), `event` (`event_id`), `council`,
-  `core` (`value`), `announce` (`text`), `alert` (`text`) or `cycle`, and mode
+  `core` (`value`), `announce` (`text`), `alert` (`text`) or `cycle` (an economy pass), and mode
   is `AUTO` (fires itself) or `MANUAL` (turns into READY TO FIRE — the
   facilitator hands the card and presses it). Skip or delay anything; the
   script never forces the room.
@@ -498,7 +497,7 @@ One JSON object per line, appended on every state change, rotated on
 facilitator fires the klaxon; the audio spike aligns every recording to this
 log. Logged: phases and clocks, faults fired/opened/resolved/expired/cleared,
 every console submission accepted *and* rejected, lockouts, inventory
-declarations, cycles and missed upkeep, injuries and recoveries, every
+declarations, economy passes and missed upkeep, injuries and recoveries, every
 transfer step, council calls/orders/no-order, blackouts, events and effects,
 alerts, announcements, configuration changes, observation tags, connects and
 disconnects. `lib/analytics.js` reads nothing else.

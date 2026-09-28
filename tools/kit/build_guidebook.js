@@ -219,7 +219,7 @@ C.push(tbl([
 C.push(H2("3.3 Pacing a shift that never stops"));
 C.push(p(t("There are no breathers and no round breaks to hide behind. The only instrument you have for easing pressure is what you inject, and how much of it: a wave where nothing new fires is a recovery window, and from the floor it reads as the city settling rather than as a break the facilitator granted. Never announce one, never name it, and never stop a clock to make one.")));
 C.push(p([t("What continues during a quiet stretch: "), t("everything", { bold: true }),
-  t(". The round timer, open faults and their decay, repairs, transfers, healing, generator upgrades, COM’s board, Council consequences, and the operating cycle that charges upkeep. A team can use the stretch to catch up on all of it. That is the recovery — operational, earned, and visible in the log.")]));
+  t(". The round timer, open faults and their decay, repairs, transfers, healing, generator upgrades, COM’s board, Council consequences, and the upkeep the next round will charge. A team can use the stretch to catch up on all of it. That is the recovery — operational, earned, and visible in the log.")]));
 C.push(p([t("The internal phases in the console — Stable Operations, Interdependence, Escalation, Core Failure, Temporary Stabilisation, Aftershock, Final Crisis — are "), t("yours, not theirs", { bold: true }),
   t(". Pressing NEXT ROUND changes what you may fire next and stamps the log for analysis. It changes nothing else: no clock resets, no stock, health, worker, transfer or upgrade moves, and the wall says only the new number for three seconds. If you want the room to feel a change, fire something.")]));
 
@@ -287,9 +287,9 @@ C.push(tbl([
 
 C.push(H2("5.1 The Shift — starting it (00:00)"));
 C.push(callout("Every round has its own clock.", "Press NEXT ROUND to Round 1, then START. NEXT ROUND deals every fault of the round onto the tables at once and loads the round's clock at its full length, waiting; START runs the clock. The pair is pressed four times — Rounds 1, 2, 3 and 4 — and the day ends with END SIMULATION. A clock that reaches 00:00 stops on its own and moves nothing, and the city keeps bleeding until the next START, so do not dawdle between rounds. Pressing the round you are already in offers a restart: the clock reloads and that round's faults go back to active. STOP CLOCK and PAUSE are not part of the script."));
-C.push(p([t("What the room sees from now on: the round number and its clock counting down, their own health and stock, their faults, and the next operating cycle. What they never see: a phase name, a debrief screen, or a screen telling them to rest. "),
-  t("The operating cycle", { bold: true }),
-  t(" comes round every ten minutes and is when the city produces, pays its upkeep and hands back Transport’s approvals, Medical’s heals and Agriculture’s intervention cards. It is not a round: it interrupts nothing and it pauses nobody.")]));
+C.push(p([t("What the room sees from now on: the round number and its clock counting down, their own health and stock, and their faults. What they never see: a phase name, a debrief screen, or a screen telling them to rest. "),
+  t("The round is the period", { bold: true }),
+  t(": when you activate the next round the city pays the outgoing round’s upkeep — POW and WTR generate their output by button during the round, and it lands then — and Transport’s approvals, Medical’s heals and Agriculture’s intervention cards come back for the new round. Round 0 is orientation and is never charged.")]));
 
 C.push(H3("Wave 1 · Stable Operations · Round 1 (00:00 – 15:00)"));
 C.push(callout("This stretch should feel easy.", "It is the baseline measurement. If you make it hard, you have no calm-state reading and the whole delta collapses. Resist the urge to add pressure. Boring is correct.", "E8F5E8", "2E7D32"));
@@ -338,7 +338,7 @@ C.push(tbl([
 ], BW));
 
 C.push(H3("Wave 5 · Temporary Stabilisation · Round 3 (10:00 – 12:00)"));
-C.push(callout("This is not a break, and it must never be called one.", "Fire nothing new for two minutes — no button, this wave is inside Round 3. The clock runs, faults decay, repairs and transfers continue, the operating cycle charges upkeep. Tables use the stretch to catch up. If you announce anything at all, announce it in-world: \"Core output is holding.\"", "E8F5E8", "2E7D32"));
+C.push(callout("This is not a break, and it must never be called one.", "Fire nothing new for two minutes — no button, this wave is inside Round 3. The clock runs, faults decay, repairs and transfers continue, upkeep waits for the next round. Tables use the stretch to catch up. If you announce anything at all, announce it in-world: \"Core output is holding.\"", "E8F5E8", "2E7D32"));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
   beat("11:00", "No button — still Round 3. Fire nothing.", "What a team does with slack: clear the backlog, fix the tray, help a neighbour, or stop working. All three are findings."),
@@ -361,7 +361,7 @@ C.push(tbl([
   beat("06:00", "Last two minutes. Announce the time remaining once, plainly.", "What a table chooses to spend its last minutes on."),
   beat("08:00", "END SIMULATION. Every clock stops and the final city state stays exactly as they left it.", "Silence, then talk. Do not explain anything yet."),
 ], BW));
-C.push(callout("End it deliberately.", "END SIMULATION on the control panel stops the round timer, the operating cycle and every decay, and leaves the city as it stands. It clears nothing and scores nothing away, and no screen in the room turns into a debrief. The wall is your lunch exhibit — leave it up."));
+C.push(callout("End it deliberately.", "END SIMULATION on the control panel stops the round timer and every decay, and leaves the city as it stands. It clears nothing and scores nothing away, and no screen in the room turns into a debrief. The wall is your lunch exhibit — leave it up."));
 
 C.push(H2("5.2 Lunch (45 min)"));
 C.push(callout("During lunch.", "Transcribe the Council audio and one nominated sector. You need only three numbers per person for Debrief 1: talk time, interruptions, questions asked. The full report can follow next morning. Leave the final city state on the big screen throughout — people will stand in front of it, and that is the debrief starting by itself.", "E8E8F5", NAVY));

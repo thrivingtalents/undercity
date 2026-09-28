@@ -33,6 +33,13 @@ function running() {
   return game;
 }
 
+/** Move the city into the next round the plain way: the period turns over, nothing is dealt or charged. */
+function nextRound(game) {
+  const ids = rounds.rounds.map((r) => r.id);
+  const i = ids.indexOf(game.state.round);
+  game.setRound(ids[Math.min(ids.length - 1, i + 1)]);
+}
+
 // -- phases -------------------------------------------------------------------
 
 test('the phases ARE the rounds: ROUND_0 → ROUND_4, and then the end', () => {
@@ -82,18 +89,16 @@ test('CT-001/CT-002/CT-004: an internal phase change interrupts nothing and rese
   assert.equal(pow.faults.filter((f) => !f.resolved).length, before.faults, 'the fault stays open');
 });
 
-test('START runs the round timer and the operating cycle together; frozen states stop both', () => {
+test('START runs the round timer; frozen states stop it', () => {
   const game = newGame();
   game.setPhase('ROUND_1');
   game.clock('start');
   assert.equal(game.state.mode, 'PLAY');
-  assert.equal(game.state.cycle.running, true, 'the operating cycle runs with the round timer');
   assert.equal(game.state.round_clock.started, true);
   assert.equal(game.state.round_clock.remaining_s, 900, 'Round 1 runs on its own 15:00');
-  const before = { round: game.state.round_clock.remaining_s, cycle: game.state.cycle.remaining_s };
+  const before = { round: game.state.round_clock.remaining_s };
   game.tick(5000);
   assert.equal(game.state.round_clock.remaining_s, before.round - 5);
-  assert.equal(game.state.cycle.remaining_s, before.cycle - 5, 'the operating cycle counts down with it');
 
   game.pause();
   game.tick(60000);
@@ -374,23 +379,21 @@ test('the upkeep pass: generated output, upkeep, shortage penalty, recovery, sum
   assert.equal(summary.sectors.WTR.recovered, 1);
   assert.equal(game.state.sectors.MED.inventory.med, 3 - 1, 'MED made nothing and spent 1');
   assert.equal(game.state.cycle.number, 2);
-  assert.equal(game.state.cycle.remaining_s, game.cfg.cycle_length_s);
   const ev = logEvents(game, 'cycle_processed');
   assert.equal(ev.length, 1);
   assert.equal(ev[0].summary.cycle, 1);
 });
 
-test('CT-005/CT-006: the operating cycle runs with the round timer and the emergency pause freezes it', () => {
+test('CT-005/CT-006: no clock charges upkeep — a paused city charges nothing, and activating the next round charges the outgoing one', () => {
   const game = running();
-  assert.equal(game.state.cycle.running, true, 'the cycle runs as soon as live play starts');
-  game.state.cycle.remaining_s = 2;
   game.pause();
-  game.tick(5000);
-  assert.equal(game.state.cycle.number, 1, 'a paused city charges no upkeep');
-  assert.equal(game.state.cycle.remaining_s, 2, 'the cycle clock is frozen where it stood');
+  game.tick(600000);
+  assert.equal(game.state.cycle.number, 1, 'a paused city charged upkeep');
   game.resume();
-  game.tick(3000);
-  assert.equal(game.state.cycle.number, 2, 'and continues from the exact frozen state');
+  game.tick(600000);
+  assert.equal(game.state.cycle.number, 1, 'a clock charged upkeep');
+  assert.equal(game.activateRound('R3').charged, 'R2');
+  assert.equal(game.state.cycle.number, 2, 'the next round did not charge the outgoing one');
 });
 
 test('with auto_economy off the cycle is logged but moves nothing (contract §3.5)', () => {
@@ -646,7 +649,7 @@ test('Transport approves only three transfers in a round by default', () => {
   assert.equal(game.stampsUsed(), 3, 'the refusal cost nothing');
 });
 
-test('an operating cycle restores Transport approvals; an internal phase change does not', () => {
+test('a new round restores Transport approvals; the economy pass alone does not', () => {
   const game = running();
   game.setInventory('POW', { power: 10 });
   for (let i = 0; i < 3; i += 1) {
@@ -654,16 +657,14 @@ test('an operating cycle restores Transport approvals; an internal phase change 
   }
   assert.equal(game.stampsUsed(), 3);
 
-  game.setPhase('ROUND_3');
-  assert.equal(game.stampsUsed(), 3, 'a phase change is not a refresh');
+  game.cycleControl('process');
+  assert.equal(game.stampsUsed(), 3, 'the economy pass is not a refresh');
   assert.equal(forSector(game, 'TRN').transfer_queue.remaining, 0);
 
-  const cycle = game.state.cycle.number;
-  game.cycleControl('process');
-  assert.equal(game.state.cycle.number, cycle + 1, 'the cycle really turned over');
-  assert.equal(game.stampsUsed(), 0, 'the operating cycle hands the approvals back');
+  game.setPhase('ROUND_3');
+  assert.equal(game.stampsUsed(), 0, 'the new round hands the approvals back');
   assert.equal(forSector(game, 'TRN').transfer_queue.remaining, 3);
-  assert.ok(logEvents(game, 'trn_approval_counter_reset').some((e) => e.by === 'operating_cycle'));
+  assert.ok(logEvents(game, 'trn_approval_counter_reset').some((e) => e.by === 'round'));
 });
 
 test('Transport can decline a transfer, and that costs no allowance', () => {
@@ -905,24 +906,24 @@ test('Medical heals only three a round by default', () => {
   assert.equal(forSector(game, 'MED').healing_queue.remaining, 0);
 });
 
-test('an operating cycle restores healing capacity; an internal phase change does not', () => {
+test('a new round restores healing capacity; the economy pass alone does not', () => {
   const game = running();
   // Keep the cycle's own MED recovery out of it — this is about the counter.
-  game.patchConfig({ injured_recovery_per_cycle: 0 });
+  game.patchConfig({ injured_recovery_per_round: 0 });
   for (const code of ['POW', 'WTR']) {
     game.injure(code, 1);
     game.healWorker(game.requestHealing(code, { by: code }).healing.id, { by: 'MED' });
   }
   assert.equal(game.medHealsUsed(), 2);
 
-  game.setPhase('ROUND_3');
-  assert.equal(game.medHealsUsed(), 2, 'a phase change is not a refresh');
+  game.cycleControl('process');
+  assert.equal(game.medHealsUsed(), 2, 'the economy pass is not a refresh');
   assert.equal(forSector(game, 'MED').healing_queue.remaining, 1);
 
-  game.cycleControl('process');
+  game.setPhase('ROUND_3');
   assert.equal(game.medHealsUsed(), 0);
   assert.equal(forSector(game, 'MED').healing_queue.remaining, 3);
-  assert.ok(logEvents(game, 'med_healing_counter_reset').some((e) => e.by === 'operating_cycle'));
+  assert.ok(logEvents(game, 'med_healing_counter_reset').some((e) => e.by === 'round'));
 });
 
 test('Medical can decline a healing request, and that costs no capacity', () => {
@@ -1081,20 +1082,20 @@ test('changing COM displayed stock never changes real inventory', () => {
   assert.deepEqual(game.state.sectors.POW.inventory, { ...game.state.sectors.POW.inventory, power: 2 });
 });
 
-test('a COM save stamps the current operating cycle, and players see a cycle, not a clock', () => {
+test('a COM save stamps the current round, and players see a round, not a clock', () => {
   const game = running();
-  game.cycleControl('process');
+  game.setPhase('ROUND_3');
   const r = game.setBroadcastRow('POW', { power: 2 }, { by: 'COM' });
-  assert.equal(r.row.round, 'C2');
+  assert.equal(r.row.round, 'R3');
   assert.equal(r.freshness, 'CURRENT');
   const row = forBigscreen(game).broadcast.rows.POW;
   assert.equal(forSector(game, 'WTR').broadcast.rows, undefined, 'a table is not sent the board');
-  assert.equal(row.round_number, 2);
+  assert.equal(row.round_number, 3);
   assert.equal(row.freshness, 'CURRENT');
   // The player-facing projection carries no timestamp field of any kind.
   for (const key of Object.keys(row)) assert.ok(!/(_at|time|stamp)/i.test(key), `player row leaks ${key}`);
   const a = game.setBroadcastAnnouncement({ headline: 'HOLD POWER', message: 'MED needs 2 power' }, { by: 'COM' });
-  assert.equal(a.announcement.round, 'C2');
+  assert.equal(a.announcement.round, 'R3');
   for (const key of Object.keys(forBigscreen(game).broadcast.announcement)) assert.ok(!/(_at|time|stamp)/i.test(key), `announcement leaks ${key}`);
   // The audit trail keeps the backend timestamp.
   assert.ok(logEvents(game, 'com_row_updated')[0].t);
@@ -1121,20 +1122,20 @@ test('displayed values do not auto-sync after production, a transfer, or an AGR 
   assert.equal(forBigscreen(game).broadcast.rows.POW.power, 5);
 });
 
-test('a row from last cycle is STALE, two cycles old is OUTDATED, never set is NOT UPDATED', () => {
+test('a row from last round is STALE, two rounds old is OUTDATED, never set is NOT UPDATED', () => {
   const game = running();
   game.setBroadcastRow('POW', { power: 5 }, { by: 'COM' });
   assert.equal(forBigscreen(game).broadcast.rows.POW.freshness, 'CURRENT');
   assert.equal(forBigscreen(game).broadcast.rows.WTR.freshness, 'NOT UPDATED');
+  game.cycleControl('process');
+  assert.equal(forBigscreen(game).broadcast.rows.POW.freshness, 'CURRENT', 'the economy pass aged the board');
   game.setPhase('ROUND_3');
-  assert.equal(forBigscreen(game).broadcast.rows.POW.freshness, 'CURRENT', 'a phase change aged the board');
-  game.cycleControl('process');
   assert.equal(forBigscreen(game).broadcast.rows.POW.freshness, 'STALE');
-  assert.equal(forBigscreen(game).broadcast.rows.POW.power, 5, 'values survive the cycle unchanged');
-  game.cycleControl('process');
+  assert.equal(forBigscreen(game).broadcast.rows.POW.power, 5, 'values survive the round unchanged');
+  game.setPhase('ROUND_4');
   assert.equal(forBigscreen(game).broadcast.rows.POW.freshness, 'OUTDATED');
-  assert.equal(forBigscreen(game).broadcast.rows.POW.round_number, 1);
-  assert.equal(forBigscreen(game).broadcast.round_number, 3);
+  assert.equal(forBigscreen(game).broadcast.rows.POW.round_number, 2);
+  assert.equal(forBigscreen(game).broadcast.round_number, 4);
 });
 
 test('COM publishes one priority announcement, replaces it, and clears it; nothing else moves', () => {
@@ -1160,60 +1161,59 @@ test('COM publishes one priority announcement, replaces it, and clears it; nothi
 
 // -- AGR: the random draw ----------------------------------------------------------------
 
-test('exactly three unique cards are dealt for the cycle, from the enabled pool only', () => {
+test('exactly three unique cards are dealt for the round, from the enabled pool only', () => {
   const game = running();
   const agr = game.state.agr;
-  assert.equal(agr.round, 'C1');
+  assert.equal(agr.round, 'R2');
   assert.equal(agr.offered.length, 3);
   assert.equal(new Set(agr.offered).size, 3, 'duplicates dealt');
   const enabled = new Set(game.agrEnabledIds());
   for (const id of agr.offered) assert.ok(enabled.has(id), `${id} is not enabled`);
   assert.ok(!agr.offered.includes('AGR_WORKFORCE_RECOVERY'), 'the disabled card was dealt');
   assert.equal(forSector(game, 'AGR').agr_cards.offered.length, 3);
-  assert.ok(logEvents(game, 'agr_random_offer_generated').some((e) => e.round === 'C1'));
+  assert.ok(logEvents(game, 'agr_random_offer_generated').some((e) => e.round === 'R2'));
 });
 
-test('a refresh, a reconnect, a reopened screen and an internal phase change all show the same hand', () => {
+test('a refresh, a reconnect and a reopened screen all show the same hand', () => {
   const game = running();
   const hand = [...game.state.agr.offered];
   // A "refresh"/"reconnect"/"reopen" is a new projection of the same state.
   for (let i = 0; i < 5; i += 1) assert.deepEqual(forSector(game, 'AGR').agr_cards.offered.map((c) => c.id), hand);
-  game.setPhase('ROUND_3');
-  assert.deepEqual(game.state.agr.offered, hand, 'a phase change redealt');
   // A restart from snapshot keeps the hand too.
   const again = newGame({ runId: 'agr-restore' });
   again.restore(JSON.parse(JSON.stringify(game.serialise())));
   assert.deepEqual(again.state.agr.offered, hand, 'a restore redealt');
-  assert.equal(logEvents(game, 'agr_random_offer_generated').length, 1, 'only the reset dealt');
+  // Two hands were dealt on the way here — Round 0's at the reset, Round 2's with the round — and none since.
+  assert.equal(logEvents(game, 'agr_random_offer_generated').length, 2, 'a refresh, a reconnect or a restore dealt');
 });
 
-test('a new operating cycle deals a new hand, archives the old one, and last cycle\'s cards sit it out', () => {
+test('a new round deals a new hand, archives the old one, and last round\'s cards sit it out', () => {
   const game = running();
   const c1 = [...game.state.agr.offered];
-  game.cycleControl('process');
+  game.setPhase('ROUND_3');
   const c2 = [...game.state.agr.offered];
   assert.equal(c2.length, 3);
   assert.notDeepEqual(c2, c1);
   for (const id of c2) assert.ok(!c1.includes(id), `${id} repeated from the cycle before`);
   assert.deepEqual(game.state.agr.previous, c1);
-  assert.equal(game.state.agr.history[0].round, 'C1');
-  assert.ok(logEvents(game, 'agr_round_offer_archived').some((e) => e.round === 'C1'));
-  // Two cycles back is fair game again.
-  game.cycleControl('process');
+  assert.equal(game.state.agr.history[0].round, 'R2');
+  assert.ok(logEvents(game, 'agr_round_offer_archived').some((e) => e.round === 'R2'));
+  // Two rounds back is fair game again.
+  game.setPhase('ROUND_4');
   const c3 = game.state.agr.offered;
   for (const id of c3) assert.ok(!c2.includes(id), `${id} repeated from C2`);
 });
 
-test('the fallback fills from last cycle when fewer than three fresh cards remain', () => {
+test('the fallback fills from last round when fewer than three fresh cards remain', () => {
   const game = running();
   // Five enabled cards: three dealt this cycle leave two fresh for the next.
   const keep = ['AGR_POWER_SURGE', 'AGR_WATER_RESERVE', 'AGR_EMERGENCY_PARTS', 'AGR_CITY_RECOVERY', 'AGR_LOGISTICS_BOOST'];
   const all = game.agrPool().map((c) => c.id);
   game.patchConfig({ agr_disabled_cards: all.filter((id) => !keep.includes(id)) });
-  game.cycleControl('process');
+  game.setPhase('ROUND_3');
   const r3 = [...game.state.agr.offered];
   assert.equal(r3.length, 3);
-  game.cycleControl('process');
+  game.setPhase('ROUND_4');
   const r4 = game.state.agr.offered;
   assert.equal(r4.length, 3, 'still three');
   assert.equal(new Set(r4).size, 3, 'still unique');
@@ -1223,12 +1223,12 @@ test('the fallback fills from last cycle when fewer than three fresh cards remai
   for (const id of r4) assert.ok(keep.includes(id), 'a disabled card was dealt');
 });
 
-test('the same run and cycle deal the same hand; a different run deals differently', () => {
+test('the same run and round deal the same hand; a different run deals differently', () => {
   const a = newGame({ runId: 'seeded-run' }); a.setPhase('ROUND_2');
   const b = newGame({ runId: 'seeded-run' }); b.setPhase('ROUND_2');
   const c = newGame({ runId: 'another-run' }); c.setPhase('ROUND_2');
   assert.deepEqual(a.state.agr.offered, b.state.agr.offered);
-  const differs = [1, 2].some(() => { a.cycleControl('process'); c.cycleControl('process'); return JSON.stringify(a.state.agr.offered) !== JSON.stringify(c.state.agr.offered); })
+  const differs = ['ROUND_3', 'ROUND_4'].some((ph) => { a.setPhase(ph); c.setPhase(ph); return JSON.stringify(a.state.agr.offered) !== JSON.stringify(c.state.agr.offered); })
     || JSON.stringify(a.state.agr.offered) !== JSON.stringify(c.state.agr.offered);
   assert.ok(differs, 'two different runs dealt identical hands every cycle');
   assert.ok(logEvents(a, 'agr_random_offer_generated').every((e) => typeof e.seed === 'number'));
@@ -1273,18 +1273,17 @@ test('a card not in the hand cannot be played; a failed activation does not spen
   assert.equal(game.state.agr.used, true);
 });
 
-test('a new operating cycle clears the selection and deals again; a phase change does neither', () => {
+test('a new round clears the selection and deals again', () => {
   const game = running();
   const hand = [...game.state.agr.offered];
   game.state.agr.offered = ['AGR_POWER_SURGE', 'AGR_WATER_RESERVE', 'AGR_EMERGENCY_PARTS'];
   game.agrActivate('AGR_POWER_SURGE', { by: 'AGR' });
-  game.setPhase('ROUND_3');
-  assert.equal(game.state.agr.used, true, 'a phase change unlocked the choice');
+  assert.equal(game.state.agr.used, true);
   assert.equal(game.agrActivate('AGR_WATER_RESERVE', { by: 'AGR' }).reason, 'agr_card_already_used');
-  game.cycleControl('process');
+  game.setPhase('ROUND_3');
   assert.equal(game.state.agr.used, false);
   assert.equal(game.state.agr.selected, null);
-  assert.equal(game.state.agr.round, 'C2');
+  assert.equal(game.state.agr.round, 'R3');
   assert.notDeepEqual(game.state.agr.offered, hand);
   assert.equal(game.state.agr.offered.length, 3);
 });
@@ -1360,7 +1359,7 @@ test('POWER SURGE and WATER RESERVE add exactly +3 once, and production is uncha
   assert.equal(game.agrActivate('AGR_POWER_SURGE', { by: 'AGR' }).ok, true);
   assert.equal(game.state.sectors.POW.inventory.power, 6);
   assert.equal(JSON.stringify(economyFor(game, 'POW')), prodPow, 'POW production changed');
-  game.cycleControl('process');                          // the operating cycle: upkeep, then a new hand
+  nextRound(game);                                       // a new round: a new hand
   const water = game.state.sectors.WTR.inventory.water;
   deal(game, 'AGR_WATER_RESERVE');
   assert.equal(game.agrActivate('AGR_WATER_RESERVE', { by: 'AGR' }).ok, true);
@@ -1368,7 +1367,7 @@ test('POWER SURGE and WATER RESERVE add exactly +3 once, and production is uncha
   assert.equal(JSON.stringify(economyFor(game, 'WTR')), prodWtr, 'WTR production changed');
 });
 
-test('MEDICAL REINFORCEMENT: +1 heal this cycle only, and AGR still cannot heal', () => {
+test('MEDICAL REINFORCEMENT: +1 heal this round only, and AGR still cannot heal', () => {
   const game = running();
   assert.equal(game.medCapacity(), 3);
   deal(game, 'AGR_MEDICAL_REINFORCEMENT');
@@ -1379,12 +1378,12 @@ test('MEDICAL REINFORCEMENT: +1 heal this cycle only, and AGR still cannot heal'
   const h = game.requestHealing('POW', { by: 'POW' });
   assert.equal(game.healWorker(h.healing.id, { by: 'AGR' }).reason, 'heal_med_only');
   assert.equal(game.healWorker(h.healing.id, { by: 'MED' }).ok, true);
-  game.cycleControl('process');
-  assert.equal(game.medCapacity(), 3, 'the operating cycle did not end the bonus');
+  nextRound(game);
+  assert.equal(game.medCapacity(), 3, 'the round change did not end the bonus');
   assert.ok(logEvents(game, 'effect_ended').some((e) => e.kind === 'med_capacity'));
 });
 
-test('LOGISTICS BOOST: +1 approval this cycle only, and AGR still cannot approve', () => {
+test('LOGISTICS BOOST: +1 approval this round only, and AGR still cannot approve', () => {
   const game = running();
   assert.equal(game.trnCapacity(), 3);
   deal(game, 'AGR_LOGISTICS_BOOST');
@@ -1396,8 +1395,8 @@ test('LOGISTICS BOOST: +1 approval this cycle only, and AGR still cannot approve
   for (let i = 0; i < 4; i += 1) ids.push(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
   assert.equal(game.approveTransfer(ids[0], { by: 'AGR' }).reason, 'approval_trn_only');
   for (const id of ids) assert.equal(game.approveTransfer(id, { by: 'TRN' }).ok, true, 'the fourth approval failed');
-  game.cycleControl('process');
-  assert.equal(game.trnCapacity(), 3, 'the bonus outlived the operating cycle');
+  nextRound(game);
+  assert.equal(game.trnCapacity(), 3, 'the bonus outlived the round');
 });
 
 test('CRISIS RESPONSE: +20 to the lowest active sector; AGR chooses among ties; DARK is skipped', () => {
@@ -1409,8 +1408,8 @@ test('CRISIS RESPONSE: +20 to the lowest active sector; AGR chooses among ties; 
   assert.equal(game.agrActivate('AGR_CRISIS_RESPONSE', { by: 'AGR' }).ok, true);
   assert.equal(game.state.sectors.POW.integrity, 60);
   assert.equal(game.state.sectors.COM.integrity, 0, 'DARK is not the lowest');
-  // A tie needs AGR's pick.
-  game.cycleControl('process');
+  // A tie needs AGR's pick — in a new round, with a fresh hand.
+  nextRound(game);
   game.setIntegrity('POW', 30);
   game.setIntegrity('WTR', 30);
   deal(game, 'AGR_CRISIS_RESPONSE');
@@ -1441,7 +1440,7 @@ test('EMERGENCY PARTS: +3 parts to AGR only', () => {
   assert.equal(game.state.sectors.POW.inventory.parts, 3);
 });
 
-test('RELIEF CREW: one temporary worker for a chosen sector until the operating cycle turns', () => {
+test('RELIEF CREW: one temporary worker for a chosen sector until the round turns', () => {
   const game = running();
   const pow = game.state.sectors.POW;
   const base = game.availableWorkers(pow);
@@ -1450,8 +1449,8 @@ test('RELIEF CREW: one temporary worker for a chosen sector until the operating 
   assert.equal(game.availableWorkers(pow), base + 1);
   assert.equal(pow.workforce.active, 8, 'the base count is untouched');
   assert.equal(forSector(game, 'POW').sectors.POW.workforce.available, base + 1);
-  game.cycleControl('process');
-  assert.equal(game.availableWorkers(pow), base, 'the operating cycle did not end it');
+  nextRound(game);
+  assert.equal(game.availableWorkers(pow), base, 'the round change did not end it');
   assert.equal(pow.workforce.injured, 0, 'nothing to do with injury');
 });
 
@@ -1589,7 +1588,7 @@ test('POW, WTR, MED, TRN and AGR are not sent the six-sector board; COM and the 
   assert.equal(forControl(game).broadcast.editable, true, 'the facilitator keeps the override editor');
 });
 
-test('no sector screen is told the phase; it gets the round number, the round timer and the cycle', () => {
+test('no sector screen is told the phase; it gets the round number and the round timer', () => {
   const game = running();
   for (const code of BOARD_ROLES) {
     const f = forSector(game, code);
@@ -1597,13 +1596,12 @@ test('no sector screen is told the phase; it gets the round number, the round ti
     assert.equal(f.round_name, undefined);
     assert.equal(f.phase, undefined, `${code} was told the phase`);
     assert.equal(f.phase_name, undefined);
-    assert.equal(f.period_number, 1);
-    assert.ok(f.cycle && f.cycle.remaining_s > 0, 'the next operating cycle is on the screen');
-    assert.equal(f.broadcast.round_number, 1);
+    assert.equal(f.period_number, 2);
+    assert.equal(f.broadcast.round_number, 2);
   }
-  game.cycleControl('process');
-  assert.equal(forSector(game, 'AGR').broadcast.round_number, 2);
-  assert.ok(/id="hdr-phase"/.test(SECTOR_INDEX), 'the header prints the cycle countdown');
+  game.setPhase('ROUND_3');
+  assert.equal(forSector(game, 'AGR').broadcast.round_number, 3);
+  assert.ok(!/id="hdr-phase"/.test(SECTOR_INDEX), 'the header still counts down to a cycle');
 });
 
 test("a sector sees its own real stock and never another sector's", () => {
@@ -1680,16 +1678,16 @@ test("the sector markup has no city table, no legend, an announcement nudge, and
 const KIT_JS = fs.readFileSync(path.join(__dirname, '..', 'tools', 'kit', 'build_kit.js'), 'utf8');
 const BINDER_JS = fs.readFileSync(path.join(__dirname, '..', 'tools', 'kit', 'build_binders.js'), 'utf8');
 
-test('the sector screen: the round as a number, the cycle and ROUND TIME as clocks', () => {
+test('the sector screen: the round as a number and ROUND TIME as its clock; nothing counts down to a cycle', () => {
   // What the room reads: comments and element ids are not on the screen.
   const visible = SECTOR_INDEX.replace(/<!--[\s\S]*?-->/g, '').replace(/\s(?:id|class)="[^"]*"/g, '');
   assert.ok(/Current round/.test(visible), 'the header lost the round');
   // The number, never a name, and never the old per-round mechanics wording.
-  for (const bad of ['NEXT ROUND UPKEEP', 'THIS ROUND', 'ROUND OUTPUT', '/ ROUND']) {
+  for (const bad of ['NEXT CYCLE UPKEEP', 'THIS CYCLE', 'CYCLE OUTPUT', '/ CYCLE', 'OPERATING CYCLE']) {
     assert.ok(!SECTOR_SCRIPT.includes(bad), `sector.js still carries ${bad}`);
   }
-  for (const good of ['Next operating cycle', 'Round time', 'NEXT CYCLE UPKEEP', 'CYCLE OUTPUT', 'HEALING THIS CYCLE',
-    'TRANSFER APPROVALS', 'INTERVENTIONS THIS CYCLE', 'CITY BIG SCREEN CONTROL', 'OUTPUT ALREADY GENERATED THIS CYCLE']) {
+  for (const good of ['Round time', 'NEXT ROUND UPKEEP', 'ROUND OUTPUT', 'HEALING THIS ROUND',
+    'TRANSFER APPROVALS', 'INTERVENTIONS THIS ROUND', 'CITY BIG SCREEN CONTROL', 'OUTPUT ALREADY GENERATED THIS ROUND']) {
     assert.ok(SECTOR_INDEX.includes(good), `index.html lacks ${good}`);
   }
   for (const bad of ['BREATHER', 'DEBRIEF', 'REFLECTION', 'REST PERIOD']) {
@@ -1710,17 +1708,17 @@ test("the charter's history keeps its Cycles; the scenario phases keep their nam
   assert.equal(game.roundConfig('R2').name, 'Interdependence');
 });
 
-test('MED sees the round timer and the time to the next operating cycle, and no production line', () => {
+test('MED sees the round timer and no production line', () => {
   const game = running();
   const f = forSector(game, 'MED');
   assert.equal(f.round, undefined);
-  assert.equal(f.period_number, 1);
+  assert.equal(f.period_number, 2);
   assert.equal(f.master_clock.running, true);
   assert.equal(f.round_clock.running, true);
   assert.ok(f.round_clock.remaining_s > 0);
   assert.equal(f.sectors.MED.round_output, null, 'MED has no output panel');
   assert.deepEqual(f.sectors.MED.production_next, {});
-  assert.ok(/id="hdr-phase"/.test(SECTOR_INDEX) && /id="hdr-round-clock"/.test(SECTOR_INDEX));
+  assert.ok(!/id="hdr-phase"/.test(SECTOR_INDEX) && /id="hdr-round-clock"/.test(SECTOR_INDEX));
   assert.ok(!/production-next/.test(SECTOR_INDEX), 'the upkeep panel still has a production row');
 });
 
@@ -1765,10 +1763,10 @@ test('WTR: ROUND OUTPUT is +3 water, once a round; the next round opens it again
   assert.deepEqual(game.generateOutput('WTR', { by: 'WTR' }).added, { water: 3 });
   assert.equal(wtr.inventory.water, before + 3);
   assert.equal(game.generateOutput('WTR', { by: 'WTR' }).reason, 'already_generated');
+  game.cycleControl('process');                       // the economy pass reports it and re-opens nothing
+  assert.equal(forSector(game, 'WTR').sectors.WTR.round_output.used, true, 'the economy pass re-opened the output');
   game.setPhase('ROUND_3');
-  assert.equal(forSector(game, 'WTR').sectors.WTR.round_output.used, true, 'a phase change re-opened the output');
-  game.cycleControl('process');                       // upkeep is charged here too
-  assert.equal(forSector(game, 'WTR').sectors.WTR.round_output.used, false, 'a new cycle, a new output');
+  assert.equal(forSector(game, 'WTR').sectors.WTR.round_output.used, false, 'a new round, a new output');
   const afterUpkeep = wtr.inventory.water;
   assert.equal(game.generateOutput('WTR', { by: 'WTR' }).ok, true);
   assert.equal(wtr.inventory.water, afterUpkeep + 3);
@@ -1780,12 +1778,12 @@ test('a refresh, a reconnect and a restart never hand out a second output', () =
   for (let i = 0; i < 3; i += 1) assert.equal(forSector(game, 'POW').sectors.POW.round_output.used, true);
   const again = newGame({ runId: 'output-restore' });
   again.restore(JSON.parse(JSON.stringify(game.serialise())));
-  assert.equal(again.state.sectors.POW.round_output.round, 'C1');
+  assert.equal(again.state.sectors.POW.round_output.round, 'R2');
   assert.equal(again.generateOutput('POW', { by: 'POW' }).reason, 'already_generated');
   assert.equal(forSector(again, 'POW').sectors.POW.round_output.used, true);
 });
 
-test('NEXT CYCLE UPKEEP: the exact requirement and READY or SHORTFALL from the real tray', () => {
+test('NEXT ROUND UPKEEP: the exact requirement and READY or SHORTFALL from the real tray', () => {
   const game = running();
   let pow = forSector(game, 'POW').sectors.POW;
   assert.deepEqual(pow.upkeep_delivery, { power: 2, water: 1 });
@@ -1796,29 +1794,36 @@ test('NEXT CYCLE UPKEEP: the exact requirement and READY or SHORTFALL from the r
   pow = forSector(game, 'POW').sectors.POW;
   assert.equal(pow.upkeep_status, 'SHORTFALL');
   assert.deepEqual(pow.upkeep_short, { power: 1 });
-  assert.equal(pow.upkeep_due_in_s, Math.ceil(game.state.cycle.remaining_s), 'upkeep is due on the cycle clock');
-  assert.ok(/NEXT CYCLE UPKEEP/.test(SECTOR_INDEX) && !/NEXT ROUND UPKEEP/.test(SECTOR_INDEX));
+  assert.equal(pow.upkeep_due, 'NEXT_ROUND', 'upkeep is due at the next round');
+  assert.ok(/NEXT ROUND UPKEEP/.test(SECTOR_INDEX) && !/NEXT CYCLE UPKEEP/.test(SECTOR_INDEX));
 });
 
-test('upkeep is charged by the operating cycle alone, and never by a phase change', () => {
-  const game = running();                                 // live, clock started
+test('upkeep is charged when the next round is activated — once, for a round that was played — and never by a plain phase change', () => {
+  const game = running();                                 // Round 2, its clock started
   const pow = game.state.sectors.POW;
   const passes = game.state.cycle.number;
 
-  // A phase change charges nothing and moves no stock.
+  // A plain phase change charges nothing and moves no stock.
   game.setPhase('ROUND_3');
   assert.equal(game.state.cycle.number, passes, 'a phase change charged an upkeep pass');
   assert.deepEqual(pow.inventory, { power: 3, water: 3, parts: 3, med: 1 });
+  game.setPhase('ROUND_2'); game.clock('start');
 
-  // The cycle clock runs itself out, and that is what charges the city.
-  game.state.cycle.remaining_s = 3;
-  game.tick(10000);
-  assert.equal(game.state.cycle.number, passes + 1, 'the operating cycle did not fire on its own clock');
+  // Activating the next round charges the outgoing one.
+  const res = game.activateRound('R3');
+  assert.equal(res.charged, 'R2');
+  assert.equal(game.state.cycle.number, passes + 1, 'the activation did not charge the outgoing round');
   assert.deepEqual(pow.inventory, { power: 1, water: 2, parts: 3, med: 1 });
-  assert.equal(game.state.cycle.remaining_s, game.cfg.cycle_length_s, 'the next cycle is armed');
-  assert.equal(game.state.cycle.running, true, 'the cycle keeps running');
   const ev = logEvents(game, 'cycle_processed');
-  assert.equal(ev[ev.length - 1].summary.period, 'C1');
+  assert.equal(ev[ev.length - 1].summary.period, 'R2');
+  assert.equal(ev[ev.length - 1].round, 'R2');
+  // Round 3 was loaded READY and never started: moving on charges nothing.
+  assert.equal(game.activateRound('R4').charged, null);
+  assert.equal(game.state.cycle.number, passes + 1);
+  // Going back charges nothing either, and Round 0 is never charged.
+  assert.equal(game.activateRound('R2').charged, null);
+  const fresh = newGame(); fresh.clock('start'); fresh.tick(1000);
+  assert.equal(fresh.activateRound('R1').charged, null, 'orientation was charged');
 });
 
 test('the tables no longer render the City Feed or an Announcements panel; the wall still has the city', () => {
@@ -1939,7 +1944,7 @@ test('a failed approval — capacity, chit, short supplier — consumes nothing 
   assert.equal(game.approveTransfer(fourth.id, { by: 'TRN' }).reason, 'capacity');
   assert.equal(game.stampsUsed(), 3);
   assert.equal(game.state.sectors.MED.inventory.power, med, 'capacity refusal moved nothing');
-  game.cycleControl('process');                       // the allowance comes back on the cycle
+  game.setPhase('ROUND_3');                             // the allowance comes back with the round
   const short = readyTransfer(game, { from: 'WTR', to: 'AGR', resource: 'water', amount: 2 });
   game.setInventory('WTR', { water: 1 });
   const agrWater = game.state.sectors.AGR.inventory.water;
@@ -1957,7 +1962,7 @@ test('the queue markup: dots and words for capacity, cards with route / item / c
   assert.ok(/PENDING APPROVALS <span class="count" id="queue-count">/.test(html), 'no pending count');
   assert.ok(!/Only Transport approves resource movement/.test(html), 'the long footer is still there');
   assert.ok(/`\$\{used\} OF \$\{cap\} USED`/.test(js), 'capacity words');
-  assert.ok(/APPROVAL CAPACITY REACHED/.test(js) && /LEFT THIS CYCLE/.test(js));
+  assert.ok(/APPROVAL CAPACITY REACHED/.test(js) && /LEFT THIS \$\{period\}/.test(js));
   assert.ok(!/USED · \$\{left\} LEFT THIS \$\{period\}/.test(js), 'the dense capacity line remains');
   assert.ok(/class="q-route"/.test(js) && /class="q-item"/.test(js) && /class="q-chitword"/.test(js), 'a card lacks route, item or chit');
   assert.ok(/class="q-chit tertiary"/.test(js) && /class="q-no secondary"/.test(js) && /class="q-stamp primary"/.test(js), 'the action hierarchy is not marked');
@@ -2374,7 +2379,7 @@ test('NEEDS ATTENTION is derived from authoritative state, in priority order, ea
   const byKind = Object.fromEntries(att.map((a) => [a.kind, a]));
   assert.equal(byKind.dark.text, 'COM · DARK'); assert.deepEqual(byKind.dark.target, { view: 'overview', sector: 'COM' });
   assert.equal(byKind.critical.text, 'AGR · 27% HEALTH · CRITICAL'); assert.equal(byKind.critical.sector, 'AGR');
-  assert.equal(byKind.upkeep.text, 'WTR · NEXT CYCLE UPKEEP SHORTFALL · MISSING 1 POWER');
+  assert.equal(byKind.upkeep.text, 'WTR · NEXT ROUND UPKEEP SHORTFALL · MISSING 1 POWER');
   assert.equal(byKind.trn.text, 'TRN · 3/3 APPROVALS USED · 1 TRANSFER WAITING'); assert.deepEqual(byKind.trn.target, { view: 'systems', tab: 'transfers' });
   assert.ok(/^MED · 3\/3 HEALS USED · 1 INJURED WAITING$/.test(byKind.med.text)); assert.deepEqual(byKind.med.target, { view: 'systems', tab: 'workforce' });
   assert.deepEqual(byKind.com.target, { view: 'systems', tab: 'com' });
@@ -2475,7 +2480,7 @@ test('the console markup: four destinations, OVERVIEW first, one PAUSE, no city 
   assert.ok(!/quick-pause|data-quick="pause"/.test(html) && !/data-quick="pause"/.test(js), 'a second PAUSE remains');
   assert.ok(!/id="city-value"|>CITY<|CITY HEALTH/.test(html), 'a city figure is on the console');
   assert.ok(!/city-value|city_stability/.test(js.slice(0, js.indexOf('function renderCore'))), 'the overview reads the city score');
-  assert.ok(/id="phase-name"/.test(html) && /id="round-value"/.test(html) && /id="master-clock"/.test(html));
+  assert.ok(/id="phase-name"/.test(html) && /id="master-clock"/.test(html) && !/id="round-value"/.test(html), 'the cycle stat is still on the bar');
   assert.ok(/round_number/.test(js), 'the round number is not printed');
   assert.ok(/id="btn-end-phase"[^>]*>STOP CLOCK/.test(html) && /id="btn-next-phase"/.test(html));
   assert.ok(/action: 'end' \}/.test(js) && /type: 'activate_round'/.test(js), 'stop-clock and next-round are different intents');
@@ -2777,7 +2782,7 @@ test('health rewards use points, cap at 100 and never revive DARK; TRN and MED b
   assert.equal(game.medCapacity(), medCap + 1, 'MED did not gain a heal');
   assert.equal(game.findHealing(h.id).status, 'WAITING_FOR_MED', 'the reward healed somebody');
   assert.equal(game.state.sectors.POW.workforce.injured, 1);
-  game.cycleControl('process');
+  nextRound(game);
   assert.equal(game.trnCapacity(), cap); assert.equal(game.medCapacity(), medCap);
 });
 
@@ -2955,12 +2960,12 @@ test('stabilisation: 90 s halves another fault\'s decay, 60 s pauses it, both in
   assert.equal(game.state.sectors.POW.integrity, before, 'a paused fault still bled');
   game.tick(31000);
   assert.equal(game.decayMultiplier(target), 1, 'the pause outlived its 60 s');
-  // the operating cycle ends a running one; resolving the target ends it too
+  // the round change ends a running one; resolving the target ends it too
   repair(game, 'F-004', 'TRN');
   game.chooseRewardTarget('TRN', game.state.sectors.TRN.faults.find((f) => f.code === 'F-004').id, { fault: target.id }, { by: 'TRN' });
   assert.equal(game.decayMultiplier(target), 0.5);
-  game.cycleControl('process');
-  assert.equal(game.decayMultiplier(target), 1, 'the modifier outlived the operating cycle');
+  nextRound(game);
+  assert.equal(game.decayMultiplier(target), 1, 'the modifier outlived the round');
   assert.equal(target.resolved, false);
   game.fireFault('F-004', 'TRN');
   repair(game, 'F-004', 'TRN');
@@ -2989,7 +2994,7 @@ test('a choosing reward keeps its amount and only takes the target after success
   // Isolate the settle: the same cycle charges upkeep, and a shortfall there
   // would move the very health this assertion is about.
   game.patchConfig({ auto_economy: false });
-  game.cycleControl('process');
+  nextRound(game);
   assert.equal(logEvents(game, 'fault_reward_default_target')[0].target.sector, 'AGR');
   assert.equal(game.state.sectors.AGR.integrity, 45);
   assert.equal(game.state.sectors.WTR.integrity, Math.min(100, wtrBefore + 5), 'the owner half was paid too');
@@ -3343,7 +3348,7 @@ test('events apply their configured consequences and respect visibility', () => 
   const res = game.fireEvent('tunnel_collapse');
   assert.equal(res.ok, true);
   assert.equal(game.state.sectors.TRN.integrity, 85);
-  assert.equal(game.trnCapacity(), game.cfg.trn_capacity_per_cycle - 1);
+  assert.equal(game.trnCapacity(), game.cfg.trn_approval_limit - 1);
   assert.equal(game.state.alert.title, 'TUNNEL COLLAPSE');
   assert.ok(forBigscreen(game).feed.some((e) => e.text === 'TUNNEL COLLAPSE'), 'CITY_WIDE reaches the wall');
 
@@ -3579,10 +3584,10 @@ test('UPG-01 an upgrade spends its Parts now, holds its crew, and lands at the e
   assert.deepEqual(prodOf(game, 'POW'), { power: 3 }, 'this round produced at the new level');
   assert.equal(r.pending.to_level, 3);
 
-  game.setPhase('ROUND_2');
-  assert.equal(game.generatorFor('POW').level, 2, 'a phase change landed the upgrade');
   game.cycleControl('process');
-  assert.equal(game.generatorFor('POW').level, 3, 'the upgrade did not land on the operating cycle');
+  assert.equal(game.generatorFor('POW').level, 2, 'the economy pass landed the upgrade');
+  game.setPhase('ROUND_2');
+  assert.equal(game.generatorFor('POW').level, 3, 'the upgrade did not land with the new round');
   assert.equal(game.availableWorkers(pow), workersBefore, 'the crew never came back');
   assert.equal(game.committedWorkers(pow), 0);
   assert.deepEqual(prodOf(game, 'POW'), { power: 4 }, 'the next round does not produce more');
@@ -3674,7 +3679,7 @@ test('UPG-05 Level 5 needs the other sector to confirm support, and says which',
   // the authorisation is spent on that upgrade, not reusable
   assert.equal(game.generatorFor('POW').confirmation, null);
 
-  game.cycleControl('process');
+  nextRound(game);
   assert.equal(game.generatorFor('POW').level, 5);
   assert.deepEqual(prodOf(game, 'POW'), { power: 6 });
   // and there is nothing above it
@@ -3727,7 +3732,7 @@ test('a pending upgrade and its level survive a snapshot', () => {
   back.restore(snap);
   assert.equal(back.generatorFor('POW').pending.to_level, 3);
   assert.equal(back.committedWorkers(back.state.sectors.POW), 1, 'the held crew did not survive');
-  back.cycleControl('process');
+  nextRound(back);
   assert.equal(back.generatorFor('POW').level, 3, 'a restored upgrade never landed');
 });
 
@@ -3748,7 +3753,7 @@ test('the facilitator and the sector both see the generator, and the log carries
   assert.equal(started.parts_spent, 1);
   assert.equal(started.workers_committed, 1);
 
-  game.cycleControl('process');
+  nextRound(game);
   const done = logEvents(game).find((e) => e.ev === 'generator_upgrade_completed');
   assert.ok(done && done.to_level === 3, 'the completion was not logged');
 });
@@ -3790,10 +3795,10 @@ test('DARK-01 a sector at zero health is shut down, not eliminated: it can buy i
   });
   assert.notEqual(res.reason, 'sector_dark', 'a restarted sector still cannot repair');
 
-  // the crew comes back with everyone else's, on the next operating cycle
-  game.setPhase('ROUND_3');
-  assert.equal(game.committedWorkers(pow), 2, 'a phase change released the crew');
+  // the crew comes back with everyone else's, when the next round begins
   game.cycleControl('process');
+  assert.equal(game.committedWorkers(pow), 2, 'the economy pass released the crew');
+  nextRound(game);
   assert.equal(game.committedWorkers(pow), 0, 'the restart crew never came back');
 });
 
@@ -3836,9 +3841,9 @@ test('FAC-01 a granted TRN slot lasts the round it was granted in, and is logged
   assert.equal(ev.reason, 'two tables stuck behind TRN');
   assert.equal(ev.round, 'R2');
 
-  // it is for that operating cycle only
-  game.cycleControl('process');
-  assert.equal(game.trnCapacity(), 3, 'the granted slot outlived its cycle');
+  // it is for that round only
+  nextRound(game);
+  assert.equal(game.trnCapacity(), 3, 'the granted slot outlived its round');
 });
 
 test('fault injection can be held without freezing the game, and the facilitator still fires by hand', () => {
@@ -4064,10 +4069,10 @@ test('TRN-02 one approval a round beyond the limit, paid for in Transport\'s own
   assert.equal(game.useEmergencyMovement(f2.id, { by: 'TRN' }).reason, 'emergency_used_this_round');
   assert.equal(Math.round(game.state.sectors.TRN.integrity), 95, 'a refused valve still cost health');
 
-  // and it comes back on the next operating cycle
-  game.setPhase('ROUND_3');
-  assert.equal(game.trnEmergencyView().available, false, 'a phase change returned the valve');
+  // and it comes back with the next round
   game.cycleControl('process');
+  assert.equal(game.trnEmergencyView().available, false, 'the economy pass returned the valve');
+  nextRound(game);
   assert.equal(game.trnEmergencyView().available, true);
 });
 
@@ -4325,14 +4330,14 @@ test('the scenario library resolves built-ins, saves copies and shadows by id', 
   assert.ok(lib.list().some((s) => s.id === 'haven9-standard' && s.builtin));
 
   const std = lib.resolve('haven9-standard');
-  assert.equal(std.defaults.cycle_length_s, 600);
+  assert.equal(std.defaults.council_clock_s, 180);
   assert.deepEqual(std.sectors.POW.production, { power: 3 });
 
   const raw = lib.raw('haven9-standard');
-  raw.defaults.cycle_length_s = 300;
+  raw.defaults.council_clock_s = 240;
   const id = lib.save({ name: 'HAVEN-9 HARD', doc: raw });
   assert.equal(id, 'haven-9-hard');
-  assert.equal(lib.resolve('haven-9-hard').defaults.cycle_length_s, 300);
+  assert.equal(lib.resolve('haven-9-hard').defaults.council_clock_s, 240);
   assert.equal(lib.resolve('haven-9-hard').defaults.lockout_s, 20, 'untouched fields come through');
 
   lib.save({ id: 'haven9-standard', name: 'HAVEN-9 STANDARD', doc: { ...raw, defaults: { ...raw.defaults, council_clock_s: 240 } } });
@@ -4343,7 +4348,7 @@ test('the scenario library resolves built-ins, saves copies and shadows by id', 
   const game = newGame();
   game.reset('r2', { scenario: lib.resolve('haven-9-hard') });
   assert.equal(game.state.scenario_id, 'haven-9-hard');
-  assert.equal(game.cfg.cycle_length_s, 300);
+  assert.equal(game.cfg.council_clock_s, 240);
   store.close();
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -4356,8 +4361,8 @@ test('sector frames carry thresholds, low flags, cycle, effects; never another s
   const f = forSector(game, 'POW');
   const mine = f.sectors.POW;
   assert.deepEqual(mine.low, { power: true, water: false, parts: false, med: true }, 'zero is always low');
-  assert.equal(mine.upkeep_due_in_s, Math.ceil(game.state.cycle.remaining_s), 'upkeep is due when the operating cycle turns');
-  assert.equal(f.cycle.length_s, game.cfg.cycle_length_s);
+  assert.equal(mine.upkeep_due, 'NEXT_ROUND', 'upkeep is due at the next round');
+  assert.equal(f.cycle.running, false, 'a cycle clock is back');
   assert.equal(f.sectors.WTR.inventory, undefined);
   assert.equal(f.sectors.WTR.low, undefined);
   assert.equal(f.thresholds.power, 1);
@@ -4810,7 +4815,7 @@ test('the demo scenario extends the standard one: defaults and sectors merge, sc
   const lib = new ScenarioLibrary({ rounds, content: loadContent() });
   const demo = lib.resolve('haven9-demo');
   const std = lib.resolve('haven9-standard');
-  assert.equal(demo.defaults.cycle_length_s, 120);
+  assert.equal(demo.defaults.council_clock_s, 90);
   assert.equal(demo.defaults.lockout_s, std.defaults.lockout_s, 'unset defaults inherit');
   assert.equal(demo.sectors.MED.start_integrity, 55);
   assert.deepEqual(demo.sectors.MED.upkeep, std.sectors.MED.upkeep, 'unset sector fields inherit');
@@ -4823,7 +4828,8 @@ test('the demo scenario extends the standard one: defaults and sectors merge, sc
   assert.equal(game.state.scenario_id, 'haven9-demo');
   assert.equal(forBigscreen(game).sectors.MED.status_word, 'DEGRADED', 'MED starts visibly degraded');
   assert.equal(forBigscreen(game).sectors.COM.integrity, 95);
-  assert.equal(game.state.cycle.remaining_s, 120);
+  assert.equal(game.cfg.council_clock_s, 90, 'the demo keeps its short council');
+  assert.equal(game.state.cycle.number, 1, 'an upkeep pass ran at the reset');
   assert.equal(game.roundConfig('R2').length_s, 600);
 });
 
@@ -4852,11 +4858,11 @@ test('the session registry opens a session on its chosen scenario; RESET RUN WIT
 
   const entry = registry.get(row.code);
   assert.equal(entry.game.state.scenario_id, 'haven9-demo', 'the session opens on the scenario it was created with');
-  assert.equal(entry.game.cfg.cycle_length_s, 120);   // the demo keeps its fast cycle
+  assert.equal(entry.game.cfg.council_clock_s, 90);   // the demo keeps its short council
 
   registry.resetRun(row.code, { runId: 'reg-2', scenarioId: 'haven9-standard' });
   assert.equal(entry.game.state.scenario_id, 'haven9-standard');
-  assert.equal(entry.game.cfg.cycle_length_s, 600);
+  assert.equal(entry.game.cfg.council_clock_s, 180);
   assert.equal(store.sessionById(row.id).scenario_id, 'haven9-standard', 'the choice is persisted');
 
   // A restart restores the run, keeps live edits, and fills settings the snapshot predates.

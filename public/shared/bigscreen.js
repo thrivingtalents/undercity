@@ -84,7 +84,7 @@
    * The freshness of a report in the width a card has — the word alone.
    *
    * The card now carries the report's own round beside the numbers (R1), so a
-   * second stamp counted in cycles would be two different answers to "when".
+   * second stamp counted in rounds would be two different answers to "when".
    * What is left here is the one thing the tag cannot say: whether the room
    * has moved on since. A current report says nothing, because a report that
    * is current needs no mark.
@@ -124,14 +124,14 @@
   }
   const healthWord = (s) => STATE_WORD[healthState(s)];
 
-  /** Has COM ever reported this sector? A row with no cycle stamp is a row COM never touched. */
+  /** Has COM ever reported this sector? A row with no round stamp is a row COM never touched. */
   const reported = (row) => !!row && row.round !== null && row.round !== undefined;
 
-  /** The freshness line under a card: UPDATED CYCLE 2 · STALE, or NOT UPDATED. */
+  /** The freshness line under a card: UPDATED ROUND 2 · STALE, or NOT UPDATED. */
   function freshnessLine(row) {
     if (!reported(row) || row.freshness === 'NOT UPDATED') return { level: 'NOT UPDATED', text: 'NOT UPDATED' };
     const level = String(row.freshness || 'CURRENT');
-    return { level, text: `UPDATED CYCLE ${row.round_number} · ${level}` };
+    return { level, text: `UPDATED ROUND ${row.round_number} · ${level}` };
   }
 
   /**

@@ -537,11 +537,6 @@
     $('phase-name').textContent = state.mode === 'ENDED' ? 'ENDED' : `Round ${state.round_number}`;
     $('mode-pill').textContent = state.mode;
     $('paused-pill').classList.toggle('hidden', !state.paused);
-    // The operating cycle, and how long until the next one turns over.
-    $('round-value').textContent = `${state.cycle ? state.cycle.number : '—'}`;
-    $('round-value').title = 'The operating cycle: production, upkeep, and the allowances coming back';
-    const cyc = state.cycle ? U.countdown({ running: state.cycle.running, remaining_s: state.cycle.remaining_s }, state.frozen) : 0;
-    $('cycle-note').textContent = state.cycle ? `— next in ${U.mmss(cyc)}` : '';
     $('btn-pause').textContent = state.paused ? 'RESUME' : 'PAUSE';
     $('btn-pause').classList.toggle('on', !!state.paused);
     const rc = state.round_clock;
@@ -1329,7 +1324,7 @@
 
   function renderCore() {
     const sum = state.cycle_summary;
-    $('core-summary').innerHTML = [[`${state.core_output}%`, 'CORE OUTPUT', state.core_output < 50 ? 'warn' : ''], [state.cycle.number - 1, 'UPKEEP PASSES', ''], [sum ? new Date(sum.t).toLocaleTimeString([], { hour12: false }) : '—', 'LAST PASS', ''], [state.cycle.running ? 'LEGACY TIMER' : 'AT ROUND END', 'UPKEEP DUE', '']]
+    $('core-summary').innerHTML = [[`${state.core_output}%`, 'CORE OUTPUT', state.core_output < 50 ? 'warn' : ''], [state.cycle.number - 1, 'UPKEEP PASSES', ''], [sum ? new Date(sum.t).toLocaleTimeString([], { hour12: false }) : '—', 'LAST PASS', ''], ['AT NEXT ROUND', 'UPKEEP DUE', '']]
       .map(([v, l, c]) => `<div class="stat ${c}"><b>${v}</b><span>${l}</span></div>`).join('');
     const presets = (state.config && state.config.core_output_presets) || [100, 90, 80, 70, 60, 50, 40];
     const ph = presets.map((p) => `<button data-p="${p}" class="${state.core_output === p ? 'on' : ''}">${p}%</button>`).join('');
@@ -1362,7 +1357,7 @@
   for (const btn of document.querySelectorAll('[data-core-delta]')) btn.addEventListener('click', () => askCore(state.core_output + Number(btn.dataset.coreDelta)));
   $('btn-core-set').addEventListener('click', () => askCore(Number($('core-input').value)));
   $('btn-stab-set').addEventListener('click', () => askOverride({ title: 'SET CITY STABILITY SCORE', target: 'CORE', diff: [['MODE', state.stability_mode, $('stab-mode').value], ['SCORE', `${state.city_stability}`, $('stab-mode').value === 'manual' ? $('stab-value').value : 'computed']], action: 'set_stability', payload: { mode: $('stab-mode').value, value: Number($('stab-value').value) } }));
-  for (const btn of document.querySelectorAll('[data-cycle]')) btn.addEventListener('click', () => askOverride({ title: 'PROCESS UPKEEP NOW', target: 'CORE', diff: [['UPKEEP PASSES', state.cycle.number - 1, state.cycle.number]], extra: '<div class="hint">Charges every sector\'s upkeep now, off schedule, with penalties for a shortfall. The round end will charge it again.</div>', action: 'cycle', payload: { action: 'process' } }));
+  for (const btn of document.querySelectorAll('[data-cycle]')) btn.addEventListener('click', () => askOverride({ title: 'PROCESS UPKEEP NOW', target: 'CORE', diff: [['UPKEEP PASSES', state.cycle.number - 1, state.cycle.number]], extra: '<div class="hint">Charges every sector\'s upkeep now, off schedule, with penalties for a shortfall. The next round activation will charge it again.</div>', action: 'cycle', payload: { action: 'process' } }));
   $('btn-tel-set').addEventListener('click', () => send({ type: 'set_telemetry', telemetry: { wtr_reservoir_pressure: Number($('tel-wtr').value) } }));
 
   // -- activity, logs, observations -----------------------------------------------------------
@@ -1420,7 +1415,7 @@
     ['dark_at', 'Dark at health', 'n'],
     ['resolve_recovery', 'Health on resolve', 'n'], ['lockout_s', 'Console lockout (s)', 'n'],
     ['lockout_after_consecutive_invalid', 'Lockout after N wrong', 'n'], ['council_clock_s', 'Council clock (s)', 'n'],
-    ['CORE, ROUND TIME & THE OPERATING CYCLE'],
+    ['CORE, ROUND TIME & UPKEEP'],
     ['core_start_output', 'Core output at start (%) — applies on reset', 'n'],
     ['round_length_s.R0', 'Round 0 length (s) — every round has its own timer', 'n'], ['round_length_s.R1', 'Round 1 length (s)', 'n'],
     ['round_length_s.R2', 'Round 2 length (s)', 'n'], ['round_length_s.R3', 'Round 3 length (s)', 'n'],
@@ -1429,11 +1424,10 @@
     ['auto_economy', 'Digital economy on (production, upkeep, stock moves)', 'b'],
     ['deduct_resources_on_resolve', 'Deduct resources on resolve', 'b'],
     ['resolve_requires_resources', 'Refuse resolve when short of stock', 'b'],
-    ['cycle_length_s', 'OPERATING CYCLE length (s) — production, upkeep, allowances', 'n'], ['cycle_autostart', 'The operating cycle runs with the round timer', 'b'],
-    ['round_output_manual', 'POW / WTR generate output by button, once a cycle', 'b'],
+    ['round_output_manual', 'POW / WTR generate output by button, once a round', 'b'],
     ['upkeep_shortfall_penalty', 'Penalty per missing upkeep unit', 'n'], ['upkeep_shortfall_penalty_cap', 'Penalty cap per upkeep pass', 'n'],
     ['core_scales_power_production', 'Core output scales POW output', 'b'],
-    ['injured_recovery_per_cycle', 'Injured recovered per operating cycle (MED)', 'n'], ['injured_recovery_costs_med', 'Med supplies per recovery', 'n'],
+    ['injured_recovery_per_round', 'Injured recovered per round (MED)', 'n'], ['injured_recovery_costs_med', 'Med supplies per recovery', 'n'],
     ['deliver_on_stamp', 'Stamp delivers immediately', 'b'],
     ['FAULT REWARDS'],
     ['fault_rewards_enabled', 'Faults pay their reward on resolution', 'b'],
@@ -1444,8 +1438,6 @@
     ['TRANSFERS & HEALING'],
     ['trn_approval_limit', 'Transport approvals per round', 'n'],
     ['med_healing_limit', 'Medical heals per round', 'n'],
-    ['transfer_limit_basis', 'Approval allowance counted per', 'e', ['round', 'cycle']],
-    ['trn_capacity_per_cycle', 'Transport capacity per cycle (legacy basis)', 'n'],
     ['require_supplier_acceptance', 'Supplier must fulfil before Transport sees it', 'b'],
     ['enforce_supplier_stock', 'Check supplier stock on fulfil and on approval', 'b'],
     ['insufficient_stock_behavior', 'When the supplier is short', 'e', ['refuse', 'legacy_partial_if_supported']],
