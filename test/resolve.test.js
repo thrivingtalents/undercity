@@ -22,7 +22,7 @@ test('F-201 accepts BOTH seeded codes — the discrepancy must never be punished
 
 test('F-201 resolution stops decay and applies recovery', () => {
   const game = newGame();
-  game.patchConfig({ fault_rewards_enabled: false });   // the +5 recovery alone, not the reward's health
+  game.patchConfig({ fault_rewards_enabled: false, resolve_recovery: 5 });   // the classic +5 recovery alone (off by default since rewards v2: INTEGRITY is a reward)
   game.fireFault('F-201', 'POW');
   game.setIntegrity('POW', 60);
   submit(game);

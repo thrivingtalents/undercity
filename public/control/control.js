@@ -36,7 +36,7 @@
     { title: 'BIOLOGICAL BREACH DETECTED', subtitle: 'TUNNEL 7' },
   ];
   const LOG_KINDS = {
-    FAULTS: ['fault', 'resolve', 'lockout', 'clear', 'open'],
+    FAULTS: ['fault', 'resolve', 'lockout', 'clear', 'open', 'reward'],
     TRANSFERS: ['transfer'],
     RESOURCES: ['cycle', 'output', 'core'],
     WORKERS: ['injury'],
@@ -760,7 +760,7 @@
 
     const faultRow = (f) => `<div class="dr-fault${f.locked_until_s > 0 ? ' locked' : ''}">
         <div class="dr-fault-top"><b>${esc(f.code)}</b> ${esc(f.name)} <span class="hint">${U.severityPips(f.severity)} · −${f.decay_per_min}/min · ${f.locked_until_s > 0 ? `LOCKED ${f.locked_until_s}s` : esc(f.status)}${f.paused ? ' · DECAY PAUSED' : ''} · ${f.attempts} attempt${f.attempts === 1 ? '' : 's'}</span></div>
-        <div class="hint">${f.reward ? `Reward: ${esc(typeof f.reward === 'string' ? f.reward : f.reward.text || JSON.stringify(f.reward))}${f.reward_claimed ? ' (claimed)' : ''}` : 'No reward'}</div>
+        <div class="hint">${f.reward ? `REPAIR REWARD: ${esc(typeof f.reward === 'string' ? f.reward : f.reward.text || '')}${f.reward_claimed ? ' (paid)' : ''}` : 'No reward'}${(f.armed || []).length ? ` · armed: ${esc(f.armed.join(', '))}` : ''}</div>
         ${faultDebug ? `<div class="dr-debug">answer ${esc(f.valid_codes.length ? f.valid_codes.join(' / ') : 'NONE — ghost, clear by hand')} · crew ${f.crew_required ?? '—'} · materials ${esc(Object.entries(f.resources_required || {}).map(([k, v]) => `${v} ${k}`).join(', ') || 'none')}${f.flavour ? `<br>${esc(f.flavour)}` : ''}</div>` : ''}
         <div class="row">
           <button data-ovr-clear="${esc(f.code)}" class="danger">FORCE RESOLVE</button>
@@ -788,6 +788,10 @@
         ${live.map(faultRow).join('') || '<div class="hint">None active.</div>'}
         <div class="row"><button id="dr-trigger">TRIGGER FAULT HERE…</button></div>
       </section>
+      <section class="dr-sec"><h4>TACTICAL OPPORTUNITIES <span class="count">${((s.opportunities || {}).tokens || []).length}</span></h4>
+        ${((s.opportunities || {}).tokens || []).length ? `<div class="dr-kv">${(s.opportunities.tokens || []).map((t) => `<span><em>${esc(t.label)}</em>${esc(t.effect || '')}${t.fault_code ? ` · from ${esc(t.fault_code)}` : ' · granted by hand'}</span>`).join('')}</div>` : '<div class="hint">No tokens held.</div>'}
+        ${((s.opportunities || {}).used || []).length ? `<div class="hint">Used: ${esc(s.opportunities.used.map((u) => `${u.label}${u.fault ? ` on ${u.fault}` : ''}`).join(' · '))}</div>` : ''}
+      </section>
       <section class="dr-sec"><h4>ROUND CAPABILITY</h4>
         <div class="dr-kv"><span><em>${capLabel}</em>${esc(capText)}</span><span><em>NEXT UPKEEP</em>${s.upkeep_status === 'SHORTFALL' ? `⚠ SHORTFALL · missing ${esc(Object.entries(s.upkeep_short || {}).map(([k, v]) => `${v} ${k}`).join(', '))}` : 'READY'} (${esc(Object.entries(s.upkeep_delivery || {}).map(([k, v]) => `${v} ${k}`).join(', ') || 'none')})</span></div>
       </section>
@@ -802,6 +806,11 @@
             <span class="stepper"><span class="n">active</span><button data-ovr-wf="-1">−</button><b>${s.workforce.active}</b><button data-ovr-wf="1">+</button></span>
             <span class="stepper"><span class="n">injured</span><button data-ovr-inj="-1">−</button><b>${s.workforce.injured}</b><button data-ovr-inj="1">+</button></span>
             <button id="dr-recover" ${s.workforce.injured ? '' : 'disabled'}>RECOVER 1</button>
+          </div>
+          <div class="dr-ovr-row"><em>TOKENS</em>
+            <select id="dr-token" class="short">${['RESERVE_CREW', 'SECOND_CHANCE', 'EMERGENCY_REPAIR_KIT', 'STABILISER'].map((t) => `<option value="${t}">${t.replace(/_/g, ' ')}</option>`).join('')}</select>
+            <button id="dr-token-grant">GRANT</button>
+            ${Object.entries(((s.opportunities || {}).counts) || {}).map(([t, n]) => `<button data-ovr-revoke="${esc(t)}">REVOKE ${esc(t.replace(/_/g, ' '))}${n > 1 ? ` (×${n})` : ''}</button>`).join('')}
           </div>
           <div class="dr-ovr-row"><em>STATUS</em>
             <button id="dr-brown">${s.status === 'BROWNOUT' ? 'RESTORE FROM BROWNOUT' : 'BROWNOUT'}</button>
@@ -821,6 +830,14 @@
     body.querySelector('#dr-trigger').addEventListener('click', () => pickFault(code));
     const admin = body.querySelector('.dr-admin');
     admin.addEventListener('toggle', () => { drawerAdmin = admin.open; });
+    body.querySelector('#dr-token-grant').addEventListener('click', () => {
+      const token = body.querySelector('#dr-token').value;
+      askOverride({ title: 'GRANT OPPORTUNITY TOKEN', target, diff: [['TOKEN', '—', token.replace(/_/g, ' ')]], action: 'grant_opportunity', payload: { sector: code, token } });
+    });
+    on('[data-ovr-revoke]', (b) => {
+      const token = b.dataset.ovrRevoke;
+      askOverride({ title: 'REVOKE OPPORTUNITY TOKEN', target, diff: [['TOKEN', token.replace(/_/g, ' '), '—']], action: 'revoke_opportunity', payload: { sector: code, token } });
+    });
     on('[data-ovr-int]', (b) => {
       const d = Number(b.dataset.ovrInt);
       askOverride({ title: 'ADJUST HEALTH', target, diff: [['HEALTH', `${Math.round(s.integrity)}%`, `${clamp(s.integrity + d)}%`]], action: 'adjust_integrity', payload: { sector: code, delta: d } });
@@ -896,8 +913,9 @@
     for (const s of Object.values(state.sectors)) for (const f of s.faults) if (!f.resolved) live.push({ ...f, sector: s.code });
     $('fv-active-n').textContent = String(live.length);
     $('fv-sched-n').textContent = String((state.scheduled || []).length);
-    const rb = state.reward_budget || {};
-    $('fault-budget').textContent = `MATERIALS ISSUED ${rb.issued ?? 0} · CONSUMED ${rb.consumed ?? 0} · REWARD STOCK RESERVED ${rb.reserved ?? 0} + GENERATED ${rb.generated ?? 0} / ${rb.max ?? 1} ALLOWED · ACTIVE SECTORS ${(state.active_sectors || []).join(' ')}`;
+    const paid = Object.keys(state.rewards_claimed || {}).length;
+    const held = Object.values(state.sectors).reduce((n, s) => n + (((s.opportunities || {}).tokens) || []).length, 0);
+    $('fault-budget').textContent = `REWARDS PAID ${paid} · TOKENS HELD ${held} · ACTIVE SECTORS ${(state.active_sectors || []).join(' ')}`;
     const html = live.length ? `<div class="fa-head"><span></span><span>SECTOR</span><span>FAULT</span><span>DECAY</span><span>STATUS</span><span>REWARD</span><span><button class="ghost tiny" id="fa-debug">${faultDebug ? 'HIDE DEBUG DETAILS' : 'VIEW DEBUG DETAILS'}</button></span></div>`
       + live.map((f) => `<div class="fa-row${f.locked_until_s > 0 ? ' locked' : ''}" data-id="${esc(f.id)}">
           <span class="hint">${esc(f.id)}</span><span><b>${esc(f.sector)}</b></span><span><b>${esc(f.code)}</b> ${esc(f.name)}</span>

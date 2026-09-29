@@ -1,0 +1,54 @@
+{
+  "version": "2.0",
+  "source": "undercity_varied_fault_rewards_spec.json (fault_reward_system_v2, 2026-09-29)",
+  "note": "One fixed reward per fault. RESOURCE adds stock to the resolving sector's real tray; INTEGRITY restores health capped at the maximum; OPPORTUNITY stores one single-use token. Nothing is rolled and nothing is chosen. A scenario's fault_reward_overrides may replace an entry with the same shape.",
+  "integrity_default": 5,
+  "tokens": {
+    "RESERVE_CREW": "+1 temporary worker for one repair procedure; declared before the repair is submitted; consumed when the attempt begins",
+    "SECOND_CHANCE": "one rejected console entry does not count toward the consecutive-rejection lockout; used right after a rejected code; the code is still wrong",
+    "EMERGENCY_REPAIR_KIT": "one repair procedure needs one Spare Part fewer, never below zero; declared before the repair is submitted; consumed when the attempt begins",
+    "STABILISER": "blocks the next minute of one unresolved fault's integrity decay in this sector; does not resolve the fault; consumed on activation"
+  },
+  "rewards": {
+    "F-001": { "sector": "POW", "type": "RESOURCE", "resource": "parts", "amount": 1 },
+    "F-002": { "sector": "WTR", "type": "RESOURCE", "resource": "parts", "amount": 1 },
+    "F-003": { "sector": "MED", "type": "RESOURCE", "resource": "med", "amount": 1 },
+    "F-004": { "sector": "TRN", "type": "RESOURCE", "resource": "parts", "amount": 1 },
+    "F-005": { "sector": "AGR", "type": "INTEGRITY", "amount": 5 },
+    "F-006": { "sector": "COM", "type": "OPPORTUNITY", "token": "SECOND_CHANCE", "amount": 1 },
+
+    "F-101": { "sector": "POW", "type": "RESOURCE", "resource": "parts", "amount": 1 },
+    "F-102": { "sector": "WTR", "type": "INTEGRITY", "amount": 5 },
+    "F-103": { "sector": "MED", "type": "RESOURCE", "resource": "water", "amount": 1 },
+    "F-104": { "sector": "TRN", "type": "RESOURCE", "resource": "parts", "amount": 1 },
+    "F-105": { "sector": "AGR", "type": "OPPORTUNITY", "token": "RESERVE_CREW", "amount": 1 },
+    "F-106": { "sector": "COM", "type": "OPPORTUNITY", "token": "EMERGENCY_REPAIR_KIT", "amount": 1 },
+
+    "F-201": { "sector": "POW", "type": "RESOURCE", "resource": "parts", "amount": 1 },
+    "F-202": { "sector": "POW", "type": "RESOURCE", "resource": "parts", "amount": 1 },
+    "F-203": { "sector": "WTR", "type": "INTEGRITY", "amount": 5 },
+    "F-204": { "sector": "WTR", "type": "RESOURCE", "resource": "parts", "amount": 1 },
+    "F-205": { "sector": "MED", "type": "RESOURCE", "resource": "med", "amount": 1 },
+    "F-206": { "sector": "MED", "type": "INTEGRITY", "amount": 5 },
+    "F-207": { "sector": "TRN", "type": "RESOURCE", "resource": "parts", "amount": 1 },
+    "F-208": { "sector": "TRN", "type": "RESOURCE", "resource": "parts", "amount": 1 },
+    "F-209": { "sector": "AGR", "type": "RESOURCE", "resource": "power", "amount": 1 },
+    "F-210": { "sector": "AGR", "type": "OPPORTUNITY", "token": "EMERGENCY_REPAIR_KIT", "amount": 1 },
+    "F-211": { "sector": "COM", "type": "INTEGRITY", "amount": 5 },
+    "F-212": { "sector": "COM", "type": "OPPORTUNITY", "token": "SECOND_CHANCE", "amount": 1 },
+
+    "F-301": { "sector": "POW", "type": "RESOURCE", "resource": "parts", "amount": 1 },
+    "F-302": { "sector": "WTR", "type": "INTEGRITY", "amount": 5 },
+    "F-303": { "sector": "MED", "type": "RESOURCE", "resource": "med", "amount": 1 },
+    "F-304": { "sector": "TRN", "type": "RESOURCE", "resource": "parts", "amount": 1 },
+    "F-305": { "sector": "AGR", "type": "INTEGRITY", "amount": 5 },
+    "F-306": { "sector": "COM", "type": "OPPORTUNITY", "token": "STABILISER", "amount": 1 },
+
+    "F-401": { "sector": "POW", "type": "RESOURCE", "resource": "parts", "amount": 1 },
+    "F-403": { "sector": "WTR", "type": "INTEGRITY", "amount": 5 },
+    "F-402": { "sector": "MED", "type": "INTEGRITY", "amount": 5 },
+    "F-404": { "sector": "TRN", "type": "RESOURCE", "resource": "parts", "amount": 1 },
+    "F-405": { "sector": "AGR", "type": "INTEGRITY", "amount": 5 },
+    "F-406": { "sector": "COM", "type": "OPPORTUNITY", "token": "RESERVE_CREW", "amount": 1 }
+  }
+}

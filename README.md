@@ -140,28 +140,32 @@ npm start                                            # http://localhost:3000/adm
    The card says what is wrong, how fast it bleeds and what it pays — never
    the crew, the materials, the procedure or where to look; the team finds
    those in the physical binder and enters the resolution code. Wrong code → attempt recorded; three consecutive wrong
-   codes → console locked 20 s (server-controlled). Right code → +5 integrity,
-   the procedure's resources leave the digital stock, the wall credits the
-   sector, and the fault pays its **reward** (`lib/fault-rewards.json`: one per
-   fault, 36 in all, balanced per phase at 12 / 8 / 18 / 18 / 12 value units
-   that players never see). The reward goes to the owning sector's real stock
-   or health, once per run, only from the authoritative completion — never
-   for opening a card, assigning crew or a wrong code. Health is capped at 100
-   and never revives a DARK sector; resources still need Transport to leave;
-   COM's board stays whatever COM last reported. A facilitator clear pays
-   nothing by default (a switch, logged as an override); clearing a ghost
-   fault, one with no code, is its real completion and does pay (the deck
-   has carried none since 2026-09-27).
+   codes → console locked 20 s (server-controlled). Right code → the
+   procedure's resources leave the digital stock, the wall credits the
+   sector, and the fault pays its **REPAIR REWARD** — FAULT REWARDS v2
+   (2026-09-29, `undercity_varied_fault_rewards_spec` 2.0): one fixed reward
+   per fault from `lib/fault-rewards.json`, never rolled, never chosen.
+   19 faults pay a RESOURCE (one unit into the resolving sector's real tray,
+   14 of them Spare Parts; stock like any other, so Transport still moves
+   it), 10 pay INTEGRITY (+5, capped at 100, never reviving DARK) and 7 pay an
+   OPPORTUNITY: one single-use tactical token stored under TACTICAL
+   OPPORTUNITIES on the sector screen — RESERVE CREW (+1 temporary worker for
+   one repair, armed on a card before the attempt), SECOND CHANCE (the last
+   rejected code does not count toward the 20 s lockout; the code is still
+   wrong), EMERGENCY REPAIR KIT (one repair needs one part fewer, never below
+   zero) and STABILISER (blocks one unresolved fault's next minute of decay).
+   The card shows REPAIR REWARD: +1 PARTS / +5 INTEGRITY / RESERVE CREW before
+   completion; the reward pays once per fault per run, only from the
+   authoritative completion — never for opening a card, assigning crew, a
+   wrong code, a short tray, a refresh or a reconnect. The classic +5
+   `resolve_recovery` on every repair is off by default now (INTEGRITY is a
+   reward, not a baseline). A facilitator clear pays nothing by default (a
+   switch, logged as an override); the facilitator can grant or revoke a
+   token from the sector drawer, each an audited override; every award and
+   every token use is in the log and the Session Review timeline.
    Since v17 a repair is crew + the binder's materials + the code, committed
    at once from the real tray (a refusal consumes nothing; the console says
-   MATERIALS NOT READY, never which). Since v17.3 every fault instance is
-   dealt one EXACT reward when it fires — sized by its own case (materials,
-   crew, dependencies, severity → an RVU target and band), drawn then and
-   shown verbatim on the card ("+1 PARTS · +5 SECTOR HEALTH"), never
-   rerolled; mostly health, capacity and support. Stock rewards are capped
-   per fault at half its material cost and across the run at ~35% of the
-   material issued, reserved at fire, and adapt to the session's active
-   sectors. Since v20 a table has one door for resources: REQUEST. The
+   MATERIALS NOT READY, never which). Since v20 a table has one door for resources: REQUEST. The
    supplier accepts, which raises the linked transfer by itself, and
    Transport still approves before anything moves — one card carries the
    whole journey, WAITING FOR SUPPLIER → WAITING FOR TRN → DELIVERED.
@@ -290,7 +294,8 @@ The transfer and healing rules are these keys, all in the same place:
 | `reward_on_facilitator_force_resolve` | `false` | A facilitator clear of a real fault also pays, logged as an override |
 | `reward_on_false_alarm_clear` | `true` | Clearing a ghost fault (no procedure) pays its reward |
 | `reward_health_cap` | `100` | Ceiling for reward health points |
-| `fault_reward_overrides` | `{}` | Per-fault overrides of the reward table, e.g. `{ "F-002": { "resources": { "power": 3 }, "rvu": 3 } }` |
+| `fault_reward_overrides` | `{}` | Per-fault overrides of the reward table, e.g. `{ "F-002": { "type": "RESOURCE", "resource": "power", "amount": 1 } }` or `{ "type": "OPPORTUNITY", "token": "STABILISER" }` |
+| `resolve_recovery` | `0` | Health every accepted repair restores besides its reward (the classic +5; off since rewards v2) |
 
 Who may approve and who may heal are **not** configurable: Transport and
 Medical respectively, enforced in the intent router and again in the reducer.

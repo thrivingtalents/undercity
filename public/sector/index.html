@@ -116,6 +116,13 @@
         <div class="wextra" id="wf-extra" hidden></div>
       </div>
 
+      <!-- TACTICAL OPPORTUNITIES (fault rewards v2): the stored single-use tokens, spent from here when it makes sense. -->
+      <div class="panel block tokens-block" id="tokens-block" hidden>
+        <h2 class="ptitle">TACTICAL OPPORTUNITIES <span class="count" id="tokens-count">0</span></h2>
+        <div class="tokens" id="tokens"></div>
+        <div class="msg" id="tokens-msg" hidden></div>
+      </div>
+
       <!-- What the next round's upkeep will cost, and whether the tray can pay it. -->
       <div class="panel block upkeep-block">
         <h2 class="ptitle">NEXT ROUND UPKEEP</h2>
@@ -145,13 +152,6 @@
 
     <!-- CENTRE: active faults -->
     <section class="col col-centre">
-      <!-- A repair's reward that waits for this table's choice of target. -->
-      <div class="panel block choose-block" id="reward-choose" hidden>
-        <h2 class="ptitle">CHOOSE YOUR REWARD TARGET</h2>
-        <div class="choose-list" id="reward-choose-list"></div>
-        <div class="msg" id="reward-msg" hidden></div>
-      </div>
-
       <div class="panel faults-panel">
         <h2 class="ptitle">ACTIVE FAULTS <span class="count" id="fault-count">0</span></h2>
         <div class="fault-list" id="fault-list"></div>
@@ -173,7 +173,8 @@
         <div class="card-status">
           <span class="chip chip-sev" id="card-sev">▲ INCIDENT</span>
           <span class="chip chip-decay" id="card-decay">DECAY −0 HEALTH / MIN</span>
-          <span class="chip chip-reward" id="card-reward" hidden>REWARD · <b id="card-reward-text"></b></span>
+          <span class="chip chip-reward" id="card-reward" hidden>REPAIR REWARD: <b id="card-reward-text"></b></span>
+          <span class="chip chip-armed" id="card-armed" hidden></span>
         </div>
         <!-- REPAIR READINESS: whether the tray is ready and crew is on it. Never which materials — that is the binder's. -->
         <div class="readiness" id="readiness">

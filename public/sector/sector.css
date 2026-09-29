@@ -332,7 +332,16 @@
 .heal-row.st-DECLINED_BY_MED .h-status, .heal-row.st-EXPIRED .h-status { color: var(--red); }
 button.wide { width: 100%; }
 
-/* -- the fault's reward ------------------------------------------------------ */
+/* -- TACTICAL OPPORTUNITIES (fault rewards v2): the stored tokens ------------- */
+.tokens-block { border-color: #1d4a2a; }
+.tokens { display: flex; flex-direction: column; gap: 6px; }
+.token { display: flex; flex-direction: column; gap: 3px; border: 1px solid var(--line); background: var(--steel); padding: 7px 9px; }
+.token-head { font-size: 12px; letter-spacing: 0.12em; color: var(--green); }
+.token-n { font-size: 11px; color: var(--ink); }
+.token-effect { font-size: 10.5px; color: var(--ink-dim); }
+.token button { align-self: flex-start; font-size: 10px; letter-spacing: 0.12em; padding: 5px 9px; }
+.token-why { font-size: 9.5px; letter-spacing: 0.08em; color: var(--ink-faint); }
+.chip-armed { color: var(--purple); border-color: #3a2a5a; background: #150e1c; }
 
 
 /* -- emergency shutdown: the one way back on -------------------------------- */
@@ -517,15 +526,6 @@ button.wide { width: 100%; }
 .rd-item[data-ok="no"] b { color: var(--red); }
 .rd-hint { flex-basis: 100%; font-size: 11px; letter-spacing: 0.12em; color: var(--amber); font-weight: 700; }
 .rd-training { flex-basis: 100%; font-size: 10px; letter-spacing: 0.1em; color: var(--purple); }
-.choose-block { border-color: var(--green); }
-.choose-card { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); background: var(--steel); padding: 8px 10px; margin-bottom: 6px; }
-.choose-head { font-size: 12px; letter-spacing: 0.06em; }
-.choose-reward { color: var(--green); font-weight: 700; }
-.choose-opts { display: flex; flex-wrap: wrap; gap: 6px; }
-.choose-opts button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 12px; font-weight: 700; letter-spacing: 0.1em; min-height: 40px; }
-.choose-opts button .sub { font-size: 9px; font-weight: 400; color: var(--ink-dim); letter-spacing: 0.06em; }
-.choose-opts button.on { background: var(--green); color: #0a1a0d; border-color: var(--green); }
-.choose-opts button.on .sub { color: #0a1a0d; }
 .console { background: #0c1013; border-top: 1px solid var(--line); padding: 10px 0 0; }
 .console.locked { border-color: var(--amber); }
 .console-row { display: flex; gap: 10px; align-items: flex-end; }

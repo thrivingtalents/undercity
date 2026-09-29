@@ -633,112 +633,85 @@ admin-scoped ticker line (`kind: "override"`) on the facilitator's feed
 lists them on its timeline. Routine scenario events (a fault, an injury, a
 brownout, an announcement) are not overrides and stay as they were.
 
-### 8.9 Binder materials and case-balanced exact rewards (v17 → v17.3, 2026-09-18)
+### 8.9 Binder materials and the fixed fault rewards (v17 → rewards v2, 2026-09-29)
 
 A repair is crew + materials + the code, committed at once. `submit_code`
 runs: fault active → sector not DARK → console not locked → crew valid and
 at least the binder's minimum → every binder material in the sector's REAL
 tray → the code → one commit that re-checks crew and tray, deducts every
 material together (all or nothing), marks the fault resolved exactly once,
-ends any stabilisation on it, pays `resolve_recovery`, then pays the
-reward the card already showed. Refusals consume nothing: `invalid_workers`,
-`insufficient_crew`, `insufficient_resources` (no numbers to the table —
-the binder has them; the log gets `short` and `required`), `invalid_code`
-(the only one that counts as a wrong-code attempt and towards the 20 s
-lock), `no_procedure` (a ghost), `unknown_fault` (also a second submit
-racing a commit — the console says FAULT NO LONGER ACTIVE). Switches:
-`resolve_requires_resources` (on in every built-in scenario) checks the
-tray; `deduct_resources_on_resolve` takes it; with `auto_economy` off the
-trays are paper and both are moot.
+ends any stabilisation on it, pays `resolve_recovery` (0 by default since
+rewards v2), then pays the reward the card already showed. Refusals consume
+nothing: `invalid_workers`, `insufficient_crew`, `insufficient_resources`
+(no numbers to the table — the binder has them; the log gets `short` and
+`required`), `invalid_code` (the only one that counts as a wrong-code
+attempt and towards the 20 s lock), `no_procedure` (a ghost),
+`unknown_fault` (also a second submit racing a commit — the console says
+FAULT NO LONGER ACTIVE). Switches: `resolve_requires_resources` (on in every
+built-in scenario) checks the tray; `deduct_resources_on_resolve` takes it;
+with `auto_economy` off the trays are paper and both are moot.
 
 Own faults carry `materials_ready` (a boolean from the real tray — never
-the recipe), `wrong_code_attempts`, and only under `training_mode`
-`requirements { crew, materials }`. The sector frame adds
-`reward_choices[]` for a repair whose reward waits for the table's pick.
+the recipe; one part fewer when the EMERGENCY REPAIR KIT is armed),
+`wrong_code_attempts`, `armed[]` (`reserve_crew`, `repair_kit`),
+`second_chance_available`, `stabilised`, and only under `training_mode`
+`requirements { crew, materials }`.
 
-**Rewards (v17.3).** Every fault has a case record in `lib/reward-pools.json`,
-copied from the v17.3 balance table and joined to the binder definition by
-`game.faultDefinition(code)`: difficulty = weighted materials (power 1,
-water 1, parts 1.25, med 1.5) + 0.5 per worker above the first + 0.75 per
-external dependency + severity bonus (0 / 0.5 / 1); target RVU =
-clamp(ceil(difficulty × 0.65), 1, 5); allowed band = [target−1, target] for
-targets ≥ 3, else [target, target]; a case profile (BASIC_LOCAL,
-STANDARD_LOCAL, COORDINATED_REPAIR, HEAVY_COORDINATED,
-CRITICAL_INTERDEPENDENT, SPECIAL_VERIFICATION) with category weights; a
-per-fault stock cap min(2, floor(material units × 0.5)) and a resource
-probability cap. `lib/rewards.js` deals ONE exact reward when the fault
-fires (seed `run_id|instance|tier`): archetypes outside the band or above
-the target, over either stock cap, or unusable in the session (inactive TRN
-or MED, no other live sector, no other fault to stabilise) are excluded; the
-RVU level is the target (70%) or target−1 (30%) for targets ≥ 3; the case
-profile weighs local health, help for another sector, capacity and stock;
-the same sector never gets the same archetype twice running when three or
-more are eligible; if nothing survives, the nearest lower-RVU health reward.
-Resources are DRAWN THEN — scarcity-weighted over the real stock of live
-active sectors (lower average → likelier, no type above 45%, distinct
-types), refunds named from the recipe — and the whole payload persists on
-the instance: `reward { reward_instance_id, archetype, rvu, tier,
-case_profile, label, display_label, choose, health_effects[],
-resource_effects[], capacity_effects[], worker_effects[],
-fault_decay_effects[], resource_units_reserved, assigned_at_fault_creation,
-reroll_allowed: false, seed, assigned_round, difficulty_score,
-reward_target_rvu, allowed_reward_rvu }`. The card shows
-`display_label` verbatim ("+1 PARTS · +5 SECTOR HEALTH", "CHOOSE ANOTHER
-ACTIVE SECTOR: +5 HEALTH", "TRN +1 APPROVAL THIS ROUND", "CHOOSE ANOTHER
-ACTIVE FAULT: HALVE ITS DECAY FOR 90 S"); after success REWARD CLAIMED
-repeats the result. Nothing rerolls it: refresh, reconnect, restart, a
-wrong code, a short tray, a phase change, the facilitator looking.
-
-**Scarcity, twice.** The run tracks `repair_material_units_issued` (binder
-units of issued, uncancelled reward-bearing faults),
-`fault_reward_resource_units_reserved` (stock promised by unresolved
-rewards) and `fault_reward_resource_units_generated` (stock paid). A stock
-reward is eligible only if generated + reserved + its units ≤ max(1,
-floor(issued × 0.35)) AND its units ≤ the fault's own cap. Units are
-reserved at fire, become generated when the reward pays, and are released
-when the fault is cleared without a reward (its binder units leave the basis
-too). Upkeep, transfers and facilitator stock edits never widen it. The
-control frame carries `reward_budget { issued, consumed, reserved,
-generated, max, remaining }` and `active_sectors`.
+**FAULT REWARDS v2 (`undercity_varied_fault_rewards_spec` 2.0).** Every
+fault has ONE fixed reward in `lib/fault-rewards.json` (a scenario's
+`fault_reward_overrides[code]` may replace it with the same shape), in one
+of three families: `RESOURCE { resource, amount }` — one unit into the
+resolving sector's real tray, stock like any other; `INTEGRITY { amount: 5 }`
+— capped at `reward_health_cap` (100), never reviving DARK; `OPPORTUNITY
+{ token }` — one stored single-use token: `RESERVE_CREW`, `SECOND_CHANCE`,
+`EMERGENCY_REPAIR_KIT`, `STABILISER`. Nothing is rolled, nothing is chosen,
+nothing is budgeted. The instance carries `reward { type, resource, amount,
+token, text, display_label: "REPAIR REWARD: +1 PARTS", fixed: true }` from the
+moment it fires; the screen's `reward` view carries `text`, `display`,
+`banner`, `claimed` and `result_text`.
 
 **Application.** Exactly once, key `faultReward:{run_id}:{instance}`, only
-after the materials are gone. Health is points, capped at 100, never
-reviving DARK. TRN/MED reinforcement adds a round-scoped `trn_capacity` /
-`med_capacity` effect (the sector still approves or heals). Temporary crew
-is a round-scoped `extra_workers` effect. Stabilisation is a
-`fault_stabilised { target: instance, mode HALVE|PAUSE, multiplier 0.5|0,
-duration_s 90|60, remaining_s }` effect the tick counts down in game time;
-it also ends at the round change or when its target resolves, never
-resolving it. Choosing rewards keep their amount and ask the table for the
-target (`reward_choose`, below); a choice not made by the round change is
-settled to the lowest-health sector or fastest-decaying fault. The
+by the authoritative completion after the materials are gone; the
 facilitator's `clear_fault` pays nothing unless `with_reward: true`, which
-is logged as an override; a refund on such a clear pays nothing because
-nothing was consumed. A false alarm keeps no crew, no materials and no
-code; any submit is `no_procedure`; the clear is its completion and pays
-a non-stock reward (SPECIAL_VERIFICATION profile). The deck has carried
-none since 2026-09-27.
+is logged as an override. A refresh, a reconnect, a re-render or a replayed
+submit pays nothing again (`fault_reward_duplicate_blocked`). The resolve
+result carries `reward { applied, type, text, result_text, banner }`; the
+banner reads FAULT RESOLVED — REWARD: +1 PARTS.
 
-```json
-{ "type": "reward_choose", "fault_id": "F-0007", "target": { "sector": "MED" } }         // a sector, from the options
-{ "type": "reward_choose", "fault_id": "F-0007", "target": { "sectors": ["MED", "AGR"] } } // up to two
-{ "type": "reward_choose", "fault_id": "F-0007", "target": { "fault": "F-0004" } }        // another fault instance
-```
+**The tokens.** A sector's store is `opportunities { tokens[], counts,
+used[] }` on its frame (and on the control frame's sector). A table spends
+one with `{ "type": "opportunity_use", "token": "RESERVE_CREW", "fault_code":
+"F-209" }` → `opportunity_result { ok, token, fault, effect | reason }`:
+RESERVE CREW and the REPAIR KIT are armed on one unresolved fault of its own
+(`effect: "armed"`) and spent the moment its next attempt begins — the crew
+check counts +1 toward the minimum, the recipe needs one part fewer, never
+below zero (`no_parts_to_reduce`); SECOND CHANCE forgives the latest rejected
+code on that fault (`nothing_to_forgive` when none): the counter steps back
+one, a lock that rejection caused lifts, the code is still wrong; the
+STABILISER blocks that fault's decay for 60 s (a `fault_stabilised` effect,
+`already_stabilised` / `no_decay`). Refusals: `no_token`, `fault_required`,
+`already_armed`. Tokens are not stock, not tradeable, not permanent.
 
-Reply `reward_result { ok, result_text, … }` or `reward_target_required` /
-`reward_invalid_target` / `no_choice_pending`. Log events:
-`fault_reward_assigned` (run_id, instance, fault, sector, reward_instance_id,
-difficulty_score, reward_target_rvu, allowed_reward_rvu, case_profile,
-eligible_after_filtering, excluded, selected, selected_by, rvu,
-exact_reward_payload, resource_units_reserved, assignment_round, budget),
-`fault_reward_applied` (reward_instance_id, exact_reward_applied,
-resources_added, health, effects, targets, resource_units_generated,
-applied_round, admin_override, budget), `fault_reward_reservation_released`,
-`fault_material_issue_cancelled`, `fault_reward_override_rejected`,
-`repair_completed` (instance, fault, sector, resolved_round, crew_assigned,
-materials_consumed, material_units, resolution_success, reward_archetype,
-reward_instance_id, exact_reward, reward_result, reward_targets,
-resource_reward_units_generated).
+**The facilitator** sees every award and token on the console (paid rewards
+on the fault rows, TACTICAL OPPORTUNITIES in the sector drawer) and corrects
+by hand through `admin_override`: `grant_opportunity { sector, token }`,
+`revoke_opportunity { sector, token }`, `opportunity_use { sector, token,
+fault_code }` — each with a reason, before/after and an audit event.
+
+Log events: `fault_reward_assigned` (run_id, instance, fault, sector,
+reward_type, reward_value, label, assignment_round), `reward_awarded`
+(run_id, round, fault, instance, sector, reward_type, reward_value,
+reward_awarded_at, result, result_text, via, by, key, facilitator_override),
+`fault_reward_duplicate_blocked`, `fault_reward_force_resolve_skipped`,
+`fault_reward_admin_override`, `opportunity_granted`,
+`opportunity_granted_by_facilitator`, `opportunity_used` (sector, token, id,
+fault, effect, opportunity_token_used_at, by), `opportunity_applied`,
+`opportunity_revoked`, `repair_completed` (instance, fault, sector,
+resolved_round, crew_assigned, crew_bonus, materials_consumed,
+material_units, resolution_success, armed_spent, reward_type, reward_text,
+reward_result). The debrief (`lib/analytics.js`) folds them into
+`rewards { awarded, by_type, resources, integrity_points, tokens_granted,
+tokens_used }` and the timeline.
 
 ### 8.10 Admin resource and timer controls (v18, 2026-09-18)
 

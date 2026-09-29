@@ -97,7 +97,7 @@
         el.hidden = false;
       }
       if (msg.type === 'submit_result') handleResult(msg);
-      if (msg.type === 'reward_result') handleRewardResult(msg);
+      if (msg.type === 'opportunity_result') handleOpportunityResult(msg);
       if (['transfer_result', 'heal_result', 'broadcast_result', 'agr_result', 'output_result'].includes(msg.type)) handleTransferResult(msg);
       if (msg.type === 'sting') U.playSting(msg.sound);
     },
@@ -371,8 +371,9 @@
       localLock.delete(msg.fault_code);
       if (consoleFor === msg.fault_code) $('code-input').value = '';
       const r = msg.reward || {};
-      const reward = r.applied ? `  ·  REWARD CLAIMED: ${r.result_text || r.text}` : r.pending ? '  ·  REWARD: CHOOSE YOUR TARGET BELOW' : '';
-      const text = `${msg.fault_code}  FAULT RESOLVED  +${Number(msg.recovery) || 0} HEALTH` + reward;
+      const recovery = Number(msg.recovery) > 0 ? `  +${Number(msg.recovery)} HEALTH` : '';
+      const reward = r.applied ? `  —  REWARD: ${r.result_text || r.text}` : '';
+      const text = `${msg.fault_code}  FAULT RESOLVED${recovery}${reward}`;
       const banner = $('banner-result');
       banner.textContent = text;
       banner.hidden = false;
@@ -562,7 +563,7 @@
     renderExchange();
     renderFaultList();
     renderCard();
-    renderRewardChoices();
+    renderTokens();
     renderCity();
     renderNotice();
     renderEffects();
@@ -1598,6 +1599,11 @@
     // What it pays, before the team commits. Never the units.
     show($('card-reward'), !!(f.reward && f.reward.text) && !f.resolved);
     if (f.reward && f.reward.text) setText($('card-reward-text'), f.reward.text);
+    // FAULT REWARDS v2: what this table has armed on the card, and a STABILISER holding its decay.
+    const armedWords = (f.armed || []).map((a) => (a === 'reserve_crew' ? 'RESERVE CREW ARMED' : 'REPAIR KIT ARMED'));
+    if (f.stabilised) armedWords.push('STABILISED');
+    show($('card-armed'), armedWords.length > 0 && !f.resolved);
+    setText($('card-armed'), armedWords.join(' · '));
     // The wrong-code count (v17.3): what counts towards the lock, never a short tray or crew.
     setText($('card-attempts'), `ATTEMPTS ${Number(f.wrong_code_attempts ?? f.attempts) || 0}`);
     renderReadiness(f);
@@ -1650,54 +1656,61 @@
     show(tr, !!f.requirements);
   }
 
-  // -- a choosing reward: the table names its target ----------------------------
+  // -- TACTICAL OPPORTUNITIES (fault rewards v2): stored tokens, spent when it makes sense --
+  // A token's USE button is live only when the open card can take it: RESERVE
+  // CREW and the REPAIR KIT arm an unresolved card for its next attempt, SECOND
+  // CHANCE needs a rejected code on it, the STABILISER a decaying one.
 
-  function handleRewardResult(msg) {
-    if (msg.ok) transientMsg('reward-msg', `REWARD CLAIMED — ${msg.result_text || msg.text || ''}`, 'ok', 6000);
-    else transientMsg('reward-msg', String(msg.reason || 'REFUSED').toUpperCase().replace(/_/g, ' '), 'bad');
-  }
+  const TOKEN_USE = {
+    RESERVE_CREW: (f) => (f && !f.resolved && !(f.armed || []).includes('reserve_crew') ? null : 'OPEN A FAULT CARD FIRST'),
+    EMERGENCY_REPAIR_KIT: (f) => (f && !f.resolved && !(f.armed || []).includes('repair_kit') ? null : 'OPEN A FAULT CARD FIRST'),
+    SECOND_CHANCE: (f) => (f && f.second_chance_available ? null : 'NEEDS A REJECTED CODE ON THE OPEN CARD'),
+    STABILISER: (f) => (f && !f.resolved && Number(f.decay_per_min) > 0 && !f.stabilised ? null : 'OPEN A DECAYING FAULT CARD FIRST'),
+  };
 
-  function renderRewardChoices() {
-    const list = mine.reward_choices || [];
-    show($('reward-choose'), list.length > 0);
-    if (!list.length) return;
-    const html = list.map((c) => {
-      const r = c.reward || {};
-      const opts = (r.options || []).map((o) => r.choose === 'fault'
-        ? `<button type="button" data-pick-fault="${esc(c.id)}" data-target="${esc(o.id)}">${esc(o.code)} · ${esc(o.sector)}<span class="sub">${esc(o.name)} · −${o.decay_per_min}/min</span></button>`
-        : `<button type="button" data-pick-sector="${esc(c.id)}" data-target="${esc(o.sector)}">${U.SECTOR_GLYPH[o.sector] || ''} ${esc(o.sector)}<span class="sub">${o.integrity}% HEALTH</span></button>`).join('');
-      const multi = r.choose === 'sectors';
-      return `<div class="choose-card" data-id="${esc(c.id)}">
-          <div class="choose-head"><b>${esc(c.code)}</b> ${esc(c.name)} — <span class="choose-reward">${esc(r.text || '')}</span></div>
-          <div class="choose-opts">${opts}</div>
-          ${multi ? `<div class="row"><button type="button" class="primary" data-confirm-sectors="${esc(c.id)}">CONFIRM SELECTION</button><span class="hint">Pick up to two, then confirm.</span></div>` : ''}
-        </div>`;
+  function renderTokens() {
+    const o = mine.opportunities || { tokens: [], used: [] };
+    const tokens = o.tokens || [];
+    show($('tokens-block'), tokens.length > 0);
+    setText($('tokens-count'), String(tokens.length));
+    if (!tokens.length) { $('tokens').dataset.sig = ''; $('tokens').innerHTML = ''; return; }
+    const f = selectedFault();
+    const groups = new Map();
+    for (const t of tokens) { const g = groups.get(t.token) || { ...t, n: 0 }; g.n += 1; groups.set(t.token, g); }
+    const html = [...groups.values()].map((g) => {
+      const why = (TOKEN_USE[g.token] || (() => 'NOT USABLE'))(f);
+      return `<div class="token"><div class="token-head"><b>${esc(g.label)}</b>${g.n > 1 ? ` <span class="token-n">×${g.n}</span>` : ''}</div>` +
+        `<div class="token-effect">${esc(g.effect || '')}</div>` +
+        `<button type="button" data-use="${esc(g.token)}"${why ? ' disabled' : ''} title="${esc(why || g.timing || '')}">${esc(g.use || 'USE')}</button>` +
+        `${why ? `<div class="token-why">${esc(why)}</div>` : ''}</div>`;
     }).join('');
-    const host = $('reward-choose-list');
-    if (host.dataset.sig === html) return;
-    host.dataset.sig = html;
-    host.innerHTML = html;
-    for (const b of host.querySelectorAll('[data-pick-fault]')) b.addEventListener('click', () => socket.send({ type: 'reward_choose', fault_id: b.dataset.pickFault, target: { fault: b.dataset.target } }));
-    for (const b of host.querySelectorAll('[data-pick-sector]')) {
-      const card = b.closest('.choose-card');
-      const multi = !!card.querySelector('[data-confirm-sectors]');
-      b.addEventListener('click', () => {
-        if (!multi) { socket.send({ type: 'reward_choose', fault_id: b.dataset.pickSector, target: { sector: b.dataset.target } }); return; }
-        b.classList.toggle('on');
-        if (card.querySelectorAll('[data-pick-sector].on').length > 2) b.classList.remove('on');
-      });
-    }
-    for (const b of host.querySelectorAll('[data-confirm-sectors]')) {
-      b.addEventListener('click', () => {
-        const card = b.closest('.choose-card');
-        const sectors = [...card.querySelectorAll('[data-pick-sector].on')].map((x) => x.dataset.target);
-        if (!sectors.length) { transientMsg('reward-msg', 'PICK AT LEAST ONE SECTOR', 'bad'); return; }
-        socket.send({ type: 'reward_choose', fault_id: b.dataset.confirmSectors, target: { sectors } });
-      });
+    const host = $('tokens');
+    if (host.dataset.sig !== html) {
+      host.dataset.sig = html;
+      host.innerHTML = html;
+      for (const b of host.querySelectorAll('[data-use]')) b.addEventListener('click', () => useToken(b.dataset.use));
     }
   }
 
-  /** Lockout / verdict text and enabled state. Called per frame and per tick. */
+  function useToken(token) {
+    const f = selectedFault();
+    socket.send({ type: 'opportunity_use', token, fault_code: f ? f.code : null });
+  }
+
+  function handleOpportunityResult(msg) {
+    if (msg.ok) {
+      const word = { armed: 'ARMED FOR THIS REPAIR', rejection_forgiven: 'REJECTION FORGIVEN — IT DOES NOT COUNT TOWARD THE LOCK', decay_blocked: 'DECAY BLOCKED FOR ONE MINUTE' }[msg.effect] || 'USED';
+      transientMsg('tokens-msg', `${String(msg.token || '').replace(/_/g, ' ')} — ${word}`, 'ok', 6000);
+      return;
+    }
+    const why = {
+      no_token: 'NO SUCH TOKEN', fault_required: 'OPEN A FAULT CARD FIRST', already_armed: 'ALREADY ARMED ON THIS FAULT',
+      nothing_to_forgive: 'NO REJECTED CODE TO FORGIVE', no_decay: 'THIS FAULT IS NOT DECAYING', already_stabilised: 'ALREADY STABILISED',
+      no_parts_to_reduce: 'THIS REPAIR NEEDS NO PARTS',
+    };
+    transientMsg('tokens-msg', why[msg.reason] || String(msg.reason || 'REFUSED').toUpperCase().replace(/_/g, ' '), 'bad');
+  }
+
   function updateConsole(f) {
     if ($('rd-workers').dataset.ok !== (Number($('workers-select').value || 0) > 0 ? 'yes' : 'no')) renderReadiness(f);
     const lock = lockRemaining(f);

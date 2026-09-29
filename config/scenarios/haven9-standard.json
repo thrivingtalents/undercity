@@ -15,7 +15,7 @@
     "core_start_output": 100,
     "round_length_s": { "R0": 1200, "R1": 900, "R2": 900, "R3": 720, "R4": 480 },
     "fault_overrides": {},
-    "resolve_recovery": 5,
+    "resolve_recovery": 0,
     "lockout_s": 20,
     "lockout_after_consecutive_invalid": 3,
     "council_clock_s": 60,
