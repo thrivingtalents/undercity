@@ -563,8 +563,8 @@ exists, else a synthesised placeholder.
 The operating cycle is gone (2026-09-28): the round is the period. `round_clock`
 is the only clock a table sees, and **upkeep falls due when the next round is
 activated**: `activate_round` runs one economy pass for the outgoing round
-(`cycle_processed {cycle, round, summary}`) — never for Round 0, never for a
-round whose clock was not started, never when going back — and then hands
+(`cycle_processed {cycle, round, summary}`) — never for a round whose clock
+was not started, never when going back — and then hands
 every allowance back for the new round (approvals, heals, AGR's hand, the
 "this round" effects; `trn_approval_counter_reset {by:"round"}`).
 `period_number` is the round number and every stamp (`round` on COM's rows,

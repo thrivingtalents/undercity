@@ -1819,10 +1819,19 @@ test('upkeep is charged when the next round is activated — once, for a round t
   // Round 3 was loaded READY and never started: moving on charges nothing.
   assert.equal(game.activateRound('R4').charged, null);
   assert.equal(game.state.cycle.number, passes + 1);
-  // Going back charges nothing either, and Round 0 is never charged.
+  // Going back charges nothing either.
   assert.equal(game.activateRound('R2').charged, null);
+  // Round 0 is charged like any other round (2026-09-29): the first bill of
+  // the run lands when Round 1 is activated, for the Round 0 just played.
   const fresh = newGame(); fresh.clock('start'); fresh.tick(1000);
-  assert.equal(fresh.activateRound('R1').charged, null, 'orientation was charged');
+  const powFresh = fresh.state.sectors.POW;
+  const stock = { ...powFresh.inventory };
+  assert.equal(fresh.activateRound('R1').charged, 'R0', 'orientation was forgiven its upkeep');
+  assert.deepEqual(powFresh.inventory, { ...stock, power: stock.power - 2, water: stock.water - 1 },
+    "Round 0's upkeep did not come off the tray");
+  // …but only once its clock had run. A run clicked through from cold is not invoiced.
+  const cold = newGame();
+  assert.equal(cold.activateRound('R1').charged, null, 'an unplayed Round 0 was charged');
 });
 
 test('the tables no longer render the City Feed or an Announcements panel; the wall still has the city', () => {
