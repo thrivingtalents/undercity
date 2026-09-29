@@ -114,7 +114,10 @@ test('a full R1→R4 dry run, six sectors on one server', async (t) => {
     say({ type: 'fire_fault', fault_code: 'F-101', sector: 'POW' });
     await wait(300);
 
-    assert.equal(sectors.POW.state.sectors.POW.faults[0].code, 'F-101');
+    // Round 0's set is dealt when the run begins (2026-09-29), so POW's board
+    // already holds F-001: the fault under test is found by code, not by index.
+    const powHas = (code) => sectors.POW.state.sectors.POW.faults.some((f) => f.code === code);
+    assert.ok(powHas('F-101'), 'POW was not dealt F-101');
     assert.equal(sectors.WTR.state.sectors.POW.faults, undefined,
       'WTR must not see POW fault detail');
 
@@ -126,7 +129,7 @@ test('a full R1→R4 dry run, six sectors on one server', async (t) => {
 
     const result = sectors.POW.messages.filter((m) => m.type === 'submit_result').pop();
     assert.equal(result.accepted, true);
-    assert.equal(sectors.POW.state.sectors.POW.faults.length, 0);
+    assert.ok(!powHas('F-101'), 'F-101 survived its code');
   });
 
   await t.test('R2: the discrepancy fault takes either code', async () => {
@@ -148,7 +151,7 @@ test('a full R1→R4 dry run, six sectors on one server', async (t) => {
     await wait(300);
     say({ type: 'clear_fault', sector: 'AGR', fault_code: 'F-209', reason: 'facilitator cleared' });
     await wait(300);
-    assert.equal(sectors.AGR.state.sectors.AGR.faults.length, 0);
+    assert.ok(!sectors.AGR.state.sectors.AGR.faults.some((f) => f.code === 'F-209'), 'F-209 was not cleared');
   });
 
   await t.test('COM sees a foreign fault the affected sector\'s neighbours cannot', async () => {
@@ -376,10 +379,14 @@ test('round activation over the wire: the facilitator deals a round as one actio
   say({ type: 'reset_run', run_id: 'activate-wire', confirm: true });
   await wait(400);
   const faultIds = () => Object.values(control.state.sectors).flatMap((s) => s.faults.map((f) => f.id)).sort();
+  // The run opens on Round 0 with that round's set already dealt (2026-09-29),
+  // so "nothing happened" means "the board is exactly what the run began with".
+  const base = faultIds();
+  assert.equal(base.length, 6, 'the run did not begin with its first round dealt');
 
   pow.ws.send(JSON.stringify({ type: 'activate_round', round: 'R2' }));
   await wait(300);
-  assert.equal(faultIds().length, 0, 'a participant activated a round');
+  assert.deepEqual(faultIds(), base, 'a participant activated a round');
 
   control.messages.length = 0;
   say({ type: 'activate_round', round: 'R2' });
@@ -388,9 +395,10 @@ test('round activation over the wire: the facilitator deals a round as one actio
   assert.ok(done && done.dealt.length === 12, JSON.stringify(done));
   assert.equal(control.state.round, 'R2');
   assert.deepEqual([control.state.round_clock.status, control.state.round_clock.remaining_s], ['ready', 900]);
-  assert.equal(pow.state.sectors.POW.faults.length, 2, 'POW did not get its two faults at once');
+  assert.equal(pow.state.sectors.POW.faults.filter((f) => f.code.startsWith('F-2')).length, 2,
+    'POW did not get its two faults at once');
   const ids = faultIds();
-  assert.equal(ids.length, 12);
+  assert.equal(ids.length, base.length + 12);
 
   say({ type: 'activate_round', round: 'R2' });
   await wait(400);

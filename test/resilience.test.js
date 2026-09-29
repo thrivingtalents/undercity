@@ -125,7 +125,10 @@ test('a sector client that drops can rejoin and is fully re-seeded', async () =>
   await wait(300);
 
   const pow = await client({ type: 'hello', role: 'sector', sector: 'POW' });
-  assert.equal(pow.state.sectors.POW.faults.length, 1);
+  // The run opens on Round 0 with that round's set dealt (2026-09-29), so what
+  // is asserted here is the fault fired by hand, not the length of the board.
+  const codes = (c) => c.state.sectors.POW.faults.map((f) => f.code);
+  assert.ok(codes(pow).includes('F-201'), 'POW was not sent the fault that fired');
 
   // The laptop's wifi drops mid-crisis.
   pow.ws.terminate();
@@ -137,8 +140,9 @@ test('a sector client that drops can rejoin and is fully re-seeded', async () =>
   await wait(300);
 
   const rejoined = await client({ type: 'hello', role: 'sector', sector: 'POW' });
-  assert.equal(rejoined.state.sectors.POW.faults.length, 2,
+  assert.deepEqual(codes(rejoined).filter((c) => c.startsWith('F-2')).sort(), ['F-201', 'F-202'],
     'the rejoining dashboard sees everything it missed');
+  assert.equal(codes(rejoined).length, codes(pow).length + 1, 'the reconnect lost or duplicated a fault');
   assert.equal(rejoined.state.announcements[0].text, 'Transport capacity reduced.');
   assert.ok(!JSON.stringify(rejoined.state).includes('valid_codes'),
     'a reconnect must not hand the team the answer key');

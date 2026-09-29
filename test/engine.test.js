@@ -5023,3 +5023,64 @@ test('the session registry opens a session on its chosen scenario; RESET RUN WIT
   store.close();
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('the first round is dealt when the run begins, once, and a restart never deals it again', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'undercity-first-'));
+  const store = new Store(path.join(dir, 'db.sqlite'));
+  const content = loadContent();
+  const scenarios = new ScenarioLibrary({ store, rounds, content });
+  const { SessionRegistry } = require('../lib/sessions');
+  const registry = new SessionRegistry({ store, content, rounds, dataDir: dir, scenarios });
+  const sys = store.createFacilitator({ email: 'first@test', name: 'First', passwordHash: 'x', isAdmin: true });
+  const row = store.createSession({
+    name: 'First run', clientName: null, facilitatorId: sys.id,
+    sectors: Object.fromEntries(SECTORS.map((c) => [c, c])),
+  });
+  const first = rounds.rounds[0].id;
+  const wanted = content.faults.faults.filter((f) => f.round === first).map((f) => f.code).sort();
+  const onBoard = (g) => Object.values(g.state.sectors).flatMap((s) => s.faults).map((f) => f.code).sort();
+  assert.ok(wanted.length, 'the first round has no faults in the content to deal');
+
+  // Opening a session for the first time IS the run beginning: Round 0's set
+  // is on the tables, stamped activated, with its timer loaded READY. Nothing
+  // else ever dealt it — the console's forward controls all activate the NEXT
+  // round, so from Round 0 they deal Round 1.
+  const game = registry.get(row.code).game;
+  assert.equal(game.state.round, first);
+  assert.deepEqual(onBoard(game), wanted, 'the run began with an empty board');
+  assert.equal(typeof game.state.rounds_activated[first], 'string', 'the first round was not stamped activated');
+  assert.equal(game.state.round_clock.status, 'ready', 'the run began with a running clock');
+
+  // Asking twice changes nothing: the deal is idempotent by the same guard
+  // that stops a second click on the round button dealing duplicates.
+  const before = JSON.stringify(onBoard(game));
+  assert.equal(game.startFirstRound().ok, false);
+  assert.equal(game.startFirstRound().reason, 'already_dealt');
+  assert.equal(JSON.stringify(onBoard(game)), before);
+
+  // A restart restores the run's own history and must not deal on top of it —
+  // six fault_fired in the log, not twelve.
+  registry.evict(row.code);
+  const again = registry.get(row.code).game;
+  assert.deepEqual(onBoard(again), wanted, 'a restart changed the board');
+  assert.deepEqual(Object.keys(again.state.rounds_activated), [first]);
+  const fired = again.log.readAll().trim().split('\n').map((l) => JSON.parse(l)).filter((e) => e.ev === 'fault_fired');
+  assert.equal(fired.length, wanted.length, 'the restart dealt the first round a second time');
+
+  // RESET RUN starts a run too, so it opens already dealt.
+  registry.resetRun(row.code, { runId: 'first-2' });
+  const reset = registry.get(row.code).game;
+  assert.deepEqual(onBoard(reset), wanted, 'RESET RUN left the board empty');
+
+  // A run past its first round is left alone — restoring mid-game must never
+  // rewind and deal Round 0 over the top of what is already there. The stamp
+  // answers first; strip it and the round itself still does.
+  reset.clock('start'); reset.tick(1000);
+  reset.activateRound('R1');
+  assert.equal(reset.startFirstRound().reason, 'already_dealt');
+  delete reset.state.rounds_activated[first];
+  assert.equal(reset.startFirstRound().reason, 'past_first_round', 'a mid-game run was rewound and re-dealt');
+  registry.evict(row.code);
+  store.close();
+  fs.rmSync(dir, { recursive: true, force: true });
+});

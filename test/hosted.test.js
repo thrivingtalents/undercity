@@ -206,9 +206,13 @@ test('two concurrent sessions never leak into each other', async (t) => {
     aCtl.ws.send(JSON.stringify({ type: 'fire_fault', fault_code: 'F-201', sector: 'POW' }));
     await wait(400);
 
-    assert.equal(aPow.state.sectors.POW.faults.length, 1, 'Alpha POW sees its fault');
-    assert.equal(aPow.state.sectors.POW.faults[0].code, 'F-201');
-    assert.equal(bPow.state.sectors.POW.faults.length, 0, 'Bravo POW must see nothing');
+    // Both sessions open on Round 0 with its set dealt (2026-09-29), so what
+    // must not leak is the fault fired by hand, not the board's whole length.
+    const has = (c, code) => c.state.sectors.POW.faults.some((f) => f.code === code);
+    assert.ok(has(aPow, 'F-201'), 'Alpha POW does not see its fault');
+    assert.ok(!has(bPow, 'F-201'), 'Bravo POW was sent a fault from another session');
+    assert.equal(aPow.state.sectors.POW.faults.length, bPow.state.sectors.POW.faults.length + 1,
+      'the two boards differ by more than the one fault Alpha was dealt');
   });
 
   await t.test('damage in one session does not move the other', async () => {
@@ -246,7 +250,8 @@ test('two concurrent sessions never leak into each other', async (t) => {
     await wait(400);
     const result = aPow.messages.filter((m) => m.type === 'submit_result').pop();
     assert.equal(result.accepted, true);
-    assert.equal(bPow.state.sectors.POW.faults.length, 0);
+    assert.ok(!bPow.state.sectors.POW.faults.some((f) => f.code === 'F-201'),
+      "Alpha's fault reached Bravo");
   });
 
   await t.test('each session writes its own run log', () => {
@@ -257,8 +262,12 @@ test('two concurrent sessions never leak into each other', async (t) => {
     const aLines = fs.readFileSync(aLog, 'utf8').trim().split('\n').map(JSON.parse);
     const bLines = fs.readFileSync(bLog, 'utf8').trim().split('\n').map(JSON.parse);
     assert.ok(aLines.some((e) => e.ev === 'fault_fired' && e.fault === 'F-201'));
-    assert.ok(!bLines.some((e) => e.ev === 'fault_fired'),
+    // Bravo has its own Round 0 set in its own log (2026-09-29); what it must
+    // never carry is an event from the run next door.
+    assert.ok(!bLines.some((e) => e.ev === 'fault_fired' && e.fault === 'F-201'),
       "Bravo's log must not contain Alpha's events");
+    assert.ok(!bLines.some((e) => e.ev === 'submit_result' || e.ev === 'fault_resolved'),
+      "Bravo's log must not contain Alpha's resolution");
   });
 
   for (const c of [aCtl, bCtl, aPow, bPow]) c.ws.close();
