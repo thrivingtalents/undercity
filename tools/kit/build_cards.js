@@ -27,6 +27,13 @@ const faults = JSON.parse(fs.readFileSync(SRC, "utf8")).faults;
 const chainFaults = fs.existsSync(CHAIN_SRC)
   ? JSON.parse(fs.readFileSync(CHAIN_SRC, "utf8")).faults
   : [];
+// F-601..F-612 (LATE SHIFT, 2026-10-05): generated too, round: null, their own
+// section after REFERENCE CHAIN. A P-10 card says TIME-CRITICAL and nothing
+// more — no countdown is printed because none runs.
+const LATE_SRC = process.argv[5] || "content/faults.late-shift.json";
+const lateFaults = fs.existsSync(LATE_SRC)
+  ? JSON.parse(fs.readFileSync(LATE_SRC, "utf8")).faults
+  : [];
 
 // Flavour lines in the matrix are structured "SYMPTOM; needs X from Y".
 // The card prints the SYMPTOM ONLY. Printing the dependency half would hand the
@@ -54,6 +61,8 @@ const ROUND_LABEL = {
   // mechanic has been playtested and each one is given a round.
   null: "REFERENCE CHAIN",
 };
+// The tab line: a generated deck names its own section; everything else is its round.
+const tabLabel = (f) => f.section || ROUND_LABEL[f.round] || ROUND_LABEL[null];
 
 const INK = "1A1A1A";
 const MUTED = "6B6B6B";
@@ -91,7 +100,7 @@ function cardCell(f) {
     children: [
       new TextRun({ text: `${f.sector}  `, font: "Arial", size: 20, bold: true, color: s.colour, characterSpacing: 40 }),
       new TextRun({ text: s.name, font: "Arial", size: 14, color: MUTED, characterSpacing: 40 }),
-      new TextRun({ text: `     ${ROUND_LABEL[f.round] || ROUND_LABEL[null]}`, font: "Arial", size: 12, color: "AAAAAA", characterSpacing: 60 }),
+      new TextRun({ text: `     ${tabLabel(f)}`, font: "Arial", size: 12, color: "AAAAAA", characterSpacing: 60 }),
     ],
   }));
 
@@ -109,6 +118,14 @@ function cardCell(f) {
       new TextRun({ text: `   ${sevPips(f.severity)}`, font: "Arial", size: 18, color: f.severity >= 3 ? "B00000" : MUTED }),
     ],
   }));
+
+  // TIME-CRITICAL (late shift): the word, never a number — nothing counts down.
+  if (f.time_critical) {
+    kids.push(new Paragraph({
+      spacing: { after: 100 },
+      children: [new TextRun({ text: "TIME-CRITICAL", font: "Arial", size: 16, bold: true, color: "B00000", characterSpacing: 60 })],
+    }));
+  }
 
   // flavour
   kids.push(new Paragraph({
@@ -153,6 +170,7 @@ for (const r of ORDER) {
   deck.push(...faults.filter((f) => f.round === r).sort((a, b) => a.code.localeCompare(b.code)));
 }
 deck.push(...chainFaults.slice().sort((a, b) => a.code.localeCompare(b.code)));
+deck.push(...lateFaults.slice().sort((a, b) => a.code.localeCompare(b.code)));
 
 const cardChildren = [];
 for (let i = 0; i < deck.length; i += 4) {
@@ -212,7 +230,7 @@ for (const f of deck) {
   ].filter(Boolean).join(" · ");
 
   const flag = f.false_alarm || (f.valid_codes.length > 1);
-  const vals = [f.code, f.round, f.sector, f.name, codes, src, cost, note || "—"];
+  const vals = [f.code, f.round || (f.section ? "LATE" : "CHAIN"), f.sector, f.name, codes, src, cost, note || "—"];
   keyRows.push(new TableRow({
     children: vals.map((v, i) => new TableCell({
       width: { size: [1100, 700, 700, 2400, 2200, 3000, 1600, 3600][i], type: WidthType.DXA },
@@ -285,6 +303,7 @@ Packer.toBuffer(keyDoc).then((b) => {
 const byRound = {};
 deck.forEach((f) => { byRound[f.round] = (byRound[f.round] || 0) + 1; });
 console.log("  deck order:", ORDER.map((r) => `${r} ${byRound[r] || 0}`).join(" · ")
-  + (chainFaults.length ? ` · REFERENCE CHAIN ${chainFaults.length} (unscheduled)` : ""));
+  + (chainFaults.length ? ` · REFERENCE CHAIN ${chainFaults.length} (unscheduled)` : "")
+  + (lateFaults.length ? ` · LATE SHIFT ${lateFaults.length} (unscheduled)` : ""));
 console.log("  no-code cards:", deck.filter((f) => f.false_alarm).map((f) => f.code).join(", ") || "none");
 console.log("  multi-code cards:", deck.filter((f) => f.valid_codes.length > 1).map((f) => f.code).join(", ") || "none");

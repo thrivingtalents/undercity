@@ -531,6 +531,8 @@ button.wide { width: 100%; }
 .fr-sev { font-size: 11px; letter-spacing: 0.14em; color: var(--ink-dim); white-space: nowrap; }
 .fr-sev i { font-style: normal; color: var(--amber); margin-right: 4px; }
 .sev-3 .fr-sev i { color: var(--red); }
+/* LATE SHIFT: the word the card prints on a P-10. No countdown, because none runs. */
+.fr-tc { font-size: 9px; letter-spacing: 0.14em; font-weight: 700; color: var(--red); white-space: nowrap; }
 .fr-name { font-size: 12px; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; letter-spacing: 0.04em; }
 .fault-row.flash-ok { animation: flashOk 900ms ease; }
 

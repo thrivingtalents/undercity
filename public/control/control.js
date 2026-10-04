@@ -140,6 +140,10 @@
   function buildStatics() {
     const codes = sectorCodes();
     for (const r of content.faults.meta.rounds) $('f-round').insertAdjacentHTML('beforeend', `<option value="${r}">${r}</option>`);
+    // The two generated decks are their own groups: unscheduled, the facilitator's to fire.
+    if (content.faults.faults.some((f) => f.reference_chain)) $('f-round').insertAdjacentHTML('beforeend', '<option value="chain">REFERENCE CHAIN</option>');
+    if (content.faults.faults.some((f) => f.late_shift)) $('f-round').insertAdjacentHTML('beforeend', '<option value="late">LATE SHIFT</option>');
+    for (const p of [...new Set(content.faults.faults.map((f) => f.procedure).filter(Boolean))].sort()) $('f-proc').insertAdjacentHTML('beforeend', `<option value="${p}">${p}</option>`);
     for (const s of codes) {
       $('f-sector').insertAdjacentHTML('beforeend', `<option value="${s}">${s}</option>`);
       $('announce-target').insertAdjacentHTML('beforeend', `<option value="${s}">${s} ONLY</option>`);
@@ -147,7 +151,7 @@
       $('tr-to').insertAdjacentHTML('beforeend', `<option value="${s}">${s}</option>`);
     }
     $('tr-to').selectedIndex = 1;
-    for (const id of ['f-round', 'f-sector', 'f-sev']) $(id).addEventListener('change', renderInjects);
+    for (const id of ['f-round', 'f-sector', 'f-sev', 'f-proc']) $(id).addEventListener('change', renderInjects);
     $('f-text').addEventListener('input', renderInjects);
 
     $('ovr-sectors').innerHTML = codes.map((s) => `<button data-ovr-sector="${s}">${U.SECTOR_GLYPH[s] || ''} ${s}</button>`).join('');
@@ -424,15 +428,45 @@
     });
   }
 
+  /**
+   * What a fault needs and what it answers, for the facilitator's eyes only
+   * (LATE SHIFT, 2026-10-05, for every fault with sources): the picker is
+   * behind the control token and nothing here reaches a table.
+   */
+  function sourceText(f) {
+    const specs = (content && content.specs && content.specs.specs) || [];
+    return (f.spec_refs || []).map((r, i) => {
+      const s = specs.find((x) => x.spec_id === r.spec_id);
+      return `VALUE ${i + 1}: ${r.binder} ${r.table} ${r.row_label}${r.buried ? ' (Appendix C)' : ''} = ${s ? s.value : '?'}`;
+    });
+  }
+  function rewardText(code) {
+    const r = content && content.rewards && content.rewards.rewards ? content.rewards.rewards[code] : null;
+    if (!r) return '';
+    if (r.type === 'RESOURCE') return `REWARD +${r.amount} ${String(r.resource).toUpperCase()}`;
+    if (r.type === 'INTEGRITY') return `REWARD +${r.amount} INTEGRITY`;
+    return `REWARD ${String(r.token || '').replace(/_/g, ' ')}`;
+  }
+  function needsText(f) {
+    const mats = Object.entries(f.resources_required || {}).map(([k, v]) => `${v} ${k.toUpperCase()}`).join(', ');
+    const parts = [`${f.procedure}`, `crew ${f.crew_required}`, mats || 'no materials', `decay ${f.decay_per_min}/min`];
+    if (f.time_critical) parts.push(`TIME-CRITICAL${f.facilitator_target_s ? ` — call it at ${U.mmss(f.facilitator_target_s)}` : ''}`);
+    const reward = rewardText(f.code);
+    if (reward) parts.push(reward);
+    return parts.join(' · ');
+  }
+
   /** Triggering a fault is routine, but never a slip: one preview, one press. */
   function confirmTrigger(code, sector) {
     const f = content && content.faults.faults.find((x) => x.code === code);
+    const group = f ? (f.reference_chain ? 'REFERENCE CHAIN' : f.late_shift ? `LATE SHIFT · from ${f.recommended_from}` : String(f.round)) : '';
     const body = openPicker(`TRIGGER FAULT — ${code}`, `
       <div class="confirm-card">
         <div class="cc-title">${esc(code)} · ${esc(f ? f.name : '')}</div>
-        <div class="cc-line">→ <b>${esc(sector)}</b> · ${f ? U.severityPips(f.severity) : ''} · ${f ? esc(String(f.reference_chain ? 'REFERENCE CHAIN' : f.round)) : ''}${f && f.injures_workforce ? ` · injures ${f.injures_workforce}` : ''}</div>
+        <div class="cc-line">→ <b>${esc(sector)}</b> · ${f ? U.severityPips(f.severity) : ''} · ${esc(group)}${f && f.injures_workforce ? ` · injures ${f.injures_workforce}` : ''}</div>
         ${f && f.reference_chain ? `<div class="cc-chain">${chainText(f).map((l) => `<div>${esc(l)}</div>`).join('')}<em>Facilitator only — no player screen shows past the first sector.</em></div>` : ''}
         ${f && f.valid_codes && f.reference_chain ? `<div class="cc-chain"><b>ANSWER ${esc(f.valid_codes.join(' / '))}</b></div>` : ''}
+        ${f && !f.reference_chain && (f.spec_refs || []).length ? `<div class="cc-chain">${sourceText(f).map((l) => `<div>${esc(l)}</div>`).join('')}<div><b>ANSWER ${esc((f.valid_codes || []).join(' / '))}</b></div><div>${esc(needsText(f))}</div><em>Facilitator only — no player screen shows any of this.</em></div>` : ''}
         <div class="row"><button id="cc-cancel">CANCEL</button><button id="cc-go" class="primary">TRIGGER</button></div>
       </div>`);
     body.querySelector('#cc-cancel').addEventListener('click', closePicker);
@@ -467,7 +501,7 @@
         <div class="pick-sector"><h3 style="color:${state.sectors[s].colour}">${U.SECTOR_GLYPH[s] || ''} ${s}</h3>
           ${content.faults.faults.filter((f) => f.sector === s).map((f) => `
             <button class="pf${active.has(f.code) ? ' live' : ''}${f.reference_chain ? ' chain' : ''}" data-fire="${f.code}" data-sector="${s}" title="${esc(f.name)}${f.reference_chain ? `\n${chainText(f).join('\n')}` : ''}">
-              <b>${f.code}</b><span class="nm">${esc(f.name)}</span><span class="rd">${f.reference_chain ? 'CHAIN' : esc(String(f.round))}</span><span class="sv">${U.severityPips(f.severity)}</span>
+              <b>${f.code}</b><span class="nm">${esc(f.name)}</span><span class="rd">${f.reference_chain ? 'CHAIN' : f.late_shift ? 'LATE' : esc(String(f.round))}</span><span class="sv">${U.severityPips(f.severity)}</span>
             </button>`).join('')}
         </div>`).join('')}
       </div>`);
@@ -975,10 +1009,12 @@
     const round = $('f-round').value;
     const sector = $('f-sector').value;
     const sev = $('f-sev').value;
+    const proc = $('f-proc').value;
     const text = $('f-text').value.trim().toUpperCase();
     const active = activeFaultCodes();
+    const inGroup = (f) => !round || (round === 'late' ? !!f.late_shift : round === 'chain' ? !!f.reference_chain : f.round === round);
     const rows = content.faults.faults.filter((f) =>
-      (!round || f.round === round) && (!sector || f.sector === sector) &&
+      inGroup(f) && (!sector || f.sector === sector) && (!proc || f.procedure === proc) &&
       (!sev || String(f.severity) === sev) && (!text || f.code.includes(text) || f.name.toUpperCase().includes(text)));
     $('injects').innerHTML = rows.map((f) => {
       const tags = [];
@@ -986,8 +1022,11 @@
       if (f.valid_codes.length > 1) tags.push('<span class="tag multi">2 CODES</span>');
       if (f.injures_workforce > 0) tags.push(`<span class="tag injury">−${f.injures_workforce}👤</span>`);
       if ((f.spec_refs || []).some((r) => r.binder !== f.sector)) tags.push('<span class="tag cross">X-SECTOR</span>');
+      // LATE SHIFT (2026-10-05): its procedure, and the word a P-10 carries.
+      if (f.late_shift) tags.push(`<span class="tag late">${esc(f.procedure)}</span>`);
+      if (f.time_critical) tags.push('<span class="tag timed">TIME-CRITICAL</span>');
       return `<div class="inject${active.has(f.code) ? ' active' : ''}">
-          <span class="code">${f.code}</span><span class="sec">${f.sector} ${f.round}</span>
+          <span class="code">${f.code}</span><span class="sec">${f.sector} ${f.reference_chain ? 'CHAIN' : f.late_shift ? 'LATE' : f.round}</span>
           <span class="nm" title="${esc(f.name)}">${U.severityPips(f.severity)} ${esc(f.name)}</span>
           <span class="tags">${tags.join('')}<button data-fire="${f.code}" data-sector="${f.sector}"${active.has(f.code) ? ' disabled' : ''}>${active.has(f.code) ? 'LIVE' : 'TRIGGER'}</button></span>
         </div>`;

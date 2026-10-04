@@ -162,10 +162,10 @@ test('RC-009: every existing fault and every existing spec value is exactly as i
   for (const p of ['P-01', 'P-02', 'P-03', 'P-04', 'P-05', 'P-06']) {
     assert.ok(workbook.faults.some((f) => f.procedure === p), `${p} is gone`);
   }
-  // The merged world is the 36 plus the 12, and the codes are unique in it.
-  assert.equal(content.faults.faults.length, 48);
-  assert.equal(content.faults.meta.fault_count, 48);
-  assert.equal(new Set(content.faults.faults.map((f) => f.code)).size, 48);
+  // The merged world is the 36 plus the 12 chains plus the 12 late-shift faults (2026-10-05), and the codes are unique in it.
+  assert.equal(content.faults.faults.length, 60);
+  assert.equal(content.faults.meta.fault_count, 60);
+  assert.equal(new Set(content.faults.faults.map((f) => f.code)).size, 60);
   // The old path still resolves, unchanged.
   const game = live('POW', 'F-101');
   assert.equal(submitCode(game, { sector: 'POW', fault_code: 'F-101', code: def('F-101').valid_codes[0], workers_assigned: 2 }).accepted, true);

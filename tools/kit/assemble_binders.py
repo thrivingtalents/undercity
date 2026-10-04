@@ -174,6 +174,16 @@ chain_by_sector = {}
 for f in chain["faults"]:
     chain_by_sector.setdefault(f["sector"], []).append(f)
 
+# ---- late-shift faults (generated, not from the workbook) -------------------
+# F-601..F-612 live in content/faults.late-shift.json: P-09 and P-10, two
+# values from two indexed tables, resolved from content/specs.json by
+# tools/build_late_shift_faults.js. They print like any workbook procedure.
+LATE_PATH = Path(__file__).resolve().parents[2] / "content" / "faults.late-shift.json"
+late = json.loads(LATE_PATH.read_text(encoding="utf-8")) if LATE_PATH.exists() else {"faults": []}
+late_by_sector = {}
+for f in late["faults"]:
+    late_by_sector.setdefault(f["sector"], []).append(f)
+
 # ---- escalate entries (parsed from CrossrefMap) -----------------------------
 escalate = {}
 for row in wb["CrossrefMap"].iter_rows(min_row=1, values_only=True):
@@ -203,6 +213,12 @@ for code, info in SECTOR_INFO.items():
         index_rows.append({
             "code": f["code"], "name": f["name"],
             "action": f"Procedure {f['procedure']}", "own": True, "no_procedure": False,
+        })
+    for f in sorted(late_by_sector.get(code, []), key=lambda x: x["code"]):
+        index_rows.append({
+            "code": f["code"], "name": f["name"],
+            "action": f"Procedure {f['procedure']}" + (" · TIME-CRITICAL" if f.get("time_critical") else ""),
+            "own": True, "no_procedure": False,
         })
     for e in escalate.get(code, []):
         index_rows.append({
@@ -278,6 +294,42 @@ for code, info in SECTOR_INFO.items():
                                  "first_reference_name": c["first_reference_name"]}
                                 for c in f["reference_chain"]],
             "steps": steps, "severity": f["severity"],
+        })
+
+    # P-09 and P-10 (LATE SHIFT, 2026-10-05): two indexed sources, written
+    # exactly like P-01..P-06. A P-10 is TIME-CRITICAL: the word is on the
+    # card and in the index, and one step says what it means — nothing
+    # counts down, Integrity simply falls faster while the fault stays open.
+    for f in sorted(late_by_sector.get(code, []), key=lambda x: x["code"]):
+        steps, sources = [], []
+        for r in f["spec_refs"]:
+            s = specs[r["spec_id"]]
+            where = (f"{s['binder']} Manual, Table {s['table_id']}" if s["binder"] != code
+                     else f"YOUR Table {s['table_id']}")
+            sources.append({"where": where, "row_label": s["row_label"],
+                            "foreign": s["binder"] != code, "buried": False})
+        fmt = f["procedure"] + "-[VALUE]-[VALUE 2]"
+        mats = ", ".join(f"{v} {k.title()}" for k, v in f["resources_required"].items())
+        steps.append(f"Confirm the fault code on the alert card matches {f['code']}.")
+        if f.get("time_critical"):
+            steps.append("TIME-CRITICAL: Integrity falls fast while this fault stays open. "
+                         "Work it ahead of anything that can wait. Nothing counts down.")
+        steps.append(f"Assign crew: {f['crew_required']} worker(s) minimum. Fewer will not hold the isolation.")
+        steps.append(f"Stage materials: {mats}.")
+        for s in sources:
+            verb = ("Obtain" if s["foreign"] else "Read off")
+            steps.append(f"{verb} the {s['row_label']} value from {s['where']}." +
+                         (" This value is not held in this binder." if s["foreign"] else ""))
+        steps.append(f"Enter the resolution code on the sector console in the format {fmt}, "
+                     "substituting the value(s) above. Values are three digits.")
+        steps.append("If the console rejects the entry, re-verify the source table before "
+                     "resubmitting. Three consecutive rejections lock the console for 20 seconds.")
+        procedures.append({
+            "id": f["procedure"], "fault_code": f["code"],
+            "title": f["name"] + (" — TIME-CRITICAL" if f.get("time_critical") else ""),
+            "resources": mats, "crew": f["crew_required"],
+            "deadline": None, "format": fmt,
+            "sources": sources, "steps": steps, "severity": f["severity"],
         })
 
     tables = {}

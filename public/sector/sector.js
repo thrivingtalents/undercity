@@ -1654,6 +1654,7 @@
     row.innerHTML =
       `<span class="fr-code">${esc(f.code)}</span>` +
       `<span class="fr-sev"><i>${U.severityPips(f.severity)}</i> ${U.severityName(f.severity)}</span>` +
+      (f.time_critical ? '<span class="fr-tc">TIME-CRITICAL</span>' : '') +
       `<span class="fr-name">${esc(f.name)}</span>`;
     row.addEventListener('click', () => selectFault(f.code));
     return row;
@@ -1725,7 +1726,7 @@
       card.classList.add(sev);
       card.dataset.sev = sev;
     }
-    setText($('card-sev'), `${U.severityPips(f.severity)} ${U.severityName(f.severity)}`);
+    setText($('card-sev'), `${U.severityPips(f.severity)} ${U.severityName(f.severity)}${f.time_critical ? ' · TIME-CRITICAL' : ''}`);
     setText($('card-code'), f.code);
     setText($('card-name'), String(f.name || '').toUpperCase());
     setText($('card-flavour'), f.flavour || '');

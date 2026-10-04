@@ -236,6 +236,10 @@ C.push(p([t("The WTR binder prints the Lower Reservoir at "), mono("340"), t(". 
 C.push(H3("The buried appendices"));
 C.push(p(t("Every binder holds one Appendix C value that appears in no index. Water and Agriculture need their own during Core Failure; every one of the six is raided by another sector in the late shift. Teams that never open the back of the binder will stall. That stall is a finding about how people behave when the documentation fights back.")));
 
+C.push(H3("The late shift"));
+C.push(p(t("Every binder's Fault Code Index ends with two more procedures, P-09 and P-10, and the card deck has a LATE SHIFT section after REFERENCE CHAIN. They add no mechanic. A P-09 fault needs two values from two other binders, exactly as Round 3's did. A P-10 fault is the same with three crew, heavier materials and Integrity falling three points a minute while it stays open: the card says TIME-CRITICAL and nothing counts down, because nothing does — the control panel's preview shows you a target time to call out loud if the room needs the pressure, and that is all it is. They exist so Round 4, and whatever follows it when the round table grows, can mix every kind of fault the room has learned without repeating one. Fire them from the library like everything else; the preview shows you the two sources and the answer, and no table ever sees that.")));
+C.push(brk());
+
 C.push(H2("3.5 Agriculture's operational decisions"));
 C.push(p(t("Agriculture's console deals it three cards at the start of every round and lets it play one. In Round 0 and Round 1 the cards are free: a gain, nothing owed, and the table learns the rhythm. From Round 2 every card is an operational decision with two halves, and the console will not let AGR take one half without the other.")));
 C.push(dash([t("GAIN", { bold: true }), t(" — what the city gets the moment AGR confirms: stock to a sector, health to a sector, a worker or an approval for the round. These are the same gains the cards have always given. The line leads with the sector and the number — POW +1 WORKER, THIS ROUND.")]));
@@ -363,6 +367,7 @@ C.push(p(t("Same teams, same roles, a fresh crisis onto the city they have left.
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
   beat("00:00", "NEXT ROUND → Round 4. START, then fire its six faults from the library, each needing another sector’s buried appendix. Announce in-world: \"Seismic activity detected.\" Restore brownout sectors to active.", "Whether anyone notices that nothing else was given back."),
+  beat("01:00", "The library's LATE SHIFT section is yours from here: twelve more faults, P-09 (two values from two other binders) and P-10 (TIME-CRITICAL — Integrity falls three a minute while it stays open). Mix them with Round 4's own six and the reference chains. Keep every table at two live faults; three only as a deliberate overload. Across the late shift, make each sector somebody's dependency at least once.", "Who is asked for a value by two tables at once, and whether they queue the asks or pick a favourite."),
   beat("01:00", "Walk the floor.", "Six sectors, six raids on six appendices. The asking behaviour should look different from the early shift — that difference is the deliverable. Watch who is asked twice and how they answer the second time. TRN’s fault is the mini-triage feed; decay pressure returns onto tired people."),
   beat("03:30", "Optional short Council if the group is coping well. Skip if they are not.", "Compare directly against the first sitting. Same people, same format, measurable difference."),
 ], BW));

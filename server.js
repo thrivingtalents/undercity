@@ -30,6 +30,7 @@ const { WebSocketServer } = require('ws');
 
 const { validateContent } = require('./lib/validate');
 const { loadContent } = require('./lib/content');
+const REWARDS = require('./lib/fault-rewards.json');   // the facilitator's library preview names each fault's reward
 const { RunLog } = require('./lib/log');
 const { submitCode } = require('./lib/resolve');
 const { filterState } = require('./lib/visibility');
@@ -593,6 +594,7 @@ app.get('/api/content', (req, res) => {
   if (!row) return;
   res.json({
     faults: content.faults, specs: content.specs, sectors: content.sectors, rounds,
+    rewards: REWARDS,
     scenarios: scenarios.list(),
     urls: publicUrls(row),
   });

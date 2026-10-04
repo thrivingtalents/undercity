@@ -1,0 +1,545 @@
+{
+  "meta": {
+    "name": "Late Shift Faults",
+    "version": "1.0",
+    "source": "spec/late_shift_faults.json",
+    "generator": "tools/build_late_shift_faults.js",
+    "section": "LATE SHIFT",
+    "recommended_from": "R4",
+    "fault_count": 12,
+    "procedures": {
+      "P-09": {
+        "severity": 2,
+        "decay_per_min": 2,
+        "time_critical": false,
+        "label": "Direct cross-sector technical dependency, two values"
+      },
+      "P-10": {
+        "severity": 3,
+        "decay_per_min": 3,
+        "time_critical": true,
+        "label": "Higher-pressure direct cross-sector dependency, two values, TIME-CRITICAL"
+      }
+    },
+    "note": "Generated. Do not hand-edit — edit spec/late_shift_faults.json and re-run the generator. Every three-digit value here was resolved from content/specs.json."
+  },
+  "faults": [
+    {
+      "code": "F-601",
+      "round": null,
+      "sector": "POW",
+      "name": "Turbine manifold pressure imbalance",
+      "flavour": "Cooling pressure across the turbine manifold is oscillating beyond control tolerance.",
+      "severity": 2,
+      "decay_per_min": 2,
+      "crew_required": 2,
+      "resources_required": {
+        "parts": 1,
+        "water": 1
+      },
+      "procedure": "P-09",
+      "spec_refs": [
+        {
+          "spec_id": "W4-1",
+          "binder": "WTR",
+          "table": "W-4",
+          "row_label": "Upper Reservoir",
+          "buried": false
+        },
+        {
+          "spec_id": "P1-2",
+          "binder": "POW",
+          "table": "P-1",
+          "row_label": "Turbine B",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-09-670-730"
+      ],
+      "false_alarm": false,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "LATE SHIFT · P-09",
+      "section": "LATE SHIFT",
+      "recommended_from": "R4",
+      "late_shift": true,
+      "time_critical": false,
+      "facilitator_target_s": null
+    },
+    {
+      "code": "F-602",
+      "round": null,
+      "sector": "POW",
+      "name": "Ring-main emergency synchronisation fault",
+      "flavour": "The ring main has lost synchronisation with the emergency distribution network.",
+      "severity": 3,
+      "decay_per_min": 3,
+      "crew_required": 3,
+      "resources_required": {
+        "parts": 2,
+        "water": 1
+      },
+      "procedure": "P-10",
+      "spec_refs": [
+        {
+          "spec_id": "C3-3",
+          "binder": "COM",
+          "table": "C-3",
+          "row_label": "Core Ring",
+          "buried": false
+        },
+        {
+          "spec_id": "T6-5",
+          "binder": "TRN",
+          "table": "T-6",
+          "row_label": "Emergency Line",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-10-145-911"
+      ],
+      "false_alarm": false,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "LATE SHIFT · P-10 · TIME-CRITICAL",
+      "section": "LATE SHIFT",
+      "recommended_from": "R4",
+      "late_shift": true,
+      "time_critical": true,
+      "facilitator_target_s": 420
+    },
+    {
+      "code": "F-603",
+      "round": null,
+      "sector": "WTR",
+      "name": "Reclaim sterilisation bypass failure",
+      "flavour": "The reclaim plant has lost its sterilisation bypass and untreated flow is backing toward storage.",
+      "severity": 2,
+      "decay_per_min": 2,
+      "crew_required": 2,
+      "resources_required": {
+        "power": 1,
+        "med": 1
+      },
+      "procedure": "P-09",
+      "spec_refs": [
+        {
+          "spec_id": "M5-5",
+          "binder": "MED",
+          "table": "M-5",
+          "row_label": "Scrubber Unit",
+          "buried": false
+        },
+        {
+          "spec_id": "A2-4",
+          "binder": "AGR",
+          "table": "A-2",
+          "row_label": "Bay 4",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-09-346-311"
+      ],
+      "false_alarm": false,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "LATE SHIFT · P-09",
+      "section": "LATE SHIFT",
+      "recommended_from": "R4",
+      "late_shift": true,
+      "time_critical": false,
+      "facilitator_target_s": null
+    },
+    {
+      "code": "F-604",
+      "round": null,
+      "sector": "WTR",
+      "name": "Emergency tank isolation failure",
+      "flavour": "The emergency tank isolation valves have failed during a pressure surge.",
+      "severity": 3,
+      "decay_per_min": 3,
+      "crew_required": 3,
+      "resources_required": {
+        "parts": 2,
+        "power": 1
+      },
+      "procedure": "P-10",
+      "spec_refs": [
+        {
+          "spec_id": "P2-1",
+          "binder": "POW",
+          "table": "P-2",
+          "row_label": "Ring Main",
+          "buried": false
+        },
+        {
+          "spec_id": "C3-5",
+          "binder": "COM",
+          "table": "C-3",
+          "row_label": "Deep Sensors",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-10-292-828"
+      ],
+      "false_alarm": false,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Approved 2026-10-04 with Ring Main in place of Emergency Bus: Emergency Bus is where WTR's own chain F-504 ends.",
+      "section": "LATE SHIFT",
+      "recommended_from": "R4",
+      "late_shift": true,
+      "time_critical": true,
+      "facilitator_target_s": 420
+    },
+    {
+      "code": "F-605",
+      "round": null,
+      "sector": "MED",
+      "name": "Surgical air-pressure collapse",
+      "flavour": "The surgical suite cannot maintain positive pressure against the surrounding gallery.",
+      "severity": 2,
+      "decay_per_min": 2,
+      "crew_required": 2,
+      "resources_required": {
+        "power": 1,
+        "med": 1
+      },
+      "procedure": "P-09",
+      "spec_refs": [
+        {
+          "spec_id": "W4-2",
+          "binder": "WTR",
+          "table": "W-4",
+          "row_label": "Mid Reservoir",
+          "buried": false
+        },
+        {
+          "spec_id": "C3-2",
+          "binder": "COM",
+          "table": "C-3",
+          "row_label": "Grid South",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-09-734-931"
+      ],
+      "false_alarm": false,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "LATE SHIFT · P-09",
+      "section": "LATE SHIFT",
+      "recommended_from": "R4",
+      "late_shift": true,
+      "time_critical": false,
+      "facilitator_target_s": null
+    },
+    {
+      "code": "F-606",
+      "round": null,
+      "sector": "MED",
+      "name": "Triage backup-power failure",
+      "flavour": "Triage backup power has failed while critical treatment loads remain active.",
+      "severity": 3,
+      "decay_per_min": 3,
+      "crew_required": 3,
+      "resources_required": {
+        "power": 2,
+        "parts": 1
+      },
+      "procedure": "P-10",
+      "spec_refs": [
+        {
+          "spec_id": "P2-2",
+          "binder": "POW",
+          "table": "P-2",
+          "row_label": "Sub-grid 1",
+          "buried": false
+        },
+        {
+          "spec_id": "T6-5",
+          "binder": "TRN",
+          "table": "T-6",
+          "row_label": "Emergency Line",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-10-990-911"
+      ],
+      "false_alarm": false,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Approved 2026-10-04 with Emergency Line in place of Line 3: Line 3 is where MED's own chain F-505 ends.",
+      "section": "LATE SHIFT",
+      "recommended_from": "R4",
+      "late_shift": true,
+      "time_critical": true,
+      "facilitator_target_s": 360
+    },
+    {
+      "code": "F-607",
+      "round": null,
+      "sector": "TRN",
+      "name": "Freight tunnel ventilation failure",
+      "flavour": "Air quality in the freight spur is deteriorating after the ventilation controller drops offline.",
+      "severity": 2,
+      "decay_per_min": 2,
+      "crew_required": 2,
+      "resources_required": {
+        "power": 1,
+        "parts": 1
+      },
+      "procedure": "P-09",
+      "spec_refs": [
+        {
+          "spec_id": "M5-4",
+          "binder": "MED",
+          "table": "M-5",
+          "row_label": "HEPA Array",
+          "buried": false
+        },
+        {
+          "spec_id": "C3-4",
+          "binder": "COM",
+          "table": "C-3",
+          "row_label": "Perimeter",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-09-273-306"
+      ],
+      "false_alarm": false,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "LATE SHIFT · P-09",
+      "section": "LATE SHIFT",
+      "recommended_from": "R4",
+      "late_shift": true,
+      "time_critical": false,
+      "facilitator_target_s": null
+    },
+    {
+      "code": "F-608",
+      "round": null,
+      "sector": "TRN",
+      "name": "Rail interlock cascade",
+      "flavour": "Multiple rail interlocks are dropping in sequence and blocking movement through the yard.",
+      "severity": 3,
+      "decay_per_min": 3,
+      "crew_required": 3,
+      "resources_required": {
+        "parts": 2,
+        "power": 1
+      },
+      "procedure": "P-10",
+      "spec_refs": [
+        {
+          "spec_id": "P2-1",
+          "binder": "POW",
+          "table": "P-2",
+          "row_label": "Ring Main",
+          "buried": false
+        },
+        {
+          "spec_id": "W3-5",
+          "binder": "WTR",
+          "table": "W-3",
+          "row_label": "Backup Pump",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-10-292-445"
+      ],
+      "false_alarm": false,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "LATE SHIFT · P-10 · TIME-CRITICAL",
+      "section": "LATE SHIFT",
+      "recommended_from": "R4",
+      "late_shift": true,
+      "time_critical": true,
+      "facilitator_target_s": 360
+    },
+    {
+      "code": "F-609",
+      "round": null,
+      "sector": "AGR",
+      "name": "Seedling-bay dosing failure",
+      "flavour": "The seedling bay dosing controller has stopped matching nutrient flow to irrigation demand.",
+      "severity": 2,
+      "decay_per_min": 2,
+      "crew_required": 2,
+      "resources_required": {
+        "water": 1,
+        "parts": 1
+      },
+      "procedure": "P-09",
+      "spec_refs": [
+        {
+          "spec_id": "W3-1",
+          "binder": "WTR",
+          "table": "W-3",
+          "row_label": "Pump Station 1",
+          "buried": false
+        },
+        {
+          "spec_id": "A2-5",
+          "binder": "AGR",
+          "table": "A-2",
+          "row_label": "Seedling Bay",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-09-617-793"
+      ],
+      "false_alarm": false,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "LATE SHIFT · P-09",
+      "section": "LATE SHIFT",
+      "recommended_from": "R4",
+      "late_shift": true,
+      "time_critical": false,
+      "facilitator_target_s": null
+    },
+    {
+      "code": "F-610",
+      "round": null,
+      "sector": "AGR",
+      "name": "Seed Vault climate-control collapse",
+      "flavour": "Temperature and humidity control in the Seed Vault are failing simultaneously.",
+      "severity": 3,
+      "decay_per_min": 3,
+      "crew_required": 3,
+      "resources_required": {
+        "water": 2,
+        "power": 1,
+        "med": 1
+      },
+      "procedure": "P-10",
+      "spec_refs": [
+        {
+          "spec_id": "M2-3",
+          "binder": "MED",
+          "table": "M-2",
+          "row_label": "Isolation Wing",
+          "buried": false
+        },
+        {
+          "spec_id": "C3-5",
+          "binder": "COM",
+          "table": "C-3",
+          "row_label": "Deep Sensors",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-10-274-828"
+      ],
+      "false_alarm": false,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "LATE SHIFT · P-10 · TIME-CRITICAL",
+      "section": "LATE SHIFT",
+      "recommended_from": "R4",
+      "late_shift": true,
+      "time_critical": true,
+      "facilitator_target_s": 420
+    },
+    {
+      "code": "F-611",
+      "round": null,
+      "sector": "COM",
+      "name": "Deep-sensor relay drift",
+      "flavour": "Deep-sensor timing is drifting far enough to corrupt the city telemetry picture.",
+      "severity": 2,
+      "decay_per_min": 2,
+      "crew_required": 2,
+      "resources_required": {
+        "power": 1,
+        "parts": 1
+      },
+      "procedure": "P-09",
+      "spec_refs": [
+        {
+          "spec_id": "T1-4",
+          "binder": "TRN",
+          "table": "T-1",
+          "row_label": "Tunnel D",
+          "buried": false
+        },
+        {
+          "spec_id": "W4-4",
+          "binder": "WTR",
+          "table": "W-4",
+          "row_label": "Overflow Basin",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-09-621-819"
+      ],
+      "false_alarm": false,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Approved 2026-10-04 with Overflow Basin in place of Lower Reservoir: Lower Reservoir is the seeded discrepancy row, kept unique to F-201.",
+      "section": "LATE SHIFT",
+      "recommended_from": "R4",
+      "late_shift": true,
+      "time_critical": false,
+      "facilitator_target_s": null
+    },
+    {
+      "code": "F-612",
+      "round": null,
+      "sector": "COM",
+      "name": "Emergency uplink routing failure",
+      "flavour": "The emergency uplink cannot establish a stable route through the city relay mesh.",
+      "severity": 3,
+      "decay_per_min": 3,
+      "crew_required": 3,
+      "resources_required": {
+        "power": 2,
+        "parts": 2
+      },
+      "procedure": "P-10",
+      "spec_refs": [
+        {
+          "spec_id": "P2-5",
+          "binder": "POW",
+          "table": "P-2",
+          "row_label": "Emergency Bus",
+          "buried": false
+        },
+        {
+          "spec_id": "M2-4",
+          "binder": "MED",
+          "table": "M-2",
+          "row_label": "Triage Bay",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-10-449-823"
+      ],
+      "false_alarm": false,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "LATE SHIFT · P-10 · TIME-CRITICAL",
+      "section": "LATE SHIFT",
+      "recommended_from": "R4",
+      "late_shift": true,
+      "time_critical": true,
+      "facilitator_target_s": 360
+    }
+  ]
+}

@@ -335,7 +335,8 @@ test('AGR-007: a delayed consequence fires exactly once, whatever happens around
 test('AGR-009 / AGR-010: AGR faults and reference-chain faults are untouched', () => {
   const content = loadContent();
   const agrFaults = content.faults.faults.filter((f) => f.sector === 'AGR');
-  assert.equal(agrFaults.length, 8, 'AGR has a different number of faults');
+  // six from the workbook, two reference chains, and since 2026-10-05 the two late-shift faults F-609 / F-610
+  assert.equal(agrFaults.length, 10, 'AGR has a different number of faults');
   assert.ok(agrFaults.some((f) => f.code === 'F-509' && f.reference_chain), 'the AGR reference-chain faults are gone');
   const g = game('ROUND_2');
   deal(g, 'AGR_EMERGENCY_PARTS');

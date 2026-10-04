@@ -1,0 +1,153 @@
+{
+  "meta": {
+    "name": "Late Shift Faults",
+    "version": "1.0",
+    "approved": "2026-10-05",
+    "generated_into": "content/faults.late-shift.json",
+    "generator": "tools/build_late_shift_faults.js",
+    "section": "LATE SHIFT",
+    "recommended_from": "R4",
+    "purpose": "Two more faults per sector — P-09 and P-10 — so the mixed-operations phase (Round 4 today; whatever follows it when the round table grows) can mix every kind of fault the room has learned without repeating one. No new mechanic: a P-09 needs two values from two binders exactly as P-05 did; a P-10 is the same under time pressure expressed by Integrity decay.",
+    "rules": [
+      "This file holds STRUCTURE only: which sector, which table, which row. It never holds a three-digit value. The generator resolves every value from content/specs.json, so a changed specification changes the answer by itself.",
+      "A source must be an indexed table row (never Appendix C), must not be where the requesting sector's own reference chain ends (the chain would collapse into the team's notes), and must not be a row the requesting sector is already sent to by one of its own faults.",
+      "round is null and section is LATE SHIFT: these are the facilitator's to fire from the library, like every fault since 2026-10-04. recommended_from names the round from which they are appropriate — from that round ONWARD, never that round only.",
+      "time_critical / facilitator_target_s are guidance for the facilitator and the TIME-CRITICAL word on the card. Nothing counts down, expires or resolves on them; the pressure a P-10 carries is its decay_per_min."
+    ]
+  },
+  "procedures": {
+    "P-09": { "severity": 2, "decay_per_min": 2.0, "time_critical": false, "label": "Direct cross-sector technical dependency, two values" },
+    "P-10": { "severity": 3, "decay_per_min": 3.0, "time_critical": true, "label": "Higher-pressure direct cross-sector dependency, two values, TIME-CRITICAL" }
+  },
+  "faults": [
+    {
+      "code": "F-601", "sector": "POW", "procedure": "P-09",
+      "name": "Turbine manifold pressure imbalance",
+      "flavour": "Cooling pressure across the turbine manifold is oscillating beyond control tolerance.",
+      "crew_required": 2, "resources_required": { "parts": 1, "water": 1 },
+      "sources": [
+        { "sector": "WTR", "table": "W-4", "row": "Upper Reservoir" },
+        { "sector": "POW", "table": "P-1", "row": "Turbine B" }
+      ]
+    },
+    {
+      "code": "F-602", "sector": "POW", "procedure": "P-10",
+      "name": "Ring-main emergency synchronisation fault",
+      "flavour": "The ring main has lost synchronisation with the emergency distribution network.",
+      "crew_required": 3, "resources_required": { "parts": 2, "water": 1 },
+      "time_critical": true, "facilitator_target_s": 420,
+      "sources": [
+        { "sector": "COM", "table": "C-3", "row": "Core Ring" },
+        { "sector": "TRN", "table": "T-6", "row": "Emergency Line" }
+      ]
+    },
+    {
+      "code": "F-603", "sector": "WTR", "procedure": "P-09",
+      "name": "Reclaim sterilisation bypass failure",
+      "flavour": "The reclaim plant has lost its sterilisation bypass and untreated flow is backing toward storage.",
+      "crew_required": 2, "resources_required": { "power": 1, "med": 1 },
+      "sources": [
+        { "sector": "MED", "table": "M-5", "row": "Scrubber Unit" },
+        { "sector": "AGR", "table": "A-2", "row": "Bay 4" }
+      ]
+    },
+    {
+      "code": "F-604", "sector": "WTR", "procedure": "P-10",
+      "name": "Emergency tank isolation failure",
+      "flavour": "The emergency tank isolation valves have failed during a pressure surge.",
+      "crew_required": 3, "resources_required": { "parts": 2, "power": 1 },
+      "time_critical": true, "facilitator_target_s": 420,
+      "sources": [
+        { "sector": "POW", "table": "P-2", "row": "Ring Main" },
+        { "sector": "COM", "table": "C-3", "row": "Deep Sensors" }
+      ],
+      "facilitator_notes": "Approved 2026-10-04 with Ring Main in place of Emergency Bus: Emergency Bus is where WTR's own chain F-504 ends."
+    },
+    {
+      "code": "F-605", "sector": "MED", "procedure": "P-09",
+      "name": "Surgical air-pressure collapse",
+      "flavour": "The surgical suite cannot maintain positive pressure against the surrounding gallery.",
+      "crew_required": 2, "resources_required": { "power": 1, "med": 1 },
+      "sources": [
+        { "sector": "WTR", "table": "W-4", "row": "Mid Reservoir" },
+        { "sector": "COM", "table": "C-3", "row": "Grid South" }
+      ]
+    },
+    {
+      "code": "F-606", "sector": "MED", "procedure": "P-10",
+      "name": "Triage backup-power failure",
+      "flavour": "Triage backup power has failed while critical treatment loads remain active.",
+      "crew_required": 3, "resources_required": { "power": 2, "parts": 1 },
+      "time_critical": true, "facilitator_target_s": 360,
+      "sources": [
+        { "sector": "POW", "table": "P-2", "row": "Sub-grid 1" },
+        { "sector": "TRN", "table": "T-6", "row": "Emergency Line" }
+      ],
+      "facilitator_notes": "Approved 2026-10-04 with Emergency Line in place of Line 3: Line 3 is where MED's own chain F-505 ends."
+    },
+    {
+      "code": "F-607", "sector": "TRN", "procedure": "P-09",
+      "name": "Freight tunnel ventilation failure",
+      "flavour": "Air quality in the freight spur is deteriorating after the ventilation controller drops offline.",
+      "crew_required": 2, "resources_required": { "power": 1, "parts": 1 },
+      "sources": [
+        { "sector": "MED", "table": "M-5", "row": "HEPA Array" },
+        { "sector": "COM", "table": "C-3", "row": "Perimeter" }
+      ]
+    },
+    {
+      "code": "F-608", "sector": "TRN", "procedure": "P-10",
+      "name": "Rail interlock cascade",
+      "flavour": "Multiple rail interlocks are dropping in sequence and blocking movement through the yard.",
+      "crew_required": 3, "resources_required": { "parts": 2, "power": 1 },
+      "time_critical": true, "facilitator_target_s": 360,
+      "sources": [
+        { "sector": "POW", "table": "P-2", "row": "Ring Main" },
+        { "sector": "WTR", "table": "W-3", "row": "Backup Pump" }
+      ]
+    },
+    {
+      "code": "F-609", "sector": "AGR", "procedure": "P-09",
+      "name": "Seedling-bay dosing failure",
+      "flavour": "The seedling bay dosing controller has stopped matching nutrient flow to irrigation demand.",
+      "crew_required": 2, "resources_required": { "water": 1, "parts": 1 },
+      "sources": [
+        { "sector": "WTR", "table": "W-3", "row": "Pump Station 1" },
+        { "sector": "AGR", "table": "A-2", "row": "Seedling Bay" }
+      ]
+    },
+    {
+      "code": "F-610", "sector": "AGR", "procedure": "P-10",
+      "name": "Seed Vault climate-control collapse",
+      "flavour": "Temperature and humidity control in the Seed Vault are failing simultaneously.",
+      "crew_required": 3, "resources_required": { "water": 2, "power": 1, "med": 1 },
+      "time_critical": true, "facilitator_target_s": 420,
+      "sources": [
+        { "sector": "MED", "table": "M-2", "row": "Isolation Wing" },
+        { "sector": "COM", "table": "C-3", "row": "Deep Sensors" }
+      ]
+    },
+    {
+      "code": "F-611", "sector": "COM", "procedure": "P-09",
+      "name": "Deep-sensor relay drift",
+      "flavour": "Deep-sensor timing is drifting far enough to corrupt the city telemetry picture.",
+      "crew_required": 2, "resources_required": { "power": 1, "parts": 1 },
+      "sources": [
+        { "sector": "TRN", "table": "T-1", "row": "Tunnel D" },
+        { "sector": "WTR", "table": "W-4", "row": "Overflow Basin" }
+      ],
+      "facilitator_notes": "Approved 2026-10-04 with Overflow Basin in place of Lower Reservoir: Lower Reservoir is the seeded discrepancy row, kept unique to F-201."
+    },
+    {
+      "code": "F-612", "sector": "COM", "procedure": "P-10",
+      "name": "Emergency uplink routing failure",
+      "flavour": "The emergency uplink cannot establish a stable route through the city relay mesh.",
+      "crew_required": 3, "resources_required": { "power": 2, "parts": 2 },
+      "time_critical": true, "facilitator_target_s": 360,
+      "sources": [
+        { "sector": "POW", "table": "P-2", "row": "Emergency Bus" },
+        { "sector": "MED", "table": "M-2", "row": "Triage Bay" }
+      ]
+    }
+  ]
+}
