@@ -1561,6 +1561,46 @@ test('the debrief keeps COM edits, announcements, AGR offers, activations, refus
 const SECTOR_INDEX = fs.readFileSync(path.join(__dirname, '..', 'public', 'sector', 'index.html'), 'utf8');
 const SECTOR_SCRIPT = fs.readFileSync(path.join(__dirname, '..', 'public', 'sector', 'sector.js'), 'utf8');
 
+test('a sector under 30 washes its console red, and the console still works through it', () => {
+  // THE TRIGGER. The server's CRITICAL is the usual road in, and it is the
+  // scenario's own threshold — but a BROWNOUT sector keeps the word BROWNOUT
+  // however badly hurt it is, so the health band counts too. A sector at 0 is
+  // DARK and gets the offline curtain instead of a warning.
+  const game = newGame();
+  assert.equal(game.cfg.critical_below, 30, 'the threshold this is written against moved');
+  const word = (code) => forSector(game, code).sectors[code].status_word;
+  game.setIntegrity('POW', 30);
+  assert.notEqual(word('POW'), 'CRITICAL', '30 is not yet under 30');
+  game.setIntegrity('POW', 29);
+  assert.equal(word('POW'), 'CRITICAL', 'the server does not call 29 critical');
+  game.setIntegrity('POW', 0);
+  assert.equal(word('POW'), 'DARK');
+
+  const branch = SECTOR_SCRIPT.slice(SECTOR_SCRIPT.indexOf('const critical = word'), SECTOR_SCRIPT.indexOf("body.classList.toggle('is-brownout'"));
+  assert.ok(/word !== 'DARK'/.test(branch), 'a DARK sector would be washed as well as curtained');
+  assert.ok(/word === 'CRITICAL'/.test(branch), "the server's own word does not light it");
+  assert.ok(/U\.integrityClass\(Number\(mine\.integrity\)\) === 'critical'/.test(branch),
+    'a brownout sector under 30 would never light it');
+  assert.ok(/show\(\$\('critical-overlay'\), critical\)/.test(SECTOR_SCRIPT), 'nothing shows the wash');
+  assert.ok(/id="critical-overlay"/.test(SECTOR_INDEX), 'the console has no wash to show');
+
+  // THE PROMISE. It is a warning, not a curtain: no clicks, no content, and a
+  // gradient that is fully transparent through the middle of the screen where
+  // the figures and the repair field are.
+  const rule = SECTOR_CSS.match(/\.critical-overlay \{([^}]*)\}/)[1];
+  assert.ok(/pointer-events: none/.test(rule), 'the wash eats the clicks underneath it');
+  assert.ok(/rgba\(232, 90, 90, 0\) 3\d%/.test(rule), 'the middle of the wash is not clear');
+  assert.ok(!/rgba\([^)]*\)\s*0%/.test(rule), 'the wash is opaque at its centre');
+  assert.equal(SECTOR_INDEX.match(/id="critical-overlay"[^>]*>([\s\S]*?)<\/div>/)[1].trim(), '',
+    'the wash carries content that would cover the console');
+
+  // It sits under the curtain and under the facilitator's emergency.
+  const z = (sel) => Number((SECTOR_CSS.match(new RegExp(`\\${sel} \\{[^}]*z-index: (\\d+)`, 's')) || [])[1]);
+  assert.ok(z('.critical-overlay') < z('.overlay'), 'the wash outranks the offline curtain');
+  assert.ok(SECTOR_CSS.indexOf('.critical-overlay {') > SECTOR_CSS.indexOf('.overlay {'),
+    'the base overlay rule would override the wash');
+});
+
 test('POW, WTR, MED, TRN and AGR are not sent the six-sector board; COM and the wall are', () => {
   const game = running();
   game.setBroadcastRow('POW', { power: 5 }, { by: 'COM' });

@@ -649,22 +649,41 @@ button.wide { width: 100%; }
 
 body.is-critical .topbar { border-bottom-color: var(--red); background: linear-gradient(180deg, #221214, #0f1418); }
 body.is-critical .crest { background: var(--red); }
-body.is-critical .shell { animation: criticalEdge 1.6s ease-in-out infinite; }
-@keyframes criticalEdge {
-  0%,100% { box-shadow: inset 0 0 0 2px rgba(232,90,90,0.25); }
-  50%     { box-shadow: inset 0 0 0 4px rgba(232,90,90,0.6); }
-}
 body.is-brownout .topbar { background: linear-gradient(180deg, #1e1810, #0f1418); }
 body.is-dark .columns, body.is-dark .exchange { filter: grayscale(0.7); opacity: 0.5; }
 
 /* -- overlays --------------------------------------------------------------- */
-
 .overlay {
   position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 18px; z-index: 50; text-align: center; padding: 40px;
 }
 .dark-overlay { background: rgba(4,5,6,0.95); }
 .pause-overlay { background: rgba(6,8,10,0.9); }
+
+/*
+  THE CRITICAL WASH. Under 30 the console turns red, and stays a console.
+  Everything about this rule is in service of that second half: it takes no
+  clicks, it covers no control, and the middle of the gradient is fully
+  transparent so the figures, the fault card and the repair field read exactly
+  as they did a moment ago. The colour gathers at the edges, where there is
+  nothing to obscure, which is how a cockpit warns without blinding.
+
+  It sits under the offline and alert overlays on purpose: a sector that
+  reaches 0 is past warning and gets the curtain instead, and the
+  facilitator's emergency still owns the screen when it fires.
+*/
+.critical-overlay {
+  display: block; padding: 0; z-index: 45; pointer-events: none;
+  background: radial-gradient(ellipse at center,
+    rgba(232, 90, 90, 0) 36%,
+    rgba(232, 90, 90, 0.13) 68%,
+    rgba(232, 90, 90, 0.30) 100%);
+  box-shadow: inset 0 0 0 3px rgba(232, 90, 90, 0.55);
+  animation: criticalWash 2.2s ease-in-out infinite;
+}
+@keyframes criticalWash { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+/* A room that has asked for less movement gets the warning, not the pulse. */
+@media (prefers-reduced-motion: reduce) { .critical-overlay { animation: none; opacity: 0.9; } }
 .stencil {
   font-size: 58px; font-weight: 700; letter-spacing: 0.2em; color: #3a3a3a;
   border: 5px solid #3a3a3a; padding: 18px 40px; transform: rotate(-3deg);

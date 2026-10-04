@@ -600,12 +600,23 @@
   function renderModes() {
     const body = document.body;
     const word = statusWord(mine);
-    body.classList.toggle('is-critical', word === 'CRITICAL');
+    /*
+      CRITICAL, by either road. The server says CRITICAL when a sector is under
+      the scenario's threshold, and that is the usual way in — but a BROWNOUT
+      sector keeps the word BROWNOUT however badly hurt it is, and a table at
+      18% in brownout is exactly the table that must not miss it. So the health
+      band counts too, from the same helper the bar beside it is coloured by.
+      DARK is neither: a sector at 0 is past warning and gets the curtain.
+    */
+    const critical = word !== 'DARK'
+      && (word === 'CRITICAL' || U.integrityClass(Number(mine.integrity)) === 'critical');
+    body.classList.toggle('is-critical', critical);
     body.classList.toggle('is-brownout', word === 'BROWNOUT');
     body.classList.toggle('is-dark', word === 'DARK');
     body.classList.toggle('is-paused', !!state.paused);
 
     show($('banner-brownout'), word === 'BROWNOUT');
+    show($('critical-overlay'), critical);
     show($('dark-overlay'), word === 'DARK');
     show($('pause-overlay'), !!state.paused);
 
