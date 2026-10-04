@@ -316,10 +316,19 @@ ALL), and:
   each item carrying `sector`, `worker_id`, `worker_label` and `still_injured`.
   **No other role is sent this key.**
 - **AGR only** — `agr_cards { round, round_number, used, selected, target,
-  offered[], message }`. `offered[]` is the three dealt cards with
-  `{ id, title, summary, category, target }` plus `sectors[]`, `choices{}` or
-  `ties[]` where a choice is needed. Never the deck. **No other role is sent
-  this key.**
+  consequences_active, pending, notice, slot_result, offered[], message }`.
+  `offered[]` is the three dealt cards with `{ id, title, summary, category,
+  target, risk }` plus `sectors[]`, `choices{}` or `ties[]` where a choice is
+  needed; from the round the decision mechanic is live each card also carries
+  `short_description`, `action_label`, `target_label`, `gain[]` and
+  `trade_off[]` (card UI v3, 2026-10-04: lines `{ who, what, when, text }`
+  derived from the card's effect data by lib/agr-copy.js — `who` may be a
+  placeholder CHOSEN / LOWEST / ALL the console resolves from the selector,
+  `when` a standard timing key) beside the sentence forms `description`,
+  `immediate_gain`, `consequence` and `consequence_timing`. `slot_result` is
+  Transport's answer to this round's freight-slot proposal while AGR has not
+  moved on from it, read from the request itself. Never the deck. **No other
+  role is sent this key.**
 - **The wall and COM** — `broadcast { round, round_number,
   rows{ CODE: { power, water, med, parts, round, round_number, freshness } },
   announcement | null, editable }`. Reported by COM, never read from

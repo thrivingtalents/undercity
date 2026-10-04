@@ -455,32 +455,42 @@ button.wide { width: 100%; }
 .agr-target.warn { color: var(--red); font-size: 10px; }
 .agr-btns { display: flex; gap: 4px; }
 
-/* -- AGR decisions (2026-10-04): the situation, the gain, the consequence ----
-   Gain is positive without being a prize; consequence is a warning that is
-   never hidden and never red-buttoned. Same type size for both, because the
-   point is that they are read together. */
+/* -- AGR decisions (2026-10-04; card UI v3 the same day): the situation,
+   then GAIN and TRADE-OFF side by side, once. Gain is positive without being
+   a prize; the trade-off is a warning that is never hidden and never
+   red-buttoned. The numbers carry the weight; the labels, the timing and the
+   risk pill sit under them, and colour supports the labels, never replaces
+   them. */
 .agr-card.decision { padding: 8px 10px; gap: 5px; }
+.agr-card.decision .agr-title { font-size: 13px; line-height: 1.25; }
 .agr-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .agr-kicker { font-size: 9px; letter-spacing: 0.18em; color: var(--ink-faint); }
-.agr-risk { font-size: 9px; letter-spacing: 0.14em; font-weight: 700; padding: 1px 6px; border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--ink-dim); }
+.agr-risk { font-size: 9px; letter-spacing: 0.14em; font-weight: 700; padding: 1px 6px; border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--ink-dim); white-space: nowrap; }
 .agr-risk.risk-medium { color: var(--amber); border-color: rgba(233, 180, 94, 0.5); }
 .agr-risk.risk-high { color: var(--red); border-color: rgba(232, 90, 90, 0.5); }
-.agr-card.decision .agr-summary { color: var(--ink); line-height: 1.45; }
-.agr-terms { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
-.agr-gain, .agr-conseq, .agr-requires { display: grid; grid-template-columns: 112px 1fr; gap: 6px; align-items: baseline; font-size: 11px; line-height: 1.4; padding: 3px 6px; border-left: 2px solid var(--line); }
-.agr-gain { border-left-color: var(--green); }
-.agr-conseq { border-left-color: var(--amber); background: rgba(233, 180, 94, 0.06); }
-.agr-requires { border-left-color: var(--accent-bright); }
-.agr-label { font-size: 9px; letter-spacing: 0.16em; font-weight: 700; color: var(--ink-faint); }
-.agr-gain .agr-label { color: var(--green); }
-.agr-conseq .agr-label { color: var(--amber); }
-.agr-when { grid-column: 2; font-style: normal; font-size: 9px; letter-spacing: 0.12em; color: var(--ink-faint); }
-.agr-both { display: flex; flex-direction: column; gap: 3px; margin: 4px 0; padding: 6px; border: 1px solid rgba(233, 180, 94, 0.45); background: rgba(233, 180, 94, 0.05); }
-.agr-both-note { font-size: 10px; letter-spacing: 0.14em; font-weight: 700; color: var(--amber); margin-top: 2px; }
+.agr-card.decision .agr-summary { color: var(--ink-dim); line-height: 1.45; }
+.agr-card.decision .agr-target { margin-top: 2px; }
+/* The one GAIN / TRADE-OFF block: two columns when the card is wide enough for
+   two readable ones, stacked (GAIN first) when it is not. Long lines wrap
+   inside their column; nothing scrolls sideways and nothing shrinks. */
+.agr-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(126px, 1fr)); gap: 4px; margin-top: 2px; min-width: 0; }
+.agr-sum-col { display: flex; flex-direction: column; gap: 3px; padding: 5px 6px 6px; border-left: 2px solid var(--line); background: rgba(255, 255, 255, 0.025); min-width: 0; overflow-wrap: anywhere; }
+.agr-sum-col.gain { border-left-color: var(--green); }
+.agr-sum-col.trade { border-left-color: var(--amber); background: rgba(233, 180, 94, 0.06); }
+.agr-sum-label { font-size: 9px; letter-spacing: 0.18em; font-weight: 700; color: var(--ink-faint); }
+.agr-sum-col.gain .agr-sum-label { color: var(--green); }
+.agr-sum-col.trade .agr-sum-label { color: var(--amber); }
+.agr-sum-line { display: flex; flex-direction: column; gap: 1px; }
+.agr-sum-line + .agr-sum-line { margin-top: 2px; }
+.agr-sum-what { font-size: 12px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.25; color: var(--ink); }
+.agr-sum-when { font-size: 9px; letter-spacing: 0.14em; color: var(--ink-faint); }
+.agr-cond { font-size: 9px; letter-spacing: 0.14em; color: var(--accent-bright); }
+.agr-rule { font-size: 10px; letter-spacing: 0.14em; font-weight: 700; color: var(--amber); margin-top: 2px; }
 .agr-pending { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border: 1px dashed var(--accent-bright); font-size: 11px; }
 .agr-pending b { letter-spacing: 0.12em; color: var(--accent-bright); }
 .agr-pending span { color: var(--ink-dim); }
 .agr-card.pending { border-color: var(--accent-bright); }
+.rx-card.mv-slot .agr-sum { margin: 4px 0; }
 .rx-card.mv-slot .rx-slot-body { font-size: 11px; color: var(--ink); line-height: 1.45; }
 
 /* the one-time operating notice */

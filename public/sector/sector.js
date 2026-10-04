@@ -471,7 +471,7 @@
         transientMsg(target, msg.pending
           ? 'PROPOSAL SENT TO TRANSPORT — awaiting TRN approval'
           : (state && state.agr_cards && state.agr_cards.consequences_active
-            ? 'DECISION AUTHORISED — both effects now apply'
+            ? 'DECISION CONFIRMED — both effects now apply'
             : 'INTERVENTION ACTIVATED — LOCKED UNTIL NEXT ROUND'), 'ok', 8000);
       }
       if (msg.action === 'slot') transientMsg(target, msg.accepted ? 'FREIGHT SLOT ACCEPTED — +1 approval this round, −1 next round' : 'FREIGHT SLOT DECLINED', msg.accepted ? 'ok' : 'warn', 8000);
@@ -1031,12 +1031,9 @@
     return `<article class="rx-card mv-slot stage-SLOT dir-INCOMING act" data-id="${esc(r.id)}" data-status="${esc(r.status)}" data-mode="received" data-since="${esc(r.requested_at || '')}">
         <div class="rx-top"><span class="rx-state" data-label="AGR PROPOSAL">AGR PROPOSAL</span><span class="rx-id">${esc(r.id)}</span><span class="rx-age"></span></div>
         <div class="rx-line"><span class="rx-route">AGR → TRN</span><span class="rx-item">${esc(r.title)}</span></div>
-        <div class="rx-slot-body">${esc(r.description || '')}</div>
-        <div class="agr-terms">
-          <div class="agr-gain"><span class="agr-label">IMMEDIATE GAIN</span><span>${esc(r.immediate_gain || '')}</span></div>
-          <div class="agr-conseq"><span class="agr-label">CONSEQUENCE</span><span>${esc(r.consequence || '')}</span></div>
-          <div class="agr-both-note">IF ACCEPTED, BOTH EFFECTS APPLY TO TRANSPORT.</div>
-        </div>
+        <div class="rx-slot-body">${esc(r.short_description || r.description || '')}</div>
+        <div class="agr-sum">${agrLinesHtml('gain', 'GAIN', r.gain, (l) => l.text)}${agrLinesHtml('trade', 'TRADE-OFF', r.trade_off, (l) => l.text)}</div>
+        <div class="agr-rule">BOTH EFFECTS APPLY IF ACCEPTED.</div>
         <div class="mv-btns"><button type="button" class="primary" data-slot-accept="${esc(r.id)}">ACCEPT</button><button type="button" class="ghost" data-slot-decline="${esc(r.id)}">DECLINE</button></div>
         <div class="mv-msg" hidden></div>
       </article>`;
@@ -1471,16 +1468,64 @@
 
   let agrPick = null;       // { card, target } while AGR is confirming
 
-  /** The timing of a consequence, in the words the card prints. */
-  function timingWord(t) {
-    return ({ NEXT_UPKEEP: 'AT NEXT UPKEEP', NEXT_ROUND: 'AT THE START OF NEXT ROUND', THIS_ROUND: 'UNTIL THE ROUND ENDS', IMMEDIATE: 'IMMEDIATELY', MIXED: 'NOW AND AT NEXT UPKEEP' })[t] || String(t || '').replace(/_/g, ' ');
+  /*
+    AGR CARD UI v3 (2026-10-04). A decision card is read in three seconds:
+    the title, the pick if one is needed, then ONE block of two columns —
+    GAIN and TRADE-OFF — each line leading with the sector and the number,
+    its timing under it in the standard words. The lines come from the server
+    already derived from the card's effect data (lib/agr-copy.js); this side
+    only writes the table's current pick into them.
+  */
+  const TIMING_LABEL = { NOW: 'NOW', IMMEDIATE: 'NOW', THIS_ROUND: 'THIS ROUND', UNTIL_ROUND_END: 'UNTIL ROUND END', NEXT_UPKEEP: 'NEXT UPKEEP', NEXT_2_UPKEEPS: 'NEXT 2 UPKEEPS', NEXT_ROUND: 'NEXT ROUND', MIXED: 'NOW + NEXT UPKEEP' };
+  const WHO_LABEL = { CHOSEN: 'CHOSEN SECTOR', LOWEST: 'LOWEST SECTOR', ALL: 'ALL SECTORS' };
+  const RES_SHORT = { power: 'POWER', water: 'WATER', med: 'MED', parts: 'PARTS' };
+  /** The timing of a line, in the standard short words. */
+  function timingWord(t) { return TIMING_LABEL[t] || String(t || '').replace(/_/g, ' '); }
+  const signedN = (n) => `${Number(n) < 0 ? '−' : '+'}${Math.abs(Number(n) || 0)}`;
+  const resShort = (k) => RES_SHORT[k] || String(k || '').toUpperCase();
+
+  /** One summary line with the table's current pick written into it. */
+  function agrLineText(card, line, pick) {
+    const sector = pick && pick.sector ? pick.sector : (card.ties && card.ties.length === 1 ? card.ties[0] : null);
+    const resource = pick && pick.resource ? pick.resource : null;
+    const who = line.who === 'CHOSEN' ? (sector || WHO_LABEL.CHOSEN)
+      : line.who === 'LOWEST' ? (sector || WHO_LABEL.LOWEST)
+        : (WHO_LABEL[line.who] || line.who);
+    let what = String(line.what || '');
+    if (what.includes('{CACHE}')) {
+      const list = card.choices || {};
+      what = what.replace('{CACHE}', resource && list[resource] !== undefined
+        ? `${signedN(list[resource])} ${resShort(resource)}`
+        : `ONE OF ${Object.entries(list).map(([k, v]) => `${signedN(v)} ${resShort(k)}`).join(' · ')}`);
+    }
+    if (what.includes('{RES}')) what = what.replace('{RES}', resource ? resShort(resource) : 'CHOSEN RESOURCE');
+    return `${who} ${what}`;
+  }
+
+  /** One column of the block: its label, then each line as number-first text over its timing. */
+  function agrLinesHtml(cls, label, lines, textOf) {
+    const rows = (lines || []).map((l) => `<div class="agr-sum-line"><span class="agr-sum-what">${esc(textOf(l))}</span>${l.when ? `<span class="agr-sum-when">${esc(timingWord(l.when))}</span>` : ''}</div>`).join('');
+    return `<div class="agr-sum-col ${cls}"><span class="agr-sum-label">${label}</span>${rows || '<div class="agr-sum-line"><span class="agr-sum-what">—</span></div>'}</div>`;
+  }
+
+  /** The card's one GAIN / TRADE-OFF block. Rendered once per card, after any selector. */
+  function agrSummary(card, pick) {
+    return `<div class="agr-sum">${agrLinesHtml('gain', 'GAIN', card.gain, (l) => agrLineText(card, l, pick))}${agrLinesHtml('trade', 'TRADE-OFF', card.trade_off, (l) => agrLineText(card, l, pick))}</div>`;
+  }
+
+  /** The selector's first option, so the block names a real pick from the first frame of the review. */
+  function agrDefaultTarget(card) {
+    if (card.target === 'sector' && card.sectors && card.sectors.length) return { sector: card.sectors[0] };
+    if (card.ties && card.ties.length > 1) return { sector: card.ties[0] };
+    if (card.target === 'resource_type') { const k = Object.keys(card.choices || {})[0]; return k ? { resource: k } : {}; }
+    return {};
   }
 
   const noticeAck = $('agr-notice-ack');
   if (noticeAck) noticeAck.addEventListener('click', () => socket.send({ type: 'agr_acknowledge_notice' }));
 
   function agrStart(card) {
-    agrPick = { card, target: {} };
+    agrPick = { card, target: agrDefaultTarget(card) };
     socket.send({ type: 'agr_select', card: card.id });
     renderAgr();
   }
@@ -1494,15 +1539,19 @@
 
   function agrCancel() { agrPick = null; renderAgr(); }
 
+  /** The one compact row a card with a choice gets, labelled with the card's own word (SEND TO, STABILISE, SUPPORT, RESOURCE). */
   function agrTargetPicker(card) {
+    const pick = agrPick && agrPick.card.id === card.id ? agrPick.target : {};
+    const opt = (v, label, cur) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${label}</option>`;
     if (card.target === 'sector' || (card.ties && card.ties.length > 1)) {
       const list = card.target === 'sector' ? (card.sectors || []) : card.ties;
-      return `<div class="agr-target"><span class="tf-label">${card.target === 'sector' ? 'SECTOR' : 'TIED — CHOOSE'}</span>
-        <select id="agr-target">${list.map((c) => `<option value="${c}">${U.SECTOR_GLYPH[c] || ''} ${c}</option>`).join('')}</select></div>`;
+      const label = card.target_label || (card.target === 'sector' ? 'SELECT TARGET' : 'SUPPORT');
+      return `<div class="agr-target"><span class="tf-label">${esc(label)}</span>
+        <select id="agr-target">${list.map((c) => opt(c, `${U.SECTOR_GLYPH[c] || ''} ${c}`, pick.sector)).join('')}</select></div>`;
     }
     if (card.target === 'resource_type') {
-      return `<div class="agr-target"><span class="tf-label">RESOURCE</span>
-        <select id="agr-target">${Object.entries(card.choices || {}).map(([k, v]) => `<option value="${k}">+${v} ${resName(k)}</option>`).join('')}</select></div>`;
+      return `<div class="agr-target"><span class="tf-label">${esc(card.target_label || 'RESOURCE')}</span>
+        <select id="agr-target">${Object.entries(card.choices || {}).map(([k, v]) => opt(k, `+${v} ${resName(k)}`, pick.resource)).join('')}</select></div>`;
     }
     if (card.target === 'worker') {
       return `<div class="agr-target warn">No eligible non-injured worker. Injured workers are healed by Medical Bay.</div>`;
@@ -1515,7 +1564,7 @@
     show($('agr-panel'), !!a);
     if (!a) return;
     setText($('agr-round'), `ROUND ${a.round_number}`);
-    setText($('agr-cap'), a.used ? 'INTERVENTION USED — LOCKED UNTIL NEXT ROUND' : '3 RANDOM CARDS · CHOOSE 1');
+    setText($('agr-cap'), a.used ? (a.consequences_active ? 'DECISION CONFIRMED — LOCKED UNTIL NEXT ROUND' : 'INTERVENTION USED — LOCKED UNTIL NEXT ROUND') : '3 RANDOM CARDS · CHOOSE 1');
     $('agr-cap').classList.toggle('warn', !!a.used);
     setText($('agr-instruction'), a.message);
     $('agr-panel').classList.toggle('used', !!a.used);
@@ -1526,12 +1575,13 @@
     /*
       AGR DECISIONS (2026-10-04). Before the mechanic's round the card is the
       teaching card: title, summary, SELECT. From that round it is an
-      operational decision — the situation, IMMEDIATE GAIN, CONSEQUENCE and
-      its timing on the face of the card, both restated on the confirmation
-      step under IF AUTHORISED, BOTH EFFECTS APPLY, and the buttons renamed to
-      match. A proposal waiting on Transport locks the other two cards and
-      says so; the server refuses them regardless, this just stops the table
-      pressing a button that cannot work.
+      operational decision, laid out to be read in three seconds: the header,
+      the title, two sentences, the selector when the card needs one, then ONE
+      GAIN / TRADE-OFF block that follows the pick — never repeated. The
+      confirmation step adds one line, BOTH EFFECTS APPLY IF CONFIRMED, and
+      the card's own verb on the button. A proposal waiting on Transport locks
+      the other two cards and says so; the server refuses them regardless,
+      this just stops the table pressing a button that cannot work.
     */
     const live = !!a.consequences_active;
     const pending = a.pending || null;
@@ -1541,29 +1591,25 @@
       const isPending = pending && pending.card === card.id;
       const locked = (a.used && a.selected !== card.id) || (pending && !isPending);
       const confirming = agrPick && agrPick.card.id === card.id && !a.used && !pending;
-      const needs = card.target ? `<span class="agr-needs">${card.target === 'sector' ? 'CHOOSE A SECTOR' : card.target === 'resource_type' ? 'CHOOSE A RESOURCE' : 'CHOOSE A WORKER'}</span>` : '';
+      const needs = !live && card.target ? `<span class="agr-needs">${card.target === 'sector' ? 'CHOOSE A SECTOR' : card.target === 'resource_type' ? 'CHOOSE A RESOURCE' : 'CHOOSE A WORKER'}</span>` : '';
       const head = live
         ? `<div class="agr-head"><span class="agr-kicker">AGR · OPERATIONAL DECISION</span><span class="agr-risk risk-${esc(String(card.risk || 'LOW').toLowerCase())}">${esc(card.risk || 'LOW')} TRADE-OFF</span></div>`
         : '';
-      const terms = live
-        ? `<div class="agr-terms">
-            <div class="agr-gain"><span class="agr-label">IMMEDIATE GAIN</span><span>${esc(card.immediate_gain || card.summary)}</span></div>
-            <div class="agr-conseq"><span class="agr-label">CONSEQUENCE</span><span>${esc(card.consequence || '')}</span>${card.consequence_timing ? `<em class="agr-when">${esc(timingWord(card.consequence_timing))}</em>` : ''}</div>
-            ${card.special_condition ? `<div class="agr-requires"><span class="agr-label">REQUIRES</span><span>${esc(card.special_condition)}</span></div>` : ''}
-          </div>`
-        : '';
+      // The one summary: the same block in every state of the card, placed
+      // after the selector when there is one, so it can name the pick.
+      const summary = live ? agrSummary(card, confirming ? agrPick.target : null) : '';
+      const cond = live && card.requires === 'TRN' ? '<div class="agr-cond">NEEDS TRANSPORT\'S AGREEMENT — ANSWERED ON ITS CONSOLE</div>' : '';
       const body = isPending
-        ? `<div class="agr-pending"><b>STATUS: PENDING TRN APPROVAL</b><span>Transport is reviewing AGR's freight-slot proposal.</span></div>`
+        ? `${summary}${cond}<div class="agr-pending"><b>PENDING TRN APPROVAL</b><span>Transport is reviewing the freight-slot arrangement.</span></div>`
         : confirming
-          ? `${agrTargetPicker(card)}
-            ${live ? `<div class="agr-both"><div class="agr-gain"><span class="agr-label">IMMEDIATE GAIN</span><span>${esc(card.immediate_gain || card.summary)}</span></div><div class="agr-conseq"><span class="agr-label">CONSEQUENCE</span><span>${esc(card.consequence || '')}</span></div><div class="agr-both-note">IF AUTHORISED, BOTH EFFECTS APPLY.</div></div>` : ''}
-            <div class="agr-btns"><button type="button" class="primary" data-confirm>${live ? 'AUTHORISE DECISION' : 'CONFIRM — ACTIVATE'}</button><button type="button" class="ghost" data-cancel>${live ? 'BACK TO OPTIONS' : 'CANCEL'}</button></div>`
-          : `<button type="button" class="agr-select${isUsed ? ' on' : ''}" data-pick="${card.id}"${a.used || pending ? ' disabled' : ''}>${isUsed ? (live ? 'AUTHORISED' : 'USED') : locked ? 'LOCKED' : (live ? 'REVIEW' : 'SELECT')}</button>`;
+          ? `${agrTargetPicker(card)}${summary}${cond}
+            ${live ? '<div class="agr-rule">BOTH EFFECTS APPLY IF CONFIRMED.</div>' : ''}
+            <div class="agr-btns"><button type="button" class="primary" data-confirm>${esc(live ? (card.action_label || 'CONFIRM DECISION') : 'CONFIRM — ACTIVATE')}</button><button type="button" class="ghost" data-cancel>${live ? 'BACK' : 'CANCEL'}</button></div>`
+          : `${summary}${cond}<button type="button" class="agr-select${isUsed ? ' on' : ''}" data-pick="${card.id}"${a.used || pending ? ' disabled' : ''}>${isUsed ? (live ? 'CONFIRMED' : 'USED') : locked ? 'LOCKED' : (live ? 'REVIEW' : 'SELECT')}</button>`;
       return `<div class="agr-card cat-${card.category}${isUsed ? ' used' : locked ? ' locked' : ''}${confirming ? ' confirming' : ''}${isPending ? ' pending' : ''}${live ? ' decision' : ''}">
           ${head}
           <div class="agr-title">${esc(card.title)}</div>
-          <div class="agr-summary">${esc(live ? (card.description || card.summary) : card.summary)}</div>
-          ${terms}
+          <div class="agr-summary">${esc(live ? (card.short_description || card.summary) : card.summary)}</div>
           ${needs}
           ${body}
         </div>`;
@@ -1573,6 +1619,15 @@
       host.innerHTML = html;
       for (const btn of host.querySelectorAll('[data-pick]')) {
         btn.addEventListener('click', () => agrStart(a.offered.find((c) => c.id === btn.dataset.pick)));
+      }
+      // The GAIN line follows the pick as it is made.
+      const sel = host.querySelector('#agr-target');
+      if (sel) {
+        sel.addEventListener('change', () => {
+          if (!agrPick) return;
+          agrPick.target = agrPick.card.target === 'resource_type' ? { resource: sel.value } : { sector: sel.value };
+          renderAgr();
+        });
       }
       const confirm = host.querySelector('[data-confirm]');
       if (confirm) {

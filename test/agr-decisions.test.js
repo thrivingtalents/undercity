@@ -220,7 +220,7 @@ test('TEST 3: while Transport is reviewing, AGR cannot select or authorise anyth
   assert.equal(g.agrSlotRespond(id, { accept: true, by: 'AGR' }).reason, 'trn_only');
   assert.equal(g.agrSlotRespond(id, { accept: true, by: 'POW' }).reason, 'trn_only');
   // The console says so and disables the others.
-  assert.ok(/STATUS: PENDING TRN APPROVAL/.test(SECTOR_SCRIPT));
+  assert.ok(/<b>PENDING TRN APPROVAL<\/b>/.test(SECTOR_SCRIPT));
   assert.ok(/a\.used \|\| pending \? ' disabled'/.test(SECTOR_SCRIPT), 'the other cards are not disabled while pending');
 });
 
@@ -391,21 +391,27 @@ test('AGR-012: the facilitator sees every pending consequence and when it lands'
   }
 });
 
-test('AGR-013 / AGR-014: the table sees the consequence before confirming, and is told both apply', () => {
+test('AGR-013 / AGR-014: the table sees the trade-off beside the gain before confirming, and is told both apply', () => {
   const g = game('ROUND_2');
   const v = agrView(g);
-  for (const c of v.offered) assert.ok(c.consequence, `${c.id} reached the table without its consequence`);
-  // On the card face, under the gain, before any button.
-  const card = SECTOR_SCRIPT.slice(SECTOR_SCRIPT.indexOf('const terms = live'), SECTOR_SCRIPT.indexOf("}).join('') || '<div class=\"empty\">No cards dealt"));
-  assert.ok(card.indexOf('IMMEDIATE GAIN') < card.indexOf('CONSEQUENCE'), 'the gain is not shown before the consequence');
-  assert.ok(card.indexOf('agr-terms') < card.indexOf('data-pick'), 'the terms come after the button');
-  // On the confirmation step, both again and the sentence.
+  for (const c of v.offered) {
+    assert.ok(c.consequence, `${c.id} reached the table without its consequence`);
+    assert.ok(c.gain && c.gain.length && c.trade_off && c.trade_off.length, `${c.id} reached the table without its GAIN / TRADE-OFF lines`);
+  }
+  // CARD UI v3: one block, GAIN column first, rendered in every state of the
+  // card after any selector and before the button; the sentence once, on the
+  // confirmation step only; the card's own verb and BACK.
+  const card = SECTOR_SCRIPT.slice(SECTOR_SCRIPT.indexOf('const summary = live'), SECTOR_SCRIPT.indexOf("}).join('') || '<div class=\"empty\">No cards dealt"));
+  const block = SECTOR_SCRIPT.slice(SECTOR_SCRIPT.indexOf('function agrSummary'), SECTOR_SCRIPT.indexOf('function agrDefaultTarget'));
+  assert.ok(block.indexOf("'GAIN'") < block.indexOf("'TRADE-OFF'"), 'the gain is not shown before the trade-off');
+  assert.ok(!/agr-both|agr-terms|IMMEDIATE GAIN|CONSEQUENCE</.test(SECTOR_SCRIPT), 'the old duplicate blocks are back');
   const confirm = card.slice(card.indexOf('confirming'));
-  assert.ok(/IF AUTHORISED, BOTH EFFECTS APPLY\./.test(confirm), 'the confirmation does not say both apply');
-  assert.ok((confirm.match(/IMMEDIATE GAIN/g) || []).length >= 1 && (confirm.match(/CONSEQUENCE/g) || []).length >= 1, 'the confirmation does not restate both');
-  assert.ok(/AUTHORISE DECISION/.test(confirm) && /BACK TO OPTIONS/.test(confirm));
+  assert.equal((card.match(/BOTH EFFECTS APPLY IF CONFIRMED\./g) || []).length, 1, 'the sentence is not shown exactly once');
+  assert.ok(/BOTH EFFECTS APPLY IF CONFIRMED\./.test(confirm), 'the confirmation step does not say both apply');
+  assert.ok(/\$\{agrTargetPicker\(card\)\}\$\{summary\}/.test(confirm), 'the summary does not follow the selector');
+  assert.ok(/card\.action_label \|\| 'CONFIRM DECISION'/.test(confirm) && /'BACK'/.test(confirm));
   // The notice says the same, once, and is acknowledged into the log.
-  assert.ok(/AGRICULTURE OPERATING NOTICE/.test(SECTOR_INDEX) && /If authorised, both effects apply\./.test(SECTOR_INDEX) && /id="agr-notice-ack"/.test(SECTOR_INDEX));
+  assert.ok(/AGRICULTURE OPERATING NOTICE/.test(SECTOR_INDEX) && /If confirmed, both effects apply\./.test(SECTOR_INDEX) && /id="agr-notice-ack"/.test(SECTOR_INDEX));
   assert.ok(/agr_acknowledge_notice/.test(SECTOR_SCRIPT));
   // No reward-coloured buttons, no score graphics.
   assert.ok(!/\+5<\/|class="score|casino|jackpot/i.test(SECTOR_SCRIPT));
