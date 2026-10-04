@@ -137,6 +137,8 @@
       ]
     },
     "agr_anti_repeat": true,
+    "agr_consequences_from_round": 2,
+    "agr_risk_pool_by_round": { "R2": ["LOW", "MEDIUM"], "R3": ["MEDIUM", "HIGH"], "R4": ["MEDIUM", "HIGH"] },
     "agr_disabled_cards": ["AGR_WORKFORCE_RECOVERY"],
     "fault_rewards_enabled": true,
     "show_fault_reward_preview": true,

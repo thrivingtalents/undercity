@@ -455,6 +455,45 @@ button.wide { width: 100%; }
 .agr-target.warn { color: var(--red); font-size: 10px; }
 .agr-btns { display: flex; gap: 4px; }
 
+/* -- AGR decisions (2026-10-04): the situation, the gain, the consequence ----
+   Gain is positive without being a prize; consequence is a warning that is
+   never hidden and never red-buttoned. Same type size for both, because the
+   point is that they are read together. */
+.agr-card.decision { padding: 8px 10px; gap: 5px; }
+.agr-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.agr-kicker { font-size: 9px; letter-spacing: 0.18em; color: var(--ink-faint); }
+.agr-risk { font-size: 9px; letter-spacing: 0.14em; font-weight: 700; padding: 1px 6px; border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--ink-dim); }
+.agr-risk.risk-medium { color: var(--amber); border-color: rgba(233, 180, 94, 0.5); }
+.agr-risk.risk-high { color: var(--red); border-color: rgba(232, 90, 90, 0.5); }
+.agr-card.decision .agr-summary { color: var(--ink); line-height: 1.45; }
+.agr-terms { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
+.agr-gain, .agr-conseq, .agr-requires { display: grid; grid-template-columns: 112px 1fr; gap: 6px; align-items: baseline; font-size: 11px; line-height: 1.4; padding: 3px 6px; border-left: 2px solid var(--line); }
+.agr-gain { border-left-color: var(--green); }
+.agr-conseq { border-left-color: var(--amber); background: rgba(233, 180, 94, 0.06); }
+.agr-requires { border-left-color: var(--accent-bright); }
+.agr-label { font-size: 9px; letter-spacing: 0.16em; font-weight: 700; color: var(--ink-faint); }
+.agr-gain .agr-label { color: var(--green); }
+.agr-conseq .agr-label { color: var(--amber); }
+.agr-when { grid-column: 2; font-style: normal; font-size: 9px; letter-spacing: 0.12em; color: var(--ink-faint); }
+.agr-both { display: flex; flex-direction: column; gap: 3px; margin: 4px 0; padding: 6px; border: 1px solid rgba(233, 180, 94, 0.45); background: rgba(233, 180, 94, 0.05); }
+.agr-both-note { font-size: 10px; letter-spacing: 0.14em; font-weight: 700; color: var(--amber); margin-top: 2px; }
+.agr-pending { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border: 1px dashed var(--accent-bright); font-size: 11px; }
+.agr-pending b { letter-spacing: 0.12em; color: var(--accent-bright); }
+.agr-pending span { color: var(--ink-dim); }
+.agr-card.pending { border-color: var(--accent-bright); }
+.rx-card.mv-slot .rx-slot-body { font-size: 11px; color: var(--ink); line-height: 1.45; }
+
+/* the one-time operating notice */
+.agr-notice { background: rgba(6, 8, 10, 0.92); }
+.agr-notice-card { max-width: 440px; width: 100%; background: var(--panel); border: 1px solid var(--amber); padding: 18px 22px; text-align: left; display: flex; flex-direction: column; gap: 8px; font-size: 12px; line-height: 1.5; }
+.agr-notice-card p { margin: 0; }
+.agr-notice-kicker { font-size: 10px; letter-spacing: 0.22em; color: var(--amber); font-weight: 700; }
+.agr-notice-lead { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; }
+.agr-notice-pair { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--line); }
+.agr-notice-pair b { letter-spacing: 0.14em; font-size: 11px; }
+.agr-notice-pair span { color: var(--ink-faint); font-size: 10px; }
+.agr-notice-card .primary { margin-top: 6px; }
+
 /* -- the two queues ---------------------------------------------------------- */
 
 .approval-block { border-color: var(--ui-border-highlight); }

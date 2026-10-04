@@ -466,7 +466,15 @@
       return;
     }
     if (msg.ok && msg.type === 'agr_result') {
-      if (msg.action === 'activate') { agrPick = null; transientMsg(target, 'INTERVENTION ACTIVATED — LOCKED UNTIL NEXT ROUND', 'ok', 8000); }
+      if (msg.action === 'activate') {
+        agrPick = null;
+        transientMsg(target, msg.pending
+          ? 'PROPOSAL SENT TO TRANSPORT — awaiting TRN approval'
+          : (state && state.agr_cards && state.agr_cards.consequences_active
+            ? 'DECISION AUTHORISED — both effects now apply'
+            : 'INTERVENTION ACTIVATED — LOCKED UNTIL NEXT ROUND'), 'ok', 8000);
+      }
+      if (msg.action === 'slot') transientMsg(target, msg.accepted ? 'FREIGHT SLOT ACCEPTED — +1 approval this round, −1 next round' : 'FREIGHT SLOT DECLINED', msg.accepted ? 'ok' : 'warn', 8000);
       return;
     }
     if (msg.ok && msg.type === 'broadcast_result') {
@@ -1018,7 +1026,25 @@
       </article>`;
   }
 
+  /** Transport's answer to AGR's freight-slot proposal. Both effects, or neither. */
+  function slotCard(r) {
+    return `<article class="rx-card mv-slot stage-SLOT dir-INCOMING act" data-id="${esc(r.id)}" data-status="${esc(r.status)}" data-mode="received" data-since="${esc(r.requested_at || '')}">
+        <div class="rx-top"><span class="rx-state" data-label="AGR PROPOSAL">AGR PROPOSAL</span><span class="rx-id">${esc(r.id)}</span><span class="rx-age"></span></div>
+        <div class="rx-line"><span class="rx-route">AGR → TRN</span><span class="rx-item">${esc(r.title)}</span></div>
+        <div class="rx-slot-body">${esc(r.description || '')}</div>
+        <div class="agr-terms">
+          <div class="agr-gain"><span class="agr-label">IMMEDIATE GAIN</span><span>${esc(r.immediate_gain || '')}</span></div>
+          <div class="agr-conseq"><span class="agr-label">CONSEQUENCE</span><span>${esc(r.consequence || '')}</span></div>
+          <div class="agr-both-note">IF ACCEPTED, BOTH EFFECTS APPLY TO TRANSPORT.</div>
+        </div>
+        <div class="mv-btns"><button type="button" class="primary" data-slot-accept="${esc(r.id)}">ACCEPT</button><button type="button" class="ghost" data-slot-decline="${esc(r.id)}">DECLINE</button></div>
+        <div class="mv-msg" hidden></div>
+      </article>`;
+  }
+
   function bindMovement(host) {
+    for (const b of host.querySelectorAll('[data-slot-accept]')) b.addEventListener('click', () => { pendingTransferAction = 'agr'; socket.send({ type: 'agr_slot_respond', id: b.dataset.slotAccept, accept: true }); });
+    for (const b of host.querySelectorAll('[data-slot-decline]')) b.addEventListener('click', () => { pendingTransferAction = 'agr'; socket.send({ type: 'agr_slot_respond', id: b.dataset.slotDecline, accept: false }); });
     for (const b of host.querySelectorAll('[data-accept]')) b.addEventListener('click', () => acceptRequest(b.dataset.accept));
     for (const b of host.querySelectorAll('[data-decline]')) b.addEventListener('click', () => declineRequest(b.dataset.decline));
     for (const b of host.querySelectorAll('[data-withdraw]')) b.addEventListener('click', () => withdrawRequest(b.dataset.withdraw));
@@ -1028,7 +1054,10 @@
   function rxBuckets() {
     const mv = (state && state.movement) || { active: [], history: [], history_total: 0 };
     const active = mv.active;
-    const action = active.filter((c) => c.action_required);
+    // AGR's freight-slot proposal (2026-10-04) is paperwork Transport must
+    // answer, so it sits in the same NEEDS MY ACTION pile as a request.
+    const slots = ((state && state.slot_requests) || []).filter((r) => r.action_required).map((r) => ({ ...r, kind: 'slot', stage: 'SLOT', at: r.requested_at }));
+    const action = [...slots, ...active.filter((c) => c.action_required)];
     const rest = active.filter((c) => !c.action_required);
     return {
       mv,
@@ -1131,8 +1160,10 @@
   function renderExchange() {
     const b = rxBuckets();
     const isTransport = !!state.transfer_queue;
-    // Transport opens on the queue only it can clear, until it says otherwise.
-    if (!filterTouched && isTransport && exchangeFilter === 'ACTION') exchangeFilter = 'APPROVALS';
+    // Transport opens on the queue only it can clear, until it says otherwise —
+    // unless Agriculture has put a freight-slot proposal in front of it, which
+    // is Transport's to answer and would be hidden behind the approvals tab.
+    if (!filterTouched && isTransport && exchangeFilter === 'ACTION' && !b.action.some((c) => c.kind === 'slot')) exchangeFilter = 'APPROVALS';
     if (!isTransport && exchangeFilter === 'APPROVALS') exchangeFilter = 'ACTION';
 
     setText($('rx-title'), isTransport ? 'TRANSFER CONTROL' : 'RESOURCE EXCHANGE');
@@ -1156,7 +1187,7 @@
     const host = $('rx-queue');
     show(host, exchangeFilter !== 'APPROVALS');
     const html = list.length
-      ? list.map((c) => movementCard(c, { history })).join('')
+      ? list.map((c) => (c.kind === 'slot' ? slotCard(c) : movementCard(c, { history }))).join('')
       : `<div class="empty"><b>${RX_EMPTY[exchangeFilter] || 'NOTHING HERE'}</b><br>New requests appear here as they arrive.</div>`;
     if (host.dataset.sig !== html) { host.dataset.sig = html; host.innerHTML = html; bindMovement(host); }
     rxAges();
@@ -1440,6 +1471,14 @@
 
   let agrPick = null;       // { card, target } while AGR is confirming
 
+  /** The timing of a consequence, in the words the card prints. */
+  function timingWord(t) {
+    return ({ NEXT_UPKEEP: 'AT NEXT UPKEEP', NEXT_ROUND: 'AT THE START OF NEXT ROUND', THIS_ROUND: 'UNTIL THE ROUND ENDS', IMMEDIATE: 'IMMEDIATELY', MIXED: 'NOW AND AT NEXT UPKEEP' })[t] || String(t || '').replace(/_/g, ' ');
+  }
+
+  const noticeAck = $('agr-notice-ack');
+  if (noticeAck) noticeAck.addEventListener('click', () => socket.send({ type: 'agr_acknowledge_notice' }));
+
   function agrStart(card) {
     agrPick = { card, target: {} };
     socket.send({ type: 'agr_select', card: card.id });
@@ -1481,18 +1520,50 @@
     setText($('agr-instruction'), a.message);
     $('agr-panel').classList.toggle('used', !!a.used);
 
+    // THE ONE-TIME NOTICE. Modal, AGR only, until acknowledged.
+    show($('agr-notice'), !!a.notice);
+
+    /*
+      AGR DECISIONS (2026-10-04). Before the mechanic's round the card is the
+      teaching card: title, summary, SELECT. From that round it is an
+      operational decision — the situation, IMMEDIATE GAIN, CONSEQUENCE and
+      its timing on the face of the card, both restated on the confirmation
+      step under IF AUTHORISED, BOTH EFFECTS APPLY, and the buttons renamed to
+      match. A proposal waiting on Transport locks the other two cards and
+      says so; the server refuses them regardless, this just stops the table
+      pressing a button that cannot work.
+    */
+    const live = !!a.consequences_active;
+    const pending = a.pending || null;
     const host = $('agr-cards');
     const html = (a.offered || []).map((card) => {
       const isUsed = a.used && a.selected === card.id;
-      const locked = a.used && a.selected !== card.id;
-      const confirming = agrPick && agrPick.card.id === card.id && !a.used;
+      const isPending = pending && pending.card === card.id;
+      const locked = (a.used && a.selected !== card.id) || (pending && !isPending);
+      const confirming = agrPick && agrPick.card.id === card.id && !a.used && !pending;
       const needs = card.target ? `<span class="agr-needs">${card.target === 'sector' ? 'CHOOSE A SECTOR' : card.target === 'resource_type' ? 'CHOOSE A RESOURCE' : 'CHOOSE A WORKER'}</span>` : '';
-      const body = confirming
-        ? `${agrTargetPicker(card)}<div class="agr-btns"><button type="button" class="primary" data-confirm>CONFIRM — ACTIVATE</button><button type="button" class="ghost" data-cancel>CANCEL</button></div>`
-        : `<button type="button" class="agr-select${isUsed ? ' on' : ''}" data-pick="${card.id}"${a.used ? ' disabled' : ''}>${isUsed ? 'USED' : locked ? 'LOCKED' : 'SELECT'}</button>`;
-      return `<div class="agr-card cat-${card.category}${isUsed ? ' used' : locked ? ' locked' : ''}${confirming ? ' confirming' : ''}">
+      const head = live
+        ? `<div class="agr-head"><span class="agr-kicker">AGR · OPERATIONAL DECISION</span><span class="agr-risk risk-${esc(String(card.risk || 'LOW').toLowerCase())}">${esc(card.risk || 'LOW')} TRADE-OFF</span></div>`
+        : '';
+      const terms = live
+        ? `<div class="agr-terms">
+            <div class="agr-gain"><span class="agr-label">IMMEDIATE GAIN</span><span>${esc(card.immediate_gain || card.summary)}</span></div>
+            <div class="agr-conseq"><span class="agr-label">CONSEQUENCE</span><span>${esc(card.consequence || '')}</span>${card.consequence_timing ? `<em class="agr-when">${esc(timingWord(card.consequence_timing))}</em>` : ''}</div>
+            ${card.special_condition ? `<div class="agr-requires"><span class="agr-label">REQUIRES</span><span>${esc(card.special_condition)}</span></div>` : ''}
+          </div>`
+        : '';
+      const body = isPending
+        ? `<div class="agr-pending"><b>STATUS: PENDING TRN APPROVAL</b><span>Transport is reviewing AGR's freight-slot proposal.</span></div>`
+        : confirming
+          ? `${agrTargetPicker(card)}
+            ${live ? `<div class="agr-both"><div class="agr-gain"><span class="agr-label">IMMEDIATE GAIN</span><span>${esc(card.immediate_gain || card.summary)}</span></div><div class="agr-conseq"><span class="agr-label">CONSEQUENCE</span><span>${esc(card.consequence || '')}</span></div><div class="agr-both-note">IF AUTHORISED, BOTH EFFECTS APPLY.</div></div>` : ''}
+            <div class="agr-btns"><button type="button" class="primary" data-confirm>${live ? 'AUTHORISE DECISION' : 'CONFIRM — ACTIVATE'}</button><button type="button" class="ghost" data-cancel>${live ? 'BACK TO OPTIONS' : 'CANCEL'}</button></div>`
+          : `<button type="button" class="agr-select${isUsed ? ' on' : ''}" data-pick="${card.id}"${a.used || pending ? ' disabled' : ''}>${isUsed ? (live ? 'AUTHORISED' : 'USED') : locked ? 'LOCKED' : (live ? 'REVIEW' : 'SELECT')}</button>`;
+      return `<div class="agr-card cat-${card.category}${isUsed ? ' used' : locked ? ' locked' : ''}${confirming ? ' confirming' : ''}${isPending ? ' pending' : ''}${live ? ' decision' : ''}">
+          ${head}
           <div class="agr-title">${esc(card.title)}</div>
-          <div class="agr-summary">${esc(card.summary)}</div>
+          <div class="agr-summary">${esc(live ? (card.description || card.summary) : card.summary)}</div>
+          ${terms}
           ${needs}
           ${body}
         </div>`;

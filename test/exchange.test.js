@@ -202,7 +202,9 @@ test('RE-006 an arrival notifies and counts, and never takes the player off the 
 
 test('RE-007 Transport opens on WAITING APPROVAL, sees its capacity, and approves by the existing rules', () => {
   assert.ok(/id="rx-f-approvals"/.test(PAGE), 'there is no WAITING APPROVAL view');
-  assert.ok(/if \(!filterTouched && isTransport && exchangeFilter === 'ACTION'\) exchangeFilter = 'APPROVALS';/.test(JS),
+  // …unless Agriculture has put a freight-slot proposal in front of it (AGR
+  // decisions, 2026-10-04): that is Transport's to answer and stays on top.
+  assert.ok(/if \(!filterTouched && isTransport && exchangeFilter === 'ACTION' && !b\.action\.some\(\(c\) => c\.kind === 'slot'\)\) exchangeFilter = 'APPROVALS';/.test(JS),
     'Transport does not open on its queue');
   assert.ok(/setText\(\$\('rx-title'\), isTransport \? 'TRANSFER CONTROL' : 'RESOURCE EXCHANGE'\)/.test(JS), 'the page is not retitled for Transport');
   assert.ok(/setText\(\$\('rx-cap-used'\), `\$\{used\} \/ \$\{cap\} USED`\)/.test(JS), 'the capacity is not on the page');

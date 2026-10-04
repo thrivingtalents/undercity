@@ -476,6 +476,25 @@
     <div class="overlay-sub">Await instructions from Continuity Authority.</div>
   </div>
 
+  <!--
+    AGRICULTURE OPERATING NOTICE (2026-10-04). Shown once, to AGR alone, the
+    first time a round carries the Gain + Consequence mechanic. It is a modal
+    on purpose: the rules of the cards change under the table's hands at this
+    moment, and a banner would be read later or not at all.
+  -->
+  <div class="overlay agr-notice" id="agr-notice" hidden>
+    <div class="agr-notice-card">
+      <div class="agr-notice-kicker">AGRICULTURE OPERATING NOTICE</div>
+      <p class="agr-notice-lead">Emergency reserves are depleted.</p>
+      <p>From this round onward, accelerated AGR initiatives carry operational consequences.</p>
+      <p>Every authorised decision will include:</p>
+      <div class="agr-notice-pair"><b>IMMEDIATE GAIN</b><span>and</span><b>CONSEQUENCE</b></div>
+      <p>If authorised, both effects apply.</p>
+      <p>Review all commitments before authorisation.</p>
+      <button type="button" class="primary wide" id="agr-notice-ack">ACKNOWLEDGE</button>
+    </div>
+  </div>
+
   <div class="overlay pause-overlay" id="pause-overlay" hidden>
     <div class="stencil pause">SIMULATION PAUSED</div>
     <div class="overlay-sub">Every clock is frozen.</div>

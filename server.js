@@ -1131,6 +1131,18 @@ function handleSector(client, entry, msg) {
       send(client.ws, { type: 'agr_result', action: 'activate', ...game.agrActivate(msg.card, { by: 'AGR', target: msg.target || null }) });
       return broadcast(entry);
     }
+    // AGR DECISIONS (2026-10-04): the one-time Round 2 notice, and Transport's
+    // answer to a freight-slot proposal. Only the party each belongs to.
+    case 'agr_acknowledge_notice': {
+      if (mine !== 'AGR') return send(client.ws, { type: 'error', reason: 'agr_only' });
+      send(client.ws, { type: 'agr_result', action: 'notice', ...game.agrAcknowledgeNotice({ by: 'AGR' }) });
+      return broadcast(entry);
+    }
+    case 'agr_slot_respond': {
+      if (mine !== 'TRN') return send(client.ws, { type: 'error', reason: 'trn_only' });
+      send(client.ws, { type: 'agr_result', action: 'slot', ...game.agrSlotRespond(msg.id, { accept: !!msg.accept, by: 'TRN' }) });
+      return broadcast(entry);
+    }
 
     default:
       return send(client.ws, { type: 'error', reason: 'forbidden' });
@@ -1335,6 +1347,9 @@ function handleControl(client, entry, msg) {
       return ok();
     case 'com_announce_clear':
       reply({ type: 'broadcast_result', ...game.clearBroadcastAnnouncement({ by: 'facilitator' }) });
+      return ok();
+    case 'agr_slot_respond':
+      reply({ type: 'agr_result', action: 'slot', ...game.agrSlotRespond(msg.id, { accept: !!msg.accept, by: 'facilitator' }) });
       return ok();
     case 'agr_reroll':
       reply({ type: 'agr_result', ...game.agrReroll({ by: 'facilitator' }) });

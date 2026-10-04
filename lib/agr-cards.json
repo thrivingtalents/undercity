@@ -1,102 +1,201 @@
 {
-  "_comment": "AGR's intervention pool (spec v5). Cards are data; lib/state.js agrResolve() applies them. Three are drawn per round from the enabled set, minus last round's draw when enough remain. Disable one with the scenario key agr_disabled_cards.",
+  "_comment": "AGR's intervention pool (spec v5), rebuilt as OPERATIONAL DECISIONS (2026-10-04). Cards are data; lib/state.js agrResolve() applies the gain and agrApplyConsequences() the consequence. Three are drawn per round from the enabled set — by risk pool from Round 2 (agr_risk_pool_by_round) — minus last round's draw when enough remain. `summary` is the TEACHING copy a table sees in R0–R1, when no consequence is enforced; `description` is the OPERATIONAL copy from the round the mechanic activates (agr_consequences_from_round), and only then are `consequence_text` and `consequences` shown or applied. `effect` is the immediate gain and is unchanged from v5. Disable one with the scenario key agr_disabled_cards.",
   "cards": [
     {
       "id": "AGR_CITY_RECOVERY",
-      "title": "CITY RECOVERY",
+      "title": "ATMOSPHERIC BIOFILTER FLUSH",
       "category": "health",
+      "risk": "HIGH",
+      "balance_watch": true,
       "summary": "+10 Health to every active sector.",
+      "description": "AGR's canopy bio-filters scrub the air for the whole city. A full flush — running every filter bed to exhaustion at once — clears the particulate load from every sector's air handling in a single cycle. The beds are spent by it, and regrowing them draws on AGR's water for the next cycle.",
+      "immediate_gain": "Every active sector +10 Health.",
+      "consequence_text": "AGR loses 12 Integrity, and requires +1 Water at its next upkeep.",
+      "consequence_timing": "MIXED",
       "target": null,
-      "effect": { "type": "health_all", "delta": 10 }
+      "effect": { "type": "health_all", "delta": 10 },
+      "consequences": [
+        { "type": "integrity", "sector": "AGR", "delta": -12 },
+        { "type": "upkeep_extra", "sector": "AGR", "add": { "water": 1 }, "cycles": 1 }
+      ]
     },
     {
       "id": "AGR_EMERGENCY_STOCKPILE",
-      "title": "EMERGENCY STOCKPILE",
+      "title": "OPEN THE CONTINGENCY STORES",
       "category": "resources",
+      "risk": "HIGH",
+      "balance_watch": true,
       "summary": "AGR gains +5 Power, +5 Water, +2 Med, +1 Parts.",
+      "description": "Sealed contingency stores sit beneath the Seed Vault, pre-positioned for a vault breach so the vault could be held without outside supply. AGR can open them now and draw everything down. Once open, the vault has no held reserve, and the stores must be re-sealed and restocked.",
+      "immediate_gain": "AGR +5 Power, +5 Water, +2 Med, +1 Parts.",
+      "consequence_text": "AGR loses 8 Integrity, and requires +1 Power and +1 Water at its next upkeep.",
+      "consequence_timing": "MIXED",
       "target": null,
-      "effect": { "type": "stock", "sector": "AGR", "add": { "power": 5, "water": 5, "med": 2, "parts": 1 } }
+      "effect": { "type": "stock", "sector": "AGR", "add": { "power": 5, "water": 5, "med": 2, "parts": 1 } },
+      "consequences": [
+        { "type": "integrity", "sector": "AGR", "delta": -8 },
+        { "type": "upkeep_extra", "sector": "AGR", "add": { "power": 1, "water": 1 }, "cycles": 1 }
+      ]
     },
     {
       "id": "AGR_WORKFORCE_RECOVERY",
       "title": "WORKFORCE RECOVERY",
       "category": "workforce",
+      "risk": "LOW",
       "summary": "Recover 1 eligible non-injured unavailable worker.",
+      "description": "Recover 1 eligible non-injured unavailable worker.",
+      "immediate_gain": "Recover 1 worker.",
+      "consequence_text": "",
+      "consequence_timing": null,
       "target": "worker",
       "effect": { "type": "workforce_recovery", "quantity": 1 },
-      "_conflict": "This game's workers are counts with no non-injury unavailable state. The card refuses until one exists; it is off by default (agr_disabled_cards)."
+      "consequences": []
     },
     {
       "id": "AGR_POWER_SURGE",
-      "title": "POWER SURGE",
+      "title": "BACK-FEED THE LIGHTING RESERVE",
       "category": "sector_support",
+      "risk": "LOW",
       "summary": "POW immediately gains +3 Power.",
+      "description": "The grow-light arrays sit on their own sub-grid with a buffered reserve held for lamp start-up surges. Power Grid is short, and AGR can back-feed that reserve across the tie-line now. The lamps will run off AGR's own stock until the buffer is recharged.",
+      "immediate_gain": "POW +3 Power.",
+      "consequence_text": "AGR requires +1 Power at its next upkeep.",
+      "consequence_timing": "NEXT_UPKEEP",
       "target": null,
-      "effect": { "type": "stock", "sector": "POW", "add": { "power": 3 } }
+      "effect": { "type": "stock", "sector": "POW", "add": { "power": 3 } },
+      "consequences": [
+        { "type": "upkeep_extra", "sector": "AGR", "add": { "power": 1 }, "cycles": 1 }
+      ]
     },
     {
       "id": "AGR_WATER_RESERVE",
-      "title": "WATER RESERVE",
+      "title": "DIVERT THE IRRIGATION HEADER",
       "category": "sector_support",
+      "risk": "MEDIUM",
       "summary": "WTR immediately gains +3 Water.",
+      "description": "The irrigation header tank holds a standing reserve so the bays can ride out a short supply interruption. Water & Filtration needs it more than the bays do right now, and AGR can divert the whole header. The bays will run on reduced irrigation until the tank is back to level, which takes two cycles.",
+      "immediate_gain": "WTR +3 Water.",
+      "consequence_text": "AGR requires +1 Water at each of its next two upkeeps.",
+      "consequence_timing": "NEXT_UPKEEP",
       "target": null,
-      "effect": { "type": "stock", "sector": "WTR", "add": { "water": 3 } }
+      "effect": { "type": "stock", "sector": "WTR", "add": { "water": 3 } },
+      "consequences": [
+        { "type": "upkeep_extra", "sector": "AGR", "add": { "water": 1 }, "cycles": 2 }
+      ]
     },
     {
       "id": "AGR_MEDICAL_REINFORCEMENT",
-      "title": "MEDICAL REINFORCEMENT",
+      "title": "CONVERT A BAY TO MEDICINAL STOCK",
       "category": "capacity",
+      "risk": "MEDIUM",
       "summary": "MED gains +1 healing capacity this round. MED still performs the heal.",
+      "description": "Medical Bay is treating more injured workers than its processing line can clear. AGR can convert one active hydroponic bay to fast-growing medicinal stock and run the processing on-site. The specialist crop improves MED's treatment capacity immediately, but its controlled irrigation cycle will increase AGR's water demand.",
+      "immediate_gain": "MED +1 healing capacity this round. MED still performs the heal.",
+      "consequence_text": "AGR requires +1 Water at its next upkeep.",
+      "consequence_timing": "NEXT_UPKEEP",
       "target": null,
-      "effect": { "type": "capacity", "kind": "med_capacity", "sector": "MED", "delta": 1 }
+      "effect": { "type": "capacity", "kind": "med_capacity", "sector": "MED", "delta": 1 },
+      "consequences": [
+        { "type": "upkeep_extra", "sector": "AGR", "add": { "water": 1 }, "cycles": 1 }
+      ]
     },
     {
       "id": "AGR_LOGISTICS_BOOST",
-      "title": "LOGISTICS BOOST",
+      "title": "RELEASE THE FREIGHT SLOT",
       "category": "capacity",
+      "risk": "MEDIUM",
+      "requires": "TRN",
       "summary": "TRN gains +1 transfer approval this round. TRN still approves.",
+      "description": "AGR holds a standing slot on the tunnel freight schedule for produce movements. Transport can borrow that slot to clear one additional transfer this round. The schedule is finite, so using the slot now means Transport will operate one movement short in the next round.",
+      "immediate_gain": "TRN +1 transfer approval this round.",
+      "consequence_text": "TRN has 1 fewer transfer approval next round.",
+      "consequence_timing": "NEXT_ROUND",
+      "special_condition": "TRN must agree to the freight-slot arrangement.",
       "target": null,
-      "effect": { "type": "capacity", "kind": "trn_capacity", "sector": "TRN", "delta": 1 }
+      "effect": { "type": "capacity", "kind": "trn_capacity", "sector": "TRN", "delta": 1 },
+      "consequences": [
+        { "type": "capacity", "kind": "trn_capacity", "sector": "TRN", "delta": -1, "apply_at": "round_start" }
+      ]
     },
     {
       "id": "AGR_CRISIS_RESPONSE",
-      "title": "CRISIS RESPONSE",
+      "title": "DEPLOY THE REMEDIATION CREW",
       "category": "health",
+      "risk": "HIGH",
       "summary": "The active sector with the lowest Health gains +20 Health.",
+      "description": "One sector is in worse condition than any other and losing ground. AGR can send its full field crew with bio-remediation stock to that sector for the rest of the cycle. While they are away, AGR's own bays run unattended, and unattended bays degrade.",
+      "immediate_gain": "The active sector with the lowest Health +20 Health.",
+      "consequence_text": "AGR loses 10 Integrity.",
+      "consequence_timing": "IMMEDIATE",
       "target": null,
-      "effect": { "type": "health_lowest", "delta": 20 }
+      "effect": { "type": "health_lowest", "delta": 20 },
+      "consequences": [
+        { "type": "integrity", "sector": "AGR", "delta": -10 }
+      ]
     },
     {
       "id": "AGR_STABILISE_SECTOR",
-      "title": "STABILISE SECTOR",
+      "title": "TARGETED ENVIRONMENTAL PURGE",
       "category": "health",
+      "risk": "MEDIUM",
       "summary": "Choose 1 active sector and restore +15 Health.",
+      "description": "A sector's air handling is loading up with particulate and its systems are suffering for it. AGR can route that sector's air through its canopy bio-filters for an extended purge cycle. The purge runs the pumps and the lamp banks hard for the whole cycle.",
+      "immediate_gain": "Chosen sector +15 Health.",
+      "consequence_text": "AGR requires +1 Power and +1 Water at its next upkeep.",
+      "consequence_timing": "NEXT_UPKEEP",
       "target": "sector",
-      "effect": { "type": "health_one", "delta": 15 }
+      "effect": { "type": "health_one", "delta": 15 },
+      "consequences": [
+        { "type": "upkeep_extra", "sector": "AGR", "add": { "power": 1, "water": 1 }, "cycles": 1 }
+      ]
     },
     {
       "id": "AGR_EMERGENCY_PARTS",
-      "title": "EMERGENCY PARTS",
+      "title": "STRIP THE RESERVE RACKS",
       "category": "resources",
+      "risk": "MEDIUM",
       "summary": "AGR gains +3 Parts.",
+      "description": "Three growing racks are held in reserve, fully fitted but unplanted. AGR can strip their serviceable pumps, valves and controllers for immediate use. The stripped racks will fail their next inspection, and AGR's reserve capacity is counted against it.",
+      "immediate_gain": "AGR +3 Parts.",
+      "consequence_text": "AGR loses 6 Integrity at the start of the next round.",
+      "consequence_timing": "NEXT_ROUND",
       "target": null,
-      "effect": { "type": "stock", "sector": "AGR", "add": { "parts": 3 } }
+      "effect": { "type": "stock", "sector": "AGR", "add": { "parts": 3 } },
+      "consequences": [
+        { "type": "integrity", "sector": "AGR", "delta": -6, "apply_at": "round_start" }
+      ]
     },
     {
       "id": "AGR_RELIEF_CREW",
-      "title": "RELIEF CREW",
+      "title": "SECOND A TECHNICIAN",
       "category": "workforce",
+      "risk": "LOW",
       "summary": "Choose 1 sector to receive +1 temporary worker until the round ends.",
+      "description": "A sector has more open work than hands. AGR can second one of its bay technicians for the rest of the round; the technician carries their own tools and needs no briefing. The bays they leave behind run one short until they return.",
+      "immediate_gain": "Chosen sector +1 worker until the round ends.",
+      "consequence_text": "AGR has 1 fewer available worker until the round ends.",
+      "consequence_timing": "THIS_ROUND",
       "target": "sector",
-      "effect": { "type": "relief_crew", "workers": 1 }
+      "effect": { "type": "relief_crew", "workers": 1 },
+      "consequences": [
+        { "type": "workers", "sector": "AGR", "delta": -1 }
+      ]
     },
     {
       "id": "AGR_RESERVE_CACHE",
-      "title": "RESERVE CACHE",
+      "title": "BREAK A CACHE SEAL",
       "category": "resources",
+      "risk": "LOW",
       "summary": "Choose one resource type and gain an emergency cache.",
+      "description": "Four sealed emergency caches sit behind the nursery bays, each stocked for one specific shortage. AGR can break one seal and draw it down now. A broken cache must be restocked from AGR's own supply at the next resupply point, or it stays empty for the rest of the shift.",
+      "immediate_gain": "Choice of +3 Power, +3 Water, +2 Med or +2 Parts.",
+      "consequence_text": "AGR requires +1 of the chosen resource at its next upkeep.",
+      "consequence_timing": "NEXT_UPKEEP",
       "target": "resource_type",
-      "effect": { "type": "cache", "sector": "AGR", "choices": { "power": 3, "water": 3, "med": 2, "parts": 2 } }
+      "effect": { "type": "cache", "sector": "AGR", "choices": { "power": 3, "water": 3, "med": 2, "parts": 2 } },
+      "consequences": [
+        { "type": "upkeep_extra", "sector": "AGR", "add": "chosen", "amount": 1, "cycles": 1 }
+      ]
     }
   ]
 }

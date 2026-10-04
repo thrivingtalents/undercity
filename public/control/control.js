@@ -1314,6 +1314,31 @@
       .map(([v, l, c]) => `<div class="stat ${c}"><b>${v}</b><span>${l}</span></div>`).join('');
     const card = (id, acts = []) => { const c = titles[id] || { title: id, summary: '', target: null }; const isUsed = agr.used && agr.selected === id; return `<div class="tr${agr.used && !isUsed ? ' closed' : ''}"><div class="who"><b>${esc(c.title)}</b> ${isUsed ? '<span class="tag multi">USED</span>' : agr.selected === id ? '<span class="tag">SELECTED</span>' : ''}<br><span class="st">${esc(c.summary)}${c.target ? ` · needs ${c.target.replace('_', ' ')}` : ''}</span></div><div class="acts">${acts.join('')}</div></div>`; };
     $('ca-offer').innerHTML = (agr.offered || []).map((id) => card(id)).join('') || '<div class="hint">No hand dealt.</div>';
+    /*
+      AGR DECISIONS (2026-10-04). The facilitator never calculates a consequence:
+      every obligation AGR has authorised is listed here with the moment it
+      lands, straight off state.effects, and a freight-slot proposal Transport
+      has not answered shows with the facilitator's own ACCEPT / DECLINE.
+    */
+    const pend = agr.pending_consequences || [];
+    const open = (agr.slot_requests || []).filter((r) => r.status === 'REQUESTED');
+    const closed = (agr.slot_requests || []).filter((r) => r.status !== 'REQUESTED').slice(0, 4);
+    const pendingHtml = [
+      `<div class="hint">${agr.consequences_active ? 'GAIN + CONSEQUENCE ACTIVE' : 'TEACHING ROUND — no consequences applied'}${agr.notice && !agr.notice.acknowledged ? ' · AGR has not acknowledged the operating notice' : ''}</div>`,
+      ...open.map((r) => `<div class="tr"><div class="who"><b>PENDING TRN APPROVAL</b> <span class="tag">${esc(r.card)}</span><br><span class="st">${esc(r.title)} · raised ${esc(String(r.requested_at || '').slice(11, 19))}Z · AGR is locked until Transport answers</span></div><div class="acts"><button data-slot="${esc(r.id)}" data-answer="1" class="primary">ACCEPT FOR TRN</button><button data-slot="${esc(r.id)}" data-answer="0" class="danger">DECLINE FOR TRN</button></div></div>`),
+      ...pend.map((e) => `<div class="tr"><div class="who"><b>${esc(e.label || e.card || 'AGR DECISION')}</b> <span class="tag multi">${esc(e.fires)}</span><br><span class="st">${esc(e.description || e.kind)}</span></div></div>`),
+      ...closed.map((r) => `<div class="tr closed"><div class="who"><b>${esc(r.title)}</b> <span class="tag">${esc(r.status)}${r.expire_reason ? ' · ' + esc(r.expire_reason) : ''}</span><br><span class="st">${esc(r.card)} · ${esc(r.round)}</span></div></div>`),
+    ].join('');
+    if ($('ca-pending').dataset.sig !== pendingHtml) {
+      $('ca-pending').dataset.sig = pendingHtml;
+      $('ca-pending').innerHTML = pendingHtml;
+      for (const btn of $('ca-pending').querySelectorAll('[data-slot]')) {
+        btn.addEventListener('click', () => {
+          const accept = btn.dataset.answer === '1';
+          askOverride({ title: accept ? 'ACCEPT FREIGHT SLOT FOR TRN' : 'DECLINE FREIGHT SLOT FOR TRN', target: 'AGR → TRN', diff: [['PROPOSAL', 'PENDING', accept ? 'ACCEPTED · +1 approval now, −1 next round' : 'DECLINED · nothing applies']], extra: '<div class="hint">Answers for Transport. In normal play TRN answers from its own console.</div>', action: 'agr_slot_respond', payload: { id: btn.dataset.slot, accept } });
+        });
+      }
+    }
     const ovr = (agr.offered || []).map((id) => card(id, agr.used ? [] : [`<button data-force="${esc(id)}" class="danger">FORCE ACTIVATE</button>`])).join('') || '<div class="hint">No hand dealt.</div>';
     if ($('ca-offer-ovr').dataset.sig !== ovr) {
       $('ca-offer-ovr').dataset.sig = ovr;

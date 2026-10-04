@@ -1188,6 +1188,10 @@ test('a refresh, a reconnect and a reopened screen all show the same hand', () =
 
 test('a new round deals a new hand, archives the old one, and last round\'s cards sit it out', () => {
   const game = running();
+  // The draw rules under test, over the whole pool: the per-round risk pools
+  // (2026-10-04) are their own test and are switched off here.
+  game.patchConfig({ agr_risk_pool_by_round: { R2: [], R3: [], R4: [] } });
+  game.state.agr.offered = []; game.agrEnsureOffer();
   const c1 = [...game.state.agr.offered];
   game.setPhase('ROUND_3');
   const c2 = [...game.state.agr.offered];
@@ -1208,7 +1212,7 @@ test('the fallback fills from last round when fewer than three fresh cards remai
   // Five enabled cards: three dealt this cycle leave two fresh for the next.
   const keep = ['AGR_POWER_SURGE', 'AGR_WATER_RESERVE', 'AGR_EMERGENCY_PARTS', 'AGR_CITY_RECOVERY', 'AGR_LOGISTICS_BOOST'];
   const all = game.agrPool().map((c) => c.id);
-  game.patchConfig({ agr_disabled_cards: all.filter((id) => !keep.includes(id)) });
+  game.patchConfig({ agr_disabled_cards: all.filter((id) => !keep.includes(id)), agr_risk_pool_by_round: { R2: [], R3: [], R4: [] } });
   game.setPhase('ROUND_3');
   const r3 = [...game.state.agr.offered];
   assert.equal(r3.length, 3);
@@ -1386,7 +1390,12 @@ test('LOGISTICS BOOST: +1 approval this round only, and AGR still cannot approve
   const game = running();
   assert.equal(game.trnCapacity(), 3);
   deal(game, 'AGR_LOGISTICS_BOOST');
-  assert.equal(game.agrActivate('AGR_LOGISTICS_BOOST', { by: 'AGR' }).ok, true);
+  // From Round 2 (AGR decisions, 2026-10-04) the slot is Transport's to
+  // accept: the activation raises a proposal and nothing moves until TRN says so.
+  const proposed = game.agrActivate('AGR_LOGISTICS_BOOST', { by: 'AGR' });
+  assert.equal(proposed.ok && proposed.pending, true);
+  assert.equal(game.trnCapacity(), 3, 'TRN gained before agreeing');
+  assert.equal(game.agrSlotRespond(proposed.request.id, { accept: true, by: 'TRN' }).ok, true);
   assert.equal(game.trnCapacity(), 4);
   assert.equal(forSector(game, 'TRN').transfer_queue.capacity, 4);
   game.setInventory('POW', { power: 10 });
@@ -1394,6 +1403,8 @@ test('LOGISTICS BOOST: +1 approval this round only, and AGR still cannot approve
   for (let i = 0; i < 4; i += 1) ids.push(readyTransfer(game, { from: 'POW', to: 'MED', resource: 'power', amount: 1 }).id);
   assert.equal(game.approveTransfer(ids[0], { by: 'AGR' }).reason, 'approval_trn_only');
   for (const id of ids) assert.equal(game.approveTransfer(id, { by: 'TRN' }).ok, true, 'the fourth approval failed');
+  nextRound(game);
+  assert.equal(game.trnCapacity(), 2, 'the borrowed slot was not paid back next round');
   nextRound(game);
   assert.equal(game.trnCapacity(), 3, 'the bonus outlived the round');
 });
