@@ -172,6 +172,25 @@ for (const f of faults) {
 for (const p of Object.keys(PROC)) {
   if (existing.some((e) => e.procedure === p)) fail(`procedure ${p} is already used by an existing fault`);
 }
+/*
+  THE SHORTCUT CHECK. A chain is only a chain if the requesting table has to
+  go and ask. If one of its own existing faults has already sent it to the
+  same spec row, the answer is in its notes and the whole journey collapses
+  into a lookup — so a collision aborts the build rather than shipping a
+  fault that teaches nothing the second time it is played.
+*/
+for (const f of faults) {
+  const already = new Set(
+    existing.filter((e) => e.sector === f.sector).flatMap((e) => (e.spec_refs || []).map((r) => r.spec_id)),
+  );
+  for (const c of f.reference_chain) {
+    if (already.has(c.final_source.spec_id)) {
+      const owner = existing.find((e) => e.sector === f.sector && (e.spec_refs || []).some((r) => r.spec_id === c.final_source.spec_id));
+      fail(`${f.code}: ends on ${c.final_source.spec_id} "${c.final_source.item}", which ${f.sector} is already sent to by ${owner.code} — the chain collapses into the team's notes`);
+    }
+  }
+}
+
 // Every sector carries its share of the network, in all three roles.
 const role = (pick) => {
   const n = Object.fromEntries(SECTORS.map((s) => [s, 0]));

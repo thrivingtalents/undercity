@@ -59,12 +59,12 @@
         "id": "RD-WTR-2",
         "owner": "WTR",
         "reference_name": "Ward Pressure Source",
-        "display": "Line 2 [TRN]",
+        "display": "Line 3 [TRN]",
         "entry_type": "REFERENCE",
         "target_sector": "TRN",
         "target_table": "T-6",
-        "target_item": "Line 2",
-        "spec_id": "T6-2"
+        "target_item": "Line 3",
+        "spec_id": "T6-3"
       },
       {
         "id": "RD-WTR-3",
@@ -164,12 +164,12 @@
         "id": "RD-AGR-2",
         "owner": "AGR",
         "reference_name": "Seedling Transport Reference",
-        "display": "Tunnel B [TRN]",
+        "display": "Tunnel D [TRN]",
         "entry_type": "REFERENCE",
         "target_sector": "TRN",
         "target_table": "T-1",
-        "target_item": "Tunnel B",
-        "spec_id": "T1-2"
+        "target_item": "Tunnel D",
+        "spec_id": "T1-4"
       },
       {
         "id": "RD-AGR-3",
@@ -453,15 +453,15 @@
       "procedure": "P-07",
       "spec_refs": [
         {
-          "spec_id": "T6-2",
+          "spec_id": "T6-3",
           "binder": "TRN",
           "table": "T-6",
-          "row_label": "Line 2",
+          "row_label": "Line 3",
           "buried": false
         }
       ],
       "valid_codes": [
-        "P-07-895"
+        "P-07-807"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -472,12 +472,12 @@
         {
           "first_sector": "WTR",
           "first_reference_name": "Ward Pressure Source",
-          "intermediate_result": "Line 2 [TRN]",
+          "intermediate_result": "Line 3 [TRN]",
           "final_source": {
             "sector": "TRN",
             "table": "T-6",
-            "item": "Line 2",
-            "spec_id": "T6-2"
+            "item": "Line 3",
+            "spec_id": "T6-3"
           }
         }
       ]
@@ -613,15 +613,15 @@
           "buried": false
         },
         {
-          "spec_id": "T1-2",
+          "spec_id": "T1-4",
           "binder": "TRN",
           "table": "T-1",
-          "row_label": "Tunnel B",
+          "row_label": "Tunnel D",
           "buried": false
         }
       ],
       "valid_codes": [
-        "P-08-331-214"
+        "P-08-331-621"
       ],
       "false_alarm": false,
       "deadline_s": null,
@@ -643,12 +643,12 @@
         {
           "first_sector": "AGR",
           "first_reference_name": "Seedling Transport Reference",
-          "intermediate_result": "Tunnel B [TRN]",
+          "intermediate_result": "Tunnel D [TRN]",
           "final_source": {
             "sector": "TRN",
             "table": "T-1",
-            "item": "Tunnel B",
-            "spec_id": "T1-2"
+            "item": "Tunnel D",
+            "spec_id": "T1-4"
           }
         }
       ]

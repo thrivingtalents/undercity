@@ -247,22 +247,25 @@ function indexPages(b) {
  */
 function referencePages(b) {
   if (!b.references || !b.references.length) return [];
-  const rows = [
-    [cell("REFERENCE NAME", { width: 4200, bold: true, shade: "F2F2F2" }),
-     cell("REFERENCE", { width: 4826, bold: true, shade: "F2F2F2" })],
-    ...b.references.map((r) => [
-      cell(r.name, { width: 4200 }),
-      cell(r.display, { width: 4826, mono: true }),
-    ]),
-  ];
+  const LEFT = 4600;
+  const rows = [new TableRow({ children: [
+    cell("REFERENCE NAME", { width: LEFT, shade: "F2F2F2", bold: true }),
+    cell("REFERENCE", { width: W - LEFT, shade: "F2F2F2", bold: true, align: AlignmentType.CENTER }),
+  ]})];
+  for (const r of b.references) {
+    rows.push(new TableRow({ children: [
+      cell(r.name, { width: LEFT }),
+      cell(r.display, { width: W - LEFT, mono: true, bold: true, align: AlignmentType.CENTER }),
+    ]}));
+  }
   return [
-    pageBreak(),
-    sectionTitle("5A · CROSS-SYSTEM REFERENCE DIRECTORY", b.colour),
+    new Paragraph({ text: "", spacing: { after: 300 } }),
+    sectionTitle("5A · Cross-System Reference Directory", b.colour),
     p(body("Entries ending with a sector code in square brackets are REFERENCES, not resolution values. "
       + "Relay the exact reference name and sector shown to the requesting team. The named sector holds "
       + "the authoritative numeric value. Do not invent or infer a number.")),
-    p(body("")),
-    table(rows, [4200, 4826]),
+    new Paragraph({ text: "", spacing: { after: 160 } }),
+    table(rows, [LEFT, W - LEFT]),
   ];
 }
 

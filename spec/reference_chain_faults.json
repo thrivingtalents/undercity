@@ -4,6 +4,7 @@
     "version": "1.0",
     "generated_into": "content/faults.reference-chain.json",
     "generator": "tools/build_reference_chain_faults.js",
+    "collision_rule": "A chain must not end on a spec row the REQUESTING sector has already been sent to by one of its own existing faults, or the team can answer from its notes instead of asking. Checked by tools/build_reference_chain_faults.js.",
     "note": "THE SOURCE OF TRUTH for the twelve reference-chain faults. Hand-edited; the generator reads it. It holds NO resolution codes and NO three-digit values: every number is resolved from content/specs.json at build time by (binder, table, item). Change a spec value in the workbook, re-run the generator, and every code here follows it. If you find a number in this file that is not a crew count or a material count, it does not belong.",
     "procedures": {
       "P-07": { "chains": 1, "severity": 2, "label": "SINGLE REFERENCE CHAIN" },
@@ -24,7 +25,7 @@
 
     "WTR": [
       { "id": "RD-WTR-1", "reference_name": "Core Coolant Route Reference", "target": { "sector": "TRN", "table": "T-1", "item": "Tunnel C" } },
-      { "id": "RD-WTR-2", "reference_name": "Ward Pressure Source", "target": { "sector": "TRN", "table": "T-6", "item": "Line 2" } },
+      { "id": "RD-WTR-2", "reference_name": "Ward Pressure Source", "target": { "sector": "TRN", "table": "T-6", "item": "Line 3" } },
       { "id": "RD-WTR-3", "reference_name": "Freight Cooling Reference", "target": { "sector": "POW", "table": "P-1", "item": "Turbine D" } }
     ],
 
@@ -42,7 +43,7 @@
 
     "AGR": [
       { "id": "RD-AGR-1", "reference_name": "Environmental Power Reference", "target": { "sector": "POW", "table": "P-2", "item": "Sub-grid 1" } },
-      { "id": "RD-AGR-2", "reference_name": "Seedling Transport Reference", "target": { "sector": "TRN", "table": "T-1", "item": "Tunnel B" } },
+      { "id": "RD-AGR-2", "reference_name": "Seedling Transport Reference", "target": { "sector": "TRN", "table": "T-1", "item": "Tunnel D" } },
       { "id": "RD-AGR-3", "reference_name": "Mast Filtration Reference", "target": { "sector": "MED", "table": "M-5", "item": "HEPA Array" } }
     ],
 
