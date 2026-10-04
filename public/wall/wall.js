@@ -271,6 +271,7 @@
       card.className = 'shc';
       card.dataset.sector = code;
       card.dataset.state = 'stable';
+      card.dataset.alarm = 'off';
       card.style.setProperty('--accent', IDENTITY[code] || d.colour);
       card.dataset.report = 'none';
       /*
@@ -555,6 +556,16 @@
       setText(card.querySelector('.shc-name'), sectorName(code));
       const state = B.healthState(s);
       if (card.dataset.state !== state) card.dataset.state = state;
+      /*
+        THE ALARM, separate from the state on purpose. `data-state` is the
+        server's word and it keeps doing its own job — a brownout card still
+        says BROWNOUT and still wears the brownout marks. `data-alarm` is the
+        one question the room asks from ten metres away: is this sector under
+        30? It is the rule the sector console turns red on, so the card and the
+        table never disagree.
+      */
+      const alarm = B.alarming(s) ? 'on' : 'off';
+      if (card.dataset.alarm !== alarm) card.dataset.alarm = alarm;
       const value = B.healthValue(s);
       setText(card.querySelector('.shc-pct'), value);   // never a fabricated 100
       // the bar follows the figure; an unknown health leaves the track empty

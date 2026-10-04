@@ -38,6 +38,7 @@
     stable: 'STABLE', degraded: 'DEGRADED', critical: 'CRITICAL', dark: 'DARK / OFFLINE', brownout: 'BROWNOUT',
   };
   const AWAITING_REPORT = 'AWAITING REPORT';
+  const CRITICAL_BELOW = 30;             // the band the console's health bar uses too
   const CORE_INSUFFICIENT = 60;          // the line the Council text already draws
   const ANNOUNCEMENT_MAX_AGE_S = 120;    // a facilitator announcement stays on the strip this long
   const MAX_ALERTS = 4;
@@ -149,6 +150,28 @@
     return { show: true, round: Number(n), text: `R${Number(n)}` };
   }
 
+  /**
+   * Does this sector's card wear the alarm — the red the room can read from
+   * the back of it?
+   *
+   * The server's CRITICAL is the usual way in and it carries the scenario's
+   * own threshold. But a BROWNOUT sector keeps the word BROWNOUT however badly
+   * hurt it is, and a sector at 18% in brownout is precisely the one nobody
+   * should have to read a number to worry about — so the health band lights it
+   * too. DARK lights neither: a sector at 0 is past alarm, and its card goes
+   * quiet and grey instead, which is a different and worse thing to see.
+   *
+   * This is the same rule the sector console washes itself red on, so a table
+   * and the wall never disagree about which sectors are in trouble.
+   */
+  function alarming(s) {
+    const state = healthState(s);
+    if (state === 'dark') return false;
+    if (state === 'critical') return true;
+    const v = healthValue(s);
+    return v !== '—' && Number(v) < CRITICAL_BELOW;
+  }
+
   /** The bar's fill, 0-100. An unknown health draws an empty track, never a full one. */
   function healthPercent(s) {
     const v = healthValue(s);
@@ -243,9 +266,9 @@
   }
 
   return {
-    RES_ORDER, CARD_RES_ORDER, GLYPH, RES_NAME, STATES, STATE_WORD, SECTOR_ORDER, CORE_INSUFFICIENT, ANNOUNCEMENT_MAX_AGE_S, MAX_ALERTS,
+    RES_ORDER, CARD_RES_ORDER, GLYPH, RES_NAME, STATES, STATE_WORD, SECTOR_ORDER, CORE_INSUFFICIENT, CRITICAL_BELOW, ANNOUNCEMENT_MAX_AGE_S, MAX_ALERTS,
     SECTOR_COLOUR, STATUS_COLOUR, CARD_WORD, CORE_WORD, AWAITING_REPORT,
     clamp, healthState, healthWord, reported, freshnessLine, freshnessShort, reportLine, reportSummary, reportTag,
-    healthValue, healthPercent, coreBand, coreStatus, transferAlert, buildAlerts,
+    healthValue, healthPercent, alarming, coreBand, coreStatus, transferAlert, buildAlerts,
   };
 });

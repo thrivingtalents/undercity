@@ -591,6 +591,39 @@
 .shc[data-state="dark"] .shc-dot { background: var(--st-offline); }
 .shc[data-state="dark"] .shc-word, .shc[data-state="dark"] .shc-pct { color: var(--st-offline); }
 
+/*
+  UNDER 30: THE CARD GOES RED.
+
+  The critical state above already tinted and pulsed, which reads from a desk
+  and not from the back of a room. This is the version a projector carries: a
+  red field across the whole card, a red edge around it, and the figure, the
+  word and the bar bright on top of it. It is driven by `data-alarm` rather
+  than `data-state`, so a brownout sector under 30 gets the red without losing
+  the amber marks that say why it is browned out.
+
+  The text stays the brightest thing on the card. A warning the room cannot
+  read the health figure through is a worse warning than none.
+*/
+.shc[data-alarm="on"] {
+  background: linear-gradient(180deg, rgba(104, 22, 34, 0.72), rgba(58, 16, 26, 0.66));
+  border-color: var(--st-critical);
+  border-left-color: var(--st-critical);
+  animation: cardAlarm 3.6s ease-in-out infinite;
+}
+.shc[data-alarm="on"] .shc-pct,
+.shc[data-alarm="on"] .shc-word,
+.shc[data-alarm="on"] .shc-code { color: #FFE2E4; }
+.shc[data-alarm="on"] .shc-name,
+.shc[data-alarm="on"] .res-vals,
+.shc[data-alarm="on"] .rep-fresh,
+.shc[data-alarm="on"] .rep-none { color: rgba(255, 214, 216, 0.82); }
+.shc[data-alarm="on"] .shc-dot { background: var(--st-critical); animation: wallPulse 2.6s ease-in-out infinite; }
+.shc[data-alarm="on"] .shc-bar { background: rgba(0, 0, 0, 0.30); border-color: rgba(255, 220, 222, 0.28); }
+.shc[data-alarm="on"] { --bar: #FF8A92; --bar-glow: rgba(255, 107, 122, 0.45); }
+.shc[data-alarm="on"] .res-tag { color: #FFE2E4; border-color: rgba(255, 220, 222, 0.34); }
+/* a room that has asked for less movement gets the red, not the breathing */
+@media (prefers-reduced-motion: reduce) { .shc[data-alarm="on"] { animation: none; } }
+
 /* -- 4. CITY BROADCAST -------------------------------------------------------
    Standby is one quiet line. A live broadcast opens the band once and then
    holds still: the room reads it, it does not perform. */

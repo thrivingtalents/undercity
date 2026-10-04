@@ -137,9 +137,10 @@ test('a stable or degraded sector never moves; critical breathes slowly; dark is
   for (const r of infinite) {
     assert.ok(!/data-state="(stable|degraded)"/.test(r.sel), `${r.sel} animates a calm state`);
     assert.ok(!/^\.(district|shc)$/.test(r.sel) && !/^\.(district|shc) /.test(r.sel), `${r.sel} animates every sector`);
-    assert.ok(/critical|dark|core-low|final|expired|blackout|breach|unstable|b-crisis|moving|down|live|scan/.test(r.sel), `${r.sel} moves for no state`);
+    assert.ok(/critical|alarm|dark|core-low|final|expired|blackout|breach|unstable|b-crisis|moving|down|live|scan/.test(r.sel), `${r.sel} moves for no state`);
   }
-  for (const r of infinite.filter((x) => /data-state="critical"/.test(x.sel))) {
+  // The alarm a sector under 30 wears breathes on the same slow beat.
+  for (const r of infinite.filter((x) => /data-state="critical"|data-alarm="on"/.test(x.sel))) {
     const m = r.body.match(/animation:[^;]*?(\d+(?:\.\d+)?)s/);
     assert.ok(m && Number(m[1]) >= 2, `${r.sel} pulses fast: ${r.body}`);
   }
@@ -280,6 +281,53 @@ test('a sector COM has not reported says AWAITING REPORT once, and the panel cou
   const pct = vh('.shc-pct');
   assert.ok(rep >= 1.25, 'AWAITING REPORT is too small to read across a room');
   assert.ok(pct && rep < pct / 2, 'AWAITING REPORT competes with the health figure');
+});
+
+test('a sector under 30 turns its card red, and a sector at 0 does not', () => {
+  const game = running();
+  const sect = (code) => forBigscreen(game).sectors[code];
+
+  // The band, from the two ends of it. 30 is not under 30.
+  game.setIntegrity('POW', 30);
+  assert.equal(B.alarming(sect('POW')), false, '30 raised the alarm');
+  game.setIntegrity('POW', 29);
+  assert.equal(B.alarming(sect('POW')), true, '29 did not raise it');
+  assert.equal(B.CRITICAL_BELOW, 30);
+
+  // A BROWNOUT sector keeps its own word and its own marks, and still goes
+  // red — it is the sector most likely to be read as merely rationed.
+  game.setIntegrity('AGR', 18);
+  game.setStatus('AGR', 'BROWNOUT');
+  assert.equal(B.healthState(sect('AGR')), 'brownout', 'the brownout marks were lost to the alarm');
+  assert.equal(B.alarming(sect('AGR')), true, 'a brownout sector at 18% stayed quiet');
+  game.setIntegrity('AGR', 45);
+  assert.equal(B.alarming(sect('AGR')), false, 'a healthy brownout sector raised the alarm');
+
+  // DARK is past alarm: the card goes quiet and grey, which is its own warning.
+  game.setIntegrity('WTR', 0);
+  assert.equal(B.healthState(sect('WTR')), 'dark');
+  assert.equal(B.alarming(sect('WTR')), false, 'a DARK card was alarmed as well as dimmed');
+  // And a frame with no figure never invents one to panic about.
+  assert.equal(B.alarming(undefined), false);
+  assert.equal(B.alarming({ integrity: null, status: 'ACTIVE' }), false);
+
+  // The card wears it on its own attribute, never on the state: data-state is
+  // the server's word and keeps doing its own job underneath.
+  assert.ok(/B\.alarming\(s\) \? 'on' : 'off'/.test(WALL_SCRIPT), 'the card does not use the shared rule');
+  assert.ok(/card\.dataset\.alarm/.test(WALL_SCRIPT), 'the alarm has nowhere to live on the card');
+  assert.ok(/\.shc\[data-alarm="on"\] \{[^}]*background: linear-gradient[^}]*rgba\(104, 22, 34/.test(WALL_CSS),
+    'an alarmed card is not red');
+  assert.ok(/\.shc\[data-alarm="on"\] \{[^}]*border-color: var\(--st-critical\)/s.test(WALL_CSS));
+  // The figure must stay the brightest thing on it: a warning nobody can read
+  // the health through is worse than none.
+  assert.ok(/\.shc\[data-alarm="on"\] \.shc-pct,[\s\S]{0,120}color: #FFE2E4/.test(WALL_CSS),
+    'the health figure was left to fight the red');
+  assert.ok(/@media \(prefers-reduced-motion: reduce\) \{ \.shc\[data-alarm="on"\] \{ animation: none; \} \}/.test(WALL_CSS),
+    'the alarm cannot be stilled');
+
+  // The wall and the sector console answer this question the same way.
+  const CONSOLE = fs.readFileSync(path.join(ROOT, 'public/sector/sector.js'), 'utf8');
+  assert.ok(/const critical = word !== 'DARK'/.test(CONSOLE), 'the console lights on a different rule');
 });
 
 test('identity and condition are different colours: MED is red because MED is red, not because MED is failing', () => {
