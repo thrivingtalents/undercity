@@ -1209,7 +1209,8 @@ function handleControl(client, entry, msg) {
 
     // -- tempo
     case 'activate_round': {
-      // ROUND ACTIVATION: the round, its timer READY, and its whole fault set, as one action.
+      // ROUND ACTIVATION: the round and its timer READY, as one action. It deals no faults (2026-10-04):
+      // the facilitator fires every fault by hand, through fire_fault above.
       const res = game.activateRound(String(msg.round || '').toUpperCase(), { restart: !!msg.restart, by: 'facilitator' });
       if (!res.ok) return reply({ type: 'error', reason: res.reason, round: res.round });
       reply({ type: 'round_activated', ...res });

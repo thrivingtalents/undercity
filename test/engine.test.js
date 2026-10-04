@@ -3574,25 +3574,28 @@ test('a follow-up event fires after its delay; the biological breach is containm
   assert.equal(logEvents(game, 'event_fired').length, 2);
 });
 
-test('a fault preset fires now and schedules the rest; the queue freezes with the game', () => {
+test('a fault preset fires its immediate items at the press, and its delayed items never fire on the clock', () => {
   const game = running();
-  // the round button deals a round's faults now; a preset is an off-script wave a scenario may still carry
+  // MANUAL FAULTS (2026-10-04): a preset is the facilitator's own press, so
+  // what it fires NOW is theirs. What it would fire LATER is a clock firing a
+  // fault, which nothing may do any more: dropped and logged, never queued.
   game.scenario.fault_presets = [{ id: 'r2_wave_a', name: 'TEST WAVE', items: [
     { fault_code: 'F-201', sector: 'POW', delay_s: 0 }, { fault_code: 'F-203', sector: 'WTR', delay_s: 90 }, { fault_code: 'F-205', sector: 'MED', delay_s: 180 },
   ] }];
   const res = game.firePreset('r2_wave_a');
   assert.equal(res.ok, true);
   assert.ok(game.findFault('POW', 'F-201'));
-  assert.equal(game.state.scheduled.length, 2);
-  game.pause();
+  assert.equal(game.findFault('POW', 'F-201').triggered_by, 'preset:r2_wave_a');
+  assert.equal(game.state.scheduled.length, 0, 'a delayed fault was queued');
+  assert.equal(logEvents(game, 'fault_auto_trigger_dropped').length, 2);
   game.tick(200000);
-  assert.equal(game.state.scheduled.length, 2, 'nothing fires while paused');
-  game.resume();
-  game.tick(91000);
-  assert.ok(game.findFault('WTR', 'F-203'));
-  assert.equal(game.findFault('WTR', 'F-203').triggered_by, 'preset:r2_wave_a');
-  game.cancelScheduled(game.state.scheduled[0].id);
-  assert.equal(game.state.scheduled.length, 0);
+  assert.equal(game.findFault('WTR', 'F-203'), null, 'a delayed fault fired on the clock');
+  assert.equal(game.findFault('MED', 'F-205'), null, 'a delayed fault fired on the clock');
+  // A delayed EVENT still runs on the clock: only faults are the facilitator's alone.
+  game.schedule({ kind: 'event', event_id: 'medical_emergency', target: 'POW', delay_s: 5, source: 'test' });
+  assert.equal(game.state.scheduled.length, 1);
+  game.tick(6000);
+  assert.equal(game.state.scheduled.length, 0, 'a scheduled event did not run');
 });
 
 test('COM goes blind under a comms blackout, and the wall degrades when COM is dark', () => {
@@ -4859,71 +4862,69 @@ test('round timer: RESET goes back to the round\'s full length and waits; a roun
 const allFaultIds = (game) => Object.values(game.state.sectors).flatMap((s) => s.faults.map((f) => f.id)).sort();
 const allFaultCodes = (game) => Object.values(game.state.sectors).flatMap((s) => s.faults.map((f) => f.code)).sort();
 
-test('round activation: R0 to R4 each deal exactly their fault set as one action with the timer READY, and earlier rounds are kept', () => {
+test('round activation: R0 to R4 each change the round and load the timer READY, and deal nothing at all', () => {
+  // MANUAL FAULTS (2026-10-04): a round button moves the round and loads its
+  // timer. Every fault in the content still carries a round, which is the
+  // library's grouping for the facilitator — not a trigger. The board stays
+  // exactly as the facilitator left it.
   const game = newGame();
-  const expect = {
-    R0: { len: 1200, faults: { POW: ['F-001'], WTR: ['F-002'], MED: ['F-003'], TRN: ['F-004'], AGR: ['F-005'], COM: ['F-006'] } },
-    R1: { len: 900, faults: { POW: ['F-101'], WTR: ['F-102'], MED: ['F-103'], TRN: ['F-104'], AGR: ['F-105'], COM: ['F-106'] } },
-    R2: { len: 900, faults: { POW: ['F-201', 'F-202'], WTR: ['F-203', 'F-204'], MED: ['F-205', 'F-206'], TRN: ['F-207', 'F-208'], AGR: ['F-209', 'F-210'], COM: ['F-211', 'F-212'] } },
-    R3: { len: 720, faults: { POW: ['F-301'], WTR: ['F-302'], MED: ['F-303'], TRN: ['F-304'], AGR: ['F-305'], COM: ['F-306'] } },
-    R4: { len: 480, faults: { POW: ['F-401'], WTR: ['F-403'], MED: ['F-402'], TRN: ['F-404'], AGR: ['F-405'], COM: ['F-406'] } },
-  };
-  let total = 0;
-  for (const [id, e] of Object.entries(expect)) {
+  const len = { R0: 1200, R1: 900, R2: 900, R3: 720, R4: 480 };
+  for (const id of ['R0', 'R1', 'R2', 'R3', 'R4']) {
     const res = game.activateRound(id);
     assert.equal(res.ok, true, `${id}: ${res.reason}`);
-    const n = Object.values(e.faults).flat().length;
-    assert.equal(res.dealt.length, n, `${id} dealt ${res.dealt.length}`); assert.deepEqual(res.reset, []); assert.deepEqual(res.kept, []);
+    assert.equal(res.dealt, undefined, `${id} still reports a deal`);
+    assert.deepEqual(res.reset, []);
     assert.equal(game.state.round, id);
-    assert.deepEqual([game.state.round_clock.status, game.state.round_clock.remaining_s, game.state.round_clock.running], ['ready', e.len, false], `${id}: timer`);
-    for (const [sector, codes] of Object.entries(e.faults)) {
-      for (const code of codes) {
-        const inst = game.state.sectors[sector].faults.filter((f) => f.code === code);
-        assert.equal(inst.length, 1, `${code} instances in ${sector}`);
-        assert.equal(inst[0].resolved, false); assert.equal(inst[0].status, 'ACTIVE');
-        assert.equal(inst[0].fired_at, res.at, `${code} was not stamped with the activation time`);
-        assert.equal(inst[0].triggered_by, `round:${id}`);
-      }
-    }
-    total += n;
-    assert.equal(allFaultCodes(game).length, total, `${id}: earlier rounds' faults were not preserved`);
-    // the faults reach the facilitator and every affected sector at once
-    assert.equal(Object.values(forControl(game).sectors).flatMap((s) => s.faults).length, total);
-    for (const [sector, codes] of Object.entries(e.faults)) {
-      const own = forSector(game, sector).sectors[sector].faults.map((f) => f.code);
-      for (const code of codes) assert.ok(own.includes(code), `${sector} does not see ${code}`);
-    }
-    game.clock('start'); game.tick(30000);   // play a little, then move on with the timer running
+    assert.deepEqual([game.state.round_clock.status, game.state.round_clock.remaining_s, game.state.round_clock.running], ['ready', len[id], false], `${id}: timer`);
+    assert.equal(allFaultCodes(game).length, 0, `${id} dealt faults onto the board`);
+    assert.equal(logEvents(game, 'fault_fired').length, 0, `${id} fired a fault`);
+    assert.ok(game.faultsForRound(id).length > 0, `${id} has no faults in the library`);
+    game.clock('start'); game.tick(30000);
   }
-  assert.equal(total, 36);
-  for (const s of Object.keys(expect.R2.faults)) assert.equal(game.state.sectors[s].faults.filter((f) => f.code.startsWith('F-2')).length, 2, 'R2 is two per sector');
+  // The facilitator's hand is the only way a fault reaches a table — and it
+  // works in any round, for any card, the library's round being advice.
+  assert.equal(game.fireFault('F-101', 'POW').ok, true);
+  assert.equal(game.fireFault('F-301', 'POW').ok, true);
+  assert.equal(game.fireFault('F-507', 'TRN').ok, true);
+  assert.equal(allFaultCodes(game).length, 3);
+  assert.deepEqual(logEvents(game, 'fault_fired').map((e) => e.fault || e.code).filter(Boolean).length, 3);
+  for (const code of ['F-101', 'F-301']) {
+    const own = forSector(game, 'POW').sectors.POW.faults.map((f) => f.code);
+    assert.ok(own.includes(code), `POW does not see ${code}`);
+  }
 });
 
-test('round activation: the same round again is refused without restart; a restart resets the timer and this round\'s faults in place, never a second record', () => {
+test('round activation: the same round again is refused without restart; a restart resets the timer and the faults the facilitator fired, never a second record', () => {
   const game = newGame();
   game.activateRound('R2');
+  // The facilitator fires this round's faults by hand, two per sector.
+  for (const code of ['F-201', 'F-202', 'F-203', 'F-204', 'F-205', 'F-206', 'F-207', 'F-208', 'F-209', 'F-210', 'F-211', 'F-212']) {
+    const def = game.faultsByCode.get(code);
+    assert.equal(game.fireFault(code, def.sector).ok, true, code);
+  }
   const ids = allFaultIds(game);
+  assert.equal(ids.length, 12);
   game.clock('start'); game.tick(60000);
   // resolve one, clear one, leave the rest open
   const def = game.faultsByCode.get('F-201');
   game.setInventory('POW', { power: 9, water: 9, parts: 9, med: 9 });
   assert.equal(submitCode(game, { sector: 'POW', fault_code: 'F-201', code: def.valid_codes[0], workers_assigned: def.crew_required }).accepted, true);
   assert.equal(game.clearFault('WTR', 'F-203', 'cleared by hand'), true);
-  // again, without restart: refused, nothing dealt, timer untouched
+  // again, without restart: refused, nothing changes, timer untouched
   const again = game.activateRound('R2');
   assert.equal(again.ok, false); assert.equal(again.reason, 'round_already_active');
   assert.equal(game.state.round_clock.remaining_s, 840); assert.equal(game.state.round_clock.status, 'running');
-  assert.deepEqual(allFaultIds(game), ids, 'a second click dealt a duplicate');
+  assert.deepEqual(allFaultIds(game), ids, 'a second click changed the board');
   // a refresh, a reconnect, a re-render: frames are read, nothing is written; a server restart keeps the records
   for (let i = 0; i < 5; i += 1) { forControl(game); forSector(game, 'POW'); forBigscreen(game); }
   const restored = newGame({ runId: 'activate-restore' });
   restored.restore(JSON.parse(JSON.stringify(game.serialise())));
-  assert.deepEqual(allFaultIds(restored), ids, 'a restart of the server dealt a duplicate');
-  assert.equal(restored.activateRound('R2').reason, 'round_already_active', 'the restored run forgot the round was dealt');
-  // restart: timer back to 15:00 READY, every R2 fault active again, the same records
+  assert.deepEqual(allFaultIds(restored), ids, 'a restart of the server changed the board');
+  assert.equal(restored.activateRound('R2').reason, 'round_already_active', 'the restored run forgot the round was active');
+  // restart: timer back to 15:00 READY, every fired R2 fault active again, the same records, nothing new
   const restart = game.activateRound('R2', { restart: true });
   assert.equal(restart.ok, true); assert.equal(restart.restart, true);
-  assert.equal(restart.reset.length, 12); assert.deepEqual(restart.dealt, []);
+  assert.equal(restart.reset.length, 12); assert.equal(restart.dealt, undefined);
   assert.deepEqual([game.state.round_clock.status, game.state.round_clock.remaining_s, game.state.round_clock.running], ['ready', 900, false]);
   assert.deepEqual(allFaultIds(game), ids, 'the restart created new records');
   const f201 = game.state.sectors.POW.faults.find((f) => f.code === 'F-201');
@@ -4932,30 +4933,51 @@ test('round activation: the same round again is refused without restart; a resta
   assert.equal(game.findFault('POW', 'F-201').id, f201.id);
   assert.equal(logEvents(game, 'round_activated').length, 2);
   assert.equal(logEvents(game, 'fault_reset').length, 12);
+  // a restart of a round whose faults were never fired resets nothing and deals nothing
+  const fresh = newGame();
+  fresh.activateRound('R3');
+  const r = fresh.activateRound('R3', { restart: true });
+  assert.deepEqual([r.ok, r.reset], [true, []]);
+  assert.equal(allFaultCodes(fresh).length, 0);
 });
 
-test('round activation: PREV and NEXT deal nothing twice, a plain phase change deals nothing at all, and the round the game starts in still needs its activation', () => {
+test('round activation: PREV, NEXT and a plain phase change all leave the board alone, and no scenario beat or clock fires a fault', () => {
   const game = newGame();
   assert.equal(game.state.round, 'R0');
-  assert.equal(game.activateRound('R0').dealt.length, 6, 'R0 was not dealt');
+  assert.equal(game.activateRound('R0').ok, true);
   assert.equal(game.activateRound('R0').reason, 'round_already_active');
-  assert.equal(game.activateRound('R1').dealt.length, 6);
+  assert.equal(game.activateRound('R1').ok, true);
   const back = game.activateRound('R0');   // PREV ROUND
-  assert.equal(back.ok, true); assert.deepEqual(back.dealt, []); assert.equal(back.kept.length, 6);
+  assert.equal(back.ok, true); assert.deepEqual(back.reset, []);
   assert.deepEqual([game.state.round, game.state.round_clock.remaining_s, game.state.round_clock.status], ['R0', 1200, 'ready']);
-  assert.equal(allFaultCodes(game).length, 12);
+  assert.equal(allFaultCodes(game).length, 0);
   game.setPhase('ROUND_2');                // a phase change on its own arms the script and deals nothing
-  assert.equal(allFaultCodes(game).length, 12);
-  assert.equal(game.activateRound('R2').dealt.length, 12);
-  assert.equal(allFaultCodes(game).length, 24);
+  assert.equal(allFaultCodes(game).length, 0);
+  assert.equal(game.activateRound('R2').ok, true);
+  assert.equal(allFaultCodes(game).length, 0);
   assert.equal(game.activateRound('R9').reason, 'unknown_round');
-  // no scenario beat deals a fault any more: the round button does
+  // no scenario beat deals a fault, and no clock may: a fault timeline item
+  // marked AUTO still waits READY for the facilitator's press
   for (const items of Object.values(game.scenario.timelines || {})) assert.ok(items.every((it) => it.kind !== 'fault'), 'a timeline still fires faults');
   assert.deepEqual(game.scenario.fault_presets, []);
+  game.state.timeline.push({ id: 'T-test', kind: 'fault', fault_code: 'F-202', sector: 'POW', offset_s: 0, mode: 'AUTO', status: 'PENDING' });
+  game.clock('start'); game.tick(5000);
+  const beat = game.state.timeline.find((t) => t.id === 'T-test');
+  assert.equal(beat.status, 'READY', 'an AUTO fault beat fired itself');
+  assert.equal(allFaultCodes(game).length, 0);
+  // the facilitator presses it: that is the manual door, and it works
+  assert.equal(game.fireTimelineItem('T-test').ok, true);
+  assert.deepEqual(allFaultCodes(game), ['F-202']);
+  // a delayed fault in the scheduled queue is dropped on the clock, logged, never fired
+  game.schedule({ kind: 'fault', fault_code: 'F-204', sector: 'WTR', delay_s: 1, source: 'test' });
+  game.tick(3000);
+  assert.deepEqual(allFaultCodes(game), ['F-202']);
+  assert.equal(logEvents(game, 'fault_auto_trigger_dropped').length, 1);
   // the console sends activate_round from every round button, and asks before a restart
   const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'control', 'control.js'), 'utf8');
   assert.ok(/type: 'activate_round'/.test(js), 'the console does not activate rounds');
-  assert.ok(/Restart \$\{roundLabel\(p\)\}\? This will reset the timer and reset this round's faults\./.test(js), 'no restart confirmation');
+  assert.ok(/Restart \$\{roundLabel\(p\)\}\? The timer reloads, and any of this round's faults you have already fired go back to active\. Nothing new is dealt\./.test(js), 'no restart confirmation');
+  assert.ok(/No fault is dealt/.test(js), 'the round confirm still promises a deal');
   assert.ok(!/type: 'next_phase'/.test(js), 'NEXT ROUND still bypasses activation');
 });
 
@@ -5077,7 +5099,7 @@ test('the session registry opens a session on its chosen scenario; RESET RUN WIT
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('the first round is dealt when the run begins, once, and a restart never deals it again', () => {
+test('the first round is stamped when the run begins, deals nothing, and a restart changes nothing', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'undercity-first-'));
   const store = new Store(path.join(dir, 'db.sqlite'));
   const content = loadContent();
@@ -5090,49 +5112,47 @@ test('the first round is dealt when the run begins, once, and a restart never de
     sectors: Object.fromEntries(SECTORS.map((c) => [c, c])),
   });
   const first = rounds.rounds[0].id;
-  const wanted = content.faults.faults.filter((f) => f.round === first).map((f) => f.code).sort();
   const onBoard = (g) => Object.values(g.state.sectors).flatMap((s) => s.faults).map((f) => f.code).sort();
-  assert.ok(wanted.length, 'the first round has no faults in the content to deal');
+  assert.ok(content.faults.faults.some((f) => f.round === first), 'the first round has no faults in the library');
 
-  // Opening a session for the first time IS the run beginning: Round 0's set
-  // is on the tables, stamped activated, with its timer loaded READY. Nothing
-  // else ever dealt it — the console's forward controls all activate the NEXT
-  // round, so from Round 0 they deal Round 1.
+  // Opening a session for the first time IS the run beginning: Round 0 is
+  // stamped activated with its timer loaded READY — and the board is EMPTY.
+  // Since 2026-10-04 no activation deals a fault; the first round's cards are
+  // the facilitator's to fire from the library, like every other round's.
   const game = registry.get(row.code).game;
   assert.equal(game.state.round, first);
-  assert.deepEqual(onBoard(game), wanted, 'the run began with an empty board');
+  assert.deepEqual(onBoard(game), [], 'the run began with faults dealt');
   assert.equal(typeof game.state.rounds_activated[first], 'string', 'the first round was not stamped activated');
   assert.equal(game.state.round_clock.status, 'ready', 'the run began with a running clock');
+  assert.equal(game.log.readAll().split('\n').filter((l) => l.includes('"fault_fired"')).length, 0, 'the run start fired a fault');
 
-  // Asking twice changes nothing: the deal is idempotent by the same guard
-  // that stops a second click on the round button dealing duplicates.
-  const before = JSON.stringify(onBoard(game));
+  // Asking twice changes nothing.
   assert.equal(game.startFirstRound().ok, false);
-  assert.equal(game.startFirstRound().reason, 'already_dealt');
-  assert.equal(JSON.stringify(onBoard(game)), before);
+  assert.equal(game.startFirstRound().reason, 'already_started');
+  assert.deepEqual(onBoard(game), []);
 
-  // A restart restores the run's own history and must not deal on top of it —
-  // six fault_fired in the log, not twelve.
+  // A restart restores the run's own history and deals nothing on top of it.
+  assert.equal(game.fireFault('F-001', 'POW').ok, true);   // the facilitator's hand
   registry.evict(row.code);
   const again = registry.get(row.code).game;
-  assert.deepEqual(onBoard(again), wanted, 'a restart changed the board');
+  assert.deepEqual(onBoard(again), ['F-001'], 'a restart changed the board');
   assert.deepEqual(Object.keys(again.state.rounds_activated), [first]);
   const fired = again.log.readAll().trim().split('\n').map((l) => JSON.parse(l)).filter((e) => e.ev === 'fault_fired');
-  assert.equal(fired.length, wanted.length, 'the restart dealt the first round a second time');
+  assert.equal(fired.length, 1, 'the restart fired a fault');
 
-  // RESET RUN starts a run too, so it opens already dealt.
+  // RESET RUN starts a run too: stamped, empty.
   registry.resetRun(row.code, { runId: 'first-2' });
   const reset = registry.get(row.code).game;
-  assert.deepEqual(onBoard(reset), wanted, 'RESET RUN left the board empty');
+  assert.deepEqual(onBoard(reset), [], 'RESET RUN dealt a fault');
+  assert.equal(typeof reset.state.rounds_activated[first], 'string');
 
-  // A run past its first round is left alone — restoring mid-game must never
-  // rewind and deal Round 0 over the top of what is already there. The stamp
-  // answers first; strip it and the round itself still does.
+  // A run past its first round is left alone. The stamp answers first; strip
+  // it and the round itself still does.
   reset.clock('start'); reset.tick(1000);
   reset.activateRound('R1');
-  assert.equal(reset.startFirstRound().reason, 'already_dealt');
+  assert.equal(reset.startFirstRound().reason, 'already_started');
   delete reset.state.rounds_activated[first];
-  assert.equal(reset.startFirstRound().reason, 'past_first_round', 'a mid-game run was rewound and re-dealt');
+  assert.equal(reset.startFirstRound().reason, 'past_first_round', 'a mid-game run was rewound');
   registry.evict(row.code);
   store.close();
   fs.rmSync(dir, { recursive: true, force: true });

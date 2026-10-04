@@ -461,7 +461,7 @@ requires stock.
 ```json
 { "type": "set_phase", "phase": "ROUND_2" }   { "type": "next_phase" }
 { "type": "clock", "which": "round", "action": "start|resume|pause|end|add|set|reset", "seconds": 120 }
-{ "type": "activate_round", "round": "R2", "restart": false }   // the round button: round + timer READY + its whole fault set, as one action
+{ "type": "activate_round", "round": "R2", "restart": false }   // the round button: round + timer READY. Deals no faults (2026-10-04)
 { "type": "cycle", "action": "process" }   // the economy pass by hand; the old clock actions are refused
 { "type": "pause" }  { "type": "resume" }
 { "type": "fire_preset", "preset_id": "r2_wave_a" }
@@ -767,24 +767,29 @@ default_remaining_ms, reason }` or `admin_timer_pause_resume { action,
 remaining_ms }` (also on session pause and resume), on top of the `clock`
 event.
 
-**ROUND ACTIVATION** (2026-09-28, `undercity_round_fault_auto_trigger_spec`
-v1.1). Every round button on the console — R0 to R4, NEXT ROUND, PREV ROUND
-— sends `activate_round { round, restart? }`, and the server does three
-things as one action: the round changes, its timer loads at full length in
-`ready`, and every fault the content assigns to that round is dealt to its
-sector at once (6, 6, 12, 6 and 6), each stamped with the same activation
-time and `triggered_by: "round:R2"`. One instance per fault per run: a fault
-that already exists, open or resolved, is left alone (`kept`), so a second
-click, a refresh, a reconnect or PREV ROUND never deals a duplicate.
+**ROUND ACTIVATION** (2026-09-28; faults made manual 2026-10-04). Every
+round button on the console — R0 to R4, NEXT ROUND, PREV ROUND — sends
+`activate_round { round, restart? }`, and the server does two things as one
+action: the round changes and its timer loads at full length in `ready`
+(the outgoing round's upkeep is charged if its clock was started). **It
+deals no faults.** Until 2026-10-04 it also dealt every fault the content
+assigned to the round; that is gone. Every fault now reaches a table by the
+facilitator's own hand — `fire_fault` from the library, or a timeline item
+the facilitator presses — and nothing else: a timeline fault beat marked
+`AUTO` becomes `READY` and waits like a MANUAL one, a preset fires only its
+immediate items and logs its delayed ones as `fault_auto_trigger_dropped`,
+and a fault reaching the scheduled queue is dropped and logged the same way.
+The `round` on a fault in the content is the library's grouping — the
+facilitator's guide to which faults belong where — not a trigger. The run's
+first round is stamped activated when the run begins, with an empty board.
 Activating the round the city is already in is refused with
 `round_already_active` unless `restart: true`, which reloads the timer and
-puts this round's existing instances back to active in place (`fault_reset`,
-`restarts` counted) — no new records. Earlier rounds' faults are never
-touched. A plain `set_phase` / `next_phase` / `set_round` still arms the
-script and the timer but deals nothing; the scenario timelines carry only
-announcements and core drops now. The reply is
-`round_activated { round, restart, dealt, reset, kept, at, timer }`; the log
-gets `round_activated`.
+puts any of this round's faults the facilitator has already fired back to
+active in place (`fault_reset`, `restarts` counted) — no new records.
+Earlier rounds' faults are never touched. A plain `set_phase` / `next_phase`
+/ `set_round` still arms the script and the timer. The reply is
+`round_activated { round, restart, reset, at, charged, timer }`; the log
+gets `round_activated { …, faults_dealt: 0 }`.
 
 ### 8.11 One door: request-driven transfers (v20, 2026-09-20)
 

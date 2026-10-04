@@ -372,38 +372,45 @@ test('v18 over the wire: a participant socket cannot touch a tray or the clock; 
   for (const c of [control, big, pow]) c.ws.close();
 });
 
-test('round activation over the wire: the facilitator deals a round as one action, a participant cannot, a second click is refused and a restart resets in place', async () => {
+test('round activation over the wire: the facilitator moves the round and fires faults by hand, a participant can do neither, a second click is refused and a restart resets in place', async () => {
   const control = await client({ type: 'hello', role: 'control', token: TOKEN });
   const pow = await client({ type: 'hello', role: 'sector', sector: 'POW' });
   const say = (msg) => control.ws.send(JSON.stringify(msg));
   say({ type: 'reset_run', run_id: 'activate-wire', confirm: true });
   await wait(400);
   const faultIds = () => Object.values(control.state.sectors).flatMap((s) => s.faults.map((f) => f.id)).sort();
-  // The run opens on Round 0 with that round's set already dealt (2026-09-29),
-  // so "nothing happened" means "the board is exactly what the run began with".
-  const base = faultIds();
-  assert.equal(base.length, 6, 'the run did not begin with its first round dealt');
+  // MANUAL FAULTS (2026-10-04): a run opens with an empty board, and no round
+  // button fills it.
+  assert.equal(faultIds().length, 0, 'the run did not begin with an empty board');
 
   pow.ws.send(JSON.stringify({ type: 'activate_round', round: 'R2' }));
+  pow.ws.send(JSON.stringify({ type: 'fire_fault', fault_code: 'F-201', sector: 'POW' }));
   await wait(300);
-  assert.deepEqual(faultIds(), base, 'a participant activated a round');
+  assert.equal(faultIds().length, 0, 'a participant activated a round or fired a fault');
+  assert.equal(control.state.round, 'R0');
 
   control.messages.length = 0;
   say({ type: 'activate_round', round: 'R2' });
   await wait(500);
   const done = control.messages.find((m) => m.type === 'round_activated');
-  assert.ok(done && done.dealt.length === 12, JSON.stringify(done));
+  assert.ok(done && done.ok && done.dealt === undefined, JSON.stringify(done));
   assert.equal(control.state.round, 'R2');
   assert.deepEqual([control.state.round_clock.status, control.state.round_clock.remaining_s], ['ready', 900]);
-  assert.equal(pow.state.sectors.POW.faults.filter((f) => f.code.startsWith('F-2')).length, 2,
-    'POW did not get its two faults at once');
+  assert.equal(faultIds().length, 0, 'the round button dealt faults');
+  assert.equal(pow.state.sectors.POW.faults.length, 0, 'POW was dealt faults');
+
+  // The facilitator's hand is the only door: two faults for POW, by name.
+  say({ type: 'fire_fault', fault_code: 'F-201', sector: 'POW' });
+  say({ type: 'fire_fault', fault_code: 'F-202', sector: 'POW' });
+  await wait(400);
+  assert.deepEqual(pow.state.sectors.POW.faults.map((f) => f.code).sort(), ['F-201', 'F-202'], 'POW did not get the faults the facilitator fired');
   const ids = faultIds();
-  assert.equal(ids.length, base.length + 12);
+  assert.equal(ids.length, 2);
 
   say({ type: 'activate_round', round: 'R2' });
   await wait(400);
   assert.ok(control.messages.some((m) => m.type === 'error' && m.reason === 'round_already_active'), 'the second click was not refused');
-  assert.deepEqual(faultIds(), ids, 'the second click dealt a duplicate');
+  assert.deepEqual(faultIds(), ids, 'the second click changed the board');
 
   say({ type: 'activate_round', round: 'R2', restart: true });
   await wait(400);

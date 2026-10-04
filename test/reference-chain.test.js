@@ -259,12 +259,15 @@ test('the source file holds no answers, and the generated file is current', () =
 
 test('the twelve are unscheduled, printed in their own section, and facilitator-issued', () => {
   const game = newGame();
-  // round:null means activateRound never deals them — that is the whole
-  // mechanism, and it needs no scheduling change to work.
+  // round:null keeps them out of every round's library group — and since
+  // 2026-10-04 no activation deals anything anyway, so the facilitator's
+  // hand is the only way any fault, these included, reaches a table.
   for (const f of chain.faults) assert.equal(f.round, null, `${f.code} was given a round`);
   for (const r of ['R0', 'R1', 'R2', 'R3', 'R4']) {
-    const dealt = game.faultsForRound(r).map((f) => f.code);
-    for (const c of CODES) assert.ok(!dealt.includes(c), `${c} is dealt by ${r}`);
+    const grouped = game.faultsForRound(r).map((f) => f.code);
+    for (const c of CODES) assert.ok(!grouped.includes(c), `${c} is grouped under ${r}`);
+    game.activateRound(r);
+    assert.equal(Object.values(game.state.sectors).flatMap((s) => s.faults).length, 0, `${r} dealt a fault`);
   }
   // The facilitator can still issue any of them by hand.
   for (const f of chain.faults) {

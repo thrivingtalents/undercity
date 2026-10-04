@@ -127,8 +127,9 @@ for (const f of src.faults) {
 
   faults.push({
     code: f.code,
-    // Deliberately unscheduled: activateRound deals by round, so null keeps
-    // these to the facilitator's hand until they are given one.
+    // Deliberately unscheduled: the library groups by round, and null keeps
+    // these out of every round's group. (Every fault is the facilitator's hand
+    // since 2026-10-04; a round is a grouping, not a trigger.)
     round: src.meta.round,
     sector: f.sector,
     name: f.name,

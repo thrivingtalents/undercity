@@ -238,11 +238,11 @@
       + 'Nothing is cleared, refilled, healed or reset, and no debrief screen is launched at the room.')) return;
     send({ type: 'end_simulation' });
   });
-  // ROUND ACTIVATION: a round button is one action — the round, its timer
-  // loaded READY at full length, and every fault of that round dealt to its
-  // sector at once, each exactly once. The server refuses duplicates; this
-  // side asks before dealing, and asks again before restarting the round the
-  // city is already in.
+  // ROUND ACTIVATION: a round button is one action — the round and its timer
+  // loaded READY at full length. It deals no faults (2026-10-04): every fault
+  // is fired by hand from the library, and the round on a fault is the
+  // library's grouping, not a trigger. This side asks before moving, and asks
+  // again before restarting the round the city is already in.
   function roundFaultCount(roundId) {
     const list = content && content.faults ? (content.faults.faults || content.faults) : null;
     return Array.isArray(list) ? list.filter((f) => f.round === roundId).length : null;
@@ -255,9 +255,9 @@
     if (!p || !p.round || p.number === null || p.number === undefined) return;
     const n = roundFaultCount(p.round);
     const len = roundLengthOf(p.round);
-    const faults = n === null ? 'Its faults land' : n === 1 ? 'Its 1 fault lands' : `Its ${n} faults land`;
-    const timer = len ? `its timer loads at ${U.mmss(len)}` : 'its timer loads at full length';
-    if (!confirm(`GO TO ${roundLabel(p)}?\n\n${faults} on the tables at once and ${timer}, READY for START. Nothing else is reset: health, stock, workers, transfers and earlier faults all carry over.`)) return;
+    const faults = n === null ? 'its faults' : n === 1 ? 'its 1 fault' : `its ${n} faults`;
+    const timer = len ? `Its timer loads at ${U.mmss(len)}` : 'Its timer loads at full length';
+    if (!confirm(`GO TO ${roundLabel(p)}?\n\n${timer}, READY for START. No fault is dealt — fire ${faults} from the library when you choose. Nothing is reset: health, stock, workers, transfers and every fault on the tables carry over.`)) return;
     send({ type: 'activate_round', round: p.round });
   }
   $('btn-next-phase').addEventListener('click', () => {
@@ -275,7 +275,7 @@
   $('btn-prev-round').addEventListener('click', () => {
     const prev = prevPhase();
     if (!prev) return;
-    if (!confirm(`GO BACK TO ${roundLabel(prev)}?\n\nThat round's timer reloads at full length, READY. Its faults are already on the tables and are not dealt again. Nothing is reset or replayed.`)) return;
+    if (!confirm(`GO BACK TO ${roundLabel(prev)}?\n\nThat round's timer reloads at full length, READY. No fault is dealt or replayed; whatever is on the tables stays.`)) return;
     send({ type: 'activate_round', round: prev.round });
   });
   /** The next round in the visible sequence, or null at the end of it. */
@@ -578,7 +578,7 @@
           }
           if (p.id === state.phase) {
             // the round the city is already in: a restart, never a second deal
-            if (confirm(`Restart ${roundLabel(p)}? This will reset the timer and reset this round's faults.`)) send({ type: 'activate_round', round: p.round, restart: true });
+            if (confirm(`Restart ${roundLabel(p)}? The timer reloads, and any of this round's faults you have already fired go back to active. Nothing new is dealt.`)) send({ type: 'activate_round', round: p.round, restart: true });
             return;
           }
           activateRound(p);
