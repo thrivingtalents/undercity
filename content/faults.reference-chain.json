@@ -1,0 +1,874 @@
+{
+  "meta": {
+    "source": "spec/reference_chain_faults.json",
+    "generator": "tools/build_reference_chain_faults.js",
+    "spec_source": "content/specs.json",
+    "fault_count": 12,
+    "reference_count": 18,
+    "note": "Generated. Do not hand-edit — edit spec/reference_chain_faults.json and re-run the generator. Every three-digit value here was resolved from content/specs.json."
+  },
+  "reference_directory": {
+    "POW": [
+      {
+        "id": "RD-POW-1",
+        "owner": "POW",
+        "reference_name": "Uplink Feed Reference",
+        "display": "Emergency Line [TRN]",
+        "entry_type": "REFERENCE",
+        "target_sector": "TRN",
+        "target_table": "T-6",
+        "target_item": "Emergency Line",
+        "spec_id": "T6-5"
+      },
+      {
+        "id": "RD-POW-2",
+        "owner": "POW",
+        "reference_name": "Relay Cooling Reference",
+        "display": "Pump Station 1 [WTR]",
+        "entry_type": "REFERENCE",
+        "target_sector": "WTR",
+        "target_table": "W-3",
+        "target_item": "Pump Station 1",
+        "spec_id": "W3-1"
+      },
+      {
+        "id": "RD-POW-3",
+        "owner": "POW",
+        "reference_name": "Vault Chiller Feed Reference",
+        "display": "Scrubber Unit [MED]",
+        "entry_type": "REFERENCE",
+        "target_sector": "MED",
+        "target_table": "M-5",
+        "target_item": "Scrubber Unit",
+        "spec_id": "M5-5"
+      }
+    ],
+    "WTR": [
+      {
+        "id": "RD-WTR-1",
+        "owner": "WTR",
+        "reference_name": "Core Coolant Route Reference",
+        "display": "Tunnel C [TRN]",
+        "entry_type": "REFERENCE",
+        "target_sector": "TRN",
+        "target_table": "T-1",
+        "target_item": "Tunnel C",
+        "spec_id": "T1-3"
+      },
+      {
+        "id": "RD-WTR-2",
+        "owner": "WTR",
+        "reference_name": "Ward Pressure Source",
+        "display": "Line 2 [TRN]",
+        "entry_type": "REFERENCE",
+        "target_sector": "TRN",
+        "target_table": "T-6",
+        "target_item": "Line 2",
+        "spec_id": "T6-2"
+      },
+      {
+        "id": "RD-WTR-3",
+        "owner": "WTR",
+        "reference_name": "Freight Cooling Reference",
+        "display": "Turbine D [POW]",
+        "entry_type": "REFERENCE",
+        "target_sector": "POW",
+        "target_table": "P-1",
+        "target_item": "Turbine D",
+        "spec_id": "P1-4"
+      }
+    ],
+    "MED": [
+      {
+        "id": "RD-MED-1",
+        "owner": "MED",
+        "reference_name": "Core Safety Broadcast Reference",
+        "display": "Emergency Band [COM]",
+        "entry_type": "REFERENCE",
+        "target_sector": "COM",
+        "target_table": "C-1",
+        "target_item": "Emergency Band",
+        "spec_id": "C1-5"
+      },
+      {
+        "id": "RD-MED-2",
+        "owner": "MED",
+        "reference_name": "Sterility Feed Reference",
+        "display": "Array East [AGR]",
+        "entry_type": "REFERENCE",
+        "target_sector": "AGR",
+        "target_table": "A-4",
+        "target_item": "Array East",
+        "spec_id": "A4-3"
+      },
+      {
+        "id": "RD-MED-3",
+        "owner": "MED",
+        "reference_name": "Bio-Safety Reference",
+        "display": "Emergency Band [COM]",
+        "entry_type": "REFERENCE",
+        "target_sector": "COM",
+        "target_table": "C-1",
+        "target_item": "Emergency Band",
+        "spec_id": "C1-5"
+      }
+    ],
+    "TRN": [
+      {
+        "id": "RD-TRN-1",
+        "owner": "TRN",
+        "reference_name": "Auxiliary Coolant Feed Reference",
+        "display": "Pump Station 4 [WTR]",
+        "entry_type": "REFERENCE",
+        "target_sector": "WTR",
+        "target_table": "W-3",
+        "target_item": "Pump Station 4",
+        "spec_id": "W3-4"
+      },
+      {
+        "id": "RD-TRN-2",
+        "owner": "TRN",
+        "reference_name": "Bypass Route Reference",
+        "display": "Emergency Bus [POW]",
+        "entry_type": "REFERENCE",
+        "target_sector": "POW",
+        "target_table": "P-2",
+        "target_item": "Emergency Bus",
+        "spec_id": "P2-5"
+      },
+      {
+        "id": "RD-TRN-3",
+        "owner": "TRN",
+        "reference_name": "Critical Route Reference",
+        "display": "Sub-grid 3 [POW]",
+        "entry_type": "REFERENCE",
+        "target_sector": "POW",
+        "target_table": "P-2",
+        "target_item": "Sub-grid 3",
+        "spec_id": "P2-4"
+      }
+    ],
+    "AGR": [
+      {
+        "id": "RD-AGR-1",
+        "owner": "AGR",
+        "reference_name": "Environmental Power Reference",
+        "display": "Sub-grid 1 [POW]",
+        "entry_type": "REFERENCE",
+        "target_sector": "POW",
+        "target_table": "P-2",
+        "target_item": "Sub-grid 1",
+        "spec_id": "P2-2"
+      },
+      {
+        "id": "RD-AGR-2",
+        "owner": "AGR",
+        "reference_name": "Seedling Transport Reference",
+        "display": "Tunnel B [TRN]",
+        "entry_type": "REFERENCE",
+        "target_sector": "TRN",
+        "target_table": "T-1",
+        "target_item": "Tunnel B",
+        "spec_id": "T1-2"
+      },
+      {
+        "id": "RD-AGR-3",
+        "owner": "AGR",
+        "reference_name": "Mast Filtration Reference",
+        "display": "HEPA Array [MED]",
+        "entry_type": "REFERENCE",
+        "target_sector": "MED",
+        "target_table": "M-5",
+        "target_item": "HEPA Array",
+        "spec_id": "M5-4"
+      }
+    ],
+    "COM": [
+      {
+        "id": "RD-COM-1",
+        "owner": "COM",
+        "reference_name": "Life-Support Telemetry Reference",
+        "display": "Filter Bank 3 [MED]",
+        "entry_type": "REFERENCE",
+        "target_sector": "MED",
+        "target_table": "M-5",
+        "target_item": "Filter Bank 3",
+        "spec_id": "M5-3"
+      },
+      {
+        "id": "RD-COM-2",
+        "owner": "COM",
+        "reference_name": "Route Beacon Reference",
+        "display": "Array North [AGR]",
+        "entry_type": "REFERENCE",
+        "target_sector": "AGR",
+        "target_table": "A-4",
+        "target_item": "Array North",
+        "spec_id": "A4-1"
+      },
+      {
+        "id": "RD-COM-3",
+        "owner": "COM",
+        "reference_name": "Nutrient Sensor Reference",
+        "display": "Pump Station 3 [WTR]",
+        "entry_type": "REFERENCE",
+        "target_sector": "WTR",
+        "target_table": "W-3",
+        "target_item": "Pump Station 3",
+        "spec_id": "W3-3"
+      }
+    ]
+  },
+  "faults": [
+    {
+      "code": "F-501",
+      "round": null,
+      "sector": "POW",
+      "name": "Turbine coolant interlock mismatch",
+      "flavour": "The coolant interlock will not arm: the route class it expects is held outside this sector.",
+      "severity": 2,
+      "decay_per_min": 0,
+      "crew_required": 2,
+      "resources_required": {
+        "parts": 1,
+        "water": 1
+      },
+      "procedure": "P-07",
+      "spec_refs": [
+        {
+          "spec_id": "T1-3",
+          "binder": "TRN",
+          "table": "T-1",
+          "row_label": "Tunnel C",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-07-236"
+      ],
+      "false_alarm": false,
+      "deadline_s": null,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Reference chain · SINGLE REFERENCE CHAIN",
+      "reference_chain": [
+        {
+          "first_sector": "WTR",
+          "first_reference_name": "Core Coolant Route Reference",
+          "intermediate_result": "Tunnel C [TRN]",
+          "final_source": {
+            "sector": "TRN",
+            "table": "T-1",
+            "item": "Tunnel C",
+            "spec_id": "T1-3"
+          }
+        }
+      ]
+    },
+    {
+      "code": "F-502",
+      "round": null,
+      "sector": "POW",
+      "name": "Core auxiliary feed mismatch",
+      "flavour": "Two interlocks, two authorities. Neither figure is written anywhere in this binder.",
+      "severity": 3,
+      "decay_per_min": 0,
+      "crew_required": 3,
+      "resources_required": {
+        "parts": 2,
+        "water": 1
+      },
+      "procedure": "P-08",
+      "spec_refs": [
+        {
+          "spec_id": "C1-5",
+          "binder": "COM",
+          "table": "C-1",
+          "row_label": "Emergency Band",
+          "buried": false
+        },
+        {
+          "spec_id": "W3-4",
+          "binder": "WTR",
+          "table": "W-3",
+          "row_label": "Pump Station 4",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-08-390-183"
+      ],
+      "false_alarm": false,
+      "deadline_s": null,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN",
+      "reference_chain": [
+        {
+          "first_sector": "MED",
+          "first_reference_name": "Core Safety Broadcast Reference",
+          "intermediate_result": "Emergency Band [COM]",
+          "final_source": {
+            "sector": "COM",
+            "table": "C-1",
+            "item": "Emergency Band",
+            "spec_id": "C1-5"
+          }
+        },
+        {
+          "first_sector": "TRN",
+          "first_reference_name": "Auxiliary Coolant Feed Reference",
+          "intermediate_result": "Pump Station 4 [WTR]",
+          "final_source": {
+            "sector": "WTR",
+            "table": "W-3",
+            "item": "Pump Station 4",
+            "spec_id": "W3-4"
+          }
+        }
+      ]
+    },
+    {
+      "code": "F-503",
+      "round": null,
+      "sector": "WTR",
+      "name": "Intake pump control desync",
+      "flavour": "The intake controller wants the environmental circuit rating. Agriculture logs which circuit that is.",
+      "severity": 2,
+      "decay_per_min": 0,
+      "crew_required": 2,
+      "resources_required": {
+        "power": 1,
+        "parts": 1
+      },
+      "procedure": "P-07",
+      "spec_refs": [
+        {
+          "spec_id": "P2-2",
+          "binder": "POW",
+          "table": "P-2",
+          "row_label": "Sub-grid 1",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-07-990"
+      ],
+      "false_alarm": false,
+      "deadline_s": null,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Reference chain · SINGLE REFERENCE CHAIN",
+      "reference_chain": [
+        {
+          "first_sector": "AGR",
+          "first_reference_name": "Environmental Power Reference",
+          "intermediate_result": "Sub-grid 1 [POW]",
+          "final_source": {
+            "sector": "POW",
+            "table": "P-2",
+            "item": "Sub-grid 1",
+            "spec_id": "P2-2"
+          }
+        }
+      ]
+    },
+    {
+      "code": "F-504",
+      "round": null,
+      "sector": "WTR",
+      "name": "Reclaim sterilisation lock",
+      "flavour": "Sterilisation will not release without both a biological clearance and a bypass rating.",
+      "severity": 3,
+      "decay_per_min": 0,
+      "crew_required": 3,
+      "resources_required": {
+        "power": 1,
+        "med": 1,
+        "parts": 1
+      },
+      "procedure": "P-08",
+      "spec_refs": [
+        {
+          "spec_id": "A4-3",
+          "binder": "AGR",
+          "table": "A-4",
+          "row_label": "Array East",
+          "buried": false
+        },
+        {
+          "spec_id": "P2-5",
+          "binder": "POW",
+          "table": "P-2",
+          "row_label": "Emergency Bus",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-08-915-449"
+      ],
+      "false_alarm": false,
+      "deadline_s": null,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN",
+      "reference_chain": [
+        {
+          "first_sector": "MED",
+          "first_reference_name": "Sterility Feed Reference",
+          "intermediate_result": "Array East [AGR]",
+          "final_source": {
+            "sector": "AGR",
+            "table": "A-4",
+            "item": "Array East",
+            "spec_id": "A4-3"
+          }
+        },
+        {
+          "first_sector": "TRN",
+          "first_reference_name": "Bypass Route Reference",
+          "intermediate_result": "Emergency Bus [POW]",
+          "final_source": {
+            "sector": "POW",
+            "table": "P-2",
+            "item": "Emergency Bus",
+            "spec_id": "P2-5"
+          }
+        }
+      ]
+    },
+    {
+      "code": "F-505",
+      "round": null,
+      "sector": "MED",
+      "name": "Ward pressure isolation mismatch",
+      "flavour": "Ward isolation is reading a supply pressure the ward does not own.",
+      "severity": 2,
+      "decay_per_min": 0,
+      "crew_required": 2,
+      "resources_required": {
+        "power": 1,
+        "water": 1
+      },
+      "procedure": "P-07",
+      "spec_refs": [
+        {
+          "spec_id": "T6-2",
+          "binder": "TRN",
+          "table": "T-6",
+          "row_label": "Line 2",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-07-895"
+      ],
+      "false_alarm": false,
+      "deadline_s": null,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Reference chain · SINGLE REFERENCE CHAIN",
+      "reference_chain": [
+        {
+          "first_sector": "WTR",
+          "first_reference_name": "Ward Pressure Source",
+          "intermediate_result": "Line 2 [TRN]",
+          "final_source": {
+            "sector": "TRN",
+            "table": "T-6",
+            "item": "Line 2",
+            "spec_id": "T6-2"
+          }
+        }
+      ]
+    },
+    {
+      "code": "F-506",
+      "round": null,
+      "sector": "MED",
+      "name": "ICU failover routing conflict",
+      "flavour": "Failover needs a route rating and a telemetry rating before it will hand over.",
+      "severity": 3,
+      "decay_per_min": 0,
+      "crew_required": 3,
+      "resources_required": {
+        "power": 2,
+        "med": 1
+      },
+      "procedure": "P-08",
+      "spec_refs": [
+        {
+          "spec_id": "P2-4",
+          "binder": "POW",
+          "table": "P-2",
+          "row_label": "Sub-grid 3",
+          "buried": false
+        },
+        {
+          "spec_id": "M5-3",
+          "binder": "MED",
+          "table": "M-5",
+          "row_label": "Filter Bank 3",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-08-107-261"
+      ],
+      "false_alarm": false,
+      "deadline_s": null,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN",
+      "reference_chain": [
+        {
+          "first_sector": "TRN",
+          "first_reference_name": "Critical Route Reference",
+          "intermediate_result": "Sub-grid 3 [POW]",
+          "final_source": {
+            "sector": "POW",
+            "table": "P-2",
+            "item": "Sub-grid 3",
+            "spec_id": "P2-4"
+          }
+        },
+        {
+          "first_sector": "COM",
+          "first_reference_name": "Life-Support Telemetry Reference",
+          "intermediate_result": "Filter Bank 3 [MED]",
+          "final_source": {
+            "sector": "MED",
+            "table": "M-5",
+            "item": "Filter Bank 3",
+            "spec_id": "M5-3"
+          }
+        }
+      ]
+    },
+    {
+      "code": "F-507",
+      "round": null,
+      "sector": "TRN",
+      "name": "Freight spur cooling signal mismatch",
+      "flavour": "The freight spur's cooling signal is calibrated to a turbine this sector cannot see.",
+      "severity": 2,
+      "decay_per_min": 0,
+      "crew_required": 2,
+      "resources_required": {
+        "power": 1,
+        "parts": 1
+      },
+      "procedure": "P-07",
+      "spec_refs": [
+        {
+          "spec_id": "P1-4",
+          "binder": "POW",
+          "table": "P-1",
+          "row_label": "Turbine D",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-07-376"
+      ],
+      "false_alarm": false,
+      "deadline_s": null,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Reference chain · SINGLE REFERENCE CHAIN",
+      "reference_chain": [
+        {
+          "first_sector": "WTR",
+          "first_reference_name": "Freight Cooling Reference",
+          "intermediate_result": "Turbine D [POW]",
+          "final_source": {
+            "sector": "POW",
+            "table": "P-1",
+            "item": "Turbine D",
+            "spec_id": "P1-4"
+          }
+        }
+      ]
+    },
+    {
+      "code": "F-508",
+      "round": null,
+      "sector": "TRN",
+      "name": "Emergency tunnel routing blackout",
+      "flavour": "The beacons and the diversion both want a figure, and neither is a transport figure.",
+      "severity": 3,
+      "decay_per_min": 0,
+      "crew_required": 3,
+      "resources_required": {
+        "parts": 2,
+        "power": 1
+      },
+      "procedure": "P-08",
+      "spec_refs": [
+        {
+          "spec_id": "A4-1",
+          "binder": "AGR",
+          "table": "A-4",
+          "row_label": "Array North",
+          "buried": false
+        },
+        {
+          "spec_id": "T1-2",
+          "binder": "TRN",
+          "table": "T-1",
+          "row_label": "Tunnel B",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-08-331-214"
+      ],
+      "false_alarm": false,
+      "deadline_s": null,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN",
+      "reference_chain": [
+        {
+          "first_sector": "COM",
+          "first_reference_name": "Route Beacon Reference",
+          "intermediate_result": "Array North [AGR]",
+          "final_source": {
+            "sector": "AGR",
+            "table": "A-4",
+            "item": "Array North",
+            "spec_id": "A4-1"
+          }
+        },
+        {
+          "first_sector": "AGR",
+          "first_reference_name": "Seedling Transport Reference",
+          "intermediate_result": "Tunnel B [TRN]",
+          "final_source": {
+            "sector": "TRN",
+            "table": "T-1",
+            "item": "Tunnel B",
+            "spec_id": "T1-2"
+          }
+        }
+      ]
+    },
+    {
+      "code": "F-509",
+      "round": null,
+      "sector": "AGR",
+      "name": "Nutrient loop sensor mismatch",
+      "flavour": "The nutrient loop is reading a flow rate nobody in this bay can confirm.",
+      "severity": 2,
+      "decay_per_min": 0,
+      "crew_required": 2,
+      "resources_required": {
+        "water": 1,
+        "parts": 1
+      },
+      "procedure": "P-07",
+      "spec_refs": [
+        {
+          "spec_id": "W3-3",
+          "binder": "WTR",
+          "table": "W-3",
+          "row_label": "Pump Station 3",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-07-722"
+      ],
+      "false_alarm": false,
+      "deadline_s": null,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Reference chain · SINGLE REFERENCE CHAIN",
+      "reference_chain": [
+        {
+          "first_sector": "COM",
+          "first_reference_name": "Nutrient Sensor Reference",
+          "intermediate_result": "Pump Station 3 [WTR]",
+          "final_source": {
+            "sector": "WTR",
+            "table": "W-3",
+            "item": "Pump Station 3",
+            "spec_id": "W3-3"
+          }
+        }
+      ]
+    },
+    {
+      "code": "F-510",
+      "round": null,
+      "sector": "AGR",
+      "name": "Seed vault climate interlock",
+      "flavour": "The vault will not seal until both its broadcast clearance and its chiller feed are confirmed.",
+      "severity": 3,
+      "decay_per_min": 0,
+      "crew_required": 3,
+      "resources_required": {
+        "water": 2,
+        "power": 1,
+        "med": 1
+      },
+      "procedure": "P-08",
+      "spec_refs": [
+        {
+          "spec_id": "C1-5",
+          "binder": "COM",
+          "table": "C-1",
+          "row_label": "Emergency Band",
+          "buried": false
+        },
+        {
+          "spec_id": "M5-5",
+          "binder": "MED",
+          "table": "M-5",
+          "row_label": "Scrubber Unit",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-08-390-346"
+      ],
+      "false_alarm": false,
+      "deadline_s": null,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN",
+      "reference_chain": [
+        {
+          "first_sector": "MED",
+          "first_reference_name": "Bio-Safety Reference",
+          "intermediate_result": "Emergency Band [COM]",
+          "final_source": {
+            "sector": "COM",
+            "table": "C-1",
+            "item": "Emergency Band",
+            "spec_id": "C1-5"
+          }
+        },
+        {
+          "first_sector": "POW",
+          "first_reference_name": "Vault Chiller Feed Reference",
+          "intermediate_result": "Scrubber Unit [MED]",
+          "final_source": {
+            "sector": "MED",
+            "table": "M-5",
+            "item": "Scrubber Unit",
+            "spec_id": "M5-5"
+          }
+        }
+      ]
+    },
+    {
+      "code": "F-511",
+      "round": null,
+      "sector": "COM",
+      "name": "Relay cooling telemetry mismatch",
+      "flavour": "The relay mast is cooled off somebody else's loop, and it wants that loop's rating.",
+      "severity": 2,
+      "decay_per_min": 0,
+      "crew_required": 2,
+      "resources_required": {
+        "power": 1,
+        "parts": 1
+      },
+      "procedure": "P-07",
+      "spec_refs": [
+        {
+          "spec_id": "W3-1",
+          "binder": "WTR",
+          "table": "W-3",
+          "row_label": "Pump Station 1",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-07-617"
+      ],
+      "false_alarm": false,
+      "deadline_s": null,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Reference chain · SINGLE REFERENCE CHAIN",
+      "reference_chain": [
+        {
+          "first_sector": "POW",
+          "first_reference_name": "Relay Cooling Reference",
+          "intermediate_result": "Pump Station 1 [WTR]",
+          "final_source": {
+            "sector": "WTR",
+            "table": "W-3",
+            "item": "Pump Station 1",
+            "spec_id": "W3-1"
+          }
+        }
+      ]
+    },
+    {
+      "code": "F-512",
+      "round": null,
+      "sector": "COM",
+      "name": "Uplink emergency power-route conflict",
+      "flavour": "The uplink wants its feed rating and its cabinet filtration rating. It holds neither.",
+      "severity": 3,
+      "decay_per_min": 0,
+      "crew_required": 3,
+      "resources_required": {
+        "power": 2,
+        "parts": 1
+      },
+      "procedure": "P-08",
+      "spec_refs": [
+        {
+          "spec_id": "T6-5",
+          "binder": "TRN",
+          "table": "T-6",
+          "row_label": "Emergency Line",
+          "buried": false
+        },
+        {
+          "spec_id": "M5-4",
+          "binder": "MED",
+          "table": "M-5",
+          "row_label": "HEPA Array",
+          "buried": false
+        }
+      ],
+      "valid_codes": [
+        "P-08-911-273"
+      ],
+      "false_alarm": false,
+      "deadline_s": null,
+      "injures_workforce": 0,
+      "triggered_by": null,
+      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN",
+      "reference_chain": [
+        {
+          "first_sector": "POW",
+          "first_reference_name": "Uplink Feed Reference",
+          "intermediate_result": "Emergency Line [TRN]",
+          "final_source": {
+            "sector": "TRN",
+            "table": "T-6",
+            "item": "Emergency Line",
+            "spec_id": "T6-5"
+          }
+        },
+        {
+          "first_sector": "AGR",
+          "first_reference_name": "Mast Filtration Reference",
+          "intermediate_result": "HEPA Array [MED]",
+          "final_source": {
+            "sector": "MED",
+            "table": "M-5",
+            "item": "HEPA Array",
+            "spec_id": "M5-4"
+          }
+        }
+      ]
+    }
+  ]
+}

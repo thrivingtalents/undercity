@@ -19,8 +19,14 @@ const {
 } = require("docx");
 
 const SRC = process.argv[2] || "content/faults.json";
+// F-501..F-512 are generated separately (see lib/content.js) and carry round:
+// null on purpose. They print, they just print in their own section.
+const CHAIN_SRC = process.argv[4] || "content/faults.reference-chain.json";
 const OUTDIR = process.argv[3] || "cards";
 const faults = JSON.parse(fs.readFileSync(SRC, "utf8")).faults;
+const chainFaults = fs.existsSync(CHAIN_SRC)
+  ? JSON.parse(fs.readFileSync(CHAIN_SRC, "utf8")).faults
+  : [];
 
 // Flavour lines in the matrix are structured "SYMPTOM; needs X from Y".
 // The card prints the SYMPTOM ONLY. Printing the dependency half would hand the
@@ -44,6 +50,9 @@ const SECTOR = {
 };
 const ROUND_LABEL = {
   R0: "ORIENTATION", R1: "SHIFT 1", R2: "SHIFT 2", R3: "SHIFT 3", R4: "AFTERSHOCK",
+  // Unscheduled by design: the facilitator deals these by hand until the
+  // mechanic has been playtested and each one is given a round.
+  null: "REFERENCE CHAIN",
 };
 
 const INK = "1A1A1A";
@@ -82,7 +91,7 @@ function cardCell(f) {
     children: [
       new TextRun({ text: `${f.sector}  `, font: "Arial", size: 20, bold: true, color: s.colour, characterSpacing: 40 }),
       new TextRun({ text: s.name, font: "Arial", size: 14, color: MUTED, characterSpacing: 40 }),
-      new TextRun({ text: `     ${ROUND_LABEL[f.round]}`, font: "Arial", size: 12, color: "AAAAAA", characterSpacing: 60 }),
+      new TextRun({ text: `     ${ROUND_LABEL[f.round] || ROUND_LABEL[null]}`, font: "Arial", size: 12, color: "AAAAAA", characterSpacing: 60 }),
     ],
   }));
 
@@ -136,11 +145,14 @@ const blankCell = () => new TableCell({
 // ---------------------------------------------------------------- deck
 
 // Print order: grouped by round so the deck can be tabbed and reset fast.
+// REFERENCE CHAIN is an unnumbered section at the back — the same card, the
+// same tab line, no round number, because these are not dealt by a round.
 const ORDER = ["R0", "R1", "R2", "R3", "R4"];
 const deck = [];
 for (const r of ORDER) {
   deck.push(...faults.filter((f) => f.round === r).sort((a, b) => a.code.localeCompare(b.code)));
 }
+deck.push(...chainFaults.slice().sort((a, b) => a.code.localeCompare(b.code)));
 
 const cardChildren = [];
 for (let i = 0; i < deck.length; i += 4) {
@@ -272,6 +284,7 @@ Packer.toBuffer(keyDoc).then((b) => {
 
 const byRound = {};
 deck.forEach((f) => { byRound[f.round] = (byRound[f.round] || 0) + 1; });
-console.log("  deck order:", ORDER.map((r) => `${r} ${byRound[r] || 0}`).join(" · "));
+console.log("  deck order:", ORDER.map((r) => `${r} ${byRound[r] || 0}`).join(" · ")
+  + (chainFaults.length ? ` · REFERENCE CHAIN ${chainFaults.length} (unscheduled)` : ""));
 console.log("  no-code cards:", deck.filter((f) => f.false_alarm).map((f) => f.code).join(", ") || "none");
 console.log("  multi-code cards:", deck.filter((f) => f.valid_codes.length > 1).map((f) => f.code).join(", ") || "none");

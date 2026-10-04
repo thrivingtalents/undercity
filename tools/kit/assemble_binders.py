@@ -161,6 +161,19 @@ for row in wb["Faults"].iter_rows(min_row=2, values_only=True):
         "notes": row[16] or "",
     })
 
+# ---- reference-chain faults (generated, not from the workbook) --------------
+# F-501..F-512 live in content/faults.reference-chain.json because their
+# resolution codes are resolved from content/specs.json rather than from an
+# Excel formula. The binder needs them in the index, in the procedures and —
+# for the sectors that hold one — in subsection 5A. Optional: a checkout that
+# has not run the generator simply builds the thirty-six-fault binders.
+CHAIN_PATH = Path(__file__).resolve().parents[2] / "content" / "faults.reference-chain.json"
+chain = json.loads(CHAIN_PATH.read_text(encoding="utf-8")) if CHAIN_PATH.exists() else {
+    "faults": [], "reference_directory": {}}
+chain_by_sector = {}
+for f in chain["faults"]:
+    chain_by_sector.setdefault(f["sector"], []).append(f)
+
 # ---- escalate entries (parsed from CrossrefMap) -----------------------------
 escalate = {}
 for row in wb["CrossrefMap"].iter_rows(min_row=1, values_only=True):
@@ -182,6 +195,11 @@ for code, info in SECTOR_INFO.items():
     for f in sorted(own, key=lambda x: x["code"]):
         if f["procedure"] in (None, "—"):
             sys.exit(f"{f['code']}: no procedure — the deck carries no false alarm, so this is a matrix error")
+        index_rows.append({
+            "code": f["code"], "name": f["name"],
+            "action": f"Procedure {f['procedure']}", "own": True, "no_procedure": False,
+        })
+    for f in sorted(chain_by_sector.get(code, []), key=lambda x: x["code"]):
         index_rows.append({
             "code": f["code"], "name": f["name"],
             "action": f"Procedure {f['procedure']}", "own": True, "no_procedure": False,
@@ -225,6 +243,43 @@ for code, info in SECTOR_INFO.items():
             "severity": f["severity"],
         })
 
+    # P-07 and P-08. The requesting binder is told ONE thing per chain: which
+    # sector to ask, and the name of the row to ask for. It is never told what
+    # that row says, and never told where the row will send them next — that
+    # is the mechanic, and writing it down here would be giving it away.
+    for f in sorted(chain_by_sector.get(code, []), key=lambda x: x["code"]):
+        n = len(f["reference_chain"])
+        fmt = f["procedure"] + "-[VALUE]" + ("-[VALUE 2]" if n == 2 else "")
+        mats = ", ".join(f"{v} {k.title()}" for k, v in f["resources_required"].items())
+        steps = [
+            f"Confirm the fault code on the alert card matches {f['code']}.",
+            f"Assign crew: {f['crew_required']} worker(s) minimum. Fewer will not hold the isolation.",
+            f"Stage materials: {mats}.",
+        ]
+        for i, c in enumerate(f["reference_chain"], 1):
+            which = "" if n == 1 else f" This is VALUE {i}."
+            steps.append(
+                f"Obtain the {c['first_reference_name']} from {c['first_sector']}."
+                f" {c['first_sector']} may answer with another asset and sector instead of a number:"
+                f" that is a REFERENCE, not a value. Follow it to the sector named and ask that sector"
+                f" for the asset's figure.{which}")
+        steps.append(f"Enter the resolution code on the sector console in the format {fmt}, "
+                     "substituting the value(s) above. Values are three digits.")
+        steps.append("If the console rejects the entry, re-verify with the sector that holds the "
+                     "figure before resubmitting. Three consecutive rejections lock the console for 20 seconds.")
+        procedures.append({
+            "id": f["procedure"], "fault_code": f["code"], "title": f["name"],
+            "resources": mats, "crew": f["crew_required"],
+            "deadline": None, "format": fmt,
+            # No `sources` block: a chain procedure has no table to send the
+            # operator to. The renderer keys off `reference_chain` instead.
+            "sources": [],
+            "reference_chain": [{"first_sector": c["first_sector"],
+                                 "first_reference_name": c["first_reference_name"]}
+                                for c in f["reference_chain"]],
+            "steps": steps, "severity": f["severity"],
+        })
+
     tables = {}
     for s in specs.values():
         if s["binder"] != code or s["buried"]:
@@ -241,6 +296,12 @@ for code, info in SECTOR_INFO.items():
         "index_rows": index_rows,
         "procedures": procedures,
         "tables": sorted(tables.values(), key=lambda t: t["id"]),
+        # 5A · Cross-System Reference Directory. Rows that point somewhere
+        # instead of answering. They carry no number, which is why the leak
+        # check below still passes: a binder may name another sector's asset,
+        # it may never print another sector's value.
+        "references": [{"name": r["reference_name"], "display": r["display"]}
+                       for r in chain["reference_directory"].get(code, [])],
         "appendix": {"row_label": appendix["row_label"], "value": appendix["value"]},
     }
 

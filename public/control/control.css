@@ -457,3 +457,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: none;
 .timer-quick button, .timer-set button, .timer-run button { font-size: 11px; }
 .timer-set input { width: 84px; font-size: 14px; text-align: center; }
 .timer-run { align-items: flex-start; }
+
+/* Reference-chain faults in the trigger picker: marked, and the path shown on
+   the confirm card. Facilitator-only — no player screen carries any of it. */
+.pf.chain .rd { color: var(--purple, #A855F7); letter-spacing: 0.08em; }
+.cc-chain { margin-top: 8px; padding: 6px 8px; border-left: 2px solid var(--purple, #A855F7); background: rgba(168,85,247,0.07); font-size: 11px; line-height: 1.7; }
+.cc-chain em { display: block; margin-top: 4px; color: var(--ink-faint); font-style: normal; font-size: 10px; letter-spacing: 0.08em; }

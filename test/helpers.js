@@ -8,10 +8,10 @@ const { RunLog } = require('../lib/log');
 
 const ROOT = path.join(__dirname, '..');
 
-function loadContent() {
-  const rd = (f) => JSON.parse(fs.readFileSync(path.join(ROOT, 'content', f), 'utf8'));
-  return { faults: rd('faults.json'), specs: rd('specs.json'), sectors: rd('sectors.json') };
-}
+// The same loader the server uses, so a test never sees a different world:
+// the workbook's faults plus the generated reference-chain twelve.
+const { loadContent: loadFromDir } = require('../lib/content');
+const loadContent = () => loadFromDir(path.join(ROOT, 'content'));
 
 const rounds = JSON.parse(fs.readFileSync(path.join(ROOT, 'lib', 'rounds.json'), 'utf8'));
 

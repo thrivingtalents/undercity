@@ -408,13 +408,31 @@
     for (const b of body.querySelectorAll('[data-s]')) b.addEventListener('click', () => { onPick(b.dataset.s); closePicker(); });
   }
 
+  /**
+   * THE WHOLE CHAIN, facilitator-only (2026-10-04). A reference-chain fault
+   * sends its owner to one sector, which holds a pointer to a second. No
+   * player screen is ever given more than the first step — lib/visibility.js
+   * builds a sector's fault from an allow-list that has no `reference_chain`
+   * in it — so this is the only place in the system the path is written out,
+   * and it is behind the control token.
+   */
+  function chainText(f) {
+    return (f.reference_chain || []).map((c, i) => {
+      const n = f.reference_chain.length > 1 ? `VALUE ${i + 1}: ` : '';
+      const s = c.final_source;
+      return `${n}${f.sector} → ${c.first_sector} "${c.first_reference_name}" → ${c.intermediate_result} → ${s.sector} ${s.table} ${s.item}`;
+    });
+  }
+
   /** Triggering a fault is routine, but never a slip: one preview, one press. */
   function confirmTrigger(code, sector) {
     const f = content && content.faults.faults.find((x) => x.code === code);
     const body = openPicker(`TRIGGER FAULT — ${code}`, `
       <div class="confirm-card">
         <div class="cc-title">${esc(code)} · ${esc(f ? f.name : '')}</div>
-        <div class="cc-line">→ <b>${esc(sector)}</b> · ${f ? U.severityPips(f.severity) : ''} · ${f ? esc(f.round) : ''}${f && f.injures_workforce ? ` · injures ${f.injures_workforce}` : ''}</div>
+        <div class="cc-line">→ <b>${esc(sector)}</b> · ${f ? U.severityPips(f.severity) : ''} · ${f ? esc(String(f.reference_chain ? 'REFERENCE CHAIN' : f.round)) : ''}${f && f.injures_workforce ? ` · injures ${f.injures_workforce}` : ''}</div>
+        ${f && f.reference_chain ? `<div class="cc-chain">${chainText(f).map((l) => `<div>${esc(l)}</div>`).join('')}<em>Facilitator only — no player screen shows past the first sector.</em></div>` : ''}
+        ${f && f.valid_codes && f.reference_chain ? `<div class="cc-chain"><b>ANSWER ${esc(f.valid_codes.join(' / '))}</b></div>` : ''}
         <div class="row"><button id="cc-cancel">CANCEL</button><button id="cc-go" class="primary">TRIGGER</button></div>
       </div>`);
     body.querySelector('#cc-cancel').addEventListener('click', closePicker);
@@ -448,8 +466,8 @@
       <div class="pick-sectors">${codes.map((s) => `
         <div class="pick-sector"><h3 style="color:${state.sectors[s].colour}">${U.SECTOR_GLYPH[s] || ''} ${s}</h3>
           ${content.faults.faults.filter((f) => f.sector === s).map((f) => `
-            <button class="pf${active.has(f.code) ? ' live' : ''}" data-fire="${f.code}" data-sector="${s}" title="${esc(f.name)}">
-              <b>${f.code}</b><span class="nm">${esc(f.name)}</span><span class="rd">${f.round}</span><span class="sv">${U.severityPips(f.severity)}</span>
+            <button class="pf${active.has(f.code) ? ' live' : ''}${f.reference_chain ? ' chain' : ''}" data-fire="${f.code}" data-sector="${s}" title="${esc(f.name)}${f.reference_chain ? `\n${chainText(f).join('\n')}` : ''}">
+              <b>${f.code}</b><span class="nm">${esc(f.name)}</span><span class="rd">${f.reference_chain ? 'CHAIN' : esc(String(f.round))}</span><span class="sv">${U.severityPips(f.severity)}</span>
             </button>`).join('')}
         </div>`).join('')}
       </div>`);

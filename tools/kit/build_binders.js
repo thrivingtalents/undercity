@@ -236,6 +236,36 @@ function indexPages(b) {
   ];
 }
 
+/**
+ * 5A · CROSS-SYSTEM REFERENCE DIRECTORY.
+ *
+ * The rows that do not answer. Where Section 5 prints a figure, this prints
+ * another sector's asset — and the whole mechanic rests on an operator being
+ * able to tell the two apart at a glance under pressure, so the reference is
+ * set in the same mono face as a value but bracketed with its sector, and the
+ * standing order above the table says in one line what it is for.
+ */
+function referencePages(b) {
+  if (!b.references || !b.references.length) return [];
+  const rows = [
+    [cell("REFERENCE NAME", { width: 4200, bold: true, shade: "F2F2F2" }),
+     cell("REFERENCE", { width: 4826, bold: true, shade: "F2F2F2" })],
+    ...b.references.map((r) => [
+      cell(r.name, { width: 4200 }),
+      cell(r.display, { width: 4826, mono: true }),
+    ]),
+  ];
+  return [
+    pageBreak(),
+    sectionTitle("5A · CROSS-SYSTEM REFERENCE DIRECTORY", b.colour),
+    p(body("Entries ending with a sector code in square brackets are REFERENCES, not resolution values. "
+      + "Relay the exact reference name and sector shown to the requesting team. The named sector holds "
+      + "the authoritative numeric value. Do not invent or infer a number.")),
+    p(body("")),
+    table(rows, [4200, 4826]),
+  ];
+}
+
 function procedurePages(b) {
   const out = [sectionTitle("4 · Repair Procedures", b.colour),
     p(body("Procedures are written to be read aloud. The console will not accept a partial code.")),
@@ -400,7 +430,7 @@ for (const code of Object.keys(data.binders)) {
       })]}) },
       children: [
         ...coverPage(b), ...overviewPage(b), ...schematicPage(b), ...indexPages(b),
-        ...procedurePages(b), ...tablePages(b), ...appendixPage(b), ...logPage(b),
+        ...procedurePages(b), ...tablePages(b), ...referencePages(b), ...appendixPage(b), ...logPage(b),
         ...quickRefPage(b),
       ],
     }],

@@ -2607,9 +2607,11 @@ function repair(game, code, sector, extra = {}) {
 }
 const submitFor = (game, code, sector, over = {}) => submitCode(game, { sector, fault_code: code, code: codeOf(code), workers_assigned: defOf(code).crew_required, ...over });
 
-test('the table: 36 faults, one fixed reward each — 19 RESOURCE (14 parts, 1 power, 1 water, 3 med), 10 INTEGRITY, 7 OPPORTUNITY', () => {
+test('the table: 48 faults, one fixed reward each — 24 RESOURCE (16 parts, 1 power, 2 water, 5 med), 14 INTEGRITY, 10 OPPORTUNITY', () => {
+  // 36 from the workbook + the twelve reference-chain faults (2026-10-04),
+  // which pay from this same table: a chain changes the work, not the wage.
   const content = loadContent().faults.faults;
-  assert.equal(Object.keys(REWARD_TABLE).length, 36);
+  assert.equal(Object.keys(REWARD_TABLE).length, 48);
   const by = { RESOURCE: 0, INTEGRITY: 0, OPPORTUNITY: 0 };
   const res = {};
   const tok = {};
@@ -2622,9 +2624,9 @@ test('the table: 36 faults, one fixed reward each — 19 RESOURCE (14 parts, 1 p
     if (r.type === 'OPPORTUNITY') tok[r.token] = (tok[r.token] || 0) + 1;
     if (r.type === 'INTEGRITY') assert.equal(r.amount, 5);
   }
-  assert.deepEqual(by, { RESOURCE: 19, INTEGRITY: 10, OPPORTUNITY: 7 });
-  assert.deepEqual(res, { parts: 14, power: 1, water: 1, med: 3 });
-  assert.deepEqual(tok, { SECOND_CHANCE: 2, RESERVE_CREW: 2, EMERGENCY_REPAIR_KIT: 2, STABILISER: 1 });
+  assert.deepEqual(by, { RESOURCE: 24, INTEGRITY: 14, OPPORTUNITY: 10 });
+  assert.deepEqual(res, { parts: 16, power: 1, water: 2, med: 5 });
+  assert.deepEqual(tok, { SECOND_CHANCE: 3, RESERVE_CREW: 3, EMERGENCY_REPAIR_KIT: 3, STABILISER: 1 });
   for (const def of content) assert.ok(REWARD_TABLE[def.code], `${def.code} has no reward`);
   // dealt at fire, verbatim, never rolled: the same fault in two runs carries the same reward
   const a = running(); a.fireFault('F-101', 'POW');

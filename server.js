@@ -29,6 +29,7 @@ const express = require('express');
 const { WebSocketServer } = require('ws');
 
 const { validateContent } = require('./lib/validate');
+const { loadContent } = require('./lib/content');
 const { RunLog } = require('./lib/log');
 const { submitCode } = require('./lib/resolve');
 const { filterState } = require('./lib/visibility');
@@ -60,11 +61,9 @@ const SECURE_COOKIES = process.env.SECURE_COOKIES === '1' || process.env.NODE_EN
 const CONTENT_DIR = path.join(__dirname, 'content');
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 
-const content = {
-  faults: loadJson(path.join(CONTENT_DIR, 'faults.json')),
-  specs: loadJson(path.join(CONTENT_DIR, 'specs.json')),
-  sectors: loadJson(path.join(CONTENT_DIR, 'sectors.json')),
-};
+// The workbook's faults plus the generated reference-chain twelve. See
+// lib/content.js for why the merge lives there and not in either generator.
+const content = loadContent(CONTENT_DIR);
 const rounds = loadJson(path.join(__dirname, 'lib', 'rounds.json'));
 const SECTOR_CODES = Object.keys(content.sectors.sectors);
 
