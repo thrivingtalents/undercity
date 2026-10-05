@@ -10,7 +10,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 # ---------------------------------------------------------------- paper kit
-# The thirteen printable documents are generated HERE, from the same commit
+# The fourteen printable documents are generated HERE, from the same commit
 # that produced content/*.json. That is what makes the admin panel's "kit
 # matches this server" badge a fact rather than a hope: both halves of the
 # pipeline run once, together, from one matrix.
@@ -26,6 +26,11 @@ COPY package.json package-lock.json ./
 RUN npm ci                                  # includes docx, the renderer
 COPY tools ./tools
 COPY content ./content
+# The binders are built from the game's own rules (2026-10-05): the
+# scenario in config/, and lib/'s rounds, rewards and AGR deck. Without
+# them tools/kit/binder_rules.js dies on its first read.
+COPY lib ./lib
+COPY config ./config
 RUN mkdir -p kit && npm run kit
 
 # ---------------------------------------------------------------- runtime
