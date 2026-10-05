@@ -2624,10 +2624,10 @@ function repair(game, code, sector, extra = {}) {
 }
 const submitFor = (game, code, sector, over = {}) => submitCode(game, { sector, fault_code: code, code: codeOf(code), workers_assigned: defOf(code).crew_required, ...over });
 
-test('the table: 60 faults, one fixed reward each — 30 RESOURCE (17 parts, 5 power, 3 water, 5 med), 20 INTEGRITY, 10 OPPORTUNITY', () => {
+test('the table: 60 faults, one fixed reward each — 30 RESOURCE (18 parts, 6 power, 6 med), 18 INTEGRITY, 12 OPPORTUNITY', () => {
   // 36 from the workbook + the twelve reference-chain faults (2026-10-04) +
-  // the twelve late-shift faults (2026-10-05): P-09 pays +1 of its first
-  // staged material, P-10 pays +5 Integrity, and no new reward type exists.
+  // the twelve late-shift faults (2026-10-05), balanced sector by sector the
+  // same day (test/reward-balance.test.js holds the matrix); no new reward type exists.
   const content = loadContent().faults.faults;
   assert.equal(Object.keys(REWARD_TABLE).length, 60);
   const by = { RESOURCE: 0, INTEGRITY: 0, OPPORTUNITY: 0 };
@@ -2642,9 +2642,9 @@ test('the table: 60 faults, one fixed reward each — 30 RESOURCE (17 parts, 5 p
     if (r.type === 'OPPORTUNITY') tok[r.token] = (tok[r.token] || 0) + 1;
     if (r.type === 'INTEGRITY') assert.equal(r.amount, 5);
   }
-  assert.deepEqual(by, { RESOURCE: 30, INTEGRITY: 20, OPPORTUNITY: 10 });
-  assert.deepEqual(res, { parts: 17, power: 5, water: 3, med: 5 });
-  assert.deepEqual(tok, { SECOND_CHANCE: 3, RESERVE_CREW: 3, EMERGENCY_REPAIR_KIT: 3, STABILISER: 1 });
+  assert.deepEqual(by, { RESOURCE: 30, INTEGRITY: 18, OPPORTUNITY: 12 });
+  assert.deepEqual(res, { parts: 18, power: 6, med: 6 });
+  assert.deepEqual(tok, { SECOND_CHANCE: 3, RESERVE_CREW: 3, EMERGENCY_REPAIR_KIT: 3, STABILISER: 3 });
   for (const def of content) assert.ok(REWARD_TABLE[def.code], `${def.code} has no reward`);
   // dealt at fire, verbatim, never rolled: the same fault in two runs carries the same reward
   const a = running(); a.fireFault('F-101', 'POW');
@@ -2684,21 +2684,21 @@ test('resolve F-101: POW receives exactly +1 Parts, once', () => {
   assert.equal(logEvents(game, 'reward_awarded').length, 1);
 });
 
-test('resolve F-102: WTR receives +5 Integrity, capped at the existing maximum', () => {
+test('resolve F-203: WTR receives +5 Integrity, capped at the existing maximum', () => {
   const game = running();
   game.setIntegrity('WTR', 60);
-  const { res } = repair(game, 'F-102', 'WTR');
+  const { res } = repair(game, 'F-203', 'WTR');
   assert.equal(res.accepted, true, res.reason);
   assert.equal(game.state.sectors.WTR.integrity, 65);
   assert.equal(res.reward.result_text, '+5 INTEGRITY');
   assert.deepEqual(game.state.sectors.WTR.inventory, { power: 0, water: 0, parts: 0, med: 0 }, 'an integrity reward moved stock');
   // near the ceiling: capped, never over
   const g2 = running(); g2.setIntegrity('WTR', 98);
-  assert.equal(repair(g2, 'F-102', 'WTR').res.accepted, true);
+  assert.equal(repair(g2, 'F-203', 'WTR').res.accepted, true);
   assert.equal(g2.state.sectors.WTR.integrity, 100);
-  assert.ok(/AT MAXIMUM/.test(g2.state.sectors.WTR.faults.find((f) => f.code === 'F-102').reward.result_text));
+  assert.ok(/AT MAXIMUM/.test(g2.state.sectors.WTR.faults.find((f) => f.code === 'F-203').reward.result_text));
   const g3 = running(); g3.setIntegrity('WTR', 100);
-  repair(g3, 'F-102', 'WTR');
+  repair(g3, 'F-203', 'WTR');
   assert.equal(g3.state.sectors.WTR.integrity, 100);
 });
 
@@ -2777,37 +2777,37 @@ test('use Second Chance after a rejected code: that rejection does not count tow
 
 test('use Emergency Repair Kit: the chosen repair costs one Part fewer, never below zero, and the token is consumed', () => {
   const game = running();
-  repair(game, 'F-106', 'COM');                                   // the token
-  const def = loadContent().faults.faults.find((f) => f.sector === 'COM' && Number((f.resources_required || {}).parts) >= 1 && f.code !== 'F-106');
-  assert.ok(def, 'no COM fault needs parts');
-  game.fireFault(def.code, 'COM');
+  repair(game, 'F-510', 'AGR');                                   // the token
+  const def = loadContent().faults.faults.find((f) => f.sector === 'AGR' && Number((f.resources_required || {}).parts) >= 1 && f.code !== 'F-510');
+  assert.ok(def, 'no AGR fault needs parts');
+  game.fireFault(def.code, 'AGR');
   const short = { ...def.resources_required, parts: def.resources_required.parts - 1 };
-  stock(game, 'COM', short);
-  assert.equal(submitFor(game, def.code, 'COM').reason, 'insufficient_resources');
-  assert.equal(forSector(game, 'COM').sectors.COM.faults.find((x) => x.code === def.code).materials_ready, false);
-  const use = game.useOpportunity('COM', 'EMERGENCY_REPAIR_KIT', { fault: def.code });
+  stock(game, 'AGR', short);
+  assert.equal(submitFor(game, def.code, 'AGR').reason, 'insufficient_resources');
+  assert.equal(forSector(game, 'AGR').sectors.AGR.faults.find((x) => x.code === def.code).materials_ready, false);
+  const use = game.useOpportunity('AGR', 'EMERGENCY_REPAIR_KIT', { fault: def.code });
   assert.equal(use.ok, true); assert.equal(use.effect, 'armed');
-  assert.equal(forSector(game, 'COM').sectors.COM.faults.find((x) => x.code === def.code).materials_ready, true, 'the kit did not take a part off the recipe');
-  const res = submitFor(game, def.code, 'COM');
+  assert.equal(forSector(game, 'AGR').sectors.AGR.faults.find((x) => x.code === def.code).materials_ready, true, 'the kit did not take a part off the recipe');
+  const res = submitFor(game, def.code, 'AGR');
   assert.equal(res.accepted, true, res.reason);
   assert.equal(res.consumed.parts, def.resources_required.parts - 1);
   for (const [k, v] of Object.entries(def.resources_required)) if (k !== 'parts') assert.equal(res.consumed[k], v, `the kit reduced ${k}`);
-  assert.equal(game.state.sectors.COM.opportunities.length, 0);
+  assert.equal(game.state.sectors.AGR.opportunities.length, 0);
   // never below zero: a recipe without parts cannot take the kit
   const g2 = running();
-  repair(g2, 'F-106', 'COM');
-  const noParts = loadContent().faults.faults.find((f) => f.sector === 'COM' && !Number((f.resources_required || {}).parts) && f.code !== 'F-106');
+  repair(g2, 'F-510', 'AGR');
+  const noParts = loadContent().faults.faults.find((f) => f.sector === 'AGR' && !Number((f.resources_required || {}).parts) && f.code !== 'F-510');
   if (noParts) {
-    g2.fireFault(noParts.code, 'COM');
-    assert.equal(g2.useOpportunity('COM', 'EMERGENCY_REPAIR_KIT', { fault: noParts.code }).reason, 'no_parts_to_reduce');
-    assert.equal(g2.state.sectors.COM.opportunities.length, 1, 'a refused use consumed the token');
+    g2.fireFault(noParts.code, 'AGR');
+    assert.equal(g2.useOpportunity('AGR', 'EMERGENCY_REPAIR_KIT', { fault: noParts.code }).reason, 'no_parts_to_reduce');
+    assert.equal(g2.state.sectors.AGR.opportunities.length, 1, 'a refused use consumed the token');
   }
   assert.deepEqual(rewardsMod.effectiveRequirements({ resources_required: { parts: 0, water: 1 }, armed: { repair_kit: 'x' } }), { parts: 0, water: 1 });
 });
 
 test('use Stabiliser: the next minute of one unresolved fault\'s decay is blocked once, and the token is consumed', () => {
   const game = running();
-  repair(game, 'F-306', 'COM');                                   // the token
+  repair(game, 'F-512', 'COM');                                   // the token
   game.fireFault('F-211', 'COM');
   const f = liveFault(game, 'COM', 'F-211');
   assert.ok(f.decay_per_min > 0);
@@ -2896,12 +2896,12 @@ test('a failed repair pays nothing: wrong code, short crew, short tray', () => {
 test('an integrity reward above the maximum stops at the maximum', () => {
   const game = running();
   game.setIntegrity('WTR', 99);
-  repair(game, 'F-102', 'WTR');
+  repair(game, 'F-203', 'WTR');
   assert.equal(game.state.sectors.WTR.integrity, 100);
   const g2 = running();
   g2.patchConfig({ reward_health_cap: 90 });
   g2.setIntegrity('WTR', 88);
-  repair(g2, 'F-102', 'WTR');
+  repair(g2, 'F-203', 'WTR');
   assert.equal(g2.state.sectors.WTR.integrity, 90);
 });
 

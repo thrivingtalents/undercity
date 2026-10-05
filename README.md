@@ -145,9 +145,10 @@ npm start                                            # http://localhost:3000/adm
    sector, and the fault pays its **REPAIR REWARD** — FAULT REWARDS v2
    (2026-09-29, `undercity_varied_fault_rewards_spec` 2.0): one fixed reward
    per fault from `lib/fault-rewards.json`, never rolled, never chosen.
-   19 faults pay a RESOURCE (one unit into the resolving sector's real tray,
-   14 of them Spare Parts; stock like any other, so Transport still moves
-   it), 10 pay INTEGRITY (+5, capped at 100, never reviving DARK) and 7 pay an
+   Of the 60 faults, 30 pay a RESOURCE (one unit into the resolving sector's
+   real tray — 18 Spare Parts, 6 Med Supplies, 6 Power Cells; stock like any
+   other, so Transport still moves it), 18 pay INTEGRITY (+5, capped at 100,
+   never reviving DARK) and 12 pay an
    OPPORTUNITY: one single-use tactical token stored under TACTICAL
    OPPORTUNITIES on the sector screen — RESERVE CREW (+1 temporary worker for
    one repair, armed on a card before the attempt), SECOND CHANCE (the last
@@ -163,6 +164,13 @@ npm start                                            # http://localhost:3000/adm
    switch, logged as an override); the facilitator can grant or revoke a
    token from the sector drawer, each an audited override; every award and
    every token use is in the log and the Session Review timeline.
+   Since the balance audit of 2026-10-05 (`docs/fault-reward-balance.md`)
+   every sector's ten faults pay the same matrix on a different journey —
+   3 Parts, 1 Med, 1 Power, 3 Integrity and 2 tokens (one of RESERVE CREW /
+   SECOND CHANCE, one of EMERGENCY REPAIR KIT / STABILISER) — and its six
+   scripted faults the same sub-matrix (2 Parts, 1 Med, 2 Integrity, 1
+   token); `test/reward-balance.test.js` holds the matrix, and the table's
+   own `balance` block states it.
    Since v17 a repair is crew + the binder's materials + the code, committed
    at once from the real tray (a refusal consumes nothing; the console says
    MATERIALS NOT READY, never which). Since v20 a table has one door for resources: REQUEST. The

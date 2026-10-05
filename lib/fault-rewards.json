@@ -1,7 +1,44 @@
 {
-  "version": "2.0",
-  "source": "undercity_varied_fault_rewards_spec.json (fault_reward_system_v2, 2026-09-29)",
-  "note": "One fixed reward per fault. RESOURCE adds stock to the resolving sector's real tray; INTEGRITY restores health capped at the maximum; OPPORTUNITY stores one single-use token. Nothing is rolled and nothing is chosen. A scenario's fault_reward_overrides may replace an entry with the same shape. The F-5xx reference-chain faults (2026-10-04) pay from the same table as every other fault; nothing about a chain changes what finishing one is worth.",
+  "version": "2.1",
+  "source": "undercity_varied_fault_rewards_spec.json (fault_reward_system_v2, 2026-09-29) + fault reward balance audit (2026-10-05, docs/fault-reward-balance.md)",
+  "note": "One fixed reward per fault. RESOURCE adds stock to the resolving sector's real tray; INTEGRITY restores health capped at the maximum; OPPORTUNITY stores one single-use token. Nothing is rolled and nothing is chosen. A scenario's fault_reward_overrides may replace an entry with the same shape. The F-5xx reference-chain faults (2026-10-04) pay from the same table as every other fault; nothing about a chain changes what finishing one is worth. BALANCE (2026-10-05): every sector's ten faults pay the same matrix on a different journey (see `balance`; docs/fault-reward-balance.md has the audit; test/reward-balance.test.js holds the matrix).",
+  "balance": {
+    "audit": "docs/fault-reward-balance.md (2026-10-05): the same opportunity in every sector, on a different journey",
+    "per_sector": {
+      "parts": 3,
+      "med": 1,
+      "power": 1,
+      "water": 0,
+      "integrity": 3,
+      "tokens": 2
+    },
+    "token_pairs": "one of RESERVE_CREW / SECOND_CHANCE and one of EMERGENCY_REPAIR_KIT / STABILISER per sector; three of each token in the city",
+    "scripted_per_sector": {
+      "parts": 2,
+      "med": 1,
+      "integrity": 2,
+      "tokens": 1
+    },
+    "library_per_sector": {
+      "parts": 1,
+      "power": 1,
+      "integrity": 1,
+      "tokens": 1
+    },
+    "library_rule": "P-07 (single reference chain) pays +1 Power, P-08 (double chain) pays the token, P-09 pays +1 Parts, P-10 (TIME-CRITICAL) pays +5 Integrity",
+    "timing": "one Parts reward in each band (Rounds 0-1; Rounds 2-3 with the reference chains; Round 4 with the late shift); no INTEGRITY reward before Round 2; every sector earns its Med and one token inside Rounds 0-4",
+    "city": {
+      "parts": 18,
+      "med": 6,
+      "power": 6,
+      "water": 0,
+      "integrity": 18,
+      "RESERVE_CREW": 3,
+      "SECOND_CHANCE": 3,
+      "EMERGENCY_REPAIR_KIT": 3,
+      "STABILISER": 3
+    }
+  },
   "integrity_default": 5,
   "tokens": {
     "RESERVE_CREW": "+1 temporary worker for one repair procedure; declared before the repair is submitted; consumed when the attempt begins",
@@ -13,7 +50,7 @@
     "F-001": {
       "sector": "POW",
       "type": "RESOURCE",
-      "resource": "parts",
+      "resource": "med",
       "amount": 1
     },
     "F-002": {
@@ -36,8 +73,9 @@
     },
     "F-005": {
       "sector": "AGR",
-      "type": "INTEGRITY",
-      "amount": 5
+      "type": "RESOURCE",
+      "resource": "parts",
+      "amount": 1
     },
     "F-006": {
       "sector": "COM",
@@ -53,19 +91,20 @@
     },
     "F-102": {
       "sector": "WTR",
-      "type": "INTEGRITY",
-      "amount": 5
+      "type": "RESOURCE",
+      "resource": "med",
+      "amount": 1
     },
     "F-103": {
       "sector": "MED",
       "type": "RESOURCE",
-      "resource": "water",
+      "resource": "parts",
       "amount": 1
     },
     "F-104": {
       "sector": "TRN",
-      "type": "RESOURCE",
-      "resource": "parts",
+      "type": "OPPORTUNITY",
+      "token": "RESERVE_CREW",
       "amount": 1
     },
     "F-105": {
@@ -76,8 +115,8 @@
     },
     "F-106": {
       "sector": "COM",
-      "type": "OPPORTUNITY",
-      "token": "EMERGENCY_REPAIR_KIT",
+      "type": "RESOURCE",
+      "resource": "parts",
       "amount": 1
     },
     "F-201": {
@@ -88,8 +127,8 @@
     },
     "F-202": {
       "sector": "POW",
-      "type": "RESOURCE",
-      "resource": "parts",
+      "type": "OPPORTUNITY",
+      "token": "EMERGENCY_REPAIR_KIT",
       "amount": 1
     },
     "F-203": {
@@ -105,8 +144,8 @@
     },
     "F-205": {
       "sector": "MED",
-      "type": "RESOURCE",
-      "resource": "med",
+      "type": "OPPORTUNITY",
+      "token": "STABILISER",
       "amount": 1
     },
     "F-206": {
@@ -123,19 +162,19 @@
     "F-208": {
       "sector": "TRN",
       "type": "RESOURCE",
-      "resource": "parts",
+      "resource": "med",
       "amount": 1
     },
     "F-209": {
       "sector": "AGR",
       "type": "RESOURCE",
-      "resource": "power",
+      "resource": "parts",
       "amount": 1
     },
     "F-210": {
       "sector": "AGR",
-      "type": "OPPORTUNITY",
-      "token": "EMERGENCY_REPAIR_KIT",
+      "type": "RESOURCE",
+      "resource": "med",
       "amount": 1
     },
     "F-211": {
@@ -145,15 +184,14 @@
     },
     "F-212": {
       "sector": "COM",
-      "type": "OPPORTUNITY",
-      "token": "SECOND_CHANCE",
+      "type": "RESOURCE",
+      "resource": "parts",
       "amount": 1
     },
     "F-301": {
       "sector": "POW",
-      "type": "RESOURCE",
-      "resource": "parts",
-      "amount": 1
+      "type": "INTEGRITY",
+      "amount": 5
     },
     "F-302": {
       "sector": "WTR",
@@ -163,14 +201,13 @@
     "F-303": {
       "sector": "MED",
       "type": "RESOURCE",
-      "resource": "med",
+      "resource": "parts",
       "amount": 1
     },
     "F-304": {
       "sector": "TRN",
-      "type": "RESOURCE",
-      "resource": "parts",
-      "amount": 1
+      "type": "INTEGRITY",
+      "amount": 5
     },
     "F-305": {
       "sector": "AGR",
@@ -179,20 +216,20 @@
     },
     "F-306": {
       "sector": "COM",
-      "type": "OPPORTUNITY",
-      "token": "STABILISER",
+      "type": "RESOURCE",
+      "resource": "med",
       "amount": 1
     },
     "F-401": {
       "sector": "POW",
-      "type": "RESOURCE",
-      "resource": "parts",
-      "amount": 1
+      "type": "INTEGRITY",
+      "amount": 5
     },
     "F-403": {
       "sector": "WTR",
-      "type": "INTEGRITY",
-      "amount": 5
+      "type": "OPPORTUNITY",
+      "token": "STABILISER",
+      "amount": 1
     },
     "F-402": {
       "sector": "MED",
@@ -201,9 +238,8 @@
     },
     "F-404": {
       "sector": "TRN",
-      "type": "RESOURCE",
-      "resource": "parts",
-      "amount": 1
+      "type": "INTEGRITY",
+      "amount": 5
     },
     "F-405": {
       "sector": "AGR",
@@ -212,74 +248,80 @@
     },
     "F-406": {
       "sector": "COM",
-      "type": "OPPORTUNITY",
-      "token": "RESERVE_CREW",
-      "amount": 1
+      "type": "INTEGRITY",
+      "amount": 5
     },
     "F-501": {
       "sector": "POW",
       "type": "RESOURCE",
-      "resource": "parts",
+      "resource": "power",
       "amount": 1
     },
     "F-502": {
       "sector": "POW",
-      "type": "INTEGRITY",
-      "amount": 5
+      "type": "OPPORTUNITY",
+      "token": "SECOND_CHANCE",
+      "amount": 1
     },
     "F-503": {
       "sector": "WTR",
-      "type": "INTEGRITY",
-      "amount": 5
+      "type": "RESOURCE",
+      "resource": "power",
+      "amount": 1
     },
     "F-504": {
       "sector": "WTR",
       "type": "OPPORTUNITY",
-      "token": "SECOND_CHANCE"
+      "token": "SECOND_CHANCE",
+      "amount": 1
     },
     "F-505": {
       "sector": "MED",
       "type": "RESOURCE",
-      "resource": "med",
+      "resource": "power",
       "amount": 1
     },
     "F-506": {
       "sector": "MED",
-      "type": "RESOURCE",
-      "resource": "med",
+      "type": "OPPORTUNITY",
+      "token": "RESERVE_CREW",
       "amount": 1
     },
     "F-507": {
       "sector": "TRN",
       "type": "RESOURCE",
-      "resource": "parts",
+      "resource": "power",
       "amount": 1
     },
     "F-508": {
       "sector": "TRN",
       "type": "OPPORTUNITY",
-      "token": "RESERVE_CREW"
+      "token": "EMERGENCY_REPAIR_KIT",
+      "amount": 1
     },
     "F-509": {
       "sector": "AGR",
       "type": "RESOURCE",
-      "resource": "water",
+      "resource": "power",
       "amount": 1
     },
     "F-510": {
       "sector": "AGR",
-      "type": "INTEGRITY",
-      "amount": 5
+      "type": "OPPORTUNITY",
+      "token": "EMERGENCY_REPAIR_KIT",
+      "amount": 1
     },
     "F-511": {
       "sector": "COM",
-      "type": "INTEGRITY",
-      "amount": 5
+      "type": "RESOURCE",
+      "resource": "power",
+      "amount": 1
     },
     "F-512": {
       "sector": "COM",
       "type": "OPPORTUNITY",
-      "token": "EMERGENCY_REPAIR_KIT"
+      "token": "STABILISER",
+      "amount": 1
     },
     "F-601": {
       "sector": "POW",
@@ -295,7 +337,7 @@
     "F-603": {
       "sector": "WTR",
       "type": "RESOURCE",
-      "resource": "power",
+      "resource": "parts",
       "amount": 1
     },
     "F-604": {
@@ -306,7 +348,7 @@
     "F-605": {
       "sector": "MED",
       "type": "RESOURCE",
-      "resource": "power",
+      "resource": "parts",
       "amount": 1
     },
     "F-606": {
@@ -317,7 +359,7 @@
     "F-607": {
       "sector": "TRN",
       "type": "RESOURCE",
-      "resource": "power",
+      "resource": "parts",
       "amount": 1
     },
     "F-608": {
@@ -328,7 +370,7 @@
     "F-609": {
       "sector": "AGR",
       "type": "RESOURCE",
-      "resource": "water",
+      "resource": "parts",
       "amount": 1
     },
     "F-610": {
@@ -339,7 +381,7 @@
     "F-611": {
       "sector": "COM",
       "type": "RESOURCE",
-      "resource": "power",
+      "resource": "parts",
       "amount": 1
     },
     "F-612": {

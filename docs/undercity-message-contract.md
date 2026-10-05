@@ -684,7 +684,10 @@ resolving sector's real tray, stock like any other; `INTEGRITY { amount: 5 }`
 — capped at `reward_health_cap` (100), never reviving DARK; `OPPORTUNITY
 { token }` — one stored single-use token: `RESERVE_CREW`, `SECOND_CHANCE`,
 `EMERGENCY_REPAIR_KIT`, `STABILISER`. Nothing is rolled, nothing is chosen,
-nothing is budgeted. The instance carries `reward { type, resource, amount,
+nothing is budgeted. Since 2026-10-05 the table is balanced sector by sector
+(`docs/fault-reward-balance.md`): every sector's ten faults pay 3 Parts, 1 Med,
+1 Power, 3 INTEGRITY and 2 tokens, and its six scripted faults 2 Parts, 1 Med,
+2 INTEGRITY and 1 token. The instance carries `reward { type, resource, amount,
 token, text, display_label: "REPAIR REWARD: +1 PARTS", fixed: true }` from the
 moment it fires; the screen's `reward` view carries `text`, `display`,
 `banner`, `claimed` and `result_text`.

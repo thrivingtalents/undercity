@@ -311,7 +311,7 @@ test('FX10-016: the generated deck, the runtime content and the kit read one fil
   assert.deepEqual(LATE.faults.map((f) => f.code), CODES);
 });
 
-test('G / J / K: twelve rewards from the existing types — P-09 +1 of its first staged material, P-10 +5 Integrity, no new token', () => {
+test('G / J / K: twelve rewards from the existing types — P-09 +1 Parts, P-10 +5 Integrity, no new token', () => {
   const types = new Set(Object.values(REWARDS.rewards).map((r) => r.type));
   assert.deepEqual([...types].sort(), ['INTEGRITY', 'OPPORTUNITY', 'RESOURCE']);
   assert.deepEqual(Object.keys(REWARDS.tokens).sort(), ['EMERGENCY_REPAIR_KIT', 'RESERVE_CREW', 'SECOND_CHANCE', 'STABILISER'].sort(), 'the token list changed');
@@ -321,8 +321,9 @@ test('G / J / K: twelve rewards from the existing types — P-09 +1 of its first
     assert.ok(r, `${code} has no reward`);
     assert.equal(r.sector, d.sector);
     if (d.procedure === 'P-09') {
-      const first = Object.keys(d.resources_required)[0];
-      assert.deepEqual(r, { sector: d.sector, type: 'RESOURCE', resource: first, amount: 1 }, `${code} does not pay its first staged material`);
+      // the 2026-10-05 balance: every sector's third Spare Part comes from its P-09, so
+      // the late shift pays Parts at the same moment for everyone (test/reward-balance.test.js)
+      assert.deepEqual(r, { sector: d.sector, type: 'RESOURCE', resource: 'parts', amount: 1 }, `${code} does not pay +1 Parts`);
     } else {
       assert.deepEqual(r, { sector: d.sector, type: 'INTEGRITY', amount: 5 }, `${code} does not pay +5 Integrity`);
     }
