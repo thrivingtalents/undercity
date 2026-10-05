@@ -18,6 +18,7 @@ const {
   PageOrientation,
 } = require("docx");
 
+const P = require("./palette").from(process.argv);   // colour, or --mono for the B&W Kit
 const SRC = process.argv[2] || "content/faults.json";
 // F-501..F-512 are generated separately (see lib/content.js) and carry round:
 // null on purpose. They print, they just print in their own section.
@@ -65,8 +66,7 @@ const ROUND_LABEL = {
 // The tab line: a generated deck names its own section; everything else is its round.
 const tabLabel = (f) => f.section || ROUND_LABEL[f.round] || ROUND_LABEL[null];
 
-const INK = "1A1A1A";
-const MUTED = "6B6B6B";
+const { INK, MUTED } = P;
 
 // A4 landscape content area, 2 cols x 2 rows = A6-ish cards
 const PORTRAIT_W = 11906, PORTRAIT_H = 16838;   // A4 portrait DXA
@@ -75,11 +75,11 @@ const GRID_W = LAND_W - MARGIN * 2;             // 15398
 const COL_W = Math.floor(GRID_W / 2);           // 7699
 const ROW_H = 4900;                          // DXA per card row
 
-const cutBorder = (colour) => ({
-  top:    { style: BorderStyle.DASHED, size: 4, color: "AAAAAA" },
-  bottom: { style: BorderStyle.DASHED, size: 4, color: "AAAAAA" },
-  left:   { style: BorderStyle.DASHED, size: 4, color: "AAAAAA" },
-  right:  { style: BorderStyle.DASHED, size: 4, color: "AAAAAA" },
+const cutBorder = () => ({
+  top:    { style: BorderStyle.DASHED, size: 4, color: P.DASH },
+  bottom: { style: BorderStyle.DASHED, size: 4, color: P.DASH },
+  left:   { style: BorderStyle.DASHED, size: 4, color: P.DASH },
+  right:  { style: BorderStyle.DASHED, size: 4, color: P.DASH },
 });
 
 const sevPips = (n) => "▲".repeat(n);
@@ -91,7 +91,7 @@ function cardCell(f) {
   // colour bar
   kids.push(new Paragraph({
     spacing: { after: 0 },
-    border: { bottom: { style: BorderStyle.SINGLE, size: 24, color: s.colour } },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 24, color: P.sector(s.colour) } },
     children: [new TextRun({ text: "", size: 2 })],
   }));
 
@@ -99,9 +99,9 @@ function cardCell(f) {
   kids.push(new Paragraph({
     spacing: { before: 120, after: 100 },
     children: [
-      new TextRun({ text: `${f.sector}  `, font: "Arial", size: 20, bold: true, color: s.colour, characterSpacing: 40 }),
-      new TextRun({ text: s.name, font: "Arial", size: 14, color: MUTED, characterSpacing: 40 }),
-      new TextRun({ text: `     ${tabLabel(f)}`, font: "Arial", size: 12, color: "AAAAAA", characterSpacing: 60 }),
+      new TextRun({ text: `${f.sector}  `, font: "Arial", size: 20, bold: true, color: P.sector(s.colour), characterSpacing: 40 }),
+      new TextRun({ text: s.name, font: "Arial", size: 14, ...(P.mono ? { bold: true, color: INK } : { color: MUTED }), characterSpacing: 40 }),
+      new TextRun({ text: `     ${tabLabel(f)}`, font: "Arial", size: 12, color: P.mono ? MUTED : "AAAAAA", characterSpacing: 60 }),
     ],
   }));
 
@@ -116,7 +116,7 @@ function cardCell(f) {
     spacing: { after: 120 },
     children: [
       new TextRun({ text: f.name, font: "Arial", size: 24, bold: true, color: INK }),
-      new TextRun({ text: `   ${sevPips(f.severity)}`, font: "Arial", size: 18, color: f.severity >= 3 ? "B00000" : MUTED }),
+      new TextRun({ text: `   ${sevPips(f.severity)}`, font: "Arial", size: 18, color: f.severity >= 3 ? P.WARN : MUTED }),
     ],
   }));
 
@@ -124,21 +124,22 @@ function cardCell(f) {
   if (f.time_critical) {
     kids.push(new Paragraph({
       spacing: { after: 100 },
-      children: [new TextRun({ text: "TIME-CRITICAL", font: "Arial", size: 16, bold: true, color: "B00000", characterSpacing: 60 })],
+      shading: P.mono ? { type: ShadingType.CLEAR, fill: "000000", color: "auto" } : undefined,
+      children: [new TextRun({ text: "TIME-CRITICAL", font: "Arial", size: 16, bold: true, color: P.mono ? "FFFFFF" : P.WARN, characterSpacing: 60 })],
     }));
   }
 
   // flavour
   kids.push(new Paragraph({
     spacing: { after: 160 },
-    children: [new TextRun({ text: cardFlavour(f), font: "Arial", size: 18, color: "3A3A3A" })],
+    children: [new TextRun({ text: cardFlavour(f), font: "Arial", size: 18, color: P.LORE })],
   }));
 
 
   // instruction footer — identical on every card
   kids.push(new Paragraph({
     spacing: { before: 60 },
-    border: { top: { style: BorderStyle.SINGLE, size: 4, color: "CCCCCC" } },
+    border: { top: { style: BorderStyle.SINGLE, size: 4, color: P.mono ? P.RULE : "CCCCCC" } },
     children: [new TextRun({ text: "LOOK UP THIS CODE IN YOUR FAULT INDEX", font: "Arial", size: 16, bold: true, color: MUTED, characterSpacing: 40 })],
   }));
 
@@ -146,7 +147,7 @@ function cardCell(f) {
     width: { size: COL_W, type: WidthType.DXA },
     verticalAlign: VerticalAlign.TOP,
     margins: { top: 200, bottom: 200, left: 320, right: 320 },
-    borders: cutBorder(s.colour),
+    borders: cutBorder(),
     children: kids,
   });
 }
@@ -212,7 +213,7 @@ const keyRows = [new TableRow({
   children: ["CODE", "RND", "SEC", "FAULT", "RESOLUTION CODE(S)", "SPEC SOURCE(S)", "COST / CREW", "FACILITATOR NOTE"]
     .map((h, i) => new TableCell({
       width: { size: [1100, 700, 700, 2400, 2200, 3000, 1600, 3600][i], type: WidthType.DXA },
-      shading: { type: ShadingType.CLEAR, fill: "1F3864", color: "auto" },
+      shading: { type: ShadingType.CLEAR, fill: P.NAVY, color: "auto" },
       margins: { top: 60, bottom: 60, left: 80, right: 80 },
       children: [new Paragraph({ children: [new TextRun({ text: h, font: "Arial", size: 16, bold: true, color: "FFFFFF" })] })],
     })),
@@ -235,7 +236,7 @@ for (const f of deck) {
   keyRows.push(new TableRow({
     children: vals.map((v, i) => new TableCell({
       width: { size: [1100, 700, 700, 2400, 2200, 3000, 1600, 3600][i], type: WidthType.DXA },
-      shading: flag ? { type: ShadingType.CLEAR, fill: "FFF2CC", color: "auto" } : undefined,
+      shading: flag ? { type: ShadingType.CLEAR, fill: P.mono ? "E6E6E6" : "FFF2CC", color: "auto" } : undefined,
       margins: { top: 60, bottom: 60, left: 80, right: 80 },
       children: [new Paragraph({
         spacing: { after: 0 },
@@ -261,13 +262,13 @@ const keyDoc = new Document({
     children: [
       new Paragraph({
         spacing: { after: 60 },
-        children: [new TextRun({ text: "UNDERCITY — FACILITATOR ANSWER KEY", font: "Arial", size: 32, bold: true, color: "1F3864" })],
+        children: [new TextRun({ text: "UNDERCITY — FACILITATOR ANSWER KEY", font: "Arial", size: 32, bold: true, color: P.NAVY })],
       }),
       new Paragraph({
         spacing: { after: 200 },
         children: [new TextRun({
           text: "THIS SHEET NEVER ENTERS THE ROOM. Generated from the crossref matrix — do not annotate by hand; edit the matrix and regenerate.",
-          font: "Arial", size: 18, bold: true, color: "B00000",
+          font: "Arial", size: 18, bold: true, color: P.WARN,
         })],
       }),
       new Table({
@@ -289,8 +290,8 @@ const keyDoc = new Document({
 // ---------------------------------------------------------------- write
 
 fs.mkdirSync(OUTDIR, { recursive: true });
-const cardPath = path.join(OUTDIR, "UNDERCITY_FaultCards.docx");
-const keyPath = path.join(OUTDIR, "UNDERCITY_AnswerKey.docx");
+const cardPath = path.join(OUTDIR, P.out("UNDERCITY_FaultCards.docx"));
+const keyPath = path.join(OUTDIR, P.out("UNDERCITY_AnswerKey.docx"));
 
 Packer.toBuffer(cardsDoc).then((b) => {
   fs.writeFileSync(cardPath, b);

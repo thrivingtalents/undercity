@@ -9,10 +9,11 @@ const {
   Header, Footer, PageNumber, HeadingLevel, TableOfContents,
 } = require("docx");
 
+const P = require("./palette").from(process.argv);   // colour, or --mono for the B&W Kit
 const OUTDIR = process.argv[2] || "kit";
 fs.mkdirSync(OUTDIR, { recursive: true });
 
-const INK = "1A1A1A", MUTED = "6B6B6B", RULE = "BFBFBF", NAVY = "1F3864", RED = "B00000";
+const { INK, MUTED, RULE, NAVY, WARN: RED } = P;
 const A4W = 11906, A4H = 16838, M = 1134;
 const W = A4W - M * 2;
 
@@ -37,16 +38,19 @@ const dash = (x) => new Paragraph({
   spacing: { after: 70 }, indent: { left: 300, hanging: 300 },
   children: [mono("—  "), ...(Array.isArray(x) ? x : [t(x)])] });
 
-const callout = (label, body, fill = "FFF4E5", edge = "E8A33A") => new Paragraph({
-  spacing: { before: 140, after: 160 },
-  shading: { type: ShadingType.CLEAR, fill, color: "auto" },
-  border: { left: { style: BorderStyle.SINGLE, size: 18, color: edge } },
-  indent: { left: 220, right: 160 },
-  children: [t(label + "  ", { bold: true, color: edge === "E8A33A" ? "8A5A00" : edge }), t(body)] });
+const callout = (label, body, fill = "FFF4E5", edge = "E8A33A") => {
+  const c = P.callout(fill, edge);   // B&W: every callout is grey with a black edge and a black label
+  return new Paragraph({
+    spacing: { before: 140, after: 160 },
+    shading: { type: ShadingType.CLEAR, fill: c.fill, color: "auto" },
+    border: { left: { style: BorderStyle.SINGLE, size: 18, color: c.edge } },
+    indent: { left: 220, right: 160 },
+    children: [t(label + "  ", { bold: true, color: c.label }), t(body)] });
+};
 
 const script = (lines) => new Paragraph({
   spacing: { before: 140, after: 160 },
-  shading: { type: ShadingType.CLEAR, fill: "F4F4F4", color: "auto" },
+  shading: { type: ShadingType.CLEAR, fill: P.fill.script, color: "auto" },
   border: { left: { style: BorderStyle.SINGLE, size: 18, color: MUTED } },
   indent: { left: 220, right: 160 },
   children: lines.flatMap((l, i) => [
@@ -516,6 +520,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then((b) => {
-  fs.writeFileSync(path.join(OUTDIR, "UNDERCITY_Facilitator_Guidebook.docx"), b);
-  console.log("✓", path.join(OUTDIR, "UNDERCITY_Facilitator_Guidebook.docx"));
+  fs.writeFileSync(path.join(OUTDIR, P.out("UNDERCITY_Facilitator_Guidebook.docx")), b);
+  console.log("✓", path.join(OUTDIR, P.out("UNDERCITY_Facilitator_Guidebook.docx")));
 });

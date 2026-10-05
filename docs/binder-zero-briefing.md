@@ -78,6 +78,20 @@ the approval message table and the brownout approval count; AGR page 3 carries
 the whole deck as a planning table; COM page 3 carries the three big-screen
 controls and the Charter custody.
 
+**B&W Kit (same day).** `B&W Kit/` holds a monochrome edition of all fourteen
+documents (`_BW` suffix), built by the same generators in `--mono` mode via
+`tools/kit/palette.js`. What colour used to carry is carried otherwise: sector
+identity by the code and name in black; ACTION and NEW ROUND boxes by a black
+heading strip (NEW ROUND in a dashed frame), WARNING by a double frame on grey,
+REMEMBER by a thin grey frame; a TIME-CRITICAL fault card by a black header
+with white text and a heavier frame; page 9's VALUE, REFERENCE and
+AUTHORISATION by a solid grey, a dashed grey and a black-headed double frame;
+the chit's stamp cells by a double black frame on white; the fault card's
+TIME-CRITICAL label by white on black. `python tools/kit/check_mono.py`
+verified every document: zero coloured pixels on any page, the same page
+count and the same words as the colour original. The colour kit's document XML
+rebuilds byte-identical after the palette refactor.
+
 **Issues for the designer (nine-page edition).**
 
 1. *Brownout output wording.* Config: `brownout_effects.production_multiplier`

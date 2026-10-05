@@ -11,10 +11,11 @@ const {
   PageOrientation, HeadingLevel,
 } = require("docx");
 
+const P = require("./palette").from(process.argv);   // colour, or --mono for the B&W Kit
 const OUTDIR = process.argv[2] || "kit";
 fs.mkdirSync(OUTDIR, { recursive: true });
 
-const INK = "1A1A1A", MUTED = "6B6B6B", RULE = "BFBFBF";
+const { INK, MUTED, RULE } = P;
 const A4W = 11906, A4H = 16838, M = 1134;
 const W = A4W - M * 2; // 9638
 
@@ -25,12 +26,14 @@ const SECTORS = [
 ];
 
 const t = (text, o = {}) => new TextRun({ text, font: "Arial", size: 20, color: INK, ...o });
+// text that carries a resource glyph: the glyph is its own run, in the palette's monochrome font when there is one
+const tg = (text, o = {}) => P.splitGlyphs(text).map((seg) => t(seg.text, seg.glyph ? { ...o, font: P.glyphFont } : o));
 const mono = (text, o = {}) => new TextRun({ text, font: "Courier New", size: 20, color: INK, ...o });
 const p = (runs, o = {}) => new Paragraph({
   children: Array.isArray(runs) ? runs : [runs], spacing: { after: 120 }, ...o,
 });
 const brk = () => new Paragraph({ children: [new PageBreak()] });
-const h1 = (text, colour = "1F3864") => new Paragraph({
+const h1 = (text, colour = P.NAVY) => new Paragraph({
   spacing: { before: 120, after: 180 },
   children: [new TextRun({ text, font: "Arial", size: 30, bold: true, color: colour })],
 });
@@ -48,21 +51,27 @@ const thin = {
   insideVertical: { style: BorderStyle.SINGLE, size: 4, color: RULE },
 };
 const dashed = {
-  top: { style: BorderStyle.DASHED, size: 4, color: "AAAAAA" },
-  bottom: { style: BorderStyle.DASHED, size: 4, color: "AAAAAA" },
-  left: { style: BorderStyle.DASHED, size: 4, color: "AAAAAA" },
-  right: { style: BorderStyle.DASHED, size: 4, color: "AAAAAA" },
-  insideHorizontal: { style: BorderStyle.DASHED, size: 4, color: "AAAAAA" },
-  insideVertical: { style: BorderStyle.DASHED, size: 4, color: "AAAAAA" },
+  top: { style: BorderStyle.DASHED, size: 4, color: P.DASH },
+  bottom: { style: BorderStyle.DASHED, size: 4, color: P.DASH },
+  left: { style: BorderStyle.DASHED, size: 4, color: P.DASH },
+  right: { style: BorderStyle.DASHED, size: 4, color: P.DASH },
+  insideHorizontal: { style: BorderStyle.DASHED, size: 4, color: P.DASH },
+  insideVertical: { style: BorderStyle.DASHED, size: 4, color: P.DASH },
 };
+// B&W: the stamp cells of a chit wear a double black frame instead of a yellow fill
+const stampFrame = P.mono ? {
+  top: { style: BorderStyle.DOUBLE, size: 6, color: "000000" }, bottom: { style: BorderStyle.DOUBLE, size: 6, color: "000000" },
+  left: { style: BorderStyle.DOUBLE, size: 6, color: "000000" }, right: { style: BorderStyle.DOUBLE, size: 6, color: "000000" },
+} : undefined;
 
-function cell(children, { width, shade, bold, align, size } = {}) {
+function cell(children, { width, shade, bold, align, size, borders } = {}) {
   const runs = (Array.isArray(children) ? children : [children])
     .map((c) => (typeof c === "string" ? t(c, { bold, size }) : c));
   return new TableCell({
     width: { size: width, type: WidthType.DXA },
     verticalAlign: VerticalAlign.TOP,
     shading: shade ? { type: ShadingType.CLEAR, fill: shade, color: "auto" } : undefined,
+    borders,
     margins: { top: 70, bottom: 70, left: 100, right: 100 },
     children: [new Paragraph({ spacing: { after: 0 }, alignment: align, children: runs })],
   });
@@ -80,8 +89,8 @@ const a4 = (children, o = {}) => new Document({
 });
 
 const save = (doc, name) => Packer.toBuffer(doc).then((b) => {
-  fs.writeFileSync(path.join(OUTDIR, name), b);
-  console.log("✓", path.join(OUTDIR, name));
+  fs.writeFileSync(path.join(OUTDIR, P.out(name)), b);
+  console.log("✓", path.join(OUTDIR, P.out(name)));
 });
 
 // ============================================================ 1. TRANSFER CHITS
@@ -107,9 +116,9 @@ function chitBlock(n) {
       ]}),
       new TableRow({ children: [
         cell([t("RESOURCES", { size: 14, color: MUTED })], { width: 2400, shade: "F2F2F2" }),
-        cell([t("___ ⚡   ___ 💧   ___ 🔧   ___ ⚕", { size: 18 })], { width: 2400 }),
+        cell(tg("___ ⚡   ___ 💧   ___ 🔧   ___ ⚕", { size: 18 }), { width: 2400 }),
         cell([t("WORKERS", { size: 14, color: MUTED })], { width: 2200, shade: "F2F2F2" }),
-        cell([t("_____ 👤", { size: 18 })], { width: W - 7000 }),
+        cell(tg("_____ 👤", { size: 18 }), { width: W - 7000 }),
       ]}),
       new TableRow({ children: [
         cell([t("IN EXCHANGE FOR", { size: 14, color: MUTED })], { width: 2400, shade: "F2F2F2" }),
@@ -124,8 +133,8 @@ function chitBlock(n) {
       new TableRow({ children: [
         cell([t("TIME", { size: 14, color: MUTED })], { width: 2400, shade: "F2F2F2" }),
         cell("", { width: 2400 }),
-        cell([t("TRN STAMP", { size: 14, bold: true, color: "B00000" })], { width: 2200, shade: "FFF2CC" }),
-        cell([t("VOID WITHOUT STAMP", { size: 14, color: "B00000" })], { width: W - 7000, shade: "FFF2CC" }),
+        cell([t("TRN STAMP", { size: 14, bold: true, color: P.WARN })], { width: 2200, shade: P.fill.stamp, borders: stampFrame }),
+        cell([t("VOID WITHOUT STAMP", { size: 14, ...(P.mono ? { bold: true } : {}), color: P.WARN })], { width: W - 7000, shade: P.fill.stamp, borders: stampFrame }),
       ]}),
     ], [2400, 2400, 2200, W - 7000]),
     new Paragraph({
@@ -139,7 +148,7 @@ for (let sheet = 0; sheet < 20; sheet++) {
   chitChildren.push(...chitBlock("______"));
   chitChildren.push(new Paragraph({
     spacing: { after: 300 },
-    border: { bottom: { style: BorderStyle.DASHED, size: 6, color: "AAAAAA" } },
+    border: { bottom: { style: BorderStyle.DASHED, size: 6, color: P.DASH } },
     children: [t("", { size: 2 })],
   }));
   chitChildren.push(...chitBlock("______"));
@@ -176,8 +185,8 @@ const charter = [
     children: [new TextRun({ text: "Clause 7 — Continuity of essential services", font: "Arial", size: 22, bold: true, color: INK })] }),
   new Paragraph({
     spacing: { after: 140 },
-    shading: { type: ShadingType.CLEAR, fill: "F7F7F7", color: "auto" },
-    border: { left: { style: BorderStyle.SINGLE, size: 18, color: "1F3864" } },
+    shading: { type: ShadingType.CLEAR, fill: P.fill.faint, color: "auto" },
+    border: { left: { style: BorderStyle.SINGLE, size: 18, color: P.NAVY } },
     indent: { left: 220 },
     children: [new TextRun({
       text: "In the event of Core insufficiency, continuity of essential services shall take precedence, as determined by the Council.",
@@ -202,9 +211,9 @@ const charter = [
   new Paragraph({ text: "", spacing: { after: 160 } }),
   tbl([
     new TableRow({ children: [
-      cell("RANK", { width: 1200, shade: "1F3864", bold: true, align: AlignmentType.CENTER }),
-      cell("SECTOR", { width: 3000, shade: "1F3864", bold: true }),
-      cell("POPULATION / FUNCTION AT RISK IN BROWNOUT", { width: W - 4200, shade: "1F3864", bold: true }),
+      cell("RANK", { width: 1200, shade: P.NAVY, bold: true, align: AlignmentType.CENTER }),
+      cell("SECTOR", { width: 3000, shade: P.NAVY, bold: true }),
+      cell("POPULATION / FUNCTION AT RISK IN BROWNOUT", { width: W - 4200, shade: P.NAVY, bold: true }),
     ].map((c) => { c.root.forEach?.(() => {}); return c; })}),
     ...[
       ["POW", "Power Grid", "Ring main degrades. All sectors lose 40% of delivered power. No sector is unaffected."],
@@ -231,7 +240,7 @@ const charter = [
     ]}),
   ], [W]),
   new Paragraph({ spacing: { before: 200 },
-    children: [t("Hand this form to the Continuity Authority before the sitting closes. A form submitted after the close has no effect.", { size: 18, bold: true, color: "B00000" })] }),
+    children: [t("Hand this form to the Continuity Authority before the sitting closes. A form submitted after the close has no effect.", { size: 18, bold: true, color: P.WARN })] }),
 ];
 save(a4(charter), "UNDERCITY_CityCharter.docx");
 
@@ -240,22 +249,22 @@ save(a4(charter), "UNDERCITY_CityCharter.docx");
 // prints in full. The card is the pocket copy — DO, DON'T, WHEN NEEDED.
 const ROLES = JSON.parse(fs.readFileSync(path.join(__dirname, "roles.json"), "utf8")).roles
   .map((r) => [r.title, r.tagline, [
-    ...r.do.map((l) => ["✓", l, "2E7D32"]),
-    ...r.dont.map((l) => ["✗", l, "B00000"]),
-    ...r.when.map((l) => ["→", l, "8A5A00"]),
+    ...r.do.map((l) => ["✓", l, P.GREEN]),
+    ...r.dont.map((l) => ["✗", l, P.WARN]),
+    ...r.when.map((l) => ["→", l, P.AMBER]),
   ]]);
 const roleChildren = [];
 SECTORS.forEach(([code, name, colour], si) => {
   ROLES.forEach((r, ri) => {
     roleChildren.push(new Paragraph({
       spacing: { after: 0 },
-      border: { bottom: { style: BorderStyle.SINGLE, size: 20, color: colour } },
+      border: { bottom: { style: BorderStyle.SINGLE, size: 20, color: P.sector(colour) } },
       children: [t("", { size: 2 })],
     }));
     roleChildren.push(new Paragraph({
       spacing: { before: 120, after: 60 },
       children: [
-        new TextRun({ text: `${code}  `, font: "Arial", size: 20, bold: true, color: colour, characterSpacing: 40 }),
+        new TextRun({ text: `${code}  `, font: "Arial", size: 20, bold: true, color: P.sector(colour), characterSpacing: 40 }),
         new TextRun({ text: name, font: "Arial", size: 14, color: MUTED, characterSpacing: 40 }),
       ],
     }));
@@ -265,7 +274,7 @@ SECTORS.forEach(([code, name, colour], si) => {
     }));
     roleChildren.push(new Paragraph({
       spacing: { after: 100 },
-      children: [t(r[1], { italics: true, size: 18, color: "3A3A3A" })],
+      children: [t(r[1], { italics: true, size: 18, color: P.LORE })],
     }));
     r[2].forEach(([mark, line, colour]) => roleChildren.push(new Paragraph({
       spacing: { after: 40 }, indent: { left: 260, hanging: 260 },
@@ -273,7 +282,7 @@ SECTORS.forEach(([code, name, colour], si) => {
     })));
     roleChildren.push(new Paragraph({
       spacing: { before: 140, after: 260 },
-      border: { bottom: { style: BorderStyle.DASHED, size: 4, color: "AAAAAA" } },
+      border: { bottom: { style: BorderStyle.DASHED, size: 4, color: P.DASH } },
       children: [t("", { size: 2 })],
     }));
   });
@@ -328,11 +337,11 @@ const consent = [
   // table tents
   ...SECTORS.flatMap(([code, name, colour], i) => [
     new Paragraph({ spacing: { before: i === 0 ? 0 : 600, after: 200 }, alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: code, font: "Arial", size: 120, bold: true, color: colour })] }),
+      children: [new TextRun({ text: code, font: "Arial", size: 120, bold: true, color: P.sector(colour) })] }),
     new Paragraph({ spacing: { after: 200 }, alignment: AlignmentType.CENTER,
       children: [new TextRun({ text: name.toUpperCase(), font: "Arial", size: 32, bold: true, color: INK, characterSpacing: 40 })] }),
     new Paragraph({ spacing: { after: 100 }, alignment: AlignmentType.CENTER,
-      children: [t("🎙  THIS TABLE IS BEING RECORDED", { size: 22, bold: true, color: "B00000" })] }),
+      children: tg("🎙  THIS TABLE IS BEING RECORDED", { size: 22, bold: true, color: P.WARN }) }),
     new Paragraph({ spacing: { after: 0 }, alignment: AlignmentType.CENTER,
       children: [t("for your personal development report", { size: 18, italics: true, color: MUTED })] }),
     ...(i < SECTORS.length - 1 ? [brk()] : []),

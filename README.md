@@ -454,7 +454,18 @@ whether the kit matches the content the server is running (SHA-256 of every
 content file, recorded at build time). `npm run kit` rebuilds locally
 (needs `openpyxl` and the `docx` devDependency); `python tools/kit/check_binder_pages.py`
 then exports every binder to PDF with Word and checks that each section starts
-on the page its cover promises (needs Word and `pip install pymupdf`). Three content rules are
+on the page its cover promises (needs Word and `pip install pymupdf`).
+
+**B&W Kit.** `npm run kit:bw` (also the last step of `npm run kit`) prints the
+same fourteen documents for a monochrome laser printer into `B&W Kit/`, each
+with a `_BW` suffix. It is a rendering mode of the same generators
+(`tools/kit/palette.js`, chosen with `--mono`), not a desaturation: sector
+colours become black with the sector code and name carrying the identity,
+callout kinds become border weights and a black heading strip, the resource
+glyphs are set in Segoe UI Symbol so Word renders them in monochrome, and the
+colour kit is untouched. `python tools/kit/check_mono.py` exports every B&W
+document and its colour original with Word and verifies that no page carries a
+coloured pixel and that page counts and words are identical. Three content rules are
 enforced by the generators: a card prints the symptom only; a binder never
 prints another sector's spec values or a complete code; Appendix C gets no
 index entry.
