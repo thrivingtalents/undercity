@@ -24,21 +24,18 @@ const CONTENT = process.argv[4] || 'content';
 const sha = (p) => crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 
 // Which documents may sit on a participant table, and which must never.
-// A binder is facilitator-issued: it holds that sector's own spec values, and
-// the answer key holds every resolution code in the game.
+// A sector binder sits on ITS OWN sector's table (zero-briefing edition,
+// 2026-10-05): it holds that sector's own spec values and nothing of any other
+// sector's, and the team cannot play without it. The answer key holds every
+// resolution code in the game and the guidebook holds the runbook, the probes
+// and the observation prompts; those two never leave the control desk.
 const FACILITATOR_ONLY = new Set([
   'UNDERCITY_AnswerKey.docx',
-  'UNDERCITY_Binder_POW.docx',
-  'UNDERCITY_Binder_WTR.docx',
-  'UNDERCITY_Binder_MED.docx',
-  'UNDERCITY_Binder_TRN.docx',
-  'UNDERCITY_Binder_AGR.docx',
-  'UNDERCITY_Binder_COM.docx',
   'UNDERCITY_Facilitator_Guidebook.docx',
 ]);
 
 const TITLES = {
-  'UNDERCITY_FaultCards.docx': 'Fault card deck — 36 cards, 4-up on A4',
+  'UNDERCITY_FaultCards.docx': 'Fault card deck — optional props, 4-up on A4; the console is the alert',
   'UNDERCITY_CityCharter.docx': 'City Charter + Continuity Order ballot',
   'UNDERCITY_RoleCards.docx': 'Role cards — one per participant',
   'UNDERCITY_TransferChits.docx': 'Transfer chits',
@@ -46,7 +43,7 @@ const TITLES = {
   'UNDERCITY_AnswerKey.docx': 'Answer key — every resolution code',
   'UNDERCITY_Facilitator_Guidebook.docx': 'Facilitator & Administrator Guidebook',
 };
-const binderTitle = (code) => `Sector binder — ${code}`;
+const binderTitle = (code) => `Sector binder — ${code} (one per station; the team's own operating manual)`;
 
 function describe(file) {
   const m = /^UNDERCITY_Binder_([A-Z]{3})\.docx$/.exec(file);

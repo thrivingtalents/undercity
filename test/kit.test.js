@@ -41,16 +41,16 @@ test('the manifest describes every document that exists', () => {
     'the manifest and the directory agree — no ghost or unlisted document');
 });
 
-test('the answer key and every binder are marked facilitator-only', () => {
+test('only the answer key and the guidebook are facilitator-only; every binder goes to its station', () => {
   const summary = kit().summary();
   const facilitator = summary.files.filter((f) => f.audience === 'facilitator').map((f) => f.file);
 
-  assert.ok(facilitator.includes('UNDERCITY_AnswerKey.docx'));
+  assert.deepEqual(facilitator.sort(), ['UNDERCITY_AnswerKey.docx', 'UNDERCITY_Facilitator_Guidebook.docx']);
+  const participant = summary.files.filter((f) => f.audience === 'participant').map((f) => f.file);
   for (const sector of ['POW', 'WTR', 'MED', 'TRN', 'AGR', 'COM']) {
-    assert.ok(facilitator.includes(`UNDERCITY_Binder_${sector}.docx`),
-      `${sector} binder must not be classed participant-facing`);
+    assert.ok(participant.includes(`UNDERCITY_Binder_${sector}.docx`),
+      `${sector} binder is the team's operating manual and must be participant-facing`);
   }
-  assert.ok(facilitator.includes('UNDERCITY_Facilitator_Guidebook.docx'));
 });
 
 test('participant-facing set contains nothing carrying an answer', () => {
@@ -58,13 +58,19 @@ test('participant-facing set contains nothing carrying an answer', () => {
   const participant = summary.files.filter((f) => f.audience === 'participant').map((f) => f.file);
 
   assert.deepEqual(participant.sort(), [
+    'UNDERCITY_Binder_AGR.docx',
+    'UNDERCITY_Binder_COM.docx',
+    'UNDERCITY_Binder_MED.docx',
+    'UNDERCITY_Binder_POW.docx',
+    'UNDERCITY_Binder_TRN.docx',
+    'UNDERCITY_Binder_WTR.docx',
     'UNDERCITY_CityCharter.docx',
     'UNDERCITY_ConsentPack_TableTents.docx',
     'UNDERCITY_FaultCards.docx',
     'UNDERCITY_RoleCards.docx',
     'UNDERCITY_TransferChits.docx',
   ]);
-  assert.ok(!participant.some((f) => /AnswerKey|Binder|Guidebook/.test(f)));
+  assert.ok(!participant.some((f) => /AnswerKey|Guidebook/.test(f)));
 });
 
 test('resolve() refuses anything the manifest does not list', () => {
@@ -144,11 +150,11 @@ test('the download-all zip is valid and round-trips every document', () => {
 
 test('audience filters produce the two printable sets', () => {
   const k = kit();
-  assert.equal(k.entries({ audience: 'participant' }).length, 5);
-  assert.equal(k.entries({ audience: 'facilitator' }).length, 8);
+  assert.equal(k.entries({ audience: 'participant' }).length, 11);
+  assert.equal(k.entries({ audience: 'facilitator' }).length, 2);
 
   const names = k.entries({ audience: 'participant' }).map((e) => e.name);
-  assert.ok(!names.some((n) => /AnswerKey|Binder/.test(n)),
+  assert.ok(!names.some((n) => /AnswerKey|Guidebook/.test(n)),
     'the participant zip can never carry an answer');
 });
 

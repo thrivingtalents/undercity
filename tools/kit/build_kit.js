@@ -236,20 +236,14 @@ const charter = [
 save(a4(charter), "UNDERCITY_CityCharter.docx");
 
 // ============================================================ 3. ROLE CARDS
-const ROLES = [
-  ["SECTOR CHIEF", "You are accountable for this sector and you speak for it at Council.",
-   ["You hold the final call inside this station.", "You attend every Council sitting. Your voice is the sector's voice.",
-    "You cannot leave the station except for Council.", "If you are not at Council, your sector has no voice."]],
-  ["LIAISON", "You are the only member of this station permitted to leave it.",
-   ["All trade, negotiation and physical delivery goes through you.", "You carry and sign every Transfer Chit.",
-    "You attend Council alongside the Chief.", "While you are away, your station cannot trade."]],
-  ["SYSTEMS LEAD", "You hold the binder and you work the console.",
-   ["You look up every fault code and read the procedure aloud.", "You enter resolution codes. Three wrong entries lock the console for 20 seconds.",
-    "You keep the console stock figures matching the chits on the table.", "You do not leave the station."]],
-  ["ENGINEER", "You keep the station running and the record straight.",
-   ["You track physical chits and workers.", "You keep the Station Operations Log current.",
-    "You assign crew to procedures.", "You do not leave the station."]],
-];
+// One source for the four roles: roles.json, which section 3 of every binder
+// prints in full. The card is the pocket copy — DO, DON'T, WHEN NEEDED.
+const ROLES = JSON.parse(fs.readFileSync(path.join(__dirname, "roles.json"), "utf8")).roles
+  .map((r) => [r.title, r.tagline, [
+    ...r.do.map((l) => ["✓", l, "2E7D32"]),
+    ...r.dont.map((l) => ["✗", l, "B00000"]),
+    ...r.when.map((l) => ["→", l, "8A5A00"]),
+  ]]);
 const roleChildren = [];
 SECTORS.forEach(([code, name, colour], si) => {
   ROLES.forEach((r, ri) => {
@@ -273,9 +267,9 @@ SECTORS.forEach(([code, name, colour], si) => {
       spacing: { after: 100 },
       children: [t(r[1], { italics: true, size: 18, color: "3A3A3A" })],
     }));
-    r[2].forEach((line) => roleChildren.push(new Paragraph({
+    r[2].forEach(([mark, line, colour]) => roleChildren.push(new Paragraph({
       spacing: { after: 40 }, indent: { left: 260, hanging: 260 },
-      children: [mono("—  ", { size: 18 }), t(line, { size: 18 })],
+      children: [t(`${mark}  `, { size: 18, bold: true, color: colour }), t(line, { size: 18 })],
     })));
     roleChildren.push(new Paragraph({
       spacing: { before: 140, after: 260 },

@@ -123,8 +123,10 @@ C.push(callout("Never cut the late shift.", "If the day is running late, shorten
 C.push(H2("Three deliberate design choices you will be asked about"));
 C.push(H3("Nobody is ever eliminated"));
 C.push(p(t("Sectors can go dark and can be placed in brownout, but no participant is ever removed from play, and no mechanic asks the group to expel a person. Sacrifice decisions target fictional populations. Participants go back to the same office on Monday, and a transcript showing who argued to cut whom would outlive the workshop.")));
-C.push(H3("The software does not enforce resources"));
-C.push(p(t("The console checks the resolution code and the crew, not the stock. Physical chits are the truth. If the software policed inventory, teams would argue with a screen instead of with each other, and the argument is the data.")));
+C.push(H3("The console is the official count; the chits mirror it"));
+C.push(p(t("The console refuses a repair whose materials are not in INVENTORY, deducts them when the code is accepted, takes upkeep at the round change, moves stock when Transport approves, and adds output when GENERATE is pressed. The physical chits are not a second ledger: the binder tells every team to move the chits whenever the console moves the stock, and the argument about whether the table matches the screen is still theirs to have. Nobody at the control desk adjusts a sector's inventory on request.")));
+C.push(H3("There is no briefing"));
+C.push(p(t("Nobody presents the rules. Each binder opens with START HERE — YOUR FIRST 5 MINUTES and ten more sections that explain the shift, the console, upkeep, faults, trading, Council and what to do when nothing is happening, all written from the engine's actual behaviour and rebuilt with the kit. A team that asks you how the game works is pointed at the section number, never answered. The Game Master stays at the control panel for the whole shift; the only reasons to leave it are a physical-safety, venue or technical problem.")));
 C.push(H3("There is no chat function"));
 C.push(p(t("Every message between sectors is spoken or walked. A chat box would move the entire diagnostic into silent text. If a participant asks for one, the answer is that the city's network is down — which it is.")));
 C.push(brk());
@@ -136,8 +138,8 @@ C.push(H2("2.1 Staffing"));
 C.push(p(t("Minimum two people. One Game Master on the control panel, one Floor Facilitator moving between tables. A single facilitator can run 18 participants at a push, but will lose most of the observation data, which is the expensive part.")));
 C.push(tbl([
   headRow(["ROLE", "DURING PLAY", "DURING DEBRIEF"], [2200, 4000, W - 6200]),
-  row(["Game Master", "Fires injects from the runbook, manages clocks and modes, hands out fault cards, watches the big screen.", "Runs the deltas on screen. Owns timing."], [2200, 4000, W - 6200]),
-  row(["Floor Facilitator", "Moves between tables. Tags observations. Answers rules questions. Does not solve problems.", "Runs the small-group trigger work. Holds the room."], [2200, 4000, W - 6200]),
+  row(["Game Master", "Stays on the control panel: fires injects from the runbook and the library, manages clocks, Council and modes, watches the big screen. Never briefs, never explains.", "Runs the deltas on screen. Owns timing."], [2200, 4000, W - 6200]),
+  row(["Floor Facilitator", "Moves between tables. Tags observations. Points a rules question at the binder section that answers it. Does not solve problems.", "Runs the small-group trigger work. Holds the room."], [2200, 4000, W - 6200]),
   row(["Client contact", "Not in the room during play if avoidable.", "Attends the aggregate readout only, never individual work."], [2200, 4000, W - 6200]),
 ], [2200, 4000, W - 6200]));
 C.push(callout("On the client contact.", "Senior client stakeholders standing behind tables change how people speak. If a sponsor wants to observe, seat them as a participant in a sector or ask them to watch the big screen from the back. Say this in the sales conversation, not on the morning.", "E8E8F5", NAVY));
@@ -172,8 +174,8 @@ C.push(H2("2.5 Printing and assembly"));
 C.push(p(t("All paper is generated from the crossref matrix. Never hand-edit a printed value or a JSON file: the moment paper and server disagree, a fault becomes unsolvable mid-session and there is no recovery in the room.")));
 C.push(tbl([
   headRow(["ARTIFACT", "QUANTITY", "NOTES"], [3000, 1800, W - 4800]),
-  row(["Sector binders", "6", "Two-ring binder each, sector-coloured. Log sheet loose-leaf — the only consumable page."], [3000, 1800, W - 4800]),
-  row(["Fault cards", "60", "15 A4 landscape sheets, 4-up. Cut and tab by section — ROUND 0 to ROUND 4, REFERENCE CHAIN and LATE SHIFT on the card. The tabs are your filing, not a schedule the room is shown."], [3000, 1800, W - 4800]),
+  row(["Sector binders", "6", "Participant-facing: one per station, that sector's and nobody else's. Sections 1–11 are the team's operating manual and replace the briefing; 12–15 are its faults, procedures, tables and log. Two-ring binder each, sector-coloured. Log sheet loose-leaf — the only consumable page."], [3000, 1800, W - 4800]),
+  row(["Fault cards", "60 (optional)", "The console is the alert: a fault fired from the library appears on the sector's screen with its code, severity, decay and reward, and the binder sends the team from the screen to the index. Print the deck only if you want a prop to hand over; nothing in the binder refers to it."], [3000, 1800, W - 4800]),
   row(["Answer key", "1", "Game Master only. Never leaves the control table."], [3000, 1800, W - 4800]),
   row(["Transfer chits", "~120", "40 sheets, 2-up. Overprint — teams waste them early and hoard them late."], [3000, 1800, W - 4800]),
   row(["City Charter", "1", "Two pages plus Continuity Order. Goes to COM at orientation."], [3000, 1800, W - 4800]),
@@ -192,7 +194,7 @@ C.push(H2("3.1 The five principles"));
 C.push(H3("1. Your eyes belong on the room, not the screen"));
 C.push(p(t("The control panel is built so that every action takes at most two clicks. If you find yourself reading the screen for long stretches, you are missing the data the day exists to collect. Learn the runbook well enough to fire injects by glance.")));
 C.push(H3("2. Do not rescue"));
-C.push(p(t("Teams will flounder, misread procedures, forget to send their liaison, and blame the software. Let them. The floundering is the diagnostic. Answer rules questions plainly and refuse content questions: you may say how the console works, never what the answer is or who to ask.")));
+C.push(p(t("Teams will flounder, misread procedures, forget to send their liaison, and blame the software. Let them. The floundering is the diagnostic. A rules question is answered by the binder: say the section number (faults §7, upkeep §5, trading §9, Council §10) and nothing else. Refuse content questions: never what the answer is or who to ask.")));
 C.push(script([
   "Participant: \"We can't find this spec anywhere.\"",
   "You: \"Your binder tells you where it lives. Read the procedure again, all of it.\"",
@@ -286,20 +288,16 @@ C.push(brk());
 C.push(H1("Part 5 · The Runbook"));
 C.push(p(t("Run the day from this part. The control panel mirrors these beats in order; firing a beat there marks it done and stamps the log. Inside the shift, every time is minutes into the round: each round's clock loads at its full length when you press NEXT ROUND, runs from START, and stops at 00:00.")));
 
-C.push(H2("5.0 Briefing and Orientation (20 min, before the shift)"));
-C.push(script([
-  "\"The surface has been uninhabitable for forty years. Your city, HAVEN-9, survives three hundred metres underground, kept alive by six sector systems and a geothermal core.\"",
-  "\"This morning the core began to degrade. You are the sector leadership. The city does not know yet. You have one shift — one, without a break in it.\"",
-  "\"Three rules. Your binder does not leave your station. Only your liaison leaves your station. And nothing moves between sectors without a signed chit stamped by Transport.\"",
-]));
+C.push(H2("5.0 Orientation (20 min, Round 0 — no briefing)"));
+C.push(callout("You say nothing about the game.", "The binder's first page tells each team that no briefing is coming, what HAVEN-9 is, what the objective is, and the twelve things to do before operating. The premise, the three rules and the console are all in it. Your job in Round 0 is to hand out the materials, fire the tutorial faults, and watch how each table organises itself without being told to."));
 C.push(tbl([
   headRow(["TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("00:00", "Confirm all six recorders and the Council recorder are rolling. Then fire the klaxon sting.", "Nothing yet — this is the audio sync."),
-  beat("00:01", "Hand each table its binder, role cards, chit pad, resource tray and tokens. Hand the City Charter to COM only.", "Whether COM tells anyone they have the Charter."),
-  beat("00:03", "Two minutes to assign the four roles. Do not advise.", "How they assign. Volunteering, deferring, or the loudest person taking Chief. Tag it — this is your first data point."),
-  beat("00:06", "Fire the six tutorial faults F-001 to F-006 from the fault library on the control panel, one per sector, and hand the cards. No round button deals a fault: every fault in this shift is fired by you.", "Whether the Systems Lead reads the procedure aloud or silently."),
-  beat("00:16", "Confirm every sector has resolved its tutorial fault. Help freely here — this is the only part of the day where you may.", "Consoles showing the wrong sector. Fix now, not later."),
-  beat("00:19", "Say the one sentence that sets the shift: \"From here it runs until it is over. There is no break in it.\"", "Nobody should be waiting for a pause that is not coming."),
+  beat("00:00", "Confirm all six recorders and the Council recorder are rolling. Then fire the klaxon sting. Every console already shows ROUND 0.", "Nothing yet — this is the audio sync."),
+  beat("00:01", "Hand each table its binder, role cards, chit pad, resource tray and workforce tokens. Hand the City Charter to COM only. Say only: \"Everything you need is in the binder. Start at page 3.\"", "Who opens the binder, and who waits to be told."),
+  beat("00:03", "Watch the roles being assigned (binder §1, step 1). Do not advise.", "How they assign. Volunteering, deferring, or the loudest person taking Chief. Tag it — this is your first data point."),
+  beat("00:06", "Fire the six tutorial faults F-001 to F-006 from the fault library on the control panel, one per sector. The fault lands on each console; the binder's §7 takes it from there. No card needs handing over.", "Whether the Systems Lead reads the procedure aloud or silently, and whether anyone opens §7 first."),
+  beat("00:16", "Confirm every sector has resolved its tutorial fault. Help only with the console itself — a wrong sector, a dead connection. A rules question gets a section number.", "Consoles showing the wrong sector. Fix now, not later."),
+  beat("00:19", "Nothing to say. Press NEXT ROUND → Round 1 and START; the consoles change by themselves and the binder's NEW ROUND box tells each table what to check.", "Nobody should be waiting for a pause that is not coming."),
 ], BW));
 
 C.push(H2("5.1 The Shift — starting it (00:00)"));
@@ -472,7 +470,7 @@ const RW = [800, W - 800];
 C.push(tbl([
   headRow(["#", "STEP"], RW),
   row(["1", "Collect all six binders. Remove used log sheets, insert fresh ones. Confirm each binder still holds its Appendix C page."], RW),
-  row(["2", "Collect all fault cards from tables and floor. Re-sort by wave tab. Count to 36. A missing card silently breaks a cascade in the next run."], RW),
+  row(["2", "If the optional fault deck was used, collect every card from tables and floor, re-sort by section tab and count to 60."], RW),
   row(["3", "Refill resource trays to opening stock: 3 power, 3 water, 3 parts, 1 med per sector."], RW),
   row(["4", "Return workforce tokens to 8 per sector, including any left at the MED table."], RW),
   row(["5", "Collect used and unused chits. Refill each pad. Retrieve the TRN stamp — it goes missing more than anything else in the kit."], RW),

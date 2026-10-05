@@ -418,7 +418,7 @@
         return 'SEND A REQUEST INSTEAD — THE SUPPLIER ACCEPTS, THEN TRN APPROVES';
       case 'not_accepted':     return 'CANNOT APPROVE — THE SUPPLIER HAS NOT ACCEPTED THIS REQUEST';
       case 'chit_required':    return 'CANNOT APPROVE — PHYSICAL TRANSFER CHIT NOT CONFIRMED';
-      case 'cancel_locked':    return 'ALREADY WITH TRANSPORT — ASK THE FACILITATOR TO CANCEL';
+      case 'cancel_locked':    return 'ALREADY ACCEPTED — ONLY THE SUPPLIER CAN WITHDRAW IT NOW, OR TRANSPORT CAN DECLINE IT';
       case 'expired':          return 'THIS EXPIRED';
       case 'already_stamped':  return 'ALREADY APPROVED';
       case 'transfer_closed':  return 'TRANSFER ALREADY CLOSED';

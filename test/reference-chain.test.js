@@ -186,7 +186,7 @@ test('RC-010: every reference is an asset and a sector, and never a figure', () 
   assert.ok(!JSON.stringify(chain).includes('PWR'), 'PWR crept in');
   // The binder prints the directory, and says what it is for.
   const binders = fs.readFileSync(path.join(ROOT, 'tools/kit/build_binders.js'), 'utf8');
-  assert.ok(/5A · CROSS-SYSTEM REFERENCE DIRECTORY/.test(binders), 'the binder has no 5A');
+  assert.ok(/14A · CROSS-SYSTEM REFERENCE DIRECTORY/.test(binders), 'the binder has no 14A');
   assert.ok(/are REFERENCES, not resolution values/.test(binders), 'the binder does not explain a reference');
 });
 

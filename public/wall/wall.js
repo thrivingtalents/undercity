@@ -321,9 +321,9 @@
 
   /**
    * The command bar. Continuous gameflow (2026-09-21): the wall never names a
-   * round or a phase. Before live play it says BRIEFING; once the shift is
-   * running it counts ROUNDS, and the clock beside it is ROUND
-   * TIME. The Core keeps the middle and the largest type on the bar.
+   * round or a phase. It counts ROUNDS from ROUND 0 — there is no briefing
+   * screen, because there is no briefing (zero-briefing edition, 2026-10-05) —
+   * and the clock beside it is ROUND TIME. The Core keeps the middle and the largest type on the bar.
    */
   function renderHud() {
     // The round, as a number. The wall never names one: the room reads

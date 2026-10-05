@@ -1,0 +1,81 @@
+{
+  "note": "The four station roles, in full. One source for the role cards (build_kit.js) and for section 3 of every sector binder (binder_manual.js). Edit here, never in a DOCX.",
+  "roles": [
+    {
+      "id": "CHIEF",
+      "title": "SECTOR CHIEF",
+      "tagline": "You are accountable for this sector and you speak for it at Council.",
+      "do": [
+        "Make the final call inside the station when the team cannot agree.",
+        "Decide what the sector pays for, trades away, and keeps.",
+        "Go to the central Council table the moment COUNCIL IN SESSION shows on the console, with the Liaison.",
+        "Speak for the sector at Council. One seat, one voice: yours."
+      ],
+      "dont": [
+        "Leave the station for any reason except Council.",
+        "Sign Transfer Chits. That is the Liaison's signature."
+      ],
+      "when": [
+        "If you are not at Council, your sector has no voice for that sitting.",
+        "If the team is three people, you also keep the Station Operations Log."
+      ]
+    },
+    {
+      "id": "LIAISON",
+      "title": "LIAISON",
+      "tagline": "You are the only member of this station permitted to leave it.",
+      "do": [
+        "Carry every question to other stations: a specification value, a trade, a worker.",
+        "Negotiate every trade, fill in and sign every Transfer Chit, and carry it to Transport.",
+        "Bring the three-digit value your procedure needs back to the Systems Lead, written down.",
+        "Go to Council with the Chief when it is called. You may speak there; you hold no seat."
+      ],
+      "dont": [
+        "Send anyone else out. Nobody else leaves the station.",
+        "Hand over stock without a chit the receiving Liaison has signed."
+      ],
+      "when": [
+        "While you are away no chit can be signed, so no transfer can be completed.",
+        "Before you go, tell the team what you are asking for and what you can offer."
+      ]
+    },
+    {
+      "id": "SYSTEMS",
+      "title": "SYSTEMS LEAD",
+      "tagline": "You hold the binder and you work the console.",
+      "do": [
+        "Look up every fault code in section 12 and read the procedure in section 13 aloud, all of it.",
+        "Enter the resolution code and the Workers assigned count, then press SUBMIT REPAIR.",
+        "Send and answer requests in RESOURCE EXCHANGE, and run the sector's own panel.",
+        "Keep the console's INVENTORY and the chits on the table matching."
+      ],
+      "dont": [
+        "Leave the station.",
+        "Guess a code. Three wrong codes in a row lock the console for 20 seconds."
+      ],
+      "when": [
+        "RESOLUTION REJECTED: re-verify the source table or the sector that gave the value before trying again.",
+        "MATERIALS NOT READY or INSUFFICIENT CREW: stop, stage what the procedure lists, then submit."
+      ]
+    },
+    {
+      "id": "ENGINEER",
+      "title": "ENGINEER",
+      "tagline": "You keep the station running and the record straight.",
+      "do": [
+        "Count the chits and workforce tokens, and move them whenever the console moves stock.",
+        "Keep the Station Operations Log in section 15: time, event, decision, who agreed.",
+        "Stage the workers and materials a procedure lists before the Systems Lead submits.",
+        "Watch NEXT UPKEEP and say out loud when the sector cannot afford it."
+      ],
+      "dont": [
+        "Leave the station. A worker can be lent to another sector only through a Transfer Chit, and a token moves with it.",
+        "Let the table and the console disagree for more than a minute."
+      ],
+      "when": [
+        "A worker is injured: turn the token face down and tell the Systems Lead to press REQUEST MED HEALING.",
+        "A new round starts: run the NEW ROUND box in section 5 before anything else."
+      ]
+    }
+  ]
+}

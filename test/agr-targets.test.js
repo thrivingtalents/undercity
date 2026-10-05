@@ -160,10 +160,10 @@ test('OPEN THE STORES: AGR fills up, AGR loses 6, every active sector loses 2, a
   assert.deepEqual(obligations(g), [['AGR', { power: 1, water: 1 }]]);
   for (const s of ['POW', 'WTR', 'MED', 'TRN']) {
     assert.equal(notices(g, s).length, 1, `${s} was not told`);
-    assert.match(notices(g, s)[0], /^CITY DECISION — AGR: OPEN THE CONTINGENCY STORES\. [A-Z]{3} −2 INTEGRITY · NOW\.$/);
+    assert.match(notices(g, s)[0], /^CITY DECISION — AGR: OPEN THE CONTINGENCY STORES\. [A-Z]{3} −2 HEALTH · NOW\.$/);
   }
   assert.equal(notices(g, 'COM').length, 0, 'a dark sector was told');
-  assert.deepEqual(r.summary.AGR, ['+5 POWER · +5 WATER · +2 MED · +1 PARTS · NOW', '−6 INTEGRITY · NOW', '−2 INTEGRITY · NOW', '+1 POWER · +1 WATER UPKEEP · NEXT UPKEEP']);
+  assert.deepEqual(r.summary.AGR, ['+5 POWER · +5 WATER · +2 MED · +1 PARTS · NOW', '−6 HEALTH · NOW', '−2 HEALTH · NOW', '+1 POWER · +1 WATER UPKEEP · NEXT UPKEEP']);
   assert.equal(logEvents(g, 'agr_integrity_cost').length, 6, 'one cost line per sector hit');
   assert.equal(logEvents(g, 'agr_balance_watch').length, 1);
 });
@@ -183,7 +183,7 @@ test('BIOFILTER FLUSH: every active sector gains health and lends a worker; AGR 
   assert.ok(economy.upkeepFor(g, g.state.sectors.WTR).water >= 1);
   assert.deepEqual(r.summary.POW, ['+10 HEALTH · NOW', '−1 WORKER · THIS ROUND']);
   assert.deepEqual(r.summary.WTR, ['+5 HEALTH · NOW', '−1 WORKER · THIS ROUND', '+1 WATER UPKEEP · NEXT UPKEEP']);
-  assert.deepEqual(r.summary.AGR, ['+0 HEALTH · NOW', '−1 WORKER · THIS ROUND', '−8 INTEGRITY · NOW']);
+  assert.deepEqual(r.summary.AGR, ['+0 HEALTH · NOW', '−1 WORKER · THIS ROUND', '−8 HEALTH · NOW']);
   for (const s of ['POW', 'WTR', 'MED', 'TRN', 'COM']) assert.equal(notices(g, s).length, 1, s);
   assert.match(notices(g, 'WTR')[0], /WTR \+5 HEALTH · NOW; −1 WORKER · THIS ROUND; \+1 WATER UPKEEP · NEXT UPKEEP\./);
   // WTR pays the extra water at the change (its line is read before the pass retires it); AGR pays only its own.
@@ -204,7 +204,7 @@ test('the six local cards still pay at home, and nobody else is told', () => {
     g.setIntegrity('COM', 40);
     const r = g.agrActivate(id, { by: 'AGR', target });
     assert.equal(r.ok, true, `${id}: ${r.reason}`);
-    const paid = Object.keys(r.summary).filter((code) => r.summary[code].some((l) => /INTEGRITY|UPKEEP|−1 WORKER/.test(l) && !/^\+\d+ HEALTH/.test(l)));
+    const paid = Object.keys(r.summary).filter((code) => r.summary[code].some((l) => /HEALTH|UPKEEP|−1 WORKER/.test(l) && !/^\+\d+ HEALTH/.test(l)));
     assert.deepEqual(paid, ['AGR'], `${id} charged ${paid}`);
     // Only the sectors the gain reached are noticed — and only when it is not AGR.
     const gainers = card(id).affects.gain.map((t) => (t === 'CHOSEN' ? 'POW' : t === 'LOWEST' ? 'COM' : t));

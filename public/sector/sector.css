@@ -713,14 +713,24 @@ button.wide { width: 100%; }
 body.is-critical .topbar { border-bottom-color: var(--red); background: linear-gradient(180deg, #221214, #0f1418); }
 body.is-critical .crest { background: var(--red); }
 body.is-brownout .topbar { background: linear-gradient(180deg, #1e1810, #0f1418); }
-body.is-dark .columns, body.is-dark .exchange { filter: grayscale(0.7); opacity: 0.5; }
+/*
+  DARK. Everything greys out except the way back on: the EMERGENCY SHUTDOWN
+  panel keeps its colour and sits ABOVE the offline curtain (z 52 over the
+  overlay's 50 — it must not inherit the greyed columns' opacity, which would
+  trap it in their stacking context, so the greying is applied per panel).
+  The curtain itself takes no clicks: the binder tells a dark table to press
+  EMERGENCY RESTART, and a curtain that swallowed the click made that
+  instruction a lie (zero-briefing walkthrough, 2026-10-05).
+*/
+body.is-dark .columns > .col > *:not(#restart-panel), body.is-dark .exchange { filter: grayscale(0.7); opacity: 0.5; }
+body.is-dark #restart-panel { position: relative; z-index: 52; }
 
 /* -- overlays --------------------------------------------------------------- */
 .overlay {
   position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 18px; z-index: 50; text-align: center; padding: 40px;
 }
-.dark-overlay { background: rgba(4,5,6,0.95); }
+.dark-overlay { background: rgba(4,5,6,0.95); pointer-events: none; }
 .pause-overlay { background: rgba(6,8,10,0.9); }
 
 /*

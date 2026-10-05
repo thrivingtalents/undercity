@@ -10,6 +10,13 @@ Pipeline: matrix -> recalc -> export_faults.py (server JSON)
 
 Both branches read the SAME cells, so paper and server cannot disagree.
 
+The sector's self-guided operating manual (sections 1-11 of every binder)
+is NOT assembled here: tools/kit/binder_manual.js builds it from the scenario
+config, the engine's own modules and roles.json, and build_binders.js renders
+it in front of the reference pages this file produces. This file supplies the
+reference half: the fault index, the procedures, the specification tables, the
+reference directory and Appendix C, plus each sector's identity.
+
 CRITICAL CONTENT RULES ENFORCED HERE:
   1. A binder NEVER prints a full resolution code. It prints the procedure ref,
      the resource/crew cost, and WHERE to fetch each spec value. The team
@@ -37,102 +44,36 @@ SECTOR_INFO = {
         "name": "Power Grid",
         "colour": "E8B33A",
         "motto": "The city runs on what we hold.",
-        "mission": (
-            "Power Grid operates HAVEN-9's five geothermal turbines, the ring main, and three "
-            "sub-grids. Every other sector draws from you. Turbine output is finite and the Core "
-            "coupling is the single point of failure for the entire city — if the ring main drops, "
-            "life support in the Medical Bay has roughly four minutes of reserve. Your standing "
-            "orders are to maintain ring-main stability, honour agreed power transfers, and keep "
-            "Turbine C's bearing temperature inside tolerance. You are permitted to shed load to "
-            "protect the ring main. You are not permitted to shed load to the Medical Bay without "
-            "Council authorisation. Power cannot be manufactured faster than the turbines allow, "
-            "so every commitment you make to another sector is a commitment taken from somewhere else."
-        ),
-        "produces": "Power Cells (⚡) — 3 per round, distributed at your discretion",
     },
     "WTR": {
         "name": "Water & Filtration",
         "colour": "3A8FE8",
         "motto": "Nothing here is wasted twice.",
-        "mission": (
-            "Water & Filtration draws from the deep aquifer, runs four pump stations, and operates "
-            "the grey-water reclaim plant that makes a closed city possible. You also supply turbine "
-            "coolant to Power Grid — which makes you and POW mutual hostages, a fact both sectors "
-            "are expected to manage like adults. The Lower Reservoir wall has been on the watch list "
-            "for two years. Your standing orders are to maintain reservoir pressure inside rated "
-            "limits, keep reclaim output within Medical Bay's bio-thresholds, and never run a pump "
-            "station dry. Filtration failures are not immediately visible to anyone else in the city, "
-            "which means the decision to report a problem early is yours alone to make."
-        ),
-        "produces": "Water Units (💧) — 3 per round, distributed at your discretion",
     },
     "MED": {
         "name": "Medical Bay",
         "colour": "E85A5A",
         "motto": "We count in people, not units.",
-        "mission": (
-            "Medical Bay runs three wards, an isolation wing, a triage bay, and the surgical suite, "
-            "and holds the city's only cold-chain store. You treat every injured worker HAVEN-9 has: "
-            "when another sector takes casualties, their people arrive at your door and cannot return "
-            "to work until you release them. You also set the bio-thresholds that constrain Water's "
-            "reclaim plant. Your standing orders are to maintain sterile atmosphere in all wards, "
-            "protect the cold chain, and keep life support powered without exception. You have the "
-            "strongest moral claim in any triage argument and the weakest ability to generate the "
-            "resources you need. Both of those are true at once."
-        ),
-        "produces": "Nothing. Med Supplies (⚕) are finite — opening stock, fault rewards and AGR cards — and each restores one injured Worker",
     },
     "TRN": {
         "name": "Transport & Tunnels",
         "colour": "9A9A9A",
         "motto": "Everything moves through us.",
-        "mission": (
-            "Transport & Tunnels maintains four galleries, the freight spur, the rail network, and "
-            "every blast door in HAVEN-9. You produce nothing, and nothing reaches anyone without "
-            "you: every resource transfer in this city is stamped by Transport before it takes "
-            "effect. That makes you the quietest form of power in HAVEN-9 and the easiest to resent. "
-            "Your standing orders are to keep Tunnels A through D load-rated and passable, maintain "
-            "rail voltage inside spec, and stamp agreed transfers promptly. Tunnel B has had roof "
-            "movement logged in three consecutive inspections. A collapse there injures crew — yours."
-        ),
-        "produces": "Nothing. You control transfer capacity — stamp required on every chit.",
     },
     "AGR": {
         "name": "Agriculture",
         "colour": "5AB86A",
         "motto": "Slow problems kill slowly.",
-        "mission": (
-            "Agriculture runs four hydroponic bays, the seedling bay, and the seed vault that "
-            "represents HAVEN-9's only path to a future beyond the current generation. You feed the "
-            "city. Your failures are the least urgent-looking and the most expensive: a grow-lamp "
-            "array lost today shows up as a workforce efficiency problem three cycles from now, long "
-            "after the argument about who gets power has been settled without you. Your standing "
-            "orders are to maintain nutrient mix ratios, keep all arrays on cycle, and protect the "
-            "vault environment. You will spend this shift arguing for resources against sectors whose "
-            "emergencies are louder than yours. Prepare that argument before you need it."
-        ),
-        "produces": "Food — sustains Workforce efficiency city-wide",
     },
     "COM": {
         "name": "Comms & Sensors",
         "colour": "B07AD8",
         "motto": "We see it first. What we do next is the question.",
-        "mission": (
-            "Comms & Sensors operates the sensor grid, the relay network, and the uplink. Your "
-            "telemetry covers every sector in HAVEN-9, which means you routinely see a fault before "
-            "the sector suffering it does. You hold the City Charter. Nothing in your standing orders "
-            "tells you how quickly to pass on what you see, or to whom, or what to do when your "
-            "readings contradict another sector's instruments — those are judgement calls, and they "
-            "are yours. Your standing orders are to maintain sensor calibration, keep the relay "
-            "network powered, and preserve the uplink. When the grid goes down, the city is blind, "
-            "and every other sector is arguing from memory."
-        ),
-        "produces": "Telemetry — you alone see other sectors' live fault data",
     },
 }
 
-START_INVENTORY = "3 ⚡ Power Cells · 3 💧 Water Units · 3 🔧 Spare Parts · 1 ⚕ Med Supply"
-UPKEEP = "2 ⚡ Power Cells + 1 💧 Water Unit per round"
+# Opening stock and upkeep are no longer written here: binder_manual.js reads
+# them from the scenario the kit is built for, so paper cannot drift from play.
 
 wb = load_workbook(XLSX, data_only=True)
 
@@ -235,22 +176,22 @@ for code, info in SECTOR_INFO.items():
                 nparts += 1
                 s = specs[sid]
                 where = ("YOUR Appendix C" if s["buried"] and s["binder"] == code
-                         else f"{s['binder']} Manual, Table {s['table_id']}"
-                         if s["binder"] != code else f"YOUR Table {s['table_id']}")
+                         else f"{s['binder']} Binder, Table {s['table_id']}"
+                         if s["binder"] != code else f"YOUR Table {s['table_id']} (§14)")
                 sources.append({"where": where, "row_label": s["row_label"],
                                 "foreign": s["binder"] != code, "buried": s["buried"]})
         fmt = f["procedure"] + "-[VALUE]" + ("-[VALUE 2]" if nparts == 2 else "")
-        steps.append(f"Confirm the fault code on the alert card matches {f['code']}.")
+        steps.append(f"Confirm the fault code on your console matches {f['code']}.")
         steps.append(f"Assign crew: {f['crew']} worker(s) minimum. Fewer will not hold the isolation.")
         steps.append(f"Stage materials: {f['resources']}.")
         for i, s in enumerate(sources, 1):
             verb = ("Obtain" if s["foreign"] else "Read off")
             steps.append(f"{verb} the {s['row_label']} value from {s['where']}." +
-                         (" This value is not held in this binder." if s["foreign"] else ""))
+                         (" This value is not held in this binder: the Liaison asks that sector for it by row name (§7)." if s["foreign"] else ""))
         steps.append(f"Enter the resolution code on the sector console in the format {fmt}, "
                      "substituting the value(s) above. Values are three digits.")
         steps.append("If the console rejects the entry, re-verify the source table before "
-                     "resubmitting. Three consecutive rejections lock the console for 20 seconds.")
+                     "resubmitting. Three consecutive rejections lock the console for 20 seconds (§7).")
         procedures.append({
             "id": f["procedure"], "fault_code": f["code"], "title": f["name"],
             "resources": f["resources"], "crew": f["crew"],
@@ -268,7 +209,7 @@ for code, info in SECTOR_INFO.items():
         fmt = f["procedure"] + "-[VALUE]" + ("-[VALUE 2]" if n == 2 else "")
         mats = ", ".join(f"{v} {k.title()}" for k, v in f["resources_required"].items())
         steps = [
-            f"Confirm the fault code on the alert card matches {f['code']}.",
+            f"Confirm the fault code on your console matches {f['code']}.",
             f"Assign crew: {f['crew_required']} worker(s) minimum. Fewer will not hold the isolation.",
             f"Stage materials: {mats}.",
         ]
@@ -282,7 +223,7 @@ for code, info in SECTOR_INFO.items():
         steps.append(f"Enter the resolution code on the sector console in the format {fmt}, "
                      "substituting the value(s) above. Values are three digits.")
         steps.append("If the console rejects the entry, re-verify with the sector that holds the "
-                     "figure before resubmitting. Three consecutive rejections lock the console for 20 seconds.")
+                     "figure before resubmitting. Three consecutive rejections lock the console for 20 seconds (§7).")
         procedures.append({
             "id": f["procedure"], "fault_code": f["code"], "title": f["name"],
             "resources": mats, "crew": f["crew_required"],
@@ -304,13 +245,13 @@ for code, info in SECTOR_INFO.items():
         steps, sources = [], []
         for r in f["spec_refs"]:
             s = specs[r["spec_id"]]
-            where = (f"{s['binder']} Manual, Table {s['table_id']}" if s["binder"] != code
-                     else f"YOUR Table {s['table_id']}")
+            where = (f"{s['binder']} Binder, Table {s['table_id']}" if s["binder"] != code
+                     else f"YOUR Table {s['table_id']} (§14)")
             sources.append({"where": where, "row_label": s["row_label"],
                             "foreign": s["binder"] != code, "buried": False})
         fmt = f["procedure"] + "-[VALUE]-[VALUE 2]"
         mats = ", ".join(f"{v} {k.title()}" for k, v in f["resources_required"].items())
-        steps.append(f"Confirm the fault code on the alert card matches {f['code']}.")
+        steps.append(f"Confirm the fault code on your console matches {f['code']}.")
         if f.get("time_critical"):
             steps.append("TIME-CRITICAL: Integrity falls fast while this fault stays open. "
                          "Work it ahead of anything that can wait. Nothing counts down.")
@@ -319,11 +260,11 @@ for code, info in SECTOR_INFO.items():
         for s in sources:
             verb = ("Obtain" if s["foreign"] else "Read off")
             steps.append(f"{verb} the {s['row_label']} value from {s['where']}." +
-                         (" This value is not held in this binder." if s["foreign"] else ""))
+                         (" This value is not held in this binder: the Liaison asks that sector for it by row name (§7)." if s["foreign"] else ""))
         steps.append(f"Enter the resolution code on the sector console in the format {fmt}, "
                      "substituting the value(s) above. Values are three digits.")
         steps.append("If the console rejects the entry, re-verify the source table before "
-                     "resubmitting. Three consecutive rejections lock the console for 20 seconds.")
+                     "resubmitting. Three consecutive rejections lock the console for 20 seconds (§7).")
         procedures.append({
             "id": f["procedure"], "fault_code": f["code"],
             "title": f["name"] + (" — TIME-CRITICAL" if f.get("time_critical") else ""),
@@ -343,8 +284,7 @@ for code, info in SECTOR_INFO.items():
 
     binders[code] = {
         "code": code, "name": info["name"], "colour": info["colour"],
-        "motto": info["motto"], "mission": info["mission"], "produces": info["produces"],
-        "upkeep": UPKEEP, "start_inventory": START_INVENTORY,
+        "motto": info["motto"],
         "index_rows": index_rows,
         "procedures": procedures,
         "tables": sorted(tables.values(), key=lambda t: t["id"]),

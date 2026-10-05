@@ -172,9 +172,9 @@ test('UI-AGR-005: timing uses the standard short labels', () => {
   assert.ok(!/AT NEXT UPKEEP|UNTIL THE ROUND ENDS|AT THE START OF NEXT ROUND/.test(SCRIPT), 'the long timing words are back');
   // MIXED cards get one line per timing rather than a blended word.
   const city = viewOf('AGR_CITY_RECOVERY');
-  assert.deepEqual(city.trade_off.map((l) => [l.text, l.when]), [['ALL SECTORS −1 WORKER', 'THIS_ROUND'], ['AGR −8 INTEGRITY', 'NOW'], ['WTR +1 WATER UPKEEP', 'NEXT_UPKEEP']]);
+  assert.deepEqual(city.trade_off.map((l) => [l.text, l.when]), [['ALL SECTORS −1 WORKER', 'THIS_ROUND'], ['AGR −8 HEALTH', 'NOW'], ['WTR +1 WATER UPKEEP', 'NEXT_UPKEEP']]);
   assert.deepEqual(viewOf('AGR_WATER_RESERVE').trade_off.map((l) => [l.text, l.when]), [['AGR +1 WATER UPKEEP', 'NEXT_2_UPKEEPS']]);
-  assert.deepEqual(viewOf('AGR_EMERGENCY_PARTS').trade_off.map((l) => [l.text, l.when]), [['AGR −6 INTEGRITY', 'NEXT_ROUND']]);
+  assert.deepEqual(viewOf('AGR_EMERGENCY_PARTS').trade_off.map((l) => [l.text, l.when]), [['AGR −6 HEALTH', 'NEXT_ROUND']]);
   assert.deepEqual(viewOf('AGR_LOGISTICS_BOOST').trade_off.map((l) => [l.text, l.when]), [['TRN −1 APPROVAL', 'NEXT_ROUND']]);
 });
 

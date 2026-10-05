@@ -445,12 +445,16 @@ fixtures at every boot; errors abort startup. Findings to date are in
 
 ## The paper kit
 
-Sign in to the hosted `/admin` → **PRINT KIT**: fault cards, City Charter,
-role cards, transfer chits, consent pack (participant-facing) and the answer
-key, six sector binders and the Guidebook (facilitator only). A badge says
+Sign in to the hosted `/admin` → **PRINT KIT**: the six sector binders (one
+per station — each is that team's self-guided operating manual plus its own
+faults, procedures and tables), fault cards (optional props), City Charter,
+role cards, transfer chits and consent pack (participant-facing), and the
+answer key and the Guidebook (facilitator only). A badge says
 whether the kit matches the content the server is running (SHA-256 of every
 content file, recorded at build time). `npm run kit` rebuilds locally
-(needs `openpyxl` and the `docx` devDependency). Three content rules are
+(needs `openpyxl` and the `docx` devDependency); `python tools/kit/check_binder_pages.py`
+then exports every binder to PDF with Word and checks that each section starts
+on the page its cover promises (needs Word and `pip install pymupdf`). Three content rules are
 enforced by the generators: a card prints the symptom only; a binder never
 prints another sector's spec values or a complete code; Appendix C gets no
 index entry.

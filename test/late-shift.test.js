@@ -129,7 +129,7 @@ test('FX10-008: every new fault has a complete P-09 or P-10 procedure — crew, 
     assert.equal(d.severity, d.procedure === 'P-10' ? 3 : 2);
   }
   // The binder prints them in the P-01..P-06 voice: confirm, crew, materials, obtain, obtain, enter, re-check.
-  for (const line of ['Confirm the fault code on the alert card matches', 'Assign crew:', 'Stage materials:', 'value from', 'Enter the resolution code on the sector console in the format', 're-verify the source table']) {
+  for (const line of ['Confirm the fault code on your console matches', 'Assign crew:', 'Stage materials:', 'value from', 'Enter the resolution code on the sector console in the format', 're-verify the source table']) {
     assert.ok(BINDERS_SRC.includes(line), `the binder lacks "${line}"`);
   }
   assert.ok(/late_by_sector/.test(BINDERS_SRC) && /-\[VALUE\]-\[VALUE 2\]/.test(BINDERS_SRC));

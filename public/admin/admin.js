@@ -408,13 +408,15 @@
     {
       key: 'participant',
       title: 'Participant-facing',
-      blurb: 'Safe to hand out and to leave on a table.',
+      blurb: 'Safe to hand out and to leave on a table. Each sector binder goes to its own '
+           + 'station and nowhere else: it is that team\'s operating manual and holds only '
+           + 'its own spec values.',
     },
     {
       key: 'facilitator',
       title: 'Facilitator only — never leave on a participant table',
-      blurb: 'The answer key carries every resolution code. Each binder carries that '
-           + "sector's own spec values. Print these yourself and keep them with you.",
+      blurb: 'The answer key carries every resolution code and the guidebook carries the '
+           + 'runbook and the probes. Print these yourself and keep them with you.',
     },
   ];
 
