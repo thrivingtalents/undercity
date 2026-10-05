@@ -445,11 +445,11 @@ fixtures at every boot; errors abort startup. Findings to date are in
 
 ## The paper kit
 
-Sign in to the hosted `/admin` → **PRINT KIT**: the six sector binders (one
-per station — each is that team's self-guided operating manual plus its own
-faults, procedures and tables), fault cards (optional props), City Charter,
-role cards, transfer chits and consent pack (participant-facing), and the
-answer key and the Guidebook (facilitator only). A badge says
+Sign in to the hosted `/admin` → **PRINT KIT**: the six nine-page sector
+binders (one per station: six operating pages, then its faults as cards and
+its values), the station log sheets, fault cards (optional props), City
+Charter, role cards, transfer chits and consent pack (participant-facing),
+and the answer key and the Guidebook (facilitator only). A badge says
 whether the kit matches the content the server is running (SHA-256 of every
 content file, recorded at build time). `npm run kit` rebuilds locally
 (needs `openpyxl` and the `docx` devDependency); `python tools/kit/check_binder_pages.py`

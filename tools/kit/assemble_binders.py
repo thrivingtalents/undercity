@@ -170,60 +170,33 @@ for code, info in SECTOR_INFO.items():
     procedures = []
     for f in sorted([x for x in own if x["procedure"] not in (None, "—")],
                     key=lambda x: x["procedure"]):
-        steps, sources, nparts = [], [], 0
+        sources, nparts = [], 0
         for sid in (f["spec1"], f["spec2"]):
             if sid and sid in specs:
                 nparts += 1
                 s = specs[sid]
-                where = ("YOUR Appendix C" if s["buried"] and s["binder"] == code
-                         else f"{s['binder']} Binder, Table {s['table_id']}"
-                         if s["binder"] != code else f"YOUR Table {s['table_id']} (§14)")
-                sources.append({"where": where, "row_label": s["row_label"],
+                sources.append({"row_label": s["row_label"],
+                                "binder": s["binder"], "table_id": s["table_id"],
                                 "foreign": s["binder"] != code, "buried": s["buried"]})
         fmt = f["procedure"] + "-[VALUE]" + ("-[VALUE 2]" if nparts == 2 else "")
-        steps.append(f"Confirm the fault code on your console matches {f['code']}.")
-        steps.append(f"Assign crew: {f['crew']} worker(s) minimum. Fewer will not hold the isolation.")
-        steps.append(f"Stage materials: {f['resources']}.")
-        for i, s in enumerate(sources, 1):
-            verb = ("Obtain" if s["foreign"] else "Read off")
-            steps.append(f"{verb} the {s['row_label']} value from {s['where']}." +
-                         (" This value is not held in this binder: the Liaison asks that sector for it by row name (§7)." if s["foreign"] else ""))
-        steps.append(f"Enter the resolution code on the sector console in the format {fmt}, "
-                     "substituting the value(s) above. Values are three digits.")
-        steps.append("If the console rejects the entry, re-verify the source table before "
-                     "resubmitting. Three consecutive rejections lock the console for 20 seconds (§7).")
         procedures.append({
             "id": f["procedure"], "fault_code": f["code"], "title": f["name"],
             "resources": f["resources"], "crew": f["crew"],
             "deadline": f["deadline"], "format": fmt,
-            "sources": sources, "steps": steps,
-            "severity": f["severity"],
+            "sources": sources,
+            "severity": f["severity"], "time_critical": False,
         })
 
     # P-07 and P-08. The requesting binder is told ONE thing per chain: which
     # sector to ask, and the name of the row to ask for. It is never told what
     # that row says, and never told where the row will send them next — that
     # is the mechanic, and writing it down here would be giving it away.
+    # A procedure is a data row (binder page 7 or 8); the universal repair
+    # flow is printed once, on page 4, never repeated per fault.
     for f in sorted(chain_by_sector.get(code, []), key=lambda x: x["code"]):
         n = len(f["reference_chain"])
         fmt = f["procedure"] + "-[VALUE]" + ("-[VALUE 2]" if n == 2 else "")
         mats = ", ".join(f"{v} {k.title()}" for k, v in f["resources_required"].items())
-        steps = [
-            f"Confirm the fault code on your console matches {f['code']}.",
-            f"Assign crew: {f['crew_required']} worker(s) minimum. Fewer will not hold the isolation.",
-            f"Stage materials: {mats}.",
-        ]
-        for i, c in enumerate(f["reference_chain"], 1):
-            which = "" if n == 1 else f" This is VALUE {i}."
-            steps.append(
-                f"Obtain the {c['first_reference_name']} from {c['first_sector']}."
-                f" {c['first_sector']} may answer with another asset and sector instead of a number:"
-                f" that is a REFERENCE, not a value. Follow it to the sector named and ask that sector"
-                f" for the asset's figure.{which}")
-        steps.append(f"Enter the resolution code on the sector console in the format {fmt}, "
-                     "substituting the value(s) above. Values are three digits.")
-        steps.append("If the console rejects the entry, re-verify with the sector that holds the "
-                     "figure before resubmitting. Three consecutive rejections lock the console for 20 seconds (§7).")
         procedures.append({
             "id": f["procedure"], "fault_code": f["code"], "title": f["name"],
             "resources": mats, "crew": f["crew_required"],
@@ -234,43 +207,28 @@ for code, info in SECTOR_INFO.items():
             "reference_chain": [{"first_sector": c["first_sector"],
                                  "first_reference_name": c["first_reference_name"]}
                                 for c in f["reference_chain"]],
-            "steps": steps, "severity": f["severity"],
+            "severity": f["severity"], "time_critical": False,
         })
 
-    # P-09 and P-10 (LATE SHIFT, 2026-10-05): two indexed sources, written
-    # exactly like P-01..P-06. A P-10 is TIME-CRITICAL: the word is on the
-    # card and in the index, and one step says what it means — nothing
-    # counts down, Integrity simply falls faster while the fault stays open.
+    # P-09 and P-10 (LATE SHIFT, 2026-10-05): two indexed sources, a row like
+    # any other. A P-10 is TIME-CRITICAL: the card says so — nothing counts
+    # down, Health simply falls faster while the fault stays open.
     for f in sorted(late_by_sector.get(code, []), key=lambda x: x["code"]):
-        steps, sources = [], []
+        sources = []
         for r in f["spec_refs"]:
             s = specs[r["spec_id"]]
-            where = (f"{s['binder']} Binder, Table {s['table_id']}" if s["binder"] != code
-                     else f"YOUR Table {s['table_id']} (§14)")
-            sources.append({"where": where, "row_label": s["row_label"],
+            sources.append({"row_label": s["row_label"],
+                            "binder": s["binder"], "table_id": s["table_id"],
                             "foreign": s["binder"] != code, "buried": False})
         fmt = f["procedure"] + "-[VALUE]-[VALUE 2]"
         mats = ", ".join(f"{v} {k.title()}" for k, v in f["resources_required"].items())
-        steps.append(f"Confirm the fault code on your console matches {f['code']}.")
-        if f.get("time_critical"):
-            steps.append("TIME-CRITICAL: Integrity falls fast while this fault stays open. "
-                         "Work it ahead of anything that can wait. Nothing counts down.")
-        steps.append(f"Assign crew: {f['crew_required']} worker(s) minimum. Fewer will not hold the isolation.")
-        steps.append(f"Stage materials: {mats}.")
-        for s in sources:
-            verb = ("Obtain" if s["foreign"] else "Read off")
-            steps.append(f"{verb} the {s['row_label']} value from {s['where']}." +
-                         (" This value is not held in this binder: the Liaison asks that sector for it by row name (§7)." if s["foreign"] else ""))
-        steps.append(f"Enter the resolution code on the sector console in the format {fmt}, "
-                     "substituting the value(s) above. Values are three digits.")
-        steps.append("If the console rejects the entry, re-verify the source table before "
-                     "resubmitting. Three consecutive rejections lock the console for 20 seconds (§7).")
         procedures.append({
             "id": f["procedure"], "fault_code": f["code"],
-            "title": f["name"] + (" — TIME-CRITICAL" if f.get("time_critical") else ""),
+            "title": f["name"],
             "resources": mats, "crew": f["crew_required"],
             "deadline": None, "format": fmt,
-            "sources": sources, "steps": steps, "severity": f["severity"],
+            "sources": sources, "severity": f["severity"],
+            "time_critical": bool(f.get("time_critical")),
         })
 
     tables = {}

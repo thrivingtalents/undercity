@@ -39,11 +39,12 @@ const TITLES = {
   'UNDERCITY_CityCharter.docx': 'City Charter + Continuity Order ballot',
   'UNDERCITY_RoleCards.docx': 'Role cards — one per participant',
   'UNDERCITY_TransferChits.docx': 'Transfer chits',
+  'UNDERCITY_StationLog.docx': 'Station Operations Log — loose sheets, one per sector',
   'UNDERCITY_ConsentPack_TableTents.docx': 'PDPA consent pack + table tents',
   'UNDERCITY_AnswerKey.docx': 'Answer key — every resolution code',
   'UNDERCITY_Facilitator_Guidebook.docx': 'Facilitator & Administrator Guidebook',
 };
-const binderTitle = (code) => `Sector binder — ${code} (one per station; the team's own operating manual)`;
+const binderTitle = (code) => `Sector binder — ${code} (nine pages; the station's quick reference)`;
 
 function describe(file) {
   const m = /^UNDERCITY_Binder_([A-Z]{3})\.docx$/.exec(file);

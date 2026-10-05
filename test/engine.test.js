@@ -1755,7 +1755,7 @@ test('the sector screen: the round as a number and ROUND TIME as its clock; noth
 
 test("the charter's history keeps its Cycles; the scenario phases keep their names", () => {
   assert.ok(KIT_JS.includes('Ratified Cycle 12 · Amended Cycle 31'));
-  assert.ok(BINDER_JS.includes('Cycle 31 records purge'));
+  assert.ok(/Non-Routine Authorisation/.test(fs.readFileSync(path.join(__dirname, '..', 'tools', 'kit', 'binder_compact.js'), 'utf8')), 'the binder lost its Appendix C');
   const game = running();
   const ids = (game.rounds.phases || []).map((p) => p.id);
   assert.ok(ids.includes('ROUND_0') && ids.includes('ROUND_4'), 'the phases are not the rounds');

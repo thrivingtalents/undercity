@@ -128,12 +128,18 @@ test('FX10-008: every new fault has a complete P-09 or P-10 procedure — crew, 
     assert.ok(d.name && d.flavour && !d.flavour.includes(';'), `${code}: card copy`);
     assert.equal(d.severity, d.procedure === 'P-10' ? 3 : 2);
   }
-  // The binder prints them in the P-01..P-06 voice: confirm, crew, materials, obtain, obtain, enter, re-check.
-  for (const line of ['Confirm the fault code on your console matches', 'Assign crew:', 'Stage materials:', 'value from', 'Enter the resolution code on the sector console in the format', 're-verify the source table']) {
-    assert.ok(BINDERS_SRC.includes(line), `the binder lacks "${line}"`);
-  }
+  // The binder prints each as a fault card: two value sources, a two-value format, TIME-CRITICAL on the P-10 card.
   assert.ok(/late_by_sector/.test(BINDERS_SRC) && /-\[VALUE\]-\[VALUE 2\]/.test(BINDERS_SRC));
-  assert.ok(/TIME-CRITICAL: Integrity falls fast while this fault stays open/.test(BINDERS_SRC), 'P-10 is not labelled in the binder');
+  const compact = require('../tools/kit/binder_compact');
+  const binderContent = path.join(ROOT, 'build', 'binder_content.json');
+  if (!fs.existsSync(binderContent)) return;   // the kit was never built here; the compact tests cover it when it is
+  const cards = compact.compactFor(JSON.parse(fs.readFileSync(binderContent, 'utf8')).binders.POW)[7].blocks.find((x) => x.t === 'faultcards').cards;
+  const p09 = cards.find((c) => c.proc === 'P-09');
+  const p10 = cards.find((c) => c.proc === 'P-10');
+  assert.ok(p09 && p10, 'the late shift is not on the POW binder');
+  assert.ok(p09.v1 && p09.v2 && p10.v1 && p10.v2, 'a late-shift card lacks its second value');
+  assert.equal(p09.format, 'P-09-[VALUE]-[VALUE 2]');
+  assert.ok(p10.time_critical && !p09.time_critical, 'TIME-CRITICAL is on the wrong card');
 });
 
 // -- FX10-009 / 010 / C / D / E: the codes --------------------------------------------------------

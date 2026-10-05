@@ -32,7 +32,7 @@ test('the committed kit matches the committed content', () => {
 test('the manifest describes every document that exists', () => {
   const summary = kit().summary();
   assert.equal(summary.available, true);
-  assert.equal(summary.counts.documents, 13);
+  assert.equal(summary.counts.documents, 14);
   assert.ok(summary.files.every((f) => f.present), 'every listed document is on disk');
 
   // Word's owner files (~$name.docx) are locks, not documents.
@@ -68,6 +68,7 @@ test('participant-facing set contains nothing carrying an answer', () => {
     'UNDERCITY_ConsentPack_TableTents.docx',
     'UNDERCITY_FaultCards.docx',
     'UNDERCITY_RoleCards.docx',
+    'UNDERCITY_StationLog.docx',
     'UNDERCITY_TransferChits.docx',
   ]);
   assert.ok(!participant.some((f) => /AnswerKey|Guidebook/.test(f)));
@@ -127,14 +128,14 @@ test('a missing kit reports unknown rather than pretending to be fine', () => {
 
 test('the download-all zip is valid and round-trips every document', () => {
   const entries = kit().entries();
-  assert.equal(entries.length, 13);
+  assert.equal(entries.length, 14);
 
   const archive = zip(entries);
 
   // End-of-central-directory signature, and the entry count it declares.
   const eocd = archive.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
   assert.ok(eocd > 0, 'archive carries an end-of-central-directory record');
-  assert.equal(archive.readUInt16LE(eocd + 10), 13, 'it declares all 13 entries');
+  assert.equal(archive.readUInt16LE(eocd + 10), 14, 'it declares all 14 entries');
 
   // Every local header is where the central directory says, and the stored
   // bytes are the file's bytes — a corrupt kit download would be worse than
@@ -150,7 +151,7 @@ test('the download-all zip is valid and round-trips every document', () => {
 
 test('audience filters produce the two printable sets', () => {
   const k = kit();
-  assert.equal(k.entries({ audience: 'participant' }).length, 11);
+  assert.equal(k.entries({ audience: 'participant' }).length, 12);
   assert.equal(k.entries({ audience: 'facilitator' }).length, 2);
 
   const names = k.entries({ audience: 'participant' }).map((e) => e.name);

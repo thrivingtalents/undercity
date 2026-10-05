@@ -1,14 +1,106 @@
 # UNDERCITY — Zero-Briefing Binders (2026-10-05)
 
-The six sector binders are now the participant's complete operating manual. A
-team receives its binder, its console, its chits and its role cards, and plays
-the whole shift without a presentation, a verbal briefing or a rules
-explanation. The Game Master stays at `/control`.
+The six sector binders are the participant's complete operating manual. A team
+receives its binder, its console, its chits and its role cards, and plays the
+whole shift without a presentation, a verbal briefing or a rules explanation.
+The Game Master stays at `/control`.
 
-This file is the implementation report for that change: the paper-versus-
-software reconciliation, what was built, every file changed, the before-and-
-after summary, the Zero-Briefing Test results, and the items that still need an
-owner's decision.
+Two editions were built on the same day. The **nine-page edition** (section 0)
+is the one the kit prints; the 27-page operating manual it replaced is kept
+below as the reconciliation record (sections 1–6), because the paper-versus-
+software decisions and the Zero-Briefing Test results still stand.
+
+## 0. The nine-page edition (approved architecture, 2026-10-05)
+
+Every sector binder is exactly nine A4 pages, no cover, no contents page, no
+role-card text, no worked examples, no generic steps repeated per fault. The
+Station Operations Log is a separate loose sheet (`UNDERCITY_StationLog.docx`,
+one page per sector).
+
+| Page | Title | Scope | What is on it |
+|---|---|---|---|
+| 1 | START HERE — YOUR SECTOR | sector | Two-sentence context, objective, three-sentence mission, eight facts (operates, supplies, who depends, depends on, if DARK, authority, opening stock, workforce + upkeep), five-step start-up checklist. Roles: "take the Role Cards and assign them"; the cards carry the duties |
+| 2 | RUNNING EACH ROUND | shared frame, own refresh line | Six-step round strip, rounds and clock, UPKEEP box, NEW ROUND — CHECK THESE NOW (upkeep result, production, workers, this sector's own refresh, open requests carry over), status table STABLE to DARK with the restart, pre-round line, banner line |
+| 3 | YOUR SECTOR CONTROL | sector | POW/WTR: GENERATE, level table with a BROWNOUT column, upgrading, Level 5 support, allocation authority. MED: queue, HEAL, DECLINE, automatic recovery, Med Supplies, priority. TRN: approvals, CONFIRM CHIT, stamp, APPROVE, DECLINE, message table, brownout, own trades. AGR: three cards, GAIN and TRADE-OFF, targets, freight slot, the deck. COM: feed, intelligence, board, broadcast, focus, Charter, "publishing changes nothing real" |
+| 4 | WHEN A FAULT APPEARS | shared | 1 GET VALUE → 2 BUILD CODE → 3 SUBMIT strip, seven steps, console message table, lockout, tactical tokens |
+| 5 | TRADING, WORKERS & HEALING | shared | Seven-step transfer strip and steps, the "all three or nothing moved" box, workers and loans, injury and healing |
+| 6 | QUICK ACTIONS & COUNCIL | shared, one own-panel line | Fourteen WHEN THIS HAPPENS → DO THIS rows, the Council box |
+| 7 | FAULTS & REPAIRS — PART 1 | sector | Five fault cards (P-01 to P-05): large code, name, PROCEDURE · CREW · MATERIALS, VALUE 1 · VALUE 2 · ENTER |
+| 8 | FAULTS & REPAIRS — PART 2 | sector | Five fault cards (P-06 to P-10) with TIME-CRITICAL and REFERENCE chains, then the ESCALATE TO line |
+| 9 | SPECIFICATIONS, REFERENCES & AUTHORISATIONS | sector | VALUE / REFERENCE / AUTHORISATION legend, every specification table, the reference directory, the Appendix C value |
+
+**How it is built.** `tools/kit/binder_compact.js` builds the nine pages;
+`tools/kit/binder_rules.js` reads every number from the scenario config, the
+tokens from `lib/rewards.js` and the AGR deck from `lib/agr-deck.js`;
+`tools/kit/assemble_binders.py` supplies each sector's identity and its fault
+rows, tables, references and Appendix C from the matrix and the generated
+decks; `tools/kit/build_binders.js` renders. `python tools/kit/check_binder_pages.py`
+exports every binder to PDF with Word and verifies that each of the nine pages
+starts where it should.
+
+**Verified, by test (`test/binder-compact.test.js`).** Every fault card
+matches the content the server runs (code, name, procedure, crew, materials,
+both value sources, format, TIME-CRITICAL); page 9 prints every value,
+reference and authorisation of the sector and nobody else's; every printed
+number is the scenario's; the BROWNOUT column equals what `economy.productionFor`
+yields in brownout at each generator level, by execution; no resolution code,
+spec value, probe or future fault list leaks; nothing waits for a trainer; the
+console's own labels are used and the word is Health, never Integrity; the
+shared pages are identical across the six binders; the kit sends every binder
+and the log sheets to the stations and only the Answer Key and the Guidebook
+to the desk.
+
+**Change log, all six binders** (what was merged, shortened, moved or removed
+against the 27-page edition):
+
+- Merged: the Fault Code Index, the Repair Procedures and the escalation rows
+  into the fault cards of pages 7–8; the Specification Tables, the Reference
+  Directory and Appendix C into page 9; upkeep, the NEW ROUND box, the status
+  table and the restart into page 2; the quick reference and Council into
+  page 6.
+- Shortened: START HERE from twelve steps to five; the upkeep Q&A to one box;
+  every procedure from seven prose steps to one data card; the worked trade to
+  a seven-step strip; the console guide to the labels used where they matter.
+- Moved: the roles to the Role Cards only; the Station Operations Log to a
+  loose sheet.
+- Removed: cover, contents strip, back-cover duplicate, the sample Transfer
+  Chit, the full console manual, the long upkeep FAQ.
+- Preserved exactly: every fault code, name, ownership, escalation, procedure,
+  crew, material, format, value source, reference chain, specification value,
+  reference, Appendix C value, opening stock, workforce, upkeep, production,
+  generator level and cost, approval and healing capacity, intervention
+  effect, brownout and DARK effect, restart requirement, token effect, Council
+  rule and trading requirement.
+
+Sector notes: POW and WTR page 3 carry the generator table with the BROWNOUT
+column; MED page 3 states both healing paths as implemented; TRN page 3 carries
+the approval message table and the brownout approval count; AGR page 3 carries
+the whole deck as a planning table; COM page 3 carries the three big-screen
+controls and the Charter custody.
+
+**Issues for the designer (nine-page edition).**
+
+1. *Brownout output wording.* Config: `brownout_effects.production_multiplier`
+   0.5, `per_sector.POW.production_multiplier` 0.25; the engine floors output
+   × multiplier. Executed: POW yields 0, 0, 1, 1, 1 at Levels 1–5 in brownout
+   (WTR 1, 1, 2, 2, 3). The binder prints these as the BROWNOUT column. The
+   console's ROUND OUTPUT note still says "BROWNOUT — OUTPUT HALVED" for every
+   sector, which is wrong for POW; the Guidebook said "to a quarter". Confirm
+   the 0.25 and the rounding, then fix the console note.
+2. *Council duration.* The brief asked the binder to say "Council lasts 5
+   minutes". The scenario's `council_clock_s` is 60, the control panel resets to
+   01:00, and five engine tests pin it. The binder says the sitting is timed by
+   the Authority and ends when the Council clock reaches 00:00. To print five
+   minutes, set `council_clock_s` to 300 (one config value) and update the
+   control panel's RESET label and the tests; that is a mechanic decision.
+3. *Appendix C is on page 9*, beside the tables, as the brief required; the old
+   frustration-tolerance probe (an unindexed back page) is therefore weaker.
+4. *MED's two healing prices* remain as implemented: HEAL from the queue costs
+   no stock; the automatic round-change recovery spends one Med Supply.
+
+---
+
+## The 27-page edition (superseded the same day; reconciliation record)
 
 ## 1. Paper versus software: reconciliation
 

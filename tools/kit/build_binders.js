@@ -1,31 +1,33 @@
 // UNDERCITY — binder renderer.
-// Reads binder_content.json (from assemble_binders.py) -> six A4 DOCX binders.
-// Run: node build_binders.js [binder_content.json] [outdir]
+// Reads binder_content.json (from assemble_binders.py) -> six nine-page A4 DOCX
+// binders, plus the Station Operations Log as loose sheets.
+// Run: node build_binders.js [binder_content.json] [outdir] [--only POW,WTR]
 //
-// ZERO-BRIEFING EDITION (2026-10-05). Each binder is two halves. The FRONT is
-// the participant operating manual — eleven sections built by binder_manual.js
-// from the scenario config and the engine's own modules, identical in every
-// binder — opened and closed by the one-page WHEN THIS HAPPENS → DO THIS sheet.
-// The BACK is this sector's reference: fault index, procedures, specification
-// tables, reference directory, Appendix C and the operations log, exactly the
-// content the assembler has always produced, renumbered 12 to 15.
-//
-// Pages are arithmetic. Every section declares the pages it is laid out for and
-// starts on a fresh page, so the contents strip on the cover can print page
-// numbers without Word's help; the kit build checks with Word that no section
-// overflows what it declared.
+// NINE-PAGE EDITION (2026-10-05). The pages are built by binder_compact.js;
+// this file owns the typography. Every page starts on a fresh leaf with a
+// "page break before" paragraph (a PageBreak run that does not fit on a full
+// page would print an empty leaf), every table row is kept whole, and a page
+// never ends on a spacing paragraph. The plan each binder was laid out to is
+// written beside binder_content.json for tools/kit/check_binder_pages.py,
+// which exports the DOCX to PDF with Word and verifies that every page starts
+// where the binder says it does.
 
 const fs = require("fs");
 const path = require("path");
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  WidthType, ShadingType, AlignmentType, BorderStyle, HeadingLevel,
-  PageBreak, Header, Footer, PageNumber, VerticalAlign,
+  WidthType, ShadingType, AlignmentType, BorderStyle,
+  Header, Footer, PageNumber, VerticalAlign,
 } = require("docx");
-const manual = require("./binder_manual");
+const compact = require("./binder_compact");
+const { fill } = require("./binder_rules");
 
-const SRC = process.argv[2] || "binder_content.json";
-const OUTDIR = process.argv[3] || "binders";
+const argv = process.argv.slice(2);
+const flag = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : null; };
+const positional = argv.filter((a, i) => !a.startsWith("--") && (i === 0 || !argv[i - 1].startsWith("--")));
+const SRC = positional[0] || "binder_content.json";
+const OUTDIR = positional[1] || "binders";
+const ONLY = (flag("--only") || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
 const data = JSON.parse(fs.readFileSync(SRC, "utf8"));
 
 const W = 9026;                     // A4 content width in DXA (11906 - 2*1440)
@@ -62,7 +64,7 @@ const body = (text, opts = {}) =>
   new TextRun({ text, font: "Arial", size: 20, color: INK, ...opts });
 
 /**
- * Inline markup for the manual: **bold** and `mono`. Nothing else — the
+ * Inline markup for the pages: **bold** and `mono`. Nothing else — the
  * content model is prose with emphasis, and the renderer owns the type.
  */
 function runs(text, opts = {}) {
@@ -79,11 +81,6 @@ function runs(text, opts = {}) {
 const p = (children, opts = {}) =>
   new Paragraph({ children: Array.isArray(children) ? children : [children], spacing: { after: 120 }, ...opts });
 
-const rule = () => new Paragraph({
-  text: "", spacing: { after: 160 },
-  border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: RULE } },
-});
-
 /**
  * A page starts here. Not a PageBreak run: a paragraph that cannot fit on a
  * page that is already full would carry its break onto the next page and
@@ -91,24 +88,18 @@ const rule = () => new Paragraph({
  * only ever start the page it is on, so no section can print a blank leaf.
  */
 const pageStart = () => new Paragraph({ pageBreakBefore: true, spacing: { before: 0, after: 0, line: 20 }, children: [new TextRun({ text: "", size: 2 })] });
-const gap = (after = 120) => new Paragraph({ text: "", spacing: { after } });
+/** Spacing after a block. It knows it is a gap, so a page never ends on one. */
+const gap = (after = 120) => Object.assign(new Paragraph({ text: "", spacing: { after } }), { __gap: true });
 
 function cell(children, { width, shade, bold, align, mono: isMono, size, color, margins } = {}) {
   const list = (Array.isArray(children) ? children : [children]).map((t) =>
     typeof t === "string" ? (isMono ? mono(t, { bold, size, color }) : body(t, { bold, size, color })) : t);
-  const paras = [];
-  let current = [];
-  for (const r of list) {
-    if (r && r.__break) { paras.push(new Paragraph({ spacing: { after: 40 }, alignment: align, children: current })); current = []; }
-    else current.push(r);
-  }
-  paras.push(new Paragraph({ spacing: { after: 0 }, alignment: align, children: current }));
   return new TableCell({
     width: { size: width, type: WidthType.DXA },
     verticalAlign: VerticalAlign.TOP,
     shading: shade ? { type: ShadingType.CLEAR, fill: shade, color: "auto" } : undefined,
     margins: margins || { top: 60, bottom: 60, left: 100, right: 100 },
-    children: paras,
+    children: [new Paragraph({ spacing: { after: 0 }, alignment: align, children: list })],
   });
 }
 
@@ -116,11 +107,10 @@ function table(rows, widths, borders = thinBorders) {
   return new Table({ columnWidths: widths, width: { size: W, type: WidthType.DXA }, borders, rows });
 }
 
-// ---------------------------------------------------------------- section furniture
+// ---------------------------------------------------------------- page furniture
 
-/** The section head: a large number in the sector colour, the title, a tab chip at the right. */
-function sectionHead(num, title, colour, tab) {
-  const numText = num === null || num === undefined ? "" : `${num}`;
+/** The page head: a large number in the sector colour, the title, a chip at the right. */
+function pageHead(num, title, colour, tab) {
   const left = new TableCell({
     width: { size: W - 1500, type: WidthType.DXA }, verticalAlign: VerticalAlign.BOTTOM,
     borders: { bottom: { style: BorderStyle.SINGLE, size: 12, color: colour } },
@@ -128,7 +118,7 @@ function sectionHead(num, title, colour, tab) {
     children: [new Paragraph({
       spacing: { after: 0 },
       children: [
-        ...(numText ? [new TextRun({ text: `${numText}  `, font: "Arial", size: 56, bold: true, color: colour })] : []),
+        ...(num === "" ? [] : [new TextRun({ text: `${num}  `, font: "Arial", size: 56, bold: true, color: colour })]),
         new TextRun({ text: title, font: "Arial", size: 30, bold: true, color: INK, characterSpacing: 10 }),
       ],
     })],
@@ -136,28 +126,17 @@ function sectionHead(num, title, colour, tab) {
   const right = new TableCell({
     width: { size: 1500, type: WidthType.DXA }, verticalAlign: VerticalAlign.BOTTOM,
     borders: { bottom: { style: BorderStyle.SINGLE, size: 12, color: colour } },
-    shading: tab ? { type: ShadingType.CLEAR, fill: colour, color: "auto" } : undefined,
+    shading: { type: ShadingType.CLEAR, fill: colour, color: "auto" },
     margins: { top: 60, bottom: 60, left: 100, right: 100 },
     children: [new Paragraph({
       alignment: AlignmentType.CENTER, spacing: { after: 0 },
-      children: [new TextRun({ text: tab || "", font: "Arial", size: 18, bold: true, color: "FFFFFF", characterSpacing: 60 })],
+      children: [new TextRun({ text: tab, font: "Arial", size: 18, bold: true, color: "FFFFFF", characterSpacing: 60 })],
     })],
   });
   return [
     new Table({ columnWidths: [W - 1500, 1500], width: { size: W, type: WidthType.DXA }, borders: noBorders, rows: [new TableRow({ children: [left, right] })] }),
     gap(140),
   ];
-}
-
-function subsectionHead(num, title, colour) {
-  return new Paragraph({
-    spacing: { before: 260, after: 120 },
-    border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: colour } },
-    children: [
-      new TextRun({ text: `${num}  `, font: "Arial", size: 40, bold: true, color: colour }),
-      new TextRun({ text: title, font: "Arial", size: 30, bold: true, color: INK, characterSpacing: 10 }),
-    ],
-  });
 }
 
 const BOX_STYLE = {
@@ -181,10 +160,7 @@ function boxBlock(kind, title, lines, colour) {
   ];
   return new Table({
     columnWidths: [W], width: { size: W, type: WidthType.DXA },
-    borders: {
-      ...noBorders,
-      left: { style: BorderStyle.SINGLE, size: 36, color: st.bar },
-    },
+    borders: { ...noBorders, left: { style: BorderStyle.SINGLE, size: 36, color: st.bar } },
     rows: [new TableRow({ children: [new TableCell({
       width: { size: W, type: WidthType.DXA },
       shading: { type: ShadingType.CLEAR, fill: st.fill, color: "auto" },
@@ -205,20 +181,6 @@ function stepsBlock(items, { start = 1 } = {}) {
   return items.map((text, i) => new Paragraph({
     spacing: { after: 70 }, indent: { left: 420, hanging: 420 },
     children: [mono(`${String(i + start).padStart(2, " ")}  `, { bold: true }), ...runs(text)],
-  }));
-}
-
-function checkBlock(items) {
-  return items.map((text) => new Paragraph({
-    spacing: { after: 70 }, indent: { left: 420, hanging: 420 },
-    children: [body("☐   ", { size: 24 }), ...runs(text)],
-  }));
-}
-
-function bulletsBlock(items) {
-  return items.map((text) => new Paragraph({
-    spacing: { after: 60 }, indent: { left: 360, hanging: 360 },
-    children: [body("•   "), ...runs(text)],
   }));
 }
 
@@ -247,9 +209,10 @@ function kvBlock(rows, { keyWidth = 2600 } = {}) {
   ] })), [keyWidth, W - keyWidth]);
 }
 
-function flowBlock(steps, colour) {
+/** A strip of steps joined by arrows. `big` is the three actions a repair comes down to. */
+function flowBlock(steps, colour, { big = false } = {}) {
   const n = steps.length;
-  const arrow = 360;
+  const arrow = big ? 600 : 360;
   const stepW = Math.floor((W - arrow * (n - 1)) / n);
   const widths = [];
   const cells = [];
@@ -257,17 +220,17 @@ function flowBlock(steps, colour) {
     widths.push(stepW);
     cells.push(new TableCell({
       width: { size: stepW, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
-      shading: { type: ShadingType.CLEAR, fill: i === 0 ? colour : tint(colour, 0.8), color: "auto" },
-      margins: { top: 90, bottom: 90, left: 70, right: 70 },
+      shading: { type: ShadingType.CLEAR, fill: big ? colour : i === 0 ? colour : tint(colour, 0.8), color: "auto" },
+      margins: { top: big ? 120 : 90, bottom: big ? 120 : 90, left: 70, right: 70 },
       borders: thinBorders,
-      children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: runs(s, { size: 16, bold: true, color: i === 0 ? "FFFFFF" : INK }) })],
+      children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: runs(big ? `${i + 1}  ${s}` : s, { size: big ? 30 : 16, bold: true, color: big || i === 0 ? "FFFFFF" : INK, characterSpacing: big ? 40 : 0 }) })],
     }));
     if (i < n - 1) {
       widths.push(arrow);
       cells.push(new TableCell({
         width: { size: arrow, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, borders: noBorders,
         margins: { top: 0, bottom: 0, left: 0, right: 0 },
-        children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [body("→", { size: 28, bold: true, color: colour })] })],
+        children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [body("→", { size: big ? 44 : 28, bold: true, color: colour })] })],
       }));
     }
   });
@@ -276,412 +239,227 @@ function flowBlock(steps, colour) {
   return new Table({ columnWidths: widths, width: { size: W, type: WidthType.DXA }, borders: noBorders, rows: [new TableRow({ children: cells })] });
 }
 
-/** The four role cards, two by two, DO / DON'T / WHEN NEEDED. */
-function cardsBlock(roles, colour) {
-  const half = Math.floor(W / 2);
-  const card = (r) => {
-    const paras = [
-      new Paragraph({ spacing: { after: 20 }, children: [new TextRun({ text: r.title, font: "Arial", size: 26, bold: true, color: colour })] }),
-      new Paragraph({ spacing: { after: 90 }, children: [body(r.tagline, { italics: true, size: 18, color: "3A3A3A" })] }),
-    ];
-    const group = (label, lines, mark, col) => {
-      paras.push(new Paragraph({ spacing: { before: 60, after: 30 }, children: [new TextRun({ text: label, font: "Arial", size: 15, bold: true, color: col, characterSpacing: 60 })] }));
-      for (const l of lines) paras.push(new Paragraph({ spacing: { after: 30 }, indent: { left: 260, hanging: 260 }, children: [body(`${mark}  `, { bold: true, color: col, size: 18 }), ...runs(l, { size: 18 })] }));
-    };
-    group("DO", r.do, "✓", "2E7D32");
-    group("DON'T", r.dont, "✗", WARN_RED);
-    group("WHEN NEEDED", r.when, "→", AMBER);
-    return new TableCell({
-      width: { size: half, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP,
-      margins: { top: 100, bottom: 100, left: 140, right: 140 },
-      borders: { top: { style: BorderStyle.SINGLE, size: 18, color: colour }, bottom: { style: BorderStyle.SINGLE, size: 4, color: RULE }, left: { style: BorderStyle.SINGLE, size: 4, color: RULE }, right: { style: BorderStyle.SINGLE, size: 4, color: RULE } },
-      children: paras,
-    });
+/**
+ * FAULTS & REPAIRS (pages 7 and 8): one card per procedure. The code is the
+ * biggest thing on the page because finding it is the job; the three things a
+ * team must stage, fetch and type sit on fixed cells underneath.
+ */
+const CARD_W = [3000, 3000, 3026];
+function faultCardBlock(c, colour) {
+  const labelled = (label, value, { monoValue = false, size = 20, extra = [] } = {}) => new TableCell({
+    width: { size: CARD_W[0], type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP,
+    margins: { top: 35, bottom: 45, left: 110, right: 90 },
+    children: [
+      new Paragraph({ spacing: { after: 10 }, children: [new TextRun({ text: label, font: "Arial", size: 13, bold: true, color: MUTED, characterSpacing: 60 })] }),
+      new Paragraph({ spacing: { after: 0 }, children: [monoValue ? mono(value, { bold: true, size }) : body(value, { bold: true, size })] }),
+      ...extra,
+    ],
+  });
+  const valueCell = (label, text) => {
+    if (!text) return labelled(label, "—", { size: 18 });
+    const [first, ...rest] = String(text).split("\n");
+    return labelled(label, first, { size: 19, extra: rest.map((l) => new Paragraph({ spacing: { before: 20, after: 0 }, children: [body(l, { size: 15, italics: true, color: AMBER })] })) });
   };
-  const rows = [];
-  for (let i = 0; i < roles.length; i += 2) rows.push(new TableRow({ children: [card(roles[i]), card(roles[i + 1] || roles[i])] }));
-  return new Table({ columnWidths: [half, W - half], width: { size: W, type: WidthType.DXA }, borders: noBorders, rows });
+  const head = new TableRow({ cantSplit: true, children: [
+    new TableCell({
+      width: { size: CARD_W[0], type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
+      shading: { type: ShadingType.CLEAR, fill: tint(colour, 0.78), color: "auto" },
+      margins: { top: 30, bottom: 30, left: 110, right: 90 },
+      children: [new Paragraph({ spacing: { after: 0 }, children: [mono(c.code, { bold: true, size: 36, color: colour })] })],
+    }),
+    new TableCell({
+      width: { size: CARD_W[1] + CARD_W[2], type: WidthType.DXA }, columnSpan: 2, verticalAlign: VerticalAlign.CENTER,
+      shading: { type: ShadingType.CLEAR, fill: tint(colour, 0.78), color: "auto" },
+      margins: { top: 30, bottom: 30, left: 110, right: 90 },
+      children: [new Paragraph({ spacing: { after: 0 }, children: [
+        body(c.name, { bold: true, size: 22 }),
+        ...(c.time_critical ? [body("   ⚠ TIME-CRITICAL", { bold: true, size: 20, color: WARN_RED })] : []),
+      ] })],
+    }),
+  ] });
+  const facts = new TableRow({ cantSplit: true, children: [
+    labelled("PROCEDURE", c.proc, { monoValue: true, size: 22 }),
+    labelled("CREW", c.crew),
+    labelled("MATERIALS", c.materials),
+  ] });
+  const values = new TableRow({ cantSplit: true, children: [
+    valueCell("VALUE 1", c.v1),
+    valueCell("VALUE 2", c.v2),
+    labelled("ENTER", c.format, { monoValue: true, size: 22 }),
+  ] });
+  return new Table({
+    columnWidths: CARD_W, width: { size: W, type: WidthType.DXA },
+    borders: {
+      top: { style: BorderStyle.SINGLE, size: 12, color: colour }, bottom: { style: BorderStyle.SINGLE, size: 12, color: colour },
+      left: { style: BorderStyle.SINGLE, size: 12, color: colour }, right: { style: BorderStyle.SINGLE, size: 12, color: colour },
+      insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: RULE }, insideVertical: { style: BorderStyle.SINGLE, size: 4, color: RULE },
+    },
+    rows: [head, facts, values],
+  });
 }
 
-function namesBlock(rows) {
-  return table(rows.map(([k]) => new TableRow({ children: [
-    cell(k, { width: 2600, shade: "F2F2F2", bold: true, size: 18 }),
-    cell([body(" "), body(" ")], { width: W - 2600, margins: { top: 120, bottom: 120, left: 100, right: 100 } }),
-  ] })), [2600, W - 2600]);
+const KIND_STYLE = {
+  value: { fill: "F2F2F2", bar: INK, left: "ASSEMBLY", right: "RATED VALUE", tag: "VALUE" },
+  reference: { fill: "FFF6E5", bar: AMBER, left: "REFERENCE NAME", right: "REFERENCE — NOT A VALUE", tag: "REFERENCE" },
+  authorisation: { fill: "FBE9E7", bar: WARN_RED, left: "AUTHORISATION", right: "VALUE", tag: "AUTHORISATION" },
+};
+
+/** Three chips: what a VALUE, a REFERENCE and an AUTHORISATION are (page 9). */
+function legendBlock(items) {
+  const w = Math.floor(W / items.length);
+  const widths = items.map((_, i) => (i === items.length - 1 ? W - w * (items.length - 1) : w));
+  return new Table({
+    columnWidths: widths, width: { size: W, type: WidthType.DXA }, borders: noBorders,
+    rows: [new TableRow({ children: items.map(([tag, text, kind], i) => {
+      const st = KIND_STYLE[kind];
+      return new TableCell({
+        width: { size: widths[i], type: WidthType.DXA },
+        shading: { type: ShadingType.CLEAR, fill: st.fill, color: "auto" },
+        borders: { top: { style: BorderStyle.SINGLE, size: 24, color: st.bar }, bottom: { style: BorderStyle.SINGLE, size: 4, color: RULE }, left: { style: BorderStyle.SINGLE, size: 4, color: RULE }, right: { style: BorderStyle.SINGLE, size: 4, color: RULE } },
+        margins: { top: 80, bottom: 80, left: 110, right: 90 },
+        children: [
+          new Paragraph({ spacing: { after: 30 }, children: [new TextRun({ text: tag, font: "Arial", size: 20, bold: true, color: st.bar, characterSpacing: 40 })] }),
+          new Paragraph({ spacing: { after: 0 }, children: [body(text, { size: 17 })] }),
+        ],
+      });
+    }) })],
+  });
 }
 
-/** A completed Transfer Chit, in the chit's own layout, so the paper is recognisable. */
-function chitBlock(s) {
-  const lab = (t, w, shade = "F2F2F2") => cell([body(t, { size: 14, color: MUTED })], { width: w, shade });
-  const val = (t, w) => cell([body(t, { size: 18, bold: true })], { width: w });
-  const rows = [
-    new TableRow({ children: [lab("FROM SECTOR", 2200), val(s.from, 2300), lab("TO SECTOR", 2200), val(s.to, W - 6700)] }),
-    new TableRow({ children: [lab("RESOURCES", 2200), val(s.resources, 2300), lab("WORKERS", 2200), val(s.workers, W - 6700)] }),
-    new TableRow({ children: [lab("IN EXCHANGE FOR", 2200), new TableCell({ width: { size: W - 2200, type: WidthType.DXA }, columnSpan: 3, margins: { top: 60, bottom: 60, left: 100, right: 100 }, children: [new Paragraph({ spacing: { after: 0 }, children: [body(s.exchange, { size: 18, bold: true })] })] })] }),
-    new TableRow({ children: [lab("SENDING LIAISON", 2200), val(s.sending, 2300), lab("RECEIVING LIAISON", 2200), val(s.receiving, W - 6700)] }),
-    new TableRow({ children: [lab("TIME", 2200), val(s.time, 2300), cell([body("TRN STAMP", { size: 14, bold: true, color: WARN_RED })], { width: 2200, shade: "FFF2CC" }), cell([body(s.stamp, { size: 18, bold: true, color: WARN_RED })], { width: W - 6700, shade: "FFF2CC" })] }),
-  ];
+/** A specification table, the reference directory or the appendix row (page 9), styled by kind. */
+function specTableBlock(blk, colour) {
+  const st = KIND_STYLE[blk.kind || "value"];
+  const LEFT = 5400;
+  const rows = [new TableRow({ tableHeader: true, children: [
+    cell(st.left, { width: LEFT, shade: st.fill, bold: true, size: 15 }),
+    cell(st.right, { width: W - LEFT, shade: st.fill, bold: true, size: 15, align: AlignmentType.CENTER, color: st.bar }),
+  ] })];
+  for (const [label, value] of blk.rows) {
+    rows.push(new TableRow({ cantSplit: true, children: [
+      cell(label, { width: LEFT, size: 19, margins: { top: 80, bottom: 80, left: 100, right: 100 } }),
+      new TableCell({
+        width: { size: W - LEFT, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
+        shading: blk.kind === "value" ? undefined : { type: ShadingType.CLEAR, fill: st.fill, color: "auto" },
+        margins: { top: 80, bottom: 80, left: 100, right: 100 },
+        children: [new Paragraph({ spacing: { after: 0 }, alignment: AlignmentType.CENTER, children: [mono(value, { bold: true, size: blk.kind === "value" ? 24 : 20, color: blk.kind === "reference" ? AMBER : blk.kind === "authorisation" ? WARN_RED : INK })] })],
+      }),
+    ] }));
+  }
   return [
     new Paragraph({
       spacing: { before: 160, after: 60 },
+      border: { left: { style: BorderStyle.SINGLE, size: 24, color: st.bar } }, indent: { left: 120 },
       children: [
-        new TextRun({ text: "SAMPLE — COMPLETED TRANSFER CHIT  ", font: "Arial", size: 14, bold: true, color: MUTED, characterSpacing: 60 }),
-        new TextRun({ text: `No. ${s.no}`, font: "Courier New", size: 16, color: MUTED }),
+        new TextRun({ text: `${st.tag}  `, font: "Arial", size: 13, bold: true, color: st.bar, characterSpacing: 80 }),
+        new TextRun({ text: blk.id === "REFERENCES" || blk.id === "APPENDIX C" ? blk.id : `TABLE ${blk.id}`, font: "Courier New", size: 20, bold: true, color: colour }),
+        new TextRun({ text: `   ${blk.name}`, font: "Arial", size: 18, bold: true, color: INK }),
       ],
     }),
-    table(rows, [2200, 2300, 2200, W - 6700]),
-    new Paragraph({ spacing: { before: 40, after: 160 }, children: [body("White copy to the receiving sector · Duplicate retained by the sender · VOID WITHOUT STAMP", { size: 14, italics: true, color: MUTED })] }),
+    table(rows, [LEFT, W - LEFT]),
   ];
 }
 
 /** One content block -> DOCX paragraphs/tables. */
 function renderBlock(blk, b) {
-  const f = (t) => manual.fill(t, b);
+  const f = (t) => fill(t, b);
   switch (blk.t) {
     case "p": return [new Paragraph({
-      spacing: { after: 120 },
-      children: runs(f(blk.text), blk.muted ? { size: 16, italics: true, color: MUTED } : blk.lore ? { italics: true, color: "3A3A3A" } : {}),
+      spacing: { after: blk.small ? 90 : 120 },
+      children: runs(f(blk.text), blk.muted ? { size: 16, italics: true, color: MUTED } : blk.lore ? { italics: true, color: "3A3A3A" } : blk.small ? { size: 18 } : {}),
     })];
     case "h": return [headingBlock(f(blk.text), b.colour)];
     case "steps": return stepsBlock(blk.items.map(f), blk);
-    case "check": return checkBlock(blk.items.map(f));
-    case "bullets": return bulletsBlock(blk.items.map(f));
     case "table": return [tableBlock(blk.head.map(f), blk.rows.map((r) => r.map(f)), blk.widths, blk), gap(100)];
     case "kv": return [kvBlock(blk.rows.map(([k, v]) => [f(k), f(v)]), blk), gap(100)];
     case "box": return [boxBlock(blk.kind, f(blk.title), blk.lines.map(f), b.colour), gap(120)];
-    case "flow": return [flowBlock(blk.steps.map(f), b.colour), gap(120)];
-    case "cards": return [cardsBlock(blk.items, b.colour)];
-    case "names": return [namesBlock(blk.rows), gap(120)];
-    case "chit": return chitBlock(blk.sample);
-    case "subsection": return [subsectionHead(blk.num, f(blk.title), b.colour)];
+    case "flow": return [flowBlock(blk.steps.map(f), b.colour, blk), gap(120)];
+    case "faultcards": return blk.cards.flatMap((c) => [faultCardBlock(c, b.colour), gap(40)]);
+    case "legend": return [legendBlock(blk.items), gap(80)];
+    case "spectable": return specTableBlock(blk, b.colour);
     case "gap": return [gap(blk.n)];
-    case "break": return [pageStart()];
     default: throw new Error(`build_binders: unknown block ${blk.t}`);
   }
 }
 
-function renderSection(sec, b) {
-  const breaks = sec.blocks.filter((x) => x.t === "break").length;
-  // A section may flow across more pages than it breaks explicitly; it may
-  // never break more often than it declares, or the cover's arithmetic lies.
-  if (breaks + 1 > sec.pages) throw new Error(`build_binders: ${b.code} §${sec.num} declares ${sec.pages} pages but breaks ${breaks + 1} times`);
-  const out = [pageStart(), ...sectionHead(sec.num, manual.fill(sec.title, b), b.colour, sec.tab)];
-  for (const blk of sec.blocks) out.push(...renderBlock(blk, b));
-  return out;
-}
-
-// ---------------------------------------------------------------- cover
-
-function coverPage(b, plan) {
-  const glyph = { POW: "⚡", WTR: "💧", MED: "⚕", TRN: "🚇", AGR: "🌱", COM: "📡" }[b.code] || "";
-  const line = (entry) => new TableRow({ children: [
-    new TableCell({ width: { size: 1100, type: WidthType.DXA }, borders: noBorders, margins: { top: 30, bottom: 30, left: 60, right: 60 },
-      children: [new Paragraph({ spacing: { after: 0 }, children: [body(entry.num === null || entry.num === undefined ? "" : `§${entry.num}`, { bold: true, size: 16, color: b.colour })] })] }),
-    new TableCell({ width: { size: 2900, type: WidthType.DXA }, borders: noBorders, margins: { top: 30, bottom: 30, left: 60, right: 60 },
-      children: [new Paragraph({ spacing: { after: 0 }, children: [body(entry.title, { size: 16 })] })] }),
-    new TableCell({ width: { size: 513, type: WidthType.DXA }, borders: noBorders, margins: { top: 30, bottom: 30, left: 60, right: 60 },
-      children: [new Paragraph({ spacing: { after: 0 }, alignment: AlignmentType.RIGHT, children: [body(String(entry.page), { size: 16, bold: true })] })] }),
-  ] });
-  const half = Math.ceil(plan.length / 2);
-  const col = (entries) => new TableCell({
-    width: { size: W / 2, type: WidthType.DXA }, borders: noBorders, margins: { top: 0, bottom: 0, left: 0, right: 0 },
-    children: [new Table({ columnWidths: [1100, 2900, 513], width: { size: W / 2, type: WidthType.DXA }, borders: noBorders, rows: entries.map(line) })],
-  });
-  return [
-    new Paragraph({
-      alignment: AlignmentType.CENTER, spacing: { before: 400, after: 80 },
-      children: [new TextRun({ text: "HAVEN-9", font: "Arial", size: 36, bold: true, color: MUTED, characterSpacing: 200 })],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER, spacing: { after: 500 },
-      children: [new TextRun({ text: "SUBTERRANEAN CONTINUITY AUTHORITY", font: "Arial", size: 16, color: MUTED, characterSpacing: 80 })],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER, spacing: { after: 100 },
-      children: [new TextRun({ text: glyph, font: "Segoe UI Emoji", size: 96 })],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER, spacing: { after: 40 },
-      children: [new TextRun({ text: b.code, font: "Arial", size: 96, bold: true, color: b.colour })],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER, spacing: { after: 60 },
-      children: [new TextRun({ text: b.name.toUpperCase(), font: "Arial", size: 32, bold: true, color: INK, characterSpacing: 40 })],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER, spacing: { after: 360 },
-      children: [new TextRun({ text: b.motto, font: "Arial", size: 20, italics: true, color: MUTED })],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER, spacing: { after: 60 },
-      children: [new TextRun({ text: "TECHNICAL OPERATIONS BINDER", font: "Arial", size: 22, bold: true, color: INK, characterSpacing: 40 })],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER, spacing: { after: 300 },
-      children: [new TextRun({ text: "Revision 10 · Self-guided edition · Keep at the sector station", font: "Arial", size: 16, color: MUTED })],
-    }),
-    boxBlock("ACTION", "NO BRIEFING IS COMING", [
-      "This binder and your sector console contain everything you need to operate your station. Nobody will present the rules. **Turn to page 3 and begin.** Pages 3 to 7 are enough to start; the rest is reference for when you need it.",
-    ], b.colour),
-    gap(200),
-    new Paragraph({
-      spacing: { after: 80 },
-      children: [new TextRun({ text: "CONTENTS", font: "Arial", size: 16, bold: true, color: MUTED, characterSpacing: 80 })],
-    }),
-    new Table({ columnWidths: [W / 2, W / 2], width: { size: W, type: WidthType.DXA }, borders: noBorders, rows: [new TableRow({ children: [col(plan.slice(0, half)), col(plan.slice(half))] })] }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      border: { top: { style: BorderStyle.SINGLE, size: 6, color: b.colour } },
-      spacing: { before: 300, after: 60 },
-      children: [new TextRun({ text: `${b.code} PERSONNEL ONLY`, font: "Arial", size: 18, bold: true, color: b.colour, characterSpacing: 60 })],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: "This binder does not leave the sector station. What it says may be shared out loud, at your discretion. Only your Liaison leaves the station.", font: "Arial", size: 16, italics: true, color: MUTED })],
-    }),
-  ];
-}
-
-// ---------------------------------------------------------------- the reference half (from the assembler)
-
-function indexPages(b) {
-  const rows = [new TableRow({ tableHeader: true, children: [
-    cell("FAULT CODE", { width: 1800, shade: "F2F2F2", bold: true }),
-    cell("DESCRIPTION", { width: 4200, shade: "F2F2F2", bold: true }),
-    cell("ACTION", { width: W - 6000, shade: "F2F2F2", bold: true }),
-  ]})];
-  for (const r of b.index_rows) {
-    const actionRuns = r.own
-      ? (r.no_procedure
-          ? [body(r.action, { bold: true })]
-          : [mono(r.action)])
-      : [body(r.action, { bold: true, color: AMBER })];
-    rows.push(new TableRow({ children: [
-      cell(r.code, { width: 1800, mono: true, bold: r.own }),
-      cell(r.name, { width: 4200 }),
-      new TableCell({
-        width: { size: W - 6000, type: WidthType.DXA },
-        margins: { top: 60, bottom: 60, left: 100, right: 100 },
-        shading: r.own ? undefined : { type: ShadingType.CLEAR, fill: "FFF6E5", color: "auto" },
-        children: [new Paragraph({ spacing: { after: 0 }, children: actionRuns })],
-      }),
-    ]}));
-  }
-  return [
-    pageStart(),
-    ...sectionHead(12, manual.TITLES[12], b.colour, "INDEX"),
-    p(runs("When a fault appears on your console, find its code here first. A fault on your own console is always yours: its row names the procedure to open in §13. **Shaded rows are codes that belong to another sector.** If you are told or shown one of those, send it to the sector named; do not attempt a repair. The flow is §7.")),
-    table(rows, [1800, 4200, W - 6000]),
-    gap(160),
-    p([body("TIME-CRITICAL", { bold: true }), body(" marks a fault that bleeds Health faster than any other. Work it first.")]),
-  ];
-}
-
-/**
- * 14A · CROSS-SYSTEM REFERENCE DIRECTORY.
- *
- * The rows that do not answer. Where §14 prints a figure, this prints another
- * sector's asset — and the whole mechanic rests on an operator being able to
- * tell the two apart at a glance under pressure, so the reference is set in
- * the same mono face as a value but bracketed with its sector, and the
- * standing order above the table says in one line what it is for.
- */
-function referencePages(b) {
-  if (!b.references || !b.references.length) return [];
-  const LEFT = 4600;
-  const rows = [new TableRow({ tableHeader: true, children: [
-    cell("REFERENCE NAME", { width: LEFT, shade: "F2F2F2", bold: true }),
-    cell("REFERENCE", { width: W - LEFT, shade: "F2F2F2", bold: true, align: AlignmentType.CENTER }),
-  ]})];
-  for (const r of b.references) {
-    rows.push(new TableRow({ children: [
-      cell(r.name, { width: LEFT }),
-      cell(r.display, { width: W - LEFT, mono: true, bold: true, align: AlignmentType.CENTER }),
-    ]}));
-  }
-  return [
-    pageStart(),
-    ...sectionHead("14A", "CROSS-SYSTEM REFERENCE DIRECTORY", b.colour, "REFS"),
-    p(body("Entries ending with a sector code in square brackets are REFERENCES, not resolution values. "
-      + "Relay the exact reference name and sector shown to the requesting team. The named sector holds "
-      + "the authoritative numeric value. Do not invent or infer a number.")),
-    gap(160),
-    table(rows, [LEFT, W - LEFT]),
-  ];
-}
-
-const PROCS_PER_PAGE = 3;
-
-function procedurePages(b) {
-  const out = [pageStart(), ...sectionHead(13, manual.TITLES[13], b.colour, "REPAIR"),
-    p(runs("Procedures are written to be read aloud, by the Systems Lead, all the way through. The console will not accept a partial code. **§7 is the flow; this is the content.** A value \"not held in this binder\" is fetched in person by the Liaison, by row name, from the sector named.")),
-  ];
-  b.procedures.forEach((proc, i) => {
-    out.push(new Paragraph({
-      pageBreakBefore: i > 0 && i % PROCS_PER_PAGE === 0,
-      spacing: { before: 240, after: 100 },
-      border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: b.colour } },
-      children: [
-        new TextRun({ text: `PROCEDURE ${proc.id}`, font: "Courier New", size: 24, bold: true, color: b.colour }),
-        new TextRun({ text: `   ${proc.title}`, font: "Arial", size: 24, bold: true, color: INK }),
-      ],
-    }));
-    out.push(table([
-      new TableRow({ children: [
-        cell("APPLIES TO", { width: 1900, shade: "F2F2F2", bold: true }),
-        cell(proc.fault_code, { width: 1700, mono: true }),
-        cell("CREW", { width: 1200, shade: "F2F2F2", bold: true }),
-        cell(String(proc.crew), { width: 900 }),
-        cell("MATERIALS", { width: 1700, shade: "F2F2F2", bold: true }),
-        cell(proc.resources, { width: W - 7400 }),
-      ]}),
-    ], [1900, 1700, 1200, 900, 1700, W - 7400]));
-    proc.steps.forEach((s, n) => {
-      out.push(new Paragraph({
-        spacing: { after: 60 }, indent: { left: 340, hanging: 340 },
-        children: [mono(`${n + 1}.  `), body(s)],
-      }));
-    });
-    out.push(new Paragraph({
-      spacing: { before: 100, after: 120 },
-      shading: { type: ShadingType.CLEAR, fill: "F2F2F2", color: "auto" },
-      children: [body("CODE FORMAT:  ", { bold: true }), mono(proc.format, { bold: true })],
-    }));
-  });
-  return out;
-}
-
-function tablePages(b) {
-  const out = [pageStart(), ...sectionHead(14, manual.TITLES[14], b.colour, "SPECS"),
-    p(body("These values are held by this sector. Other stations will send their Liaison to ask for them, by row name, during the shift. Whether you give them, and how quickly, is your call.")),
-  ];
-  for (const t of b.tables) {
-    out.push(new Paragraph({
-      spacing: { before: 220, after: 100 },
-      children: [
-        new TextRun({ text: `TABLE ${t.id}`, font: "Courier New", size: 22, bold: true, color: b.colour }),
-        new TextRun({ text: `   ${t.name}`, font: "Arial", size: 22, bold: true, color: INK }),
-      ],
-    }));
-    const rows = [new TableRow({ children: [
-      cell("ASSEMBLY", { width: 5000, shade: "F2F2F2", bold: true }),
-      cell("RATED VALUE", { width: W - 5000, shade: "F2F2F2", bold: true, align: AlignmentType.CENTER }),
-    ]})];
-    for (const r of t.rows) {
-      rows.push(new TableRow({ children: [
-        cell(r.label, { width: 5000 }),
-        cell(String(r.value), { width: W - 5000, mono: true, bold: true, align: AlignmentType.CENTER }),
-      ]}));
-    }
-    out.push(table(rows, [5000, W - 5000]));
-  }
-  out.push(gap(200));
-  out.push(p([body("Values are as-built and take precedence over station instrumentation.", { italics: true, color: MUTED })]));
-  return out;
-}
-
-function appendixPage(b) {
-  return [
-    pageStart(),
-    ...sectionHead(null, "APPENDIX C · NON-ROUTINE AUTHORISATIONS", b.colour, "APP C"),
-    p(body("Retained for audit. Not part of the standard fault index. Applies only where a procedure directs the operator to this appendix or where no indexed procedure exists.")),
-    gap(200),
-    p(body("C.1  Scope")),
-    p(body("The authorisation below was issued under emergency powers and has not been revoked. It remains valid for the current operating period.", { color: MUTED })),
-    gap(200),
-    table([
-      new TableRow({ children: [
-        cell("AUTHORISATION", { width: 5000, shade: "F2F2F2", bold: true }),
-        cell("VALUE", { width: W - 5000, shade: "F2F2F2", bold: true, align: AlignmentType.CENTER }),
-      ]}),
-      new TableRow({ children: [
-        cell(b.appendix.row_label, { width: 5000 }),
-        cell(String(b.appendix.value), { width: W - 5000, mono: true, bold: true, align: AlignmentType.CENTER }),
-      ]}),
-    ], [5000, W - 5000]),
-    gap(240),
-    p(body("C.2  Records retention")),
-    p(body("Superseded revisions of this appendix were destroyed in the Cycle 31 records purge. No further entries follow.", { color: MUTED })),
-  ];
-}
-
-function logPage(b) {
-  const rows = [new TableRow({ children: [
-    cell("TIME", { width: 1200, shade: "F2F2F2", bold: true }),
-    cell("EVENT / FAULT", { width: 2600, shade: "F2F2F2", bold: true }),
-    cell("DECISION TAKEN", { width: 3200, shade: "F2F2F2", bold: true }),
-    cell("WHO AGREED", { width: W - 7000, shade: "F2F2F2", bold: true }),
-  ]})];
-  for (let i = 0; i < 16; i++) {
-    rows.push(new TableRow({ children: [
-      cell("", { width: 1200 }), cell("", { width: 2600 }),
-      cell("", { width: 3200 }), cell("", { width: W - 7000 }),
-    ]}));
-  }
-  return [
-    pageStart(),
-    ...sectionHead(15, manual.TITLES[15], b.colour, "LOG"),
-    p(body("Keep this current. It is the sector's record of what was decided and who agreed to it, and the Council may call for it at any time. Loose-leaf: ask for a fresh sheet when it is full.")),
-    table(rows, [1200, 2600, 3200, W - 7000]),
-  ];
-}
-
-/** The reference half's page plan, from the content it will print. */
-function referencePlan(b) {
-  const plan = [
-    { id: "index", num: 12, title: manual.TITLES[12], pages: 1 },
-    { id: "procedures", num: 13, title: manual.TITLES[13], pages: Math.max(1, Math.ceil(b.procedures.length / PROCS_PER_PAGE)) },
-    { id: "tables", num: 14, title: manual.TITLES[14], pages: 1 },
-  ];
-  if (b.references && b.references.length) plan.push({ id: "references", num: "14A", title: "CROSS-SYSTEM REFERENCE DIRECTORY", pages: 1 });
-  plan.push({ id: "appendix", num: null, title: "APPENDIX C · NON-ROUTINE AUTHORISATIONS", pages: 1 });
-  plan.push({ id: "log", num: 15, title: manual.TITLES[15], pages: 1 });
-  return plan;
-}
-
 // ---------------------------------------------------------------- assemble
+
+/** The nine pages: no cover, no contents, every page titled and numbered. */
+function buildBinder(b) {
+  const pages = compact.compactFor(b);
+  const children = [];
+  pages.forEach((pg, i) => {
+    if (i > 0) children.push(pageStart());
+    children.push(...pageHead(pg.num, fill(pg.title, b), b.colour, `${b.code} ${pg.num}/${pages.length}`));
+    for (const blk of pg.blocks) children.push(...renderBlock(blk, b));
+    // the spacing after a page's last table would be a paragraph that can spill onto a blank leaf
+    while (children.length && children[children.length - 1].__gap) children.pop();
+  });
+  const plan = pages.map((pg) => ({ id: `p${pg.num}`, num: pg.num, title: fill(pg.title, b), page: pg.num, pages: 1 }));
+  return {
+    children, plan,
+    header: `HAVEN-9 · ${b.code} ${b.name.toUpperCase()} · TECHNICAL OPERATIONS BINDER · KEEP AT STATION`,
+    footer: ["Page ", PageNumber.CURRENT, ` of ${pages.length}  ·  Each round p.2  ·  Your panel p.3  ·  Faults p.4 then p.7–8  ·  Trades p.5  ·  Quick actions p.6  ·  Values p.9`],
+  };
+}
+
+const docOf = ({ children, header, footer }) => new Document({
+  styles: { default: { document: { run: { font: "Arial", size: 20, color: INK } } } },
+  sections: [{
+    properties: { page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } },
+    headers: { default: new Header({ children: [new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: RULE } },
+      children: [new TextRun({ text: header, font: "Arial", size: 14, color: MUTED })],
+    })]}) },
+    footers: footer ? { default: new Footer({ children: [new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new TextRun({ children: footer, font: "Arial", size: 14, color: MUTED })],
+    })]}) } : undefined,
+    children,
+  }],
+});
+
+/** The Station Operations Log as a loose sheet, one page per sector, printed as needed. */
+function stationLog(binders) {
+  const children = [];
+  binders.forEach((b, i) => {
+    if (i > 0) children.push(pageStart());
+    children.push(...pageHead("", "STATION OPERATIONS LOG", b.colour, b.code));
+    children.push(p(body("Loose sheet. Keep it current: it is the sector's record of what was decided and who agreed to it, and the Council may call for it at any time. Ask for a fresh sheet when it is full.")));
+    const rows = [new TableRow({ children: [
+      cell("TIME", { width: 1200, shade: "F2F2F2", bold: true }),
+      cell("EVENT / FAULT", { width: 2600, shade: "F2F2F2", bold: true }),
+      cell("DECISION TAKEN", { width: 3200, shade: "F2F2F2", bold: true }),
+      cell("WHO AGREED", { width: W - 7000, shade: "F2F2F2", bold: true }),
+    ] })];
+    for (let n = 0; n < 18; n += 1) {
+      rows.push(new TableRow({ children: [cell("", { width: 1200 }), cell("", { width: 2600 }), cell("", { width: 3200 }), cell("", { width: W - 7000 })] }));
+    }
+    children.push(table(rows, [1200, 2600, 3200, W - 7000]));
+  });
+  return { children, header: "HAVEN-9 · STATION OPERATIONS LOG · LOOSE SHEET", footer: null };
+}
 
 fs.mkdirSync(OUTDIR, { recursive: true });
 const plans = {};
+const codes = Object.keys(data.binders).filter((c) => !ONLY.length || ONLY.includes(c));
 
-for (const code of Object.keys(data.binders)) {
+for (const code of codes) {
   const b = data.binders[code];
-  const man = manual.manualFor(b);
-  const refPlan = referencePlan(b);
-  const plan = manual.pagePlan(man, refPlan);
-  plans[code] = plan;
-  const front = [{ num: null, title: manual.QUICK_TITLE, page: 2 }, ...plan];
-  const children = [
-    ...coverPage(b, front),
-    ...renderSection(man.front, b),
-    ...man.sections.flatMap((s) => renderSection(s, b)),
-    ...indexPages(b), ...procedurePages(b), ...tablePages(b), ...referencePages(b), ...appendixPage(b), ...logPage(b),
-  ];
-  // the back page: the quick reference again
-  children.push(...renderSection(man.back, b));
-
-  const doc = new Document({
-    styles: { default: { document: { run: { font: "Arial", size: 20, color: INK } } } },
-    sections: [{
-      properties: { page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } },
-      headers: { default: new Header({ children: [new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: RULE } },
-        children: [new TextRun({ text: `HAVEN-9 · ${b.code} TECHNICAL OPERATIONS BINDER · ${b.name.toUpperCase()} · KEEP AT STATION`, font: "Arial", size: 14, color: MUTED })],
-      })]}) },
-      footers: { default: new Footer({ children: [new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [new TextRun({ children: ["Page ", PageNumber.CURRENT, "  ·  Quick reference: page 2 and the back page  ·  Faults §7  ·  Upkeep §5  ·  Trading §9"], font: "Arial", size: 14, color: MUTED })],
-      })]}) },
-      children,
-    }],
-  });
+  const built = buildBinder(b);
+  plans[code] = built.plan;
   const file = path.join(OUTDIR, `UNDERCITY_Binder_${b.code}.docx`);
-  Packer.toBuffer(doc).then((buf) => {
+  Packer.toBuffer(docOf(built)).then((buf) => {
     fs.writeFileSync(file, buf);
-    console.log("✓", file, `(${plan[plan.length - 1].page} pages planned)`);
+    console.log("✓", file, `(${built.plan.length} pages)`);
   });
 }
+
+const logFile = path.join(OUTDIR, "UNDERCITY_StationLog.docx");
+Packer.toBuffer(docOf(stationLog(codes.map((c) => data.binders[c])))).then((buf) => {
+  fs.writeFileSync(logFile, buf);
+  console.log("✓", logFile, `(${codes.length} loose sheets)`);
+});
 
 // The plan each binder was laid out to, beside binder_content.json: the page
 // check (tools/kit/check_binder_pages.py) reads it back and compares.

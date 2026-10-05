@@ -33,10 +33,12 @@ SECTORS = ["POW", "WTR", "MED", "TRN", "AGR", "COM"]
 TITLE_PT = 15  # the section head's title size, and nothing else's
 
 EXPORT_PS = r"""
+$ErrorActionPreference = "Stop"
 $word = New-Object -ComObject Word.Application
 $word.Visible = $false
 try {
   foreach ($code in @(%s)) {
+    if (-not (Test-Path "%s\UNDERCITY_Binder_$code.docx")) { continue }
     $doc = $word.Documents.Open("%s\UNDERCITY_Binder_$code.docx", $false, $true)
     try { $doc.ExportAsFixedFormat("%s\UNDERCITY_Binder_$code.pdf", 17) } finally { $doc.Close($false) }
   }
@@ -46,11 +48,19 @@ try {
 
 def export_pdfs():
     PDF_DIR.mkdir(parents=True, exist_ok=True)
-    script = EXPORT_PS % (", ".join(f'"{c}"' for c in SECTORS), str(KIT), str(PDF_DIR))
+    # a stale PDF would pass a check it should fail: start from nothing
+    for code in SECTORS:
+        old = PDF_DIR / f"UNDERCITY_Binder_{code}.pdf"
+        if old.exists():
+            old.unlink()
+    script = EXPORT_PS % (", ".join(f'"{c}"' for c in SECTORS), str(KIT), str(KIT), str(PDF_DIR))
     r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
                        capture_output=True, text=True)
     if r.returncode != 0:
         sys.exit(f"check_binder_pages: Word export failed\n{r.stderr}")
+    missing = [c for c in SECTORS if (KIT / f"UNDERCITY_Binder_{c}.docx").exists() and not (PDF_DIR / f"UNDERCITY_Binder_{c}.pdf").exists()]
+    if missing:
+        sys.exit(f"check_binder_pages: Word produced no PDF for {', '.join(missing)}\n{r.stderr}")
 
 
 def title_pages(pdf):
@@ -72,9 +82,13 @@ def main():
     bad = 0
     for code in SECTORS:
         pdf = PDF_DIR / f"UNDERCITY_Binder_{code}.pdf"
+        if not pdf.exists():
+            continue
         found = title_pages(pdf)
         total = len(pymupdf.open(pdf))
-        plan = plans[code]
+        plan = plans.get(code)
+        if not plan:
+            continue
         expected_total = plan[-1]["page"]
         flag = "" if total == expected_total else "  <-- TOTAL DRIFT"
         bad += bool(flag)
@@ -82,7 +96,7 @@ def main():
         for entry in plan:
             title = entry["title"]
             # a wrapped title is split over lines; the first line is enough to identify it
-            key = next((k for k in found if title.startswith(k[:20]) or k.startswith(title[:20])), None)
+            key = title if title in found else next((k for k in found if title.startswith(k[:20]) or k.startswith(title[:20])), None)
             page = found.get(key)
             if entry["id"] == "quick-back":
                 page = total if key else None   # the back page carries the same title as page 2

@@ -185,9 +185,9 @@ test('RC-010: every reference is an asset and a sector, and never a figure', () 
   // PWR is not a sector in this game; the abbreviation is POW.
   assert.ok(!JSON.stringify(chain).includes('PWR'), 'PWR crept in');
   // The binder prints the directory, and says what it is for.
-  const binders = fs.readFileSync(path.join(ROOT, 'tools/kit/build_binders.js'), 'utf8');
-  assert.ok(/14A · CROSS-SYSTEM REFERENCE DIRECTORY/.test(binders), 'the binder has no 14A');
-  assert.ok(/are REFERENCES, not resolution values/.test(binders), 'the binder does not explain a reference');
+  const binders = fs.readFileSync(path.join(ROOT, 'tools/kit/binder_compact.js'), 'utf8');
+  assert.ok(/Cross-System Reference Directory/.test(binders), 'the binder has no reference directory');
+  assert.ok(/A pointer, not a number/.test(binders), 'the binder does not explain a reference');
 });
 
 // -- RC-011: the console is unchanged --------------------------------------------------------

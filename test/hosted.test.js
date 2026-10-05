@@ -131,7 +131,7 @@ test('a signed-in facilitator can read and download the kit', async () => {
   assert.equal(summary.status, 200);
   assert.equal(summary.json.available, true);
   assert.equal(summary.json.sync.status, 'ok');
-  assert.equal(summary.json.counts.documents, 13);
+  assert.equal(summary.json.counts.documents, 14);
 
   const one = await agent('/api/admin/kit/download/UNDERCITY_FaultCards.docx');
   assert.equal(one.status, 200);
