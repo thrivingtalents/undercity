@@ -3424,10 +3424,19 @@ test('the clock reaches zero: it stops at 00:00, says COUNCIL TIME EXPIRED, and 
   assert.equal(forControl(game).council.status, 'expired');
   assert.equal(forSector(game, 'POW').council.expired, true);
   assert.ok(/COUNCIL TIME EXPIRED/.test(CONTROL_SCRIPT) && /COUNCIL TIME EXPIRED/.test(SECTOR_SCRIPT));
-  // time added after 00:00 runs the clock again; the sitting is the same one
-  assert.equal(game.clock('add', 30, 'council').status, 'running');
-  assert.equal(game.state.council.status, 'active');
+  // Extended before 00:00 or not at all: a closed sitting refuses more time by
+  // either button, and a second sitting is CLOSE COUNCIL then CALL COUNCIL.
+  assert.deepEqual(
+    [game.clock('add', 30, 'council'), game.clock('reset', null, 'council')].map((r) => [r.ok, r.reason]),
+    [[false, 'council_expired'], [false, 'council_expired']], 'a closed sitting took more time');
+  assert.equal(game.state.council.status, 'expired');
+  assert.equal(game.councilRemaining(), 0);
   assert.equal(game.state.council.count, 1);
+  game.endCouncil('facilitator');
+  game.callCouncil();
+  assert.equal(game.state.council.count, 2, 'a fresh sitting is a second sitting, not a longer first one');
+  assert.equal(game.state.council_clock.status, 'running');
+  assert.equal(Math.round(game.councilRemaining()), 60, 'the new sitting is a full minute');
 });
 
 

@@ -1182,6 +1182,9 @@
   }
 
   function renderCouncilClock() {
+    // Extend before 00:00 or not at all: once the sitting has closed, the only
+    // live control is CLOSE COUNCIL.
+    for (const b of document.querySelectorAll('[data-council]')) b.disabled = expired;
     const clk = state.council_clock || {};
     const secs = U.countdown(clk, state.frozen);
     const el = $('council-time');
