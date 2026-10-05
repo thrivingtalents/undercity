@@ -85,6 +85,11 @@
   let prevCore = null;
   let prevCycle = null;
   let alertRenderedId = null;
+  // CITY EVENTS (2026-10-06): the four-second wash of a newly activated event, and which activations
+  // this screen has already shown — a fallback to an older active event never replays its wash.
+  let cityTakeover = null;
+  const cityTakeoverSeen = new Set();
+  const CITY_TAKEOVER_S = 4;
   let shockUntil = 0;
   let cycleFlashUntil = 0;
   let roundFlashUntil = 0;
@@ -313,6 +318,7 @@
     renderModes();
     renderAlertTakeover();
     renderPaused();
+    renderCityEvent();
     renderRoundFlash();
     renderCycle();
     tick();
@@ -765,6 +771,39 @@
   function renderPaused() { show($('paused'), !!frame.paused); }
 
   /**
+   * CITY EVENTS (2026-10-06). A newly activated event takes the screen for four
+   * seconds — a translucent wash, green for GOOD and red for BAD, with the
+   * words POSITIVE CITY EVENT or CITY EMERGENCY, the name and the effect — then
+   * collapses to a subtle state: an edge glow on the map frame and a chip in
+   * the alert strip, which stays while the event does. The newest active
+   * event owns the colour; a deactivation removes it at once, and a fallback
+   * to an older event never replays the wash. The wash sits under the
+   * facilitator's alert and SIMULATION PAUSED, and never touches the sector
+   * cards, so no CRITICAL or DARK word is ever covered.
+   */
+  function renderCityEvent() {
+    const ce = frame.city_event;
+    const cur = ce && ce.current;
+    $('wall').dataset.cityEvent = cur ? (cur.type === 'GOOD' ? 'good' : 'bad') : '';
+    if (!cur) { cityTakeover = null; show($('city-takeover'), false); return; }
+    if (cityTakeover && cityTakeover.activation !== cur.activation) cityTakeover = null;
+    if (!cityTakeoverSeen.has(cur.activation)) {
+      cityTakeoverSeen.add(cur.activation);
+      if (cur.full_screen) {
+        const left = Math.max(0, (Number(cur.full_s) || CITY_TAKEOVER_S) - (Number(cur.age_s) || 0));
+        cityTakeover = { activation: cur.activation, until: performance.now() + left * 1000 };
+        const box = $('city-takeover');
+        box.classList.toggle('good', cur.type === 'GOOD');
+        box.classList.toggle('bad', cur.type !== 'GOOD');
+        setText($('city-takeover-label'), cur.label || '');
+        setText($('city-takeover-name'), cur.name || '');
+        setText($('city-takeover-fx'), cur.effect_summary || '');
+      }
+    }
+    show($('city-takeover'), !!cityTakeover && performance.now() < cityTakeover.until && !frame.paused);
+  }
+
+  /**
    * THE ROUND MARKER (2026-09-21). When the round number changes the wall says
    * so for three seconds and then stops saying it. No title, no objective, no
    * hint of what is coming: the number is the whole message. It pauses
@@ -830,6 +869,7 @@
     if (!$('core-shock').hidden && now >= shockUntil) show($('core-shock'), false);
     if (!$('cycle-flash').hidden && now >= cycleFlashUntil) show($('cycle-flash'), false);
     if (!$('round-flash').hidden && now >= roundFlashUntil) show($('round-flash'), false);
+    if (cityTakeover && now >= cityTakeover.until) { cityTakeover = null; show($('city-takeover'), false); }
     if (routeEls.size || (frame.transfers || []).length) renderMovement();
     show($('alert-full'), !!frame.alert && alertIsFull());
     $('wall').classList.toggle('dimmed', !$('core-shock').hidden || !!frame.paused || alertIsFull());

@@ -19,6 +19,7 @@ const { forSector, forControl, forBigscreen } = require('../lib/visibility');
 const { analyse } = require('../lib/analytics');
 const economy = require('../lib/economy');
 const DEFS = require('../lib/city-events.json');
+const B = require('../public/shared/bigscreen');
 
 const ROOT = path.join(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
@@ -124,7 +125,7 @@ test('EVT-005: TRANSPORT CORRIDOR CLEARED lifts normal TRN capacity from 3 to 5 
   assert.equal(g.stampsUsed(), 1, 'approvals used were reset');
   assert.equal(res.applied[0].capacity_before, 3);
   assert.equal(res.applied[0].capacity_after, 5);
-  assert.equal(card(g, 'TRANSPORT_CORRIDOR_CLEARED').button, 'USED THIS ROUND');
+  assert.equal(card(g, 'TRANSPORT_CORRIDOR_CLEARED').button, 'DEACTIVATE');
   assert.deepEqual(view(g).active_effects.map((a) => a.text), ['TRN +2 TRANSFER CAPACITY · UNTIL ROUND END']);
   g.activateRound('R4');
   assert.equal(g.trnCapacity(), 3, 'the lift outlived the round');
@@ -160,8 +161,8 @@ test('EVT-007: UTILITY RESERVE RELEASED takes 1 Power off every sector\'s next u
   assert.equal(res.ok, true);
   for (const s of SECTORS) assert.deepEqual(economy.upkeepFor(g, g.state.sectors[s]), { power: 1, water: 1 }, s);
   assert.deepEqual(forSector(g, 'POW').sectors.POW.upkeep_delivery, { power: 1, water: 1 }, 'NEXT UPKEEP does not show the modifier');
-  assert.equal(card(g, 'UTILITY_RESERVE_RELEASED').button, 'PENDING');
-  assert.equal(fire(g, 'UTILITY_RESERVE_RELEASED').reason, 'city_event_pending');
+  assert.equal(card(g, 'UTILITY_RESERVE_RELEASED').button, 'DEACTIVATE');
+  assert.equal(fire(g, 'UTILITY_RESERVE_RELEASED').reason, 'event_already_active');
   assert.deepEqual(view(g).active_effects.map((a) => a.text), ['ALL SECTORS -1 POWER · NEXT UPKEEP']);
   const power = g.state.sectors.POW.inventory.power;
   const act = g.activateRound('R4');
@@ -242,7 +243,7 @@ test('EVT-012: CORE ENERGY INSTABILITY makes the next upkeep 3 Power + 1 Water, 
   assert.equal(res.ok, true);
   for (const s of SECTORS) assert.deepEqual(economy.upkeepFor(g, g.state.sectors[s]), { power: 3, water: 1 }, s);
   assert.deepEqual(forSector(g, 'TRN').sectors.TRN.upkeep_delivery, { power: 3, water: 1 });
-  assert.equal(card(g, 'CORE_ENERGY_INSTABILITY').button, 'PENDING');
+  assert.equal(card(g, 'CORE_ENERGY_INSTABILITY').button, 'DEACTIVATE');
   const power = g.state.sectors.TRN.inventory.power;
   g.activateRound('R4');
   const r = g.state.upkeep_results.R3.TRN;
@@ -311,7 +312,7 @@ test('EVT-016: a NEXT_UPKEEP effect stays pending until an upkeep is actually pr
   assert.equal(act.ok, true);
   assert.equal(act.charged, null, 'Round 0 was charged without a clock');
   assert.equal(liveEffects(g).length, 6, 'the modifier went without an upkeep');
-  assert.equal(card(g, 'CORE_ENERGY_INSTABILITY').button, 'PENDING');
+  assert.equal(card(g, 'CORE_ENERGY_INSTABILITY').button, 'DEACTIVATE');
   for (const s of SECTORS) assert.deepEqual(economy.upkeepFor(g, g.state.sectors[s]), { power: 3, water: 1 });
   for (const s of SECTORS) g.setInventory(s, { power: 9, water: 9, parts: 9, med: 9 });
   economy.processCycle(g, { round: g.state.round });
@@ -322,33 +323,50 @@ test('EVT-016: a NEXT_UPKEEP effect stays pending until an upkeep is actually pr
 
 // -- EVT-017 … EVT-020: the room, the log, not a fault -----------------------------------------------
 
-test('EVT-017: every activation raises the City Alert on all six consoles — the name, the plain effect, nothing internal', () => {
+test('EVT-017: every activation paints its own overlay on all six consoles — the colour, the words beside it, the name, the effect, nothing internal', () => {
   const g = at('R3');
+  g.drainStings();
   assert.equal(fire(g, 'MONSTER_ATTACK').ok, true);
   for (const s of SECTORS) {
     const frame = forSector(g, s);
-    assert.ok(frame.alert, `${s}: no alert`);
-    assert.equal(frame.alert.title, 'MONSTER ATTACK');
-    assert.equal(frame.alert.subtitle, 'All sectors lose 10 Health. 1 Worker is injured in every sector.');
-    assert.equal(frame.alert.full_screen, true);
-    assert.equal(frame.alert.full_s, 8);
+    const cur = frame.city_event && frame.city_event.current;
+    assert.ok(cur, `${s}: no city event overlay`);
+    assert.equal(cur.type, 'BAD');
+    assert.equal(cur.colour, 'red');
+    assert.equal(cur.label, 'CITY EMERGENCY');
+    assert.equal(cur.name, 'MONSTER ATTACK');
+    assert.equal(cur.line, 'All sectors lose 10 Health. 1 Worker is injured in every sector.');
+    assert.equal(cur.effect_summary, 'ALL SECTORS -10 HEALTH · 1 WORKER INJURED IN EVERY SECTOR');
+    assert.equal(cur.full_screen, true);
+    assert.equal(cur.full_s, 4);
+    assert.equal(frame.city_event.active.length, 1);
+    assert.equal(frame.alert, null, `${s}: the facilitator's red City Alert was raised for a city event`);
     assert.ok(frame.ticker.some((e) => e.kind === 'event' && e.text === 'MONSTER ATTACK'), `${s}: the feed has no entry`);
     assert.equal(frame.city_events, undefined, `${s} was sent the admin catalogue`);
     assert.ok(!JSON.stringify(frame).includes('MONSTER_ATTACK'), `${s} was sent the internal id`);
   }
-  const alerts = logEvents(g, 'alert');
-  assert.equal(alerts[alerts.length - 1].title, 'MONSTER ATTACK');
+  assert.equal(logEvents(g, 'alert').length, 0, 'a city event was logged as a facilitator alert');
+  assert.ok(g.drainStings().includes('alert'), 'a BAD event made no sound in the room');
 });
 
-test('EVT-018: every activation reaches the big screen at once — the alert strip and the city event feed', () => {
+test('EVT-018: every activation reaches the big screen at once — the overlay, the alert strip chip and the city event feed', () => {
   const g = at('R3');
+  g.drainStings();
   assert.equal(fire(g, 'CITY_RECOVERY_PROTOCOL').ok, true);
   const wall = forBigscreen(g);
-  assert.ok(wall.alert && wall.alert.title === 'CITY RECOVERY PROTOCOL');
-  assert.equal(wall.alert.subtitle, 'All operating sectors recover 5 Health. MED receives 2 additional heals this round.');
+  const cur = wall.city_event && wall.city_event.current;
+  assert.ok(cur && cur.type === 'GOOD' && cur.colour === 'green' && cur.label === 'POSITIVE CITY EVENT', JSON.stringify(cur));
+  assert.equal(cur.name, 'CITY RECOVERY PROTOCOL');
+  assert.equal(cur.line, 'All operating sectors recover 5 Health. MED receives 2 additional heals this round.');
+  assert.equal(wall.alert, null, 'the wall got the red MAJOR EMERGENCY takeover for a GOOD event');
+  const chip = B.buildAlerts(wall).find((c) => c.kind === 'city');
+  assert.ok(chip, 'the strip has no city event chip');
+  assert.equal(chip.accent, 'green');
+  assert.equal(chip.head, 'POSITIVE CITY EVENT · CITY RECOVERY PROTOCOL');
   const feed = Array.isArray(wall.ticker) ? wall.ticker : wall.feed;
   assert.ok(feed.some((e) => e.kind === 'event' && e.text === 'CITY RECOVERY PROTOCOL'), 'the wall feed has no entry');
   assert.ok(!JSON.stringify(wall).includes('CITY_RECOVERY_PROTOCOL') && !JSON.stringify(wall).includes('city_events'), 'the wall was sent admin data');
+  assert.ok(g.drainStings().includes('chime'), 'a GOOD event made no sound in the room');
 });
 
 test('EVT-019: every activation is written to the run log with what was asked, what happened, to whom, and for how long', () => {
@@ -397,13 +415,13 @@ test('EVT-021: the same event cannot apply twice from a rapid double-click, and 
   const first = fire(g, 'MONSTER_ATTACK');
   const second = fire(g, 'MONSTER_ATTACK');
   assert.equal(first.ok, true);
-  assert.deepEqual([second.ok, second.reason], [false, 'city_event_used_this_round']);
+  assert.deepEqual([second.ok, second.reason], [false, 'event_already_active']);
   for (const s of SECTORS) assert.equal(health(g, s), 90, `${s} was hit twice`);
   for (const s of SECTORS) assert.equal(g.state.sectors[s].workforce.injured, 1, `${s} was injured twice`);
   assert.equal(logEvents(g, 'city_event_activated').length, 1);
   // a NEXT_UPKEEP event: PENDING until its upkeep, then available again
   assert.equal(fire(g, 'UTILITY_RESERVE_RELEASED').ok, true);
-  assert.equal(fire(g, 'UTILITY_RESERVE_RELEASED').reason, 'city_event_pending');
+  assert.equal(fire(g, 'UTILITY_RESERVE_RELEASED').reason, 'event_already_active');
   assert.equal(liveEffects(g).filter((e) => e.kind === 'upkeep_extra').length, 6);
   // unknown, and after the run has ended: refused, nothing touched
   const before = JSON.stringify(g.state.sectors);
@@ -436,8 +454,8 @@ test('EVT-022: different events coexist and their modifiers combine — TRN 5 th
   assert.deepEqual(economy.upkeepFor(g, g.state.sectors.POW), { power: 1, water: 1 });
   assert.equal(fire(g, 'CORE_ENERGY_INSTABILITY').ok, true);
   assert.deepEqual(economy.upkeepFor(g, g.state.sectors.POW), { power: 2, water: 1 }, 'the net modifier is not zero');
-  assert.equal(card(g, 'UTILITY_RESERVE_RELEASED').button, 'PENDING');
-  assert.equal(card(g, 'CORE_ENERGY_INSTABILITY').button, 'PENDING');
+  assert.equal(card(g, 'UTILITY_RESERVE_RELEASED').button, 'DEACTIVATE');
+  assert.equal(card(g, 'CORE_ENERGY_INSTABILITY').button, 'DEACTIVATE');
   // seven lines: TRN +2, TRN -1 (tunnel), MED +2, TRN -1 and MED -1 (lockdown), -1 POWER, +1 POWER — one per activation and kind, never merged across events
   assert.equal(view(g).active_effects.length, 7, JSON.stringify(view(g).active_effects.map((a) => a.text)));
   g.activateRound('R4');
@@ -473,11 +491,11 @@ test('EVT-023: save/restore keeps active effects, pending modifiers, used-this-r
   back.restore(snap);
   assert.equal(back.trnCapacity(), 5);
   assert.deepEqual(economy.upkeepFor(back, back.state.sectors.POW), { power: 1, water: 1 });
-  assert.equal(card(back, 'MONSTER_ATTACK').button, 'USED THIS ROUND');
-  assert.equal(card(back, 'UTILITY_RESERVE_RELEASED').button, 'PENDING');
-  assert.equal(card(back, 'TRANSPORT_CORRIDOR_CLEARED').button, 'USED THIS ROUND');
+  assert.equal(card(back, 'MONSTER_ATTACK').button, 'DEACTIVATE');
+  assert.equal(card(back, 'UTILITY_RESERVE_RELEASED').button, 'DEACTIVATE');
+  assert.equal(card(back, 'TRANSPORT_CORRIDOR_CLEARED').button, 'DEACTIVATE');
   assert.equal(view(back).history.length, 3);
-  assert.equal(fire(back, 'MONSTER_ATTACK').reason, 'city_event_used_this_round');
+  assert.equal(fire(back, 'MONSTER_ATTACK').reason, 'event_already_active');
   // expired effects do not reactivate after a restore
   g.activateRound('R4');
   assert.equal(liveEffects(g).filter((e) => e.expires === 'round').length, 0);
@@ -502,7 +520,7 @@ test('EVT-024: RESET RUN removes every City Event effect, pending modifier, mark
   assert.ok(liveEffects(g).length > 0);
   g.reset('city-events-fresh');
   assert.deepEqual(g.state.effects, []);
-  assert.deepEqual(g.state.city_events, { used: {}, history: [] });
+  assert.deepEqual(g.state.city_events, { used: {}, history: [], active: [] });
   assert.equal(g.trnCapacity(), 3);
   assert.equal(g.medCapacity(), 3);
   for (const s of SECTORS) {
@@ -519,7 +537,7 @@ test('EVT-024: RESET RUN removes every City Event effect, pending modifier, mark
 
 test('every effect is applied through the engine\'s existing helper — no second Health, Worker, TRN, MED or upkeep system', () => {
   const src = read('lib/city-events.js');
-  for (const helper of ['this.setIntegrity(', 'this.injure(', 'this.addEffect(', 'this.trnCapacity()', 'this.medCapacity()', 'this.setAlert(', 'this.periodKey()']) {
+  for (const helper of ['this.setIntegrity(', 'this.injure(', 'this.addEffect(', 'this.trnCapacity()', 'this.medCapacity()', 'this.ticker(', 'this.sting(', 'this.periodKey()']) {
     assert.ok(src.includes(helper), `the mixin does not call ${helper}`);
   }
   for (const forbidden of ['.integrity =', 'workforce.active =', 'workforce.injured =', 'trn_approvals_used_this_round', 'med_heals_used_this_round', 'upkeep_per_round']) {

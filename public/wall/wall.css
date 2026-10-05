@@ -181,6 +181,7 @@
 .chip[data-accent="amber"] { --accent: var(--amber); background: rgba(233, 180, 94, 0.10); }
 .chip[data-accent="purple"] { --accent: var(--purple); background: rgba(139, 92, 246, 0.12); }
 .chip[data-accent="blue"] { --accent: var(--blue); }
+.chip[data-accent="green"] { --accent: #2EAD63; background: rgba(46, 173, 99, 0.12); }
 .chip[data-accent="grey"] { --accent: #9A9A9A; }
 /* a critical sector never yields its space to a transfer */
 .chip.emergency, .chip.dark, .chip.critical { flex-shrink: 0; }
@@ -683,6 +684,17 @@
 .shock { background: rgba(6,8,10,0.55); }
 .shock .t-inner { border-color: var(--amber); animation: shockIn 0.4s ease; }
 .shock .t-title, .shock .t-big { color: var(--amber); }
+/* CITY EVENTS (2026-10-06): the activation wash sits under the facilitator's alert (8) and
+   SIMULATION PAUSED (9); the lasting state is an edge glow on the map frame alone, so the
+   sector cards and their CRITICAL / DARK words are never under it. */
+.takeover.city { z-index: 7; background: rgba(30, 170, 90, 0.20); }
+.takeover.city.bad { background: rgba(210, 45, 45, 0.22); }
+.city .t-inner { border-color: #2EAD63; }
+.city .t-tag, .city .t-title { color: #2EAD63; }
+.city.bad .t-inner { border-color: #D52D2D; }
+.city.bad .t-tag, .city.bad .t-title { color: #D52D2D; }
+.wall[data-city-event="good"] .city-frame { box-shadow: inset 0 0 0 4px rgba(46, 173, 99, 0.6), inset 0 0 60px rgba(30, 170, 90, 0.25); }
+.wall[data-city-event="bad"] .city-frame { box-shadow: inset 0 0 0 4px rgba(213, 45, 45, 0.6), inset 0 0 60px rgba(210, 45, 45, 0.28); }
 .paused { background: rgba(6,8,10,0.9); z-index: 9; }
 .paused .t-inner { border-color: var(--ink-faint); }
 .paused .t-title { color: var(--ink-dim); }

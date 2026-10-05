@@ -500,7 +500,8 @@ requires stock.
 { "type": "set_sound", "on": false }
 { "type": "alert", "title": "COUNCIL SUMMONED", "subtitle": "CHIEFS + LIAISONS REPORT IMMEDIATELY" }
 { "type": "dismiss_alert" }
-{ "type": "activate_city_event", "event_id": "MONSTER_ATTACK" }   // CITY EVENTS (2026-10-06): one press, no confirmation → city_event_result (§8.12)
+{ "type": "activate_city_event", "event_id": "MONSTER_ATTACK" }   // CITY EVENTS (2026-10-06): one press, no confirmation → city_event_result { action: "activate" } (§8.12)
+{ "type": "deactivate_city_event", "event_id": "MONSTER_ATTACK" }   // ends what still runs, never what already happened → city_event_result { action: "deactivate" } (§8.12)
 { "type": "false_alert_fire", "sector": "AGR", "template": "F-705", "severity": 2, "decay": 2.0, "override": false }   // FALSE TELEMETRY (2026-10-06) → false_alert_result (§8.13)
 { "type": "false_alert_cancel", "id": "F-0042" }   { "type": "false_alert_force_clear", "id": "F-0042" }
 { "type": "call_council" }   { "type": "end_council" }   // the discussion timer: one minute, then CLOSE
@@ -885,11 +886,14 @@ in `lib/city-events.json` and applied by `lib/city-events.js`. They are not
 faults: no procedure, no code, nothing on ACTIVE FAULTS, nothing for a table to
 acknowledge. The control panel's EVENTS › CITY EVENTS tab shows each card
 (name, GOOD/BAD, situation, the effect line derived from its effects, duration)
-with one ACTIVATE button and no confirmation step.
+with one ACTIVATE button and no confirmation step — DEACTIVATE while it is
+active, with a GREEN or RED ACTIVE indicator — and an ACTIVE CITY EVENTS panel
+(name, GOOD or BAD, round and time activated, what still runs, DEACTIVATE).
 
-`activate_city_event { event_id }` → `city_event_result { ok, activation,
-event_id, name, type, round, applied[], health{}, affected[] }` or `{ ok: false,
-reason }` with `unknown_city_event`, `run_ended`, `city_event_used_this_round`
+`activate_city_event { event_id }` → `city_event_result { ok, action: "activate", activation,
+event_id, name, event_type, round, applied[], health{}, affected[], active: true, overlay, label }` or `{ ok: false,
+reason }` with `unknown_city_event`, `run_ended`, `event_already_active` (the
+event is still active), `city_event_used_this_round`
 (repeat_policy ONCE_PER_ROUND) or `city_event_pending` (BLOCK_WHILE_PENDING,
 while an upkeep modifier it created is still pending). The server validates
 every effect before applying any, then applies all of them through the engine's
@@ -904,10 +908,46 @@ modifiers end when an upkeep is actually processed. Every effect carries
 `source: "city_event"`, `event_id`, `activation` and a `player_label` the
 sector console prints on its effect chip.
 
-The room is told through the existing City Alert (`alert` on every frame:
-console overlay then banner; wall strip and feed). Nothing event-specific
-reaches a sector or the wall beyond that alert and the effect chip. Everything
-survives save/restore inside `state`; RESET clears it with the run.
+**ACTIVE and INACTIVE (later on 2026-10-06).** An activation is ACTIVE until
+`deactivate_city_event { event_id }` → `city_event_result { ok, action:
+"deactivate", activation, event_id, name, event_type, round, effects_removed[],
+pending_effects_cancelled[], effects_not_reversed[], active: false }` (refused
+with `event_not_active` or `unknown_city_event`), or until it expires by
+itself: a THIS_ROUND event with the round, a NEXT_UPKEEP event with the upkeep
+that consumes it, a MIXED event when its last lasting component ends, an
+IMMEDIATE event with the round. DEACTIVATE ends only what is still in force —
+the round modifiers still live (removed, `city_event_effect_cancelled`) and
+the upkeep modifiers not yet consumed (cancelled) — and never what already
+happened: Health taken or given, Workers injured, transfers approved and
+heals performed stay. `state.city_events.active[]` keeps the live
+activations in activation order — `{ activation, event_id, event_name,
+event_type, duration, activated_at, activated_round, activated_by, effects:
+{ id: { kind, target, status: ACTIVE | CONSUMED | EXPIRED | CANCELLED } },
+immediate[] }` — and the control frame's `city_events` carries each card's
+`active`, `activation`, `activated_round`, `activated_at`, `activated_by`,
+`remaining` and the panel's `active_events[]`. Logs: `city_event_deactivated
+{ event_id event_name event_type round t by effects_removed
+pending_effects_cancelled effects_not_reversed }`, `city_event_expired { reason:
+round_change | effects_expired | upkeep_consumed }`.
+
+**The overlay.** Every frame — the six consoles and the wall — carries
+`city_event { active[], count, current }`: the active events in activation
+order (`activation, name, type, label, colour, effect_summary, line,
+activated_at, round_number`; never an event id) and the newest as `current`
+with `age_s`, `full_s: 4` and `full_screen`. A GOOD event is GREEN with the
+words POSITIVE CITY EVENT, a BAD one RED with CITY EMERGENCY — never colour
+alone. On activation a screen washes for four seconds (name and effect), then
+keeps a thin edge glow and a banner (consoles) or the map-frame glow and a
+strip chip (wall) while the event lasts; deactivation removes them at once and
+a fallback to an older active event never replays the wash. Priority, highest
+first: SECTOR OFFLINE, the CRITICAL wash, SIMULATION PAUSED, the facilitator's
+alert, then the city event, then the sector's own theme — a console withholds
+the colour entirely while any of the first four shows, and the wall's glow
+sits on the map frame alone, never on the sector cards. The facilitator's red
+City Alert is not raised for a city event; the feed line and a sound (chime
+for GOOD, alert for BAD) are. Everything survives save/restore inside
+`state` — an older snapshot's active list is rebuilt from its live effects,
+nothing immediate is replayed — and RESET clears it with the run.
 
 ### 8.13 False telemetry (FALSE_TELEMETRY_V1, 2026-10-06; one-round lifetime)
 

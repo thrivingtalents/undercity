@@ -43,6 +43,7 @@
   };
   const OPEN_TRANSFER = new Set(['REQUESTED', 'PENDING_TRN_APPROVAL', 'APPROVED']);
   const ALERT_FULL_S = 8;
+  const CITY_TAKEOVER_S = 4;  // CITY EVENTS (2026-10-06): the activation wash, mirrored from the frame
   const WARN_S = 120;
   const DANGER_S = 30;
   const RESULT_BANNER_MS = 9000;
@@ -79,6 +80,8 @@
   const healSeen = new Set();     // healing-queue ids (MED) already rung for
   let requestBannerUntil = 0;     // when the arrival banner retires
   let alertSeen = null;       // { id, age, at } — age from the frame + local elapsed
+  let cityTakeover = null;    // CITY EVENTS (2026-10-06): { activation, until } — the four-second wash
+  const cityTakeoverSeen = new Set();   // activations this screen has washed for: never replayed
   // FALSE TELEMETRY (2026-10-06, COM only): the anomaly card the broadcast editor is correcting, if any.
   let correctionFor = null;   // { id, code, sector }
   let resultBanner = null;    // { until }
@@ -666,6 +669,54 @@
       show($('alert-full'), false);
       show($('banner-alert'), false);
     }
+    renderCityEvent(word, critical);
+  }
+
+  /**
+   * CITY EVENTS (2026-10-06). A newly activated event washes the console for
+   * four seconds — green for GOOD, red for BAD, with the words POSITIVE CITY
+   * EVENT or CITY EMERGENCY, the name and the effect — then collapses to a
+   * subtle state: a thin edge glow and a banner that stays while the event
+   * does. The newest active event owns the colour; a deactivation removes
+   * it at once, and a fallback to an older event never replays the wash.
+   * Priority: SECTOR OFFLINE, the CRITICAL wash, SIMULATION PAUSED and the
+   * facilitator's alert all sit above it, and while any of them shows the
+   * colour is withheld entirely — the banner, which is words, stays.
+   */
+  function renderCityEvent(word, critical) {
+    const ce = state.city_event;
+    const cur = ce && ce.current;
+    const body = document.body;
+    const suppressed = word === 'DARK' || !!critical || !!state.paused || !!(alertSeen && alertSeen.full);
+    body.classList.toggle('city-good', !!cur && cur.type === 'GOOD' && !suppressed);
+    body.classList.toggle('city-bad', !!cur && cur.type !== 'GOOD' && !suppressed);
+    if (!cur) {
+      cityTakeover = null;
+      show($('banner-city-event'), false);
+      show($('city-takeover'), false);
+      return;
+    }
+    const banner = $('banner-city-event');
+    banner.classList.toggle('good', cur.type === 'GOOD');
+    banner.classList.toggle('bad', cur.type !== 'GOOD');
+    setText($('banner-city-event-label'), cur.label || '');
+    setText($('banner-city-event-text'), `ACTIVE CITY EVENT · ${cur.name || ''}`);
+    show(banner, true);
+    if (cityTakeover && cityTakeover.activation !== cur.activation) cityTakeover = null;
+    if (!cityTakeoverSeen.has(cur.activation)) {
+      cityTakeoverSeen.add(cur.activation);
+      if (cur.full_screen) {
+        const left = Math.max(0, (Number(cur.full_s) || CITY_TAKEOVER_S) - (Number(cur.age_s) || 0));
+        cityTakeover = { activation: cur.activation, until: performance.now() + left * 1000 };
+        const box = $('city-takeover');
+        box.classList.toggle('good', cur.type === 'GOOD');
+        box.classList.toggle('bad', cur.type !== 'GOOD');
+        setText($('city-takeover-label'), cur.label || '');
+        setText($('city-takeover-name'), cur.name || '');
+        setText($('city-takeover-fx'), cur.effect_summary || '');
+      }
+    }
+    show($('city-takeover'), !!cityTakeover && performance.now() < cityTakeover.until && !suppressed);
   }
 
   function renderResources() {
@@ -2290,6 +2341,9 @@
       show($('alert-full'), full);
       show($('banner-alert'), !full);
     }
+
+    // CITY EVENTS (2026-10-06): the wash collapses by itself; the glow and banner stay with the frame.
+    if (cityTakeover && performance.now() >= cityTakeover.until) { cityTakeover = null; show($('city-takeover'), false); }
 
     // Result banner expiry.
     if (resultBanner && performance.now() > resultBanner.until) {

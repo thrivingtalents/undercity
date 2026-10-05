@@ -130,8 +130,10 @@
         }
       }
       if (msg.type === 'city_event_result') {
-        if (msg.ok) toast(`CITY EVENT ACTIVATED — ${msg.name}${Array.isArray(msg.affected) && msg.affected.length ? ' · ' + msg.affected.join(' ') : ''}`, 'ok');
-        else { toast(`City event refused: ${String(msg.reason || '').toUpperCase().replace(/_/g, ' ')}`); for (const h of ['ce-good', 'ce-bad']) $(h).dataset.sig = ''; if (state) renderCityEvents(); }
+        // ACTIVATE or DEACTIVATE (2026-10-06): the toast says which; the cards follow the next frame.
+        if (msg.ok && msg.action === 'deactivate') toast(`CITY EVENT DEACTIVATED — ${msg.name} · ${(msg.effects_removed || []).length + (msg.pending_effects_cancelled || []).length} ENDED · ${(msg.effects_not_reversed || []).length} KEPT`, 'ok');
+        else if (msg.ok) toast(`CITY EVENT ACTIVATED — ${msg.name}${Array.isArray(msg.affected) && msg.affected.length ? ' · ' + msg.affected.join(' ') : ''}`, 'ok');
+        else { toast(`City event refused: ${String(msg.reason || '').toUpperCase().replace(/_/g, ' ')}`); for (const h of ['ce-good', 'ce-bad', 'ce-active']) $(h).dataset.sig = ''; if (state) renderCityEvents(); }
       }
       if (msg.type === 'output_result' && msg.ok === false) toast(`Output: ${msg.reason}`);
       if (msg.type === 'override_result') {
@@ -1259,35 +1261,45 @@
   function renderCityEvents() {
     const ce = state.city_events;
     if (!ce) return;
-    const cardHtml = (e) => `<div class="ce-card ${e.type === 'GOOD' ? 'good' : 'bad'}">
-        <div class="ce-head"><span class="ce-type">${esc(e.type)}</span><b class="ce-name">${esc(e.name)}</b></div>
+    const when = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour12: false }) : '—');
+    const rn = (r) => String(r || '').replace(/^R/, '');
+    // ACTIVE / INACTIVE (2026-10-06): an inactive card offers ACTIVATE, an active one DEACTIVATE,
+    // with a GREEN or RED ACTIVE indicator; a card used this round and no longer active waits.
+    const cardHtml = (e) => `<div class="ce-card ${e.type === 'GOOD' ? 'good' : 'bad'}${e.active ? ' active' : ''}">
+        <div class="ce-head"><span class="ce-type">${esc(e.type)}</span><b class="ce-name">${esc(e.name)}</b><span class="ce-state">${e.active ? 'ACTIVE' : 'INACTIVE'}</span></div>
         <p class="ce-desc">${esc(e.description)}</p>
         <div class="ce-fx">${esc(e.effect_summary)}</div>
-        <div class="ce-foot"><span class="ce-dur">${esc(String(e.duration || '').replace(/_/g, ' '))}</span><button data-ce="${esc(e.id)}" class="${e.status === 'available' ? 'primary' : ''}"${e.status === 'available' ? '' : ' disabled'}>${esc(e.button)}</button></div>
+        ${e.active ? `<div class="ce-live">ROUND ${esc(rn(e.activated_round))} · ${esc(when(e.activated_at))} · ${esc(e.remaining || '')}</div>` : ''}
+        <div class="ce-foot"><span class="ce-dur">${esc(String(e.duration || '').replace(/_/g, ' '))}</span><button data-ce="${esc(e.id)}" data-act="${e.active ? 'deactivate' : 'activate'}" class="${e.status === 'available' ? 'primary' : e.active ? 'ce-off' : ''}"${e.status === 'available' || e.active ? '' : ' disabled'}>${esc(e.button)}</button></div>
       </div>`;
+    const press = (b) => {
+      if (b.disabled) return;
+      b.disabled = true;
+      b.textContent = 'SENDING…';
+      send({ type: b.dataset.act === 'deactivate' ? 'deactivate_city_event' : 'activate_city_event', event_id: b.dataset.ce });
+    };
     for (const [host, type] of [['ce-good', 'GOOD'], ['ce-bad', 'BAD']]) {
       const html = (ce.events || []).filter((e) => e.type === type).map(cardHtml).join('');
       if ($(host).dataset.sig !== html) {
         $(host).dataset.sig = html;
         $(host).innerHTML = html;
-        for (const b of $(host).querySelectorAll('[data-ce]')) {
-          b.addEventListener('click', () => {
-            if (b.disabled) return;
-            b.disabled = true;
-            b.textContent = 'SENDING…';
-            send({ type: 'activate_city_event', event_id: b.dataset.ce });
-          });
-        }
+        for (const b of $(host).querySelectorAll('[data-ce]')) b.addEventListener('click', () => press(b));
       }
     }
-    const act = ce.active_effects || [];
+    // ACTIVE CITY EVENTS: one row per activation, newest last, with what still runs and DEACTIVATE.
+    const act = ce.active_events || [];
     const ah = act.length
-      ? act.map((a) => `<div class="ce-eff"><b>${esc(a.text)}</b><span class="hint">${esc(a.name)}</span></div>`).join('')
-      : '<div class="hint">None. An immediate Health event does not stay here; the history below keeps it.</div>';
-    if ($('ce-active').dataset.sig !== ah) { $('ce-active').dataset.sig = ah; $('ce-active').innerHTML = ah; }
+      ? act.map((a) => `<div class="ce-row ${a.type === 'GOOD' ? 'good' : 'bad'}"><span class="tag ${a.type === 'GOOD' ? 'good' : 'bad'}">${esc(a.type)}</span><b>${esc(a.name)}</b><span class="hint">ROUND ${esc(rn(a.activated_round))} · ${esc(when(a.activated_at))}</span><span class="ce-rem">${esc(a.remaining || '')}</span><span class="ce-state on">ACTIVE</span><button data-ce="${esc(a.event_id)}" data-act="deactivate" class="ce-off">DEACTIVATE</button></div>`).join('')
+      : '<div class="hint">None active. An event stays here until DEACTIVATE or until its lasting effects end by themselves; the history below keeps what happened.</div>';
+    if ($('ce-active').dataset.sig !== ah) {
+      $('ce-active').dataset.sig = ah;
+      $('ce-active').innerHTML = ah;
+      for (const b of $('ce-active').querySelectorAll('[data-ce]')) b.addEventListener('click', () => press(b));
+    }
     const hist = ce.history || [];
+    const ended = (h) => (h.ended_at ? ` · ${h.ended_by === 'deactivate' ? 'DEACTIVATED' : 'ENDED'} ${when(h.ended_at)}` : '');
     const hh = hist.length
-      ? hist.map((h) => `<div class="ce-hist"><span class="ft">${new Date(h.t).toLocaleTimeString([], { hour12: false })}</span><span class="tag ${h.type === 'GOOD' ? 'good' : 'bad'}">${esc(h.type)}</span><b>${esc(h.name)}</b><span class="hint">ROUND ${esc(String(h.round || '').replace(/^R/, ''))} · ${esc(h.by || 'facilitator')}</span></div>`).join('')
+      ? hist.map((h) => `<div class="ce-hist"><span class="ft">${when(h.t)}</span><span class="tag ${h.type === 'GOOD' ? 'good' : 'bad'}">${esc(h.type)}</span><b>${esc(h.name)}</b><span class="hint">ROUND ${esc(rn(h.round))} · ${esc(h.by || 'facilitator')}${esc(ended(h))}</span></div>`).join('')
       : '<div class="hint">None this run.</div>';
     if ($('ce-history').dataset.sig !== hh) { $('ce-history').dataset.sig = hh; $('ce-history').innerHTML = hh; }
   }

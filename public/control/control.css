@@ -484,6 +484,18 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: none;
 .ce-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
 .ce-dur { font-size: 9px; letter-spacing: 0.16em; color: var(--ink-faint); }
 .ce-card button:disabled { opacity: 0.55; cursor: default; }
+/* ACTIVE / INACTIVE (2026-10-06): a GREEN or RED ACTIVE indicator, and DEACTIVATE in the event's colour. */
+.ce-state { margin-left: auto; font-size: 8.5px; letter-spacing: 0.2em; padding: 1px 5px; border: 1px solid var(--line); color: var(--ink-faint); }
+.ce-card.active.good { box-shadow: inset 0 0 0 1px var(--green); }
+.ce-card.active.bad { box-shadow: inset 0 0 0 1px var(--red); }
+.ce-card.active.good .ce-state, .ce-row.good .ce-state.on { border-color: var(--green); color: var(--green); }
+.ce-card.active.bad .ce-state, .ce-row.bad .ce-state.on { border-color: var(--red); color: var(--red); }
+.ce-live { font-size: 10px; letter-spacing: 0.06em; color: var(--ink-dim); }
+.ce-card.good button.ce-off, .ce-row.good button.ce-off { border-color: var(--green); color: var(--green); }
+.ce-card.bad button.ce-off, .ce-row.bad button.ce-off { border-color: var(--red); color: var(--red); }
+.ce-active .ce-row { display: flex; gap: 10px; align-items: center; padding: 4px 0; font-size: 11px; border-bottom: 1px solid var(--line); }
+.ce-active .ce-row .ce-rem { color: var(--amber); }
+.ce-active .ce-row .ce-state { margin-left: auto; }
 .ce-active .ce-eff { font-size: 11px; display: flex; gap: 10px; align-items: baseline; padding: 3px 0; }
 .ce-active .ce-eff b { color: var(--amber); }
 .ce-history .ce-hist { font-size: 10px; display: flex; gap: 8px; align-items: baseline; padding: 2px 0; }

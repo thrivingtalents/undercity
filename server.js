@@ -1277,6 +1277,10 @@ function handleControl(client, entry, msg) {
     case 'activate_city_event':
       reply({ type: 'city_event_result', ...game.activateCityEvent(msg.event_id, { by: 'facilitator' }) });
       return ok();
+    // DEACTIVATE (2026-10-06): ends what is still in force, never what already happened.
+    case 'deactivate_city_event':
+      reply({ type: 'city_event_result', ...game.deactivateCityEvent(msg.event_id, { by: 'facilitator' }) });
+      return ok();
     // FALSE TELEMETRY (2026-10-06): a phantom alert fired at a sector; only COM is told it is false.
     case 'false_alert_fire':
       reply({ type: 'false_alert_result', action: 'fire', ...game.fireFalseAlert({ sector: msg.sector, template: msg.template, severity: msg.severity, decay: msg.decay, notes: msg.notes }, { by: 'facilitator', override: !!msg.override }) });

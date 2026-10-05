@@ -249,6 +249,13 @@
       out.push({ kind: 'core', accent: 'amber', key: 'core',
         head: `⚠ CORE STABILITY ${clamp(f.core_output)}%`, detail: 'CAPACITY INSUFFICIENT · SECTORS MUST ENTER BROWNOUT' });
     }
+    // CITY EVENTS (2026-10-06): every active event, newest first — green for GOOD, red for BAD,
+    // and the words POSITIVE CITY EVENT / CITY EMERGENCY beside the colour, never colour alone.
+    const city = f.city_event && Array.isArray(f.city_event.active) ? f.city_event.active : [];
+    for (const ev of [...city].reverse()) {
+      out.push({ kind: 'city', accent: ev.type === 'GOOD' ? 'green' : 'red', key: `city:${ev.activation}`,
+        head: `${ev.label || (ev.type === 'GOOD' ? 'POSITIVE CITY EVENT' : 'CITY EMERGENCY')} · ${ev.name}`, detail: String(ev.effect_summary || '') });
+    }
     // THE COUNCIL (2026-09-29): a discussion timer — the summons while it runs, the word when it is up.
     if ((f.council && f.council.active) || f.mode === 'COUNCIL') {
       const c = f.council || {};

@@ -76,6 +76,10 @@
     <div class="banner banner-alert" id="banner-alert" hidden>
       <b id="banner-alert-title"></b><span id="banner-alert-sub"></span>
     </div>
+    <!-- CITY EVENTS (2026-10-06): the words beside the colour, while an event stays active -->
+    <div class="banner banner-city-event" id="banner-city-event" hidden>
+      <span class="ce-label" id="banner-city-event-label"></span><b id="banner-city-event-text"></b>
+    </div>
     <div class="banner banner-request" id="banner-request" hidden></div>
     <div class="banner banner-city" id="banner-city" hidden>CITY ANNOUNCEMENT UPDATED — READ IT ON THE BIG SCREEN</div>
     <div class="banner banner-notice" id="banner-notice" hidden></div>
@@ -498,6 +502,20 @@
       <p>If confirmed, both effects apply.</p>
       <p>Read both before confirming.</p>
       <button type="button" class="primary wide" id="agr-notice-ack">ACKNOWLEDGE</button>
+    </div>
+  </div>
+
+  <!--
+    CITY EVENTS (2026-10-06). Four seconds of translucent wash when an event is
+    activated — green for a GOOD one, red for a BAD one — with the words beside
+    the colour, the name and the effect. It takes no clicks and sits under the
+    CRITICAL wash, SECTOR OFFLINE, SIMULATION PAUSED and the facilitator's alert.
+  -->
+  <div class="overlay city-takeover" id="city-takeover" aria-live="polite" hidden>
+    <div class="city-takeover-card">
+      <div class="city-takeover-label" id="city-takeover-label"></div>
+      <div class="city-takeover-name" id="city-takeover-name"></div>
+      <div class="city-takeover-fx" id="city-takeover-fx"></div>
     </div>
   </div>
 
