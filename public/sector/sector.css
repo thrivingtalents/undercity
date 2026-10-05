@@ -162,6 +162,11 @@
 .uk-status { letter-spacing: 0.14em; }
 .uk-status[data-status="READY"] { color: var(--green); }
 .uk-status[data-status="SHORTFALL"] { color: var(--red); }
+.uk-plus { color: var(--ink-faint); margin: 0 2px; font-size: 12px; }
+/* the last charge: PAID in green, UNPAID and its cost in red */
+.upkeep-result { margin-top: 6px; font-size: 10.5px; letter-spacing: 0.08em; font-weight: 700; line-height: 1.4; }
+.upkeep-result[data-status="PAID"] { color: var(--green); }
+.upkeep-result[data-status="UNPAID"] { color: var(--red); }
 
 /* -- left: transfers -------------------------------------------------------- */
 

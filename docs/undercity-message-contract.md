@@ -294,7 +294,11 @@ Own sector: `brownout`, `dark`, `workforce { active injured loaned borrowed
 available total }`, `low { power water parts med }` (below threshold or zero),
 `production_next`, `upkeep_delivery` (next round's cost after brownout),
 `upkeep_due_in_s` (= round clock remaining, since 2026-09-18), `round_output`,
-`upkeep_status`, `upkeep_short` (§8.7). Own faults add `id status deadline_s
+`upkeep_status`, `upkeep_short` (§8.7), and since 2026-10-05 `last_upkeep
+{ round, round_number, status PAID|UNPAID, required, deducted, health_before,
+health_penalty, health_after, message }` for the round last charged (the
+message is the console's line: "UPKEEP PAID — Sector stable." or "UPKEEP
+SHORTFALL — -10 SECTOR HEALTH."). Own faults add `id status deadline_s
 deadline_remaining_s integrity_penalty expired opened_at`. Fault `status`:
 `ACTIVE RESOLVED EXPIRED FAILED CLEARED`. The dependency half of the flavour
 line is still cut; the screen says *consult your binder*, nothing more.
@@ -559,7 +563,7 @@ exists, else a synthesised placeholder.
 ### 8.10 Log additions
 
 `phase`, `pause`, `fault_opened`, `deadline_expired {penalty}`, `fault_failed`,
-`cycle_processed {summary}`, `upkeep_missed`, `worker_recovered`,
+`cycle_processed {summary}`, `upkeep_result { round, sector, upkeep_required, upkeep_status PAID|UNPAID, resources_deducted, health_before, health_penalty, health_after, t }` (2026-10-05: the whole bill or none of it — a sector that cannot pay in full keeps its stock and loses a flat 10 Sector Health, once per round; `upkeep_already_charged` when a pass for a charged round is refused), `upkeep_missed`, `worker_recovered`,
 `request_created/fulfilled/declined/cancelled/expired`, `request_fulfil_refused`,
 `transfer_created/chit/approved/declined/cancelled/expired/refused`,
 `heal_requested/declined/refused/cancelled/expired`, `worker_healed`,

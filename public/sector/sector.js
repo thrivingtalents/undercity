@@ -686,7 +686,7 @@
     const delivery = mine.upkeep_delivery || mine.upkeep_per_round || {};
     const items = Object.entries(delivery).filter(([, v]) => Number(v) > 0)
       .map(([k, v]) => `<span class="uk"><i>${(RES[k] || {}).glyph || ''}</i> ${v} ${(RES[k] || { name: k }).name}</span>`);
-    const html = items.length ? items.join('') : '<span class="uk dim">NONE</span>';
+    const html = items.length ? items.join('<span class="uk-plus">+</span>') : '<span class="uk dim">NONE</span>';
     const host = $('upkeep-delivery');
     if (host.innerHTML !== html) host.innerHTML = html;
 
@@ -706,6 +706,18 @@
     const word = mine.upkeep_status || (shortText ? 'SHORTFALL' : 'READY');
     setText(status, word === 'SHORTFALL' && shortText ? `SHORTFALL — ${shortText} SHORT` : word);
     status.dataset.status = word;
+
+    // The last charge (2026-10-05): the whole bill was paid, or none of it was
+    // and the sector lost Health — once, for that round — in the spec's words.
+    const res = $('upkeep-result');
+    if (res) {
+      const r = mine.last_upkeep;
+      if (r) {
+        setText(res, `ROUND ${r.round_number} · ${r.message}`);
+        res.dataset.status = r.status;
+      }
+      show(res, !!r);
+    }
   }
 
   // -- ROUND OUTPUT: a producing table generates its own stock, once a round --

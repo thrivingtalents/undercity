@@ -366,12 +366,16 @@ test('the upkeep pass: generated output, upkeep, shortage penalty, recovery, sum
   const summary = game.cycleControl('process');
   assert.deepEqual(summary.sectors.POW.produced, { power: 3 }, 'the pass reports what POW generated');
   assert.equal(summary.round, 'R2');
-  // POW: +3 power generated, then upkeep 2 power 1 water → power 1, water short by 1
-  assert.equal(pow.inventory.power, 1);
+  // POW: +3 power generated, then upkeep 2 power 1 water with no water at all →
+  // UNPAID (2026-10-05): nothing is deducted, the stock stays, and the sector
+  // loses a flat 10 Health once.
+  assert.equal(pow.inventory.power, 3, 'a partial deduction was made');
   assert.equal(pow.inventory.water, 0);
   assert.deepEqual(summary.sectors.POW.shortfall, { water: 1 });
-  assert.equal(summary.sectors.POW.integrity_delta, -game.cfg.upkeep_shortfall_penalty);
+  assert.equal(summary.sectors.POW.status, 'UNPAID');
+  assert.equal(summary.sectors.POW.integrity_delta, -game.cfg.upkeep_shortfall_health_penalty);
   assert.equal(summary.missed_upkeep_count, 1);
+  assert.equal(summary.sectors.WTR.status, 'PAID');
   // WTR produced water and MED spent med to recover one injured worker
   assert.equal(wtr.inventory.water, 3 + 3 - 1);
   assert.equal(wtr.workforce.injured, 1);
@@ -436,6 +440,8 @@ test('MED produces nothing: medical stock is finite, and no scenario falls back 
   assert.equal(med.inventory.med, 2, 'a cycle made med');
   game.state.sectors.WTR.workforce.injured = 1;
   game.state.sectors.WTR.workforce.active = 7;
+  // A round is charged once (2026-10-05), so the second pass is the next round's.
+  game.setPhase('ROUND_3'); game.clock('start');
   game.cycleControl('process');                       // one recovery costs one med, and nothing refills it
   assert.equal(med.inventory.med, 1);
   assert.equal(game.state.sectors.WTR.workforce.injured, 0);
@@ -1736,7 +1742,7 @@ test('the sector screen: the round as a number and ROUND TIME as its clock; noth
   for (const bad of ['NEXT CYCLE UPKEEP', 'THIS CYCLE', 'CYCLE OUTPUT', '/ CYCLE', 'OPERATING CYCLE']) {
     assert.ok(!SECTOR_SCRIPT.includes(bad), `sector.js still carries ${bad}`);
   }
-  for (const good of ['Round time', 'NEXT ROUND UPKEEP', 'ROUND OUTPUT', 'HEALING THIS ROUND',
+  for (const good of ['Round time', 'NEXT UPKEEP', 'ROUND OUTPUT', 'HEALING THIS ROUND',
     'TRANSFER APPROVALS', 'INTERVENTIONS THIS ROUND', 'CITY BIG SCREEN CONTROL', 'OUTPUT ALREADY GENERATED THIS ROUND']) {
     assert.ok(SECTOR_INDEX.includes(good), `index.html lacks ${good}`);
   }
@@ -1845,7 +1851,7 @@ test('NEXT ROUND UPKEEP: the exact requirement and READY or SHORTFALL from the r
   assert.equal(pow.upkeep_status, 'SHORTFALL');
   assert.deepEqual(pow.upkeep_short, { power: 1 });
   assert.equal(pow.upkeep_due, 'NEXT_ROUND', 'upkeep is due at the next round');
-  assert.ok(/NEXT ROUND UPKEEP/.test(SECTOR_INDEX) && !/NEXT CYCLE UPKEEP/.test(SECTOR_INDEX));
+  assert.ok(/NEXT UPKEEP/.test(SECTOR_INDEX) && !/NEXT CYCLE UPKEEP/.test(SECTOR_INDEX));   // the panel's title since 2026-10-05
 });
 
 test('upkeep is charged when the next round is activated — once, for a round that was played — and never by a plain phase change', () => {

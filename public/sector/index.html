@@ -125,12 +125,14 @@
 
       <!-- What the next round's upkeep will cost, and whether the tray can pay it. -->
       <div class="panel block upkeep-block">
-        <h2 class="ptitle">NEXT ROUND UPKEEP</h2>
+        <h2 class="ptitle">NEXT UPKEEP</h2>
         <div class="upkeep-line">
           <span class="upkeep-items" id="upkeep-delivery">—</span>
           <span class="upkeep-full" id="upkeep-full" hidden></span>
         </div>
         <div class="upkeep-row"><span class="label">Status</span><b class="uk-status" id="upkeep-status" data-status="">—</b></div>
+        <!-- The last charge (2026-10-05): PAID, or UNPAID and what it cost in Sector Health. -->
+        <div class="upkeep-result" id="upkeep-result" data-status="" hidden></div>
       </div>
 
       <!--

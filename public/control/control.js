@@ -717,6 +717,7 @@
         <div class="sec-row"><span class="k">WORKERS</span><span class="v">${s.workforce.available}/${s.workforce.total} AVAILABLE${s.workforce.injured ? ` · <b class="warn">${s.workforce.injured} INJURED</b>` : ''}${s.workforce.loaned ? ` · ${s.workforce.loaned} LOANED` : ''}</span></div>
         <div class="sec-row"><span class="k">FAULTS</span><span class="v ${live.length ? 'warn' : ''}">${live.length} ACTIVE${live.length ? ` · ${live.map((f) => f.code).join(' ')}` : ''}</span></div>
         <div class="sec-row"><span class="k">NEXT UPKEEP</span><span class="v ${short ? 'bad' : 'ok'}">${short ? `⚠ SHORTFALL · MISSING ${esc(Object.entries(s.upkeep_short || {}).map(([k, v]) => `${v} ${RES_NAME[k] || k}`).join(', '))}` : 'READY'}</span></div>
+        <div class="sec-row"><span class="k">LAST UPKEEP</span><span class="v ${s.last_upkeep ? (s.last_upkeep.status === 'UNPAID' ? 'bad' : 'ok') : ''}">${s.last_upkeep ? `R${s.last_upkeep.round_number} · ${s.last_upkeep.status}${s.last_upkeep.status === 'UNPAID' ? ` · −${s.last_upkeep.health_penalty} HEALTH → ${s.last_upkeep.health_after}%` : ''}` : '— (none charged yet)'}</span></div>
         <div class="sec-row"><span class="k">${capLabel}</span><span class="v ${capCls}">${esc(capText)}</span></div>
         <button class="sec-open" data-open="${code}">OPEN SECTOR</button>
       </article>`;
@@ -1435,8 +1436,8 @@
     if (sum) {
       const fmt = (o) => Object.entries(o || {}).map(([k, v]) => `${v}${U.GLYPH[k] || k}`).join(' ') || '—';
       $('cycle-summary').innerHTML = `<div class="label">UPKEEP PASS ${sum.cycle}${sum.round ? ' · ' + sum.round : ''} COMPLETE · ${new Date(sum.t).toLocaleTimeString()}${sum.missed_upkeep_count ? ` · <span class="bad">${sum.missed_upkeep_count} missed upkeep</span>` : ''}</div>
-        <table><tr><th>SECTOR</th><th>GENERATED</th><th>UPKEEP</th><th>SHORT</th><th>HEALTH</th><th>NOTES</th></tr>
-        ${Object.entries(sum.sectors).map(([c, l]) => `<tr><td><b>${c}</b></td><td class="good">${fmt(l.produced)}</td><td>${fmt(l.upkeep)}</td><td class="bad">${fmt(l.shortfall)}</td><td class="${l.integrity_delta < 0 ? 'bad' : ''}">${l.integrity_delta || ''}</td><td>${esc((l.notes || []).join(', '))}${l.recovered ? ` +${l.recovered} recovered` : ''}</td></tr>`).join('')}
+        <table><tr><th>SECTOR</th><th>GENERATED</th><th>UPKEEP</th><th>STATUS</th><th>SHORT</th><th>HEALTH</th><th>NOTES</th></tr>
+        ${Object.entries(sum.sectors).map(([c, l]) => `<tr><td><b>${c}</b></td><td class="good">${fmt(l.produced)}</td><td>${fmt(l.upkeep)}</td><td class="${l.status === 'UNPAID' ? 'bad' : l.status === 'PAID' ? 'good' : ''}">${esc(l.status || '—')}</td><td class="bad">${fmt(l.shortfall)}</td><td class="${l.integrity_delta < 0 ? 'bad' : ''}">${l.integrity_delta || ''}</td><td>${esc((l.notes || []).join(', '))}${l.recovered ? ` +${l.recovered} recovered` : ''}</td></tr>`).join('')}
         </table>`;
     }
     $('intel').innerHTML = (state.intel || []).map((i) => `<div class="it"><span>${esc(i.label)}</span><input type="text" value="${esc(i.value)}" data-intel="${esc(i.key)}"><button data-intel-set="${esc(i.key)}">SET</button></div>`).join('') +
@@ -1451,7 +1452,7 @@
   for (const btn of document.querySelectorAll('[data-core-delta]')) btn.addEventListener('click', () => askCore(state.core_output + Number(btn.dataset.coreDelta)));
   $('btn-core-set').addEventListener('click', () => askCore(Number($('core-input').value)));
   $('btn-stab-set').addEventListener('click', () => askOverride({ title: 'SET CITY STABILITY SCORE', target: 'CORE', diff: [['MODE', state.stability_mode, $('stab-mode').value], ['SCORE', `${state.city_stability}`, $('stab-mode').value === 'manual' ? $('stab-value').value : 'computed']], action: 'set_stability', payload: { mode: $('stab-mode').value, value: Number($('stab-value').value) } }));
-  for (const btn of document.querySelectorAll('[data-cycle]')) btn.addEventListener('click', () => askOverride({ title: 'PROCESS UPKEEP NOW', target: 'CORE', diff: [['UPKEEP PASSES', state.cycle.number - 1, state.cycle.number]], extra: '<div class="hint">Charges every sector\'s upkeep now, off schedule, with penalties for a shortfall. The next round activation will charge it again.</div>', action: 'cycle', payload: { action: 'process' } }));
+  for (const btn of document.querySelectorAll('[data-cycle]')) btn.addEventListener('click', () => askOverride({ title: 'PROCESS UPKEEP NOW', target: 'CORE', diff: [['UPKEEP PASSES', state.cycle.number - 1, state.cycle.number]], extra: '<div class="hint">Charges this round\'s upkeep now, off schedule: the whole bill (2 Power + 1 Water) or none of it, and −10 Sector Health for a shortfall. Once only — the next round activation will not charge this round again.</div>', action: 'cycle', payload: { action: 'process' } }));
   $('btn-tel-set').addEventListener('click', () => send({ type: 'set_telemetry', telemetry: { wtr_reservoir_pressure: Number($('tel-wtr').value) } }));
 
   // -- activity and logs ------------------------------------------------------------------
@@ -1494,7 +1495,7 @@
     ['deduct_resources_on_resolve', 'Deduct resources on resolve', 'b'],
     ['resolve_requires_resources', 'Refuse resolve when short of stock', 'b'],
     ['round_output_manual', 'POW / WTR generate output by button, once a round', 'b'],
-    ['upkeep_shortfall_penalty', 'Penalty per missing upkeep unit', 'n'], ['upkeep_shortfall_penalty_cap', 'Penalty cap per upkeep pass', 'n'],
+    ['upkeep_shortfall_health_penalty', 'Sector Health lost for an unpaid upkeep (flat, once a round)', 'n'],
     ['core_scales_power_production', 'Core output scales POW output', 'b'],
     ['injured_recovery_per_round', 'Injured recovered per round (MED)', 'n'], ['injured_recovery_costs_med', 'Med supplies per recovery', 'n'],
     ['deliver_on_stamp', 'Stamp delivers immediately', 'b'],
