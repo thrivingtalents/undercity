@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-05T16:47:32.716Z",
+  "generated_at": "2026-10-05T17:00:36.246Z",
   "sources": {
     "matrix": {
       "file": "undercity-crossref-matrix.xlsx",
@@ -28,8 +28,8 @@
       "file": "UNDERCITY_Binder_AGR.docx",
       "title": "Sector binder — AGR (nine pages; the station's quick reference)",
       "audience": "participant",
-      "bytes": 26162,
-      "sha256": "d2cfcb975cbd2ecb085236c70acdc564d353fee678568f29bc8013580018730c"
+      "bytes": 26265,
+      "sha256": "68a9e2b43d028610019757429aabdd92a5100406aa63f4b8177105af6d00566d"
     },
     {
       "file": "UNDERCITY_Binder_COM.docx",
