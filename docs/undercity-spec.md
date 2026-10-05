@@ -101,7 +101,7 @@ Cohort sizing: 3–6 participants per sector. 18 = minimum viable cohort; 36 = m
 - Wrong code: dashboard shows "REJECTED — verify procedure" and logs the attempt (failed-attempt count is itself debrief data: who bulldozed a guess vs who verified?).
 
 ### 3.3 Resolution code scheme (build-simple, cheat-resistant)
-`[Procedure]-[SpecValue]` or `[Procedure]-[Spec1]-[Spec2]` for R3/R4 two-spec faults. Example: F-201 resolves as `P-03-340`, where 340 is the Lower Reservoir pressure rating in WTR Manual Table W-4.
+`[Procedure]-[SpecValue]`, `[Procedure]-[Spec1]-[Spec2]` for R3/R4 two-spec faults, or `[Procedure]-[Spec1]-[Spec2]-[Spec3]` for the twelve three-value faults (every sector's P-08 and P-09 since 2026-10-06: `spec/reference_chain_faults.json` and `spec/late_shift_faults.json` name the rows, the generators resolve the values, and VALUE 3 is the sector's own table, its own Appendix C or a third sector's row). Example: F-201 resolves as `P-03-340`, where 340 is the Lower Reservoir pressure rating in WTR Manual Table W-4.
 - Server holds a lookup table (`content/faults.json`, generated from the crossref matrix) of fault → **array** of valid codes. No parsing logic needed.
 - One structural edge case lives in the built content: F-201 has **two** valid codes (the discrepancy seed). The array may also be **empty** for a false alarm; the deck has carried none since 2026-09-27, and any code path assuming exactly one code is still wrong.
 - Spec values are 3-digit numbers unique per table cell, so overheard numbers are useless without knowing which table they came from.

@@ -12,10 +12,12 @@
  * Run: node tools/build_late_shift_faults.js [--check]
  *   --check  verify the committed output is current and change nothing.
  *
- * Two more faults per sector, P-09 and P-10, each needing two values from
- * two specification tables. The source names the ROWS; this resolves the
- * VALUES, so a changed specification changes the answer by itself and no
- * file ever holds the same number twice. Nothing the engine does is new:
+ * Two more faults per sector, P-09 and P-10. A P-10 needs two values from
+ * two specification tables; a P-09 needs three (2026-10-06) — the third from
+ * the requesting sector's own table, its own Appendix C, or a third sector's
+ * indexed table. The source names the ROWS; this resolves the VALUES, so a
+ * changed specification changes the answer by itself and no file ever holds
+ * the same number twice. Nothing the engine does is new:
  * the resolution code is procedure + ordered values, which lib/validate.js
  * re-derives at boot and lib/resolve.js compares at the console.
  *
@@ -24,7 +26,10 @@
  * taken, a procedure already used, a source that is where the requesting
  * sector's own reference chain ends (the chain would collapse into the team's
  * notes), or a row the requesting sector is already sent to by one of its
- * own faults (the answer would already be in those notes).
+ * own faults (the answer would already be in those notes) — unless the source
+ * declares that overlap by fault code, which puts the repeat on record. The
+ * one Appendix C a late-shift fault may name is the requesting sector's own,
+ * and only as its third value.
  */
 const fs = require('fs');
 const path = require('path');
@@ -66,6 +71,26 @@ const visited = new Map(SECTORS.map((s) => [s, new Map()]));
 for (const f of existing) {
   for (const r of f.spec_refs || []) if (!visited.get(f.sector).has(r.spec_id)) visited.get(f.sector).set(r.spec_id, f.code);
 }
+// Every row each LATE-SHIFT fault names, by sector, read once up front so a
+// repeat inside the late shift is seen from both sides whatever the file
+// order — and the overlaps the source declares, as unordered pairs, so one
+// declaration (on the value that repeats) covers both faults.
+const specKey = (s) => `${s.sector}|${s.table}|${String(s.row || '').toLowerCase()}`;
+const pairKey = (sector, specId, a, b) => `${sector}|${specId}|${[a, b].sort().join('|')}`;
+const lateRows = new Map(SECTORS.map((s) => [s, new Map()]));
+const acknowledged = new Set();
+for (const f of src.faults || []) {
+  if (!SECTORS.includes(f.sector)) continue;
+  for (const s of f.sources || []) {
+    const spec = bySpec.get(specKey(s));
+    if (!spec) continue;
+    const rows = lateRows.get(f.sector);
+    if (!rows.has(spec.spec_id)) rows.set(spec.spec_id, []);
+    rows.get(spec.spec_id).push(f.code);
+    if (s.overlap) acknowledged.add(pairKey(f.sector, spec.spec_id, f.code, s.overlap));
+  }
+}
+const sourceType = (spec, sector) => (spec.binder === sector ? (spec.buried ? 'OWN_APPENDIX' : 'OWN_TABLE') : (spec.buried ? 'FOREIGN_APPENDIX' : 'EXTERNAL'));
 
 // -- 2. the meta ------------------------------------------------------------------
 if (!src.meta || !src.meta.section) fail('meta.section is missing');
@@ -75,12 +100,13 @@ for (const [id, p] of Object.entries(PROC)) {
   if (existing.some((e) => e.procedure === id)) fail(`procedure ${id} is already used by ${existing.find((e) => e.procedure === id).code}`);
   if (![1, 2, 3].includes(p.severity)) fail(`${id}: severity must be 1, 2 or 3`);
   if (!(Number(p.decay_per_min) >= 0)) fail(`${id}: decay_per_min must be a number`);
+  // How many values the code carries: P-09 three (2026-10-06), P-10 two.
+  if (![2, 3].includes(Number(p.values))) fail(`${id}: values must be 2 or 3 — how many values its code carries`);
 }
 
 // -- 3. the faults ----------------------------------------------------------------
 const faults = [];
 const seen = new Set();
-const lateVisited = new Map(SECTORS.map((s) => [s, new Map()]));
 for (const f of src.faults || []) {
   if (seen.has(f.code)) fail(`${f.code} is listed twice`);
   seen.add(f.code);
@@ -100,21 +126,35 @@ for (const f of src.faults || []) {
     if (!Number.isInteger(v) || v < 1) fail(`${f.code}: ${k} ${v} is not a positive whole number`);
   }
 
-  if (!Array.isArray(f.sources) || f.sources.length !== 2) fail(`${f.code}: a late-shift fault needs exactly two sources`);
+  const want = Number(proc.values);
+  if (!Array.isArray(f.sources) || f.sources.length !== want) fail(`${f.code}: a ${f.procedure} fault needs exactly ${want} sources, found ${(f.sources || []).length}`);
   const refs = [];
   const values = [];
-  for (const s of f.sources || []) {
-    if (!SECTORS.includes(s.sector)) { fail(`${f.code}: source sector ${s.sector} is unknown`); continue; }
-    if (!tables.has(`${s.sector}|${s.table}`)) { fail(`${f.code}: ${s.sector} has no table ${s.table}`); continue; }
-    const spec = bySpec.get(`${s.sector}|${s.table}|${String(s.row || '').toLowerCase()}`);
-    if (!spec) { fail(`${f.code}: ${s.sector} ${s.table} has no row "${s.row}"`); continue; }
-    if (spec.buried) fail(`${f.code}: ${spec.spec_id} is an Appendix C value — the late shift reuses indexed tables only`);
-    if (!/^\d{3}$/.test(String(spec.value))) fail(`${f.code}: ${spec.spec_id} value ${spec.value} is not three digits`);
+  const overlaps = [];
+  for (const [i, s] of (f.sources || []).entries()) {
+    const n = i + 1;
+    if (!SECTORS.includes(s.sector)) { fail(`${f.code} value ${n}: source sector ${s.sector} is unknown`); continue; }
+    if (!tables.has(`${s.sector}|${s.table}`)) { fail(`${f.code} value ${n}: ${s.sector} has no table ${s.table}`); continue; }
+    const spec = bySpec.get(specKey(s));
+    if (!spec) { fail(`${f.code} value ${n}: ${s.sector} ${s.table} has no row "${s.row}"`); continue; }
+    const type = sourceType(spec, f.sector);
+    // Appendix C: the requesting sector's own, as its third value, and nothing else (2026-10-06).
+    if (spec.buried && (type !== 'OWN_APPENDIX' || n !== 3)) {
+      fail(`${f.code} value ${n}: ${spec.spec_id} is ${type === 'OWN_APPENDIX' ? 'its own' : `${spec.binder}'s`} Appendix C — the late shift reuses indexed tables; only a third value may be the requesting sector's own Appendix C`);
+    }
+    if (s.source_type && s.source_type !== type) fail(`${f.code} value ${n}: declared ${s.source_type}, but ${spec.spec_id} ${spec.binder} ${spec.table_id} "${spec.row_label}" is ${type}`);
+    if (!/^\d{3}$/.test(String(spec.value))) fail(`${f.code} value ${n}: ${spec.spec_id} value ${spec.value} is not three digits`);
     const endOf = chainEnds.get(f.sector).get(spec.spec_id);
-    if (endOf) fail(`${f.code}: sends ${f.sector} to ${spec.spec_id} "${spec.row_label}", where its own reference chain ${endOf} ends — the chain would collapse into the team's notes`);
-    const prior = visited.get(f.sector).get(spec.spec_id) || lateVisited.get(f.sector).get(spec.spec_id);
-    if (prior) fail(`${f.code}: ${f.sector} is already sent to ${spec.spec_id} "${spec.row_label}" by ${prior} — the answer would be in its notes`);
-    lateVisited.get(f.sector).set(spec.spec_id, f.code);
+    if (endOf) fail(`${f.code} value ${n}: sends ${f.sector} to ${spec.spec_id} "${spec.row_label}", where its own reference chain ${endOf} ends — the chain would collapse into the team's notes`);
+    const others = (lateRows.get(f.sector).get(spec.spec_id) || []).filter((c) => c !== f.code);
+    const prior = visited.get(f.sector).get(spec.spec_id) || others[0];
+    if (prior && !acknowledged.has(pairKey(f.sector, spec.spec_id, f.code, prior))) {
+      fail(`${f.code} value ${n}: ${f.sector} is already sent to ${spec.spec_id} "${spec.row_label}" by ${prior} — the answer would be in its notes; declare "overlap": "${prior}" on the value that repeats it if that is intended`);
+    } else if (prior) {
+      overlaps.push(`VALUE ${n} row is also ${prior}'s`);
+    } else if (s.overlap) {
+      fail(`${f.code} value ${n}: declares an overlap with ${s.overlap}, but no other ${f.sector} fault is sent to ${spec.spec_id}`);
+    }
     refs.push({ spec_id: spec.spec_id, binder: spec.binder, table: spec.table_id, row_label: spec.row_label, buried: !!spec.buried });
     values.push(spec.value);
   }
@@ -148,7 +188,7 @@ for (const f of src.faults || []) {
     false_alarm: false,
     injures_workforce: 0,
     triggered_by: null,
-    facilitator_notes: f.facilitator_notes || `${src.meta.section} · ${f.procedure}${proc.time_critical ? ' · TIME-CRITICAL' : ''}`,
+    facilitator_notes: (f.facilitator_notes || `${src.meta.section} · ${f.procedure}${proc.time_critical ? ' · TIME-CRITICAL' : ''}`) + overlaps.map((o) => ` · ${o}`).join(''),
     section: src.meta.section,
     recommended_from: src.meta.recommended_from,
     late_shift: true,
@@ -184,7 +224,7 @@ const payload = {
     section: src.meta.section,
     recommended_from: src.meta.recommended_from,
     fault_count: faults.length,
-    procedures: Object.fromEntries(Object.entries(PROC).map(([id, p]) => [id, { severity: p.severity, decay_per_min: Number(p.decay_per_min), time_critical: !!p.time_critical, label: p.label || null }])),
+    procedures: Object.fromEntries(Object.entries(PROC).map(([id, p]) => [id, { severity: p.severity, decay_per_min: Number(p.decay_per_min), time_critical: !!p.time_critical, values: Number(p.values), label: p.label || null }])),
     note: 'Generated. Do not hand-edit — edit spec/late_shift_faults.json and re-run the generator. Every three-digit value here was resolved from content/specs.json.',
   },
   faults,

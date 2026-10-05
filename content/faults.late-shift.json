@@ -1,7 +1,7 @@
 {
   "meta": {
     "name": "Late Shift Faults",
-    "version": "1.0",
+    "version": "1.1",
     "source": "spec/late_shift_faults.json",
     "generator": "tools/build_late_shift_faults.js",
     "section": "LATE SHIFT",
@@ -12,12 +12,14 @@
         "severity": 2,
         "decay_per_min": 2,
         "time_critical": false,
-        "label": "Direct cross-sector technical dependency, two values"
+        "values": 3,
+        "label": "Direct cross-sector technical dependency, three values"
       },
       "P-10": {
         "severity": 3,
         "decay_per_min": 3,
         "time_critical": true,
+        "values": 2,
         "label": "Higher-pressure direct cross-sector dependency, two values, TIME-CRITICAL"
       }
     },
@@ -52,15 +54,22 @@
           "table": "P-1",
           "row_label": "Turbine B",
           "buried": false
+        },
+        {
+          "spec_id": "C3-3",
+          "binder": "COM",
+          "table": "C-3",
+          "row_label": "Core Ring",
+          "buried": false
         }
       ],
       "valid_codes": [
-        "P-09-670-730"
+        "P-09-670-730-145"
       ],
       "false_alarm": false,
       "injures_workforce": 0,
       "triggered_by": null,
-      "facilitator_notes": "LATE SHIFT · P-09",
+      "facilitator_notes": "LATE SHIFT · P-09 · VALUE 3 row is also F-602's",
       "section": "LATE SHIFT",
       "recommended_from": "R4",
       "late_shift": true,
@@ -103,7 +112,7 @@
       "false_alarm": false,
       "injures_workforce": 0,
       "triggered_by": null,
-      "facilitator_notes": "LATE SHIFT · P-10 · TIME-CRITICAL",
+      "facilitator_notes": "LATE SHIFT · P-10 · TIME-CRITICAL · VALUE 1 row is also F-601's",
       "section": "LATE SHIFT",
       "recommended_from": "R4",
       "late_shift": true,
@@ -138,15 +147,22 @@
           "table": "A-2",
           "row_label": "Bay 4",
           "buried": false
+        },
+        {
+          "spec_id": "C3-5",
+          "binder": "COM",
+          "table": "C-3",
+          "row_label": "Deep Sensors",
+          "buried": false
         }
       ],
       "valid_codes": [
-        "P-09-346-311"
+        "P-09-346-311-828"
       ],
       "false_alarm": false,
       "injures_workforce": 0,
       "triggered_by": null,
-      "facilitator_notes": "LATE SHIFT · P-09",
+      "facilitator_notes": "LATE SHIFT · P-09 · VALUE 3 row is also F-604's",
       "section": "LATE SHIFT",
       "recommended_from": "R4",
       "late_shift": true,
@@ -189,7 +205,7 @@
       "false_alarm": false,
       "injures_workforce": 0,
       "triggered_by": null,
-      "facilitator_notes": "Approved 2026-10-04 with Ring Main in place of Emergency Bus: Emergency Bus is where WTR's own chain F-504 ends.",
+      "facilitator_notes": "Approved 2026-10-04 with Ring Main in place of Emergency Bus: Emergency Bus is where WTR's own chain F-504 ends. · VALUE 2 row is also F-603's",
       "section": "LATE SHIFT",
       "recommended_from": "R4",
       "late_shift": true,
@@ -224,10 +240,17 @@
           "table": "C-3",
           "row_label": "Grid South",
           "buried": false
+        },
+        {
+          "spec_id": "M2-5",
+          "binder": "MED",
+          "table": "M-2",
+          "row_label": "Surgical Suite",
+          "buried": false
         }
       ],
       "valid_codes": [
-        "P-09-734-931"
+        "P-09-734-931-565"
       ],
       "false_alarm": false,
       "injures_workforce": 0,
@@ -310,10 +333,17 @@
           "table": "C-3",
           "row_label": "Perimeter",
           "buried": false
+        },
+        {
+          "spec_id": "TC-1",
+          "binder": "TRN",
+          "table": "App-C",
+          "row_label": "Deep-Tunnel Pressure Rating",
+          "buried": true
         }
       ],
       "valid_codes": [
-        "P-09-273-306"
+        "P-09-273-306-490"
       ],
       "false_alarm": false,
       "injures_workforce": 0,
@@ -396,10 +426,17 @@
           "table": "A-2",
           "row_label": "Seedling Bay",
           "buried": false
+        },
+        {
+          "spec_id": "P2-2",
+          "binder": "POW",
+          "table": "P-2",
+          "row_label": "Sub-grid 1",
+          "buried": false
         }
       ],
       "valid_codes": [
-        "P-09-617-793"
+        "P-09-617-793-990"
       ],
       "false_alarm": false,
       "injures_workforce": 0,
@@ -483,10 +520,17 @@
           "table": "W-4",
           "row_label": "Overflow Basin",
           "buried": false
+        },
+        {
+          "spec_id": "C3-5",
+          "binder": "COM",
+          "table": "C-3",
+          "row_label": "Deep Sensors",
+          "buried": false
         }
       ],
       "valid_codes": [
-        "P-09-621-819"
+        "P-09-621-819-828"
       ],
       "false_alarm": false,
       "injures_workforce": 0,

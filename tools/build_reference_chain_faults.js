@@ -17,6 +17,18 @@
  * answer; change Turbine D in the workbook, re-export specs.json, re-run this,
  * and F-507's code changes with it. There is one source of truth for a sector
  * specification value and it is content/specs.json.
+ *
+ * THREE VALUES (2026-10-06). A P-08 fault resolves on three values, not two:
+ * its two chains still give VALUE 1 and VALUE 2, and `direct_values` names a
+ * row outright for VALUE 3 — the requesting sector's own table, its own
+ * Appendix C, or another sector's indexed table (never another sector's
+ * Appendix C: that is a Round 4 raid, not a chain value). The source declares
+ * what kind of row it means (source_type) and the generator checks the claim
+ * against the row it resolves. Where the requesting sector is already sent to
+ * that row by one of its own faults, the source must say so (`overlap`), so a
+ * repeat is a decision on record and not an accident. The code is still the
+ * same pure function — procedure + the ordered spec values — so nothing in
+ * lib/validate.js or lib/resolve.js had to learn anything.
  */
 const fs = require('fs');
 const path = require('path');
@@ -81,6 +93,8 @@ for (const [owner, entries] of Object.entries(src.reference_directory)) {
 const PROC = src.meta.procedures;
 const faults = [];
 const usedRefs = new Set();
+const existing = read(path.join(ROOT, 'content', 'faults.json')).faults;
+const sourceType = (spec, sector) => (spec.binder === sector ? (spec.buried ? 'OWN_APPENDIX' : 'OWN_TABLE') : (spec.buried ? 'FOREIGN_APPENDIX' : 'EXTERNAL'));
 
 for (const f of src.faults) {
   const proc = PROC[f.procedure];
@@ -88,6 +102,12 @@ for (const f of src.faults) {
   if (!SECTORS.includes(f.sector)) { fail(`${f.code}: unknown sector ${f.sector}`); continue; }
   if (f.chains.length !== proc.chains) {
     fail(`${f.code}: ${f.procedure} takes ${proc.chains} chain(s), found ${f.chains.length}`);
+    continue;
+  }
+  const directs = f.direct_values || [];
+  const wantDirect = Number(proc.direct_values) || 0;
+  if (directs.length !== wantDirect) {
+    fail(`${f.code}: ${f.procedure} takes ${wantDirect} direct value(s) after its chains, found ${directs.length}`);
     continue;
   }
 
@@ -112,6 +132,48 @@ for (const f of src.faults) {
       first_reference_name: ref.reference_name,
       intermediate_result: ref.display,
       final_source: { sector: spec.binder, table: spec.table_id, item: spec.row_label, spec_id: spec.spec_id },
+    });
+    specRefs.push({
+      spec_id: spec.spec_id, binder: spec.binder, table: spec.table_id,
+      row_label: spec.row_label, buried: spec.buried,
+    });
+  }
+  if (broken) continue;
+
+  // VALUE 3 (2026-10-06): a row named outright, after the chains. It is
+  // resolved like a chain's end, declared for what it is, and allowed to
+  // repeat a row the sector already visits only when the source says so.
+  const direct = [];
+  const pool = [...existing, ...faults];   // every fault built before this one, this sector's included
+  for (const [i, d] of directs.entries()) {
+    const n = f.chains.length + i + 1;
+    const spec = lookup(d);
+    if (!spec) { fail(`${f.code} value ${n}: ${d.sector} ${d.table} "${d.item}" is not in specs.json`); broken = true; continue; }
+    if (!Number.isInteger(spec.value) || spec.value < 100 || spec.value > 999) {
+      fail(`${f.code} value ${n}: ${spec.spec_id} is ${spec.value}, not a three-digit value`); broken = true; continue;
+    }
+    const type = sourceType(spec, f.sector);
+    if (type === 'FOREIGN_APPENDIX') {
+      fail(`${f.code} value ${n}: ${spec.spec_id} is ${spec.binder}'s Appendix C — another sector's appendix is a Round 4 raid, not a chain value`); broken = true; continue;
+    }
+    if (d.source_type && d.source_type !== type) {
+      fail(`${f.code} value ${n}: declared ${d.source_type}, but ${spec.spec_id} ${spec.binder} ${spec.table_id} "${spec.row_label}" is ${type}`); broken = true; continue;
+    }
+    if (chains.some((c) => c.final_source.spec_id === spec.spec_id)) {
+      fail(`${f.code} value ${n}: ${spec.spec_id} is where one of its own chains ends — the chain would collapse into a lookup`); broken = true; continue;
+    }
+    const prior = pool.find((e) => e.sector === f.sector && (e.spec_refs || []).some((r) => r.spec_id === spec.spec_id));
+    if (prior && d.overlap !== prior.code) {
+      fail(`${f.code} value ${n}: ${f.sector} is already sent to ${spec.spec_id} "${spec.row_label}" by ${prior.code} — declare "overlap": "${prior.code}" if that repeat is intended`); broken = true; continue;
+    }
+    if (!prior && d.overlap) {
+      fail(`${f.code} value ${n}: declares an overlap with ${d.overlap}, but no ${f.sector} fault is sent to ${spec.spec_id}`); broken = true; continue;
+    }
+    direct.push({
+      position: n,
+      source_type: type,
+      sector: spec.binder, table: spec.table_id, item: spec.row_label, spec_id: spec.spec_id,
+      overlap: prior ? prior.code : null,
     });
     specRefs.push({
       spec_id: spec.spec_id, binder: spec.binder, table: spec.table_id,
@@ -145,10 +207,12 @@ for (const f of src.faults) {
     deadline_s: null,
     injures_workforce: 0,
     triggered_by: null,
-    facilitator_notes: `Reference chain · ${proc.label}`,
+    facilitator_notes: `Reference chain · ${proc.label}${direct.filter((d) => d.overlap).map((d) => ` · VALUE ${d.position} row is also ${d.overlap}'s`).join('')}`,
     // FACILITATOR-ONLY. lib/visibility.js never projects this to a sector or
     // to the wall; it exists so the admin console can show the whole path.
     reference_chain: chains,
+    // FACILITATOR-ONLY too: VALUE 3's row, declared for what it is (2026-10-06).
+    direct_values: direct,
   });
 }
 
@@ -156,7 +220,6 @@ for (const f of src.faults) {
 for (const [id, r] of refs) {
   if (!usedRefs.has(id)) fail(`${id} "${r.reference_name}" (${r.owner}) is never required by a fault`);
 }
-const existing = read(path.join(ROOT, 'content', 'faults.json')).faults;
 for (const f of faults) {
   if (existing.some((e) => e.code === f.code)) fail(`${f.code} already exists in faults.json`);
 }
@@ -244,6 +307,9 @@ console.log('\n  REQUESTER  ->  FIRST  ->  REFERENCE                          ->
 for (const f of faults) {
   for (const c of f.reference_chain) {
     console.log(`  ${f.code} ${f.sector.padEnd(4)} ->  ${c.first_sector.padEnd(5)} ->  ${c.first_reference_name.padEnd(34)} ->  ${c.intermediate_result.padEnd(24)} ${f.valid_codes[0]}`);
+  }
+  for (const d of f.direct_values) {
+    console.log(`  ${f.code} ${f.sector.padEnd(4)} ->  VALUE ${d.position}: ${d.source_type.padEnd(12)} ${d.sector} ${d.table} ${d.item}${d.overlap ? ` (also ${d.overlap}'s row)` : ''}`);
   }
 }
 const finals = role((f, c) => c.final_source.sector);

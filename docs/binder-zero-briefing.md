@@ -26,7 +26,7 @@ one page per sector).
 | 5 | TRADING, WORKERS & HEALING | shared | Seven-step transfer strip and steps, the "all three or nothing moved" box, workers and loans, injury and healing |
 | 6 | QUICK ACTIONS & COUNCIL | shared, one own-panel line | Fourteen WHEN THIS HAPPENS → DO THIS rows, the Council box |
 | 7 | FAULTS & REPAIRS — PART 1 | sector | Five fault cards (P-01 to P-05): large code, name, PROCEDURE · CREW · MATERIALS, VALUE 1 · VALUE 2 · ENTER |
-| 8 | FAULTS & REPAIRS — PART 2 | sector | Five fault cards (P-06 to P-10) with TIME-CRITICAL and REFERENCE chains, then the ESCALATE TO line |
+| 8 | FAULTS & REPAIRS — PART 2 | sector | Five fault cards (P-06 to P-10) with TIME-CRITICAL and REFERENCE chains — the P-08 and P-09 cards carry VALUE 3 and an ENTER row of their own (three-value codes, 2026-10-06) — then the ESCALATE TO line |
 | 9 | SPECIFICATIONS, REFERENCES & AUTHORISATIONS | sector | VALUE / REFERENCE / AUTHORISATION legend, every specification table, the reference directory, the Appendix C value |
 
 **How it is built.** `tools/kit/binder_compact.js` builds the nine pages;

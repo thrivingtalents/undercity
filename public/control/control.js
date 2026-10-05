@@ -424,7 +424,7 @@
    */
   function chainText(f) {
     return (f.reference_chain || []).map((c, i) => {
-      const n = f.reference_chain.length > 1 ? `VALUE ${i + 1}: ` : '';
+      const n = (f.spec_refs || f.reference_chain).length > 1 ? `VALUE ${i + 1}: ` : '';
       const s = c.final_source;
       return `${n}${f.sector} → ${c.first_sector} "${c.first_reference_name}" → ${c.intermediate_result} → ${s.sector} ${s.table} ${s.item}`;
     });
@@ -432,14 +432,17 @@
 
   /**
    * What a fault needs and what it answers, for the facilitator's eyes only
-   * (LATE SHIFT, 2026-10-05, for every fault with sources): the picker is
-   * behind the control token and nothing here reaches a table.
+   * (LATE SHIFT, 2026-10-05, for every fault with sources; from `from` on for
+   * a chain fault's VALUE 3, 2026-10-06): the picker is behind the control
+   * token and nothing here reaches a table.
    */
-  function sourceText(f) {
+  function sourceText(f, from = 0) {
     const specs = (content && content.specs && content.specs.specs) || [];
-    return (f.spec_refs || []).map((r, i) => {
+    return (f.spec_refs || []).slice(from).map((r, j) => {
       const s = specs.find((x) => x.spec_id === r.spec_id);
-      return `VALUE ${i + 1}: ${r.binder} ${r.table} ${r.row_label}${r.buried ? ' (Appendix C)' : ''} = ${s ? s.value : '?'}`;
+      const where = r.buried ? `${r.binder} Appendix C` : `${r.binder} ${r.table}`;
+      const own = r.binder === f.sector ? ' (own binder)' : '';
+      return `VALUE ${from + j + 1}: ${where} ${r.row_label}${own} = ${s ? s.value : '?'}`;
     });
   }
   function rewardText(code) {
@@ -466,7 +469,7 @@
       <div class="confirm-card">
         <div class="cc-title">${esc(code)} · ${esc(f ? f.name : '')}</div>
         <div class="cc-line">→ <b>${esc(sector)}</b> · ${f ? U.severityPips(f.severity) : ''} · ${esc(group)}${f && f.injures_workforce ? ` · injures ${f.injures_workforce}` : ''}</div>
-        ${f && f.reference_chain ? `<div class="cc-chain">${chainText(f).map((l) => `<div>${esc(l)}</div>`).join('')}<em>Facilitator only — no player screen shows past the first sector.</em></div>` : ''}
+        ${f && f.reference_chain ? `<div class="cc-chain">${[...chainText(f), ...sourceText(f, f.reference_chain.length)].map((l) => `<div>${esc(l)}</div>`).join('')}<em>Facilitator only — no player screen shows past the first sector, or any value.</em></div>` : ''}
         ${f && f.valid_codes && f.reference_chain ? `<div class="cc-chain"><b>ANSWER ${esc(f.valid_codes.join(' / '))}</b></div>` : ''}
         ${f && !f.reference_chain && (f.spec_refs || []).length ? `<div class="cc-chain">${sourceText(f).map((l) => `<div>${esc(l)}</div>`).join('')}<div><b>ANSWER ${esc((f.valid_codes || []).join(' / '))}</b></div><div>${esc(needsText(f))}</div><em>Facilitator only — no player screen shows any of this.</em></div>` : ''}
         <div class="row"><button id="cc-cancel">CANCEL</button><button id="cc-go" class="primary">TRIGGER</button></div>
@@ -1025,6 +1028,8 @@
       if (f.valid_codes.length > 1) tags.push('<span class="tag multi">2 CODES</span>');
       if (f.injures_workforce > 0) tags.push(`<span class="tag injury">−${f.injures_workforce}👤</span>`);
       if ((f.spec_refs || []).some((r) => r.binder !== f.sector)) tags.push('<span class="tag cross">X-SECTOR</span>');
+      // THREE VALUES (2026-10-06): every sector's P-08 and P-09. Pace them in from Round 5; never all at once.
+      if ((f.spec_refs || []).length >= 3) tags.push('<span class="tag values">3 VALUES</span>');
       // LATE SHIFT (2026-10-05): its procedure, and the word a P-10 carries.
       if (f.late_shift) tags.push(`<span class="tag late">${esc(f.procedure)}</span>`);
       if (f.time_critical) tags.push('<span class="tag timed">TIME-CRITICAL</span>');
@@ -1177,14 +1182,14 @@
     $('council-live').classList.toggle('expired', expired);
     $('council-pause').textContent = clk.status === 'running' ? 'PAUSE' : 'RUN';
     $('council-pause').disabled = expired;
+    // Extend before 00:00 or not at all: once the sitting has closed, the only
+    // live control is CLOSE COUNCIL.
+    for (const b of document.querySelectorAll('[data-council]')) b.disabled = expired;
     $('council-reset').textContent = `RESET ${U.mmss(Number((state.config && state.config.council_clock_s) || clk.duration_s || 60))}`;
     renderCouncilClock();
   }
 
   function renderCouncilClock() {
-    // Extend before 00:00 or not at all: once the sitting has closed, the only
-    // live control is CLOSE COUNCIL.
-    for (const b of document.querySelectorAll('[data-council]')) b.disabled = expired;
     const clk = state.council_clock || {};
     const secs = U.countdown(clk, state.frozen);
     const el = $('council-time');

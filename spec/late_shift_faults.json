@@ -1,23 +1,25 @@
 {
   "meta": {
     "name": "Late Shift Faults",
-    "version": "1.0",
+    "version": "1.1",
     "approved": "2026-10-05",
+    "three_values_approved": "2026-10-06",
     "generated_into": "content/faults.late-shift.json",
     "generator": "tools/build_late_shift_faults.js",
     "section": "LATE SHIFT",
     "recommended_from": "R4",
-    "purpose": "Two more faults per sector — P-09 and P-10 — so the mixed-operations phase (Round 4 today; whatever follows it when the round table grows) can mix every kind of fault the room has learned without repeating one. No new mechanic: a P-09 needs two values from two binders exactly as P-05 did; a P-10 is the same under time pressure expressed by Integrity decay.",
+    "purpose": "Two more faults per sector — P-09 and P-10 — so the mixed-operations phase (Round 4 today; whatever follows it when the round table grows) can mix every kind of fault the room has learned without repeating one. No new mechanic: a P-09 needs three values (2026-10-06) — two from indexed tables exactly as P-05's two were, and a third from its own table, its own Appendix C or a third sector's table; a P-10 needs two and is the same under time pressure expressed by Integrity decay.",
     "rules": [
       "This file holds STRUCTURE only: which sector, which table, which row. It never holds a three-digit value. The generator resolves every value from content/specs.json, so a changed specification changes the answer by itself.",
-      "A source must be an indexed table row (never Appendix C), must not be where the requesting sector's own reference chain ends (the chain would collapse into the team's notes), and must not be a row the requesting sector is already sent to by one of its own faults.",
+      "A source must be an indexed table row — except a P-09's third value, which may be the requesting sector's OWN Appendix C (2026-10-06); another sector's Appendix C is never a late-shift source. A source must not be where the requesting sector's own reference chain ends (the chain would collapse into the team's notes), and must not be a row the requesting sector is already sent to by one of its own faults unless the source declares that `overlap` by fault code: a repeat on record is a decision, an undeclared one is a build error.",
+      "procedures.<id>.values is how many values a procedure's code carries (P-09: 3, P-10: 2). A source may declare source_type (OWN_TABLE, OWN_APPENDIX, EXTERNAL) and the generator checks it against the row it resolves.",
       "round is null and section is LATE SHIFT: these are the facilitator's to fire from the library, like every fault since 2026-10-04. recommended_from names the round from which they are appropriate — from that round ONWARD, never that round only.",
       "time_critical / facilitator_target_s are guidance for the facilitator and the TIME-CRITICAL word on the card. Nothing counts down, expires or resolves on them; the pressure a P-10 carries is its decay_per_min."
     ]
   },
   "procedures": {
-    "P-09": { "severity": 2, "decay_per_min": 2.0, "time_critical": false, "label": "Direct cross-sector technical dependency, two values" },
-    "P-10": { "severity": 3, "decay_per_min": 3.0, "time_critical": true, "label": "Higher-pressure direct cross-sector dependency, two values, TIME-CRITICAL" }
+    "P-09": { "severity": 2, "decay_per_min": 2.0, "time_critical": false, "values": 3, "label": "Direct cross-sector technical dependency, three values" },
+    "P-10": { "severity": 3, "decay_per_min": 3.0, "time_critical": true, "values": 2, "label": "Higher-pressure direct cross-sector dependency, two values, TIME-CRITICAL" }
   },
   "faults": [
     {
@@ -27,7 +29,8 @@
       "crew_required": 2, "resources_required": { "parts": 1, "water": 1 },
       "sources": [
         { "sector": "WTR", "table": "W-4", "row": "Upper Reservoir" },
-        { "sector": "POW", "table": "P-1", "row": "Turbine B" }
+        { "sector": "POW", "table": "P-1", "row": "Turbine B" },
+        { "sector": "COM", "table": "C-3", "row": "Core Ring", "source_type": "EXTERNAL", "overlap": "F-602" }
       ]
     },
     {
@@ -48,7 +51,8 @@
       "crew_required": 2, "resources_required": { "power": 1, "med": 1 },
       "sources": [
         { "sector": "MED", "table": "M-5", "row": "Scrubber Unit" },
-        { "sector": "AGR", "table": "A-2", "row": "Bay 4" }
+        { "sector": "AGR", "table": "A-2", "row": "Bay 4" },
+        { "sector": "COM", "table": "C-3", "row": "Deep Sensors", "source_type": "EXTERNAL", "overlap": "F-604" }
       ]
     },
     {
@@ -70,7 +74,8 @@
       "crew_required": 2, "resources_required": { "power": 1, "med": 1 },
       "sources": [
         { "sector": "WTR", "table": "W-4", "row": "Mid Reservoir" },
-        { "sector": "COM", "table": "C-3", "row": "Grid South" }
+        { "sector": "COM", "table": "C-3", "row": "Grid South" },
+        { "sector": "MED", "table": "M-2", "row": "Surgical Suite", "source_type": "OWN_TABLE" }
       ]
     },
     {
@@ -92,7 +97,8 @@
       "crew_required": 2, "resources_required": { "power": 1, "parts": 1 },
       "sources": [
         { "sector": "MED", "table": "M-5", "row": "HEPA Array" },
-        { "sector": "COM", "table": "C-3", "row": "Perimeter" }
+        { "sector": "COM", "table": "C-3", "row": "Perimeter" },
+        { "sector": "TRN", "table": "App-C", "row": "Deep-Tunnel Pressure Rating", "source_type": "OWN_APPENDIX" }
       ]
     },
     {
@@ -113,7 +119,8 @@
       "crew_required": 2, "resources_required": { "water": 1, "parts": 1 },
       "sources": [
         { "sector": "WTR", "table": "W-3", "row": "Pump Station 1" },
-        { "sector": "AGR", "table": "A-2", "row": "Seedling Bay" }
+        { "sector": "AGR", "table": "A-2", "row": "Seedling Bay" },
+        { "sector": "POW", "table": "P-2", "row": "Sub-grid 1", "source_type": "EXTERNAL" }
       ]
     },
     {
@@ -134,7 +141,8 @@
       "crew_required": 2, "resources_required": { "power": 1, "parts": 1 },
       "sources": [
         { "sector": "TRN", "table": "T-1", "row": "Tunnel D" },
-        { "sector": "WTR", "table": "W-4", "row": "Overflow Basin" }
+        { "sector": "WTR", "table": "W-4", "row": "Overflow Basin" },
+        { "sector": "COM", "table": "C-3", "row": "Deep Sensors", "source_type": "OWN_TABLE" }
       ],
       "facilitator_notes": "Approved 2026-10-04 with Overflow Basin in place of Lower Reservoir: Lower Reservoir is the seeded discrepancy row, kept unique to F-201."
     },

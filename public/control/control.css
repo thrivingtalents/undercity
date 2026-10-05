@@ -255,6 +255,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: none;
 .tag.injury { border-color: var(--red);    color: var(--red); }
 .tag.cross  { border-color: var(--blue);   color: var(--blue); }
 .tag.late   { border-color: var(--ink-dim); color: var(--ink); }
+.tag.values { border-color: var(--amber);  color: var(--amber); font-weight: 700; }
 .tag.timed  { border-color: var(--red);    color: var(--red); font-weight: 700; }
 .inject button { padding: 3px 8px; font-size: 10px; font-weight: 700; }
 .scheduled .sc { display: flex; gap: 8px; font-size: 11px; align-items: center; padding: 2px 0; }

@@ -3,9 +3,10 @@
  * LATE SHIFT (2026-10-05): two more faults per sector, P-09 and P-10.
  *
  * Ten playable faults per sector now, sixty in all. The twelve new ones add no
- * mechanic: a P-09 needs two values from two binders exactly as P-05 did; a
- * P-10 is the same under time pressure expressed as Integrity decay, with
- * TIME-CRITICAL printed on the card and nothing counting down. Their values
+ * mechanic: a P-09 needs values from other binders exactly as P-05 did —
+ * three of them since 2026-10-06 (test/three-value-codes.test.js); a P-10
+ * needs two and is the same under time pressure expressed as Integrity decay,
+ * with TIME-CRITICAL printed on the card and nothing counting down. Their values
  * are resolved from the specification tables by the generator and never
  * written anywhere else, so a changed specification changes the answer.
  *
@@ -40,17 +41,17 @@ const content = loadContent();
 const def = (code) => content.faults.faults.find((f) => f.code === code);
 const specValue = (binder, table, row) => SPECS.find((s) => s.binder === binder && s.table_id === table && s.row_label === row).value;
 const APPROVED = {
-  'F-601': [['WTR', 'W-4', 'Upper Reservoir'], ['POW', 'P-1', 'Turbine B']],
+  'F-601': [['WTR', 'W-4', 'Upper Reservoir'], ['POW', 'P-1', 'Turbine B'], ['COM', 'C-3', 'Core Ring']],
   'F-602': [['COM', 'C-3', 'Core Ring'], ['TRN', 'T-6', 'Emergency Line']],
-  'F-603': [['MED', 'M-5', 'Scrubber Unit'], ['AGR', 'A-2', 'Bay 4']],
+  'F-603': [['MED', 'M-5', 'Scrubber Unit'], ['AGR', 'A-2', 'Bay 4'], ['COM', 'C-3', 'Deep Sensors']],
   'F-604': [['POW', 'P-2', 'Ring Main'], ['COM', 'C-3', 'Deep Sensors']],
-  'F-605': [['WTR', 'W-4', 'Mid Reservoir'], ['COM', 'C-3', 'Grid South']],
+  'F-605': [['WTR', 'W-4', 'Mid Reservoir'], ['COM', 'C-3', 'Grid South'], ['MED', 'M-2', 'Surgical Suite']],
   'F-606': [['POW', 'P-2', 'Sub-grid 1'], ['TRN', 'T-6', 'Emergency Line']],
-  'F-607': [['MED', 'M-5', 'HEPA Array'], ['COM', 'C-3', 'Perimeter']],
+  'F-607': [['MED', 'M-5', 'HEPA Array'], ['COM', 'C-3', 'Perimeter'], ['TRN', 'App-C', 'Deep-Tunnel Pressure Rating']],
   'F-608': [['POW', 'P-2', 'Ring Main'], ['WTR', 'W-3', 'Backup Pump']],
-  'F-609': [['WTR', 'W-3', 'Pump Station 1'], ['AGR', 'A-2', 'Seedling Bay']],
+  'F-609': [['WTR', 'W-3', 'Pump Station 1'], ['AGR', 'A-2', 'Seedling Bay'], ['POW', 'P-2', 'Sub-grid 1']],
   'F-610': [['MED', 'M-2', 'Isolation Wing'], ['COM', 'C-3', 'Deep Sensors']],
-  'F-611': [['TRN', 'T-1', 'Tunnel D'], ['WTR', 'W-4', 'Overflow Basin']],
+  'F-611': [['TRN', 'T-1', 'Tunnel D'], ['WTR', 'W-4', 'Overflow Basin'], ['COM', 'C-3', 'Deep Sensors']],
   'F-612': [['POW', 'P-2', 'Emergency Bus'], ['MED', 'M-2', 'Triage Bay']],
 };
 const TARGETS = { 'F-602': 420, 'F-604': 420, 'F-606': 360, 'F-608': 360, 'F-610': 420, 'F-612': 360 };
@@ -118,18 +119,18 @@ test('FX10-007 / N: all 12 can be issued by the facilitator, and only by the fac
 
 // -- FX10-008: complete procedures ------------------------------------------------------------
 
-test('FX10-008: every new fault has a complete P-09 or P-10 procedure — crew, materials, two sources, a two-value format', () => {
+test('FX10-008: every new fault has a complete P-09 or P-10 procedure — crew, materials, its sources (three for a P-09, two for a P-10), the matching format', () => {
   for (const code of CODES) {
     const d = def(code);
     assert.ok(['P-09', 'P-10'].includes(d.procedure), `${code}: ${d.procedure}`);
     assert.ok(Number.isInteger(d.crew_required) && d.crew_required >= 2, `${code}: crew`);
     assert.ok(Object.keys(d.resources_required).length >= 2, `${code}: materials`);
-    assert.equal(d.spec_refs.length, 2, `${code}: sources`);
+    assert.equal(d.spec_refs.length, d.procedure === 'P-09' ? 3 : 2, `${code}: sources`);
     assert.ok(d.name && d.flavour && !d.flavour.includes(';'), `${code}: card copy`);
     assert.equal(d.severity, d.procedure === 'P-10' ? 3 : 2);
   }
-  // The binder prints each as a fault card: two value sources, a two-value format, TIME-CRITICAL on the P-10 card.
-  assert.ok(/late_by_sector/.test(BINDERS_SRC) && /-\[VALUE\]-\[VALUE 2\]/.test(BINDERS_SRC));
+  // The binder prints each as a fault card: every value source, a format with as many [VALUE] slots, TIME-CRITICAL on the P-10 card.
+  assert.ok(/late_by_sector/.test(BINDERS_SRC) && /\[VALUE 2\]/.test(BINDERS_SRC) && /\[VALUE 3\]/.test(BINDERS_SRC));
   const compact = require('../tools/kit/binder_compact');
   const binderContent = path.join(ROOT, 'build', 'binder_content.json');
   if (!fs.existsSync(binderContent)) return;   // the kit was never built here; the compact tests cover it when it is
@@ -137,29 +138,31 @@ test('FX10-008: every new fault has a complete P-09 or P-10 procedure — crew, 
   const p09 = cards.find((c) => c.proc === 'P-09');
   const p10 = cards.find((c) => c.proc === 'P-10');
   assert.ok(p09 && p10, 'the late shift is not on the POW binder');
-  assert.ok(p09.v1 && p09.v2 && p10.v1 && p10.v2, 'a late-shift card lacks its second value');
-  assert.equal(p09.format, 'P-09-[VALUE]-[VALUE 2]');
+  assert.ok(p09.v1 && p09.v2 && p09.v3 && p10.v1 && p10.v2, 'a late-shift card lacks a value');
+  assert.ok(!p10.v3, 'a P-10 card grew a third value');
+  assert.equal(p09.format, 'P-09-[VALUE]-[VALUE 2]-[VALUE 3]');
+  assert.equal(p10.format, 'P-10-[VALUE]-[VALUE 2]');
   assert.ok(p10.time_critical && !p09.time_critical, 'TIME-CRITICAL is on the wrong card');
 });
 
 // -- FX10-009 / 010 / C / D / E: the codes --------------------------------------------------------
 
-test('FX10-009 / FX10-010: P-09 and P-10 validate two three-digit values, resolved from the specification tables', () => {
+test('FX10-009 / FX10-010: P-09 validates three three-digit values and P-10 two, all resolved from the specification tables', () => {
   for (const code of CODES) {
     const d = def(code);
     assert.equal(d.valid_codes.length, 1);
-    const m = d.valid_codes[0].match(/^(P-09|P-10)-(\d{3})-(\d{3})$/);
+    const m = d.valid_codes[0].match(d.procedure === 'P-09' ? /^(P-09)-(\d{3})-(\d{3})-(\d{3})$/ : /^(P-10)-(\d{3})-(\d{3})$/);
     assert.ok(m, `${code}: ${d.valid_codes[0]}`);
     assert.equal(m[1], d.procedure);
-    const [a, b] = APPROVED[code];
-    assert.equal(Number(m[2]), specValue(...a), `${code} value 1 is not ${a.join(' ')}`);
-    assert.equal(Number(m[3]), specValue(...b), `${code} value 2 is not ${b.join(' ')}`);
-    assert.deepEqual(d.spec_refs.map((r) => [r.binder, r.table, r.row_label]), APPROVED[code], `${code} sources`);
+    const want = APPROVED[code];
+    assert.equal(m.length - 2, want.length, `${code}: value count`);
+    want.forEach((src, i) => assert.equal(Number(m[i + 2]), specValue(...src), `${code} value ${i + 1} is not ${src.join(' ')}`));
+    assert.deepEqual(d.spec_refs.map((r) => [r.binder, r.table, r.row_label]), want, `${code} sources`);
   }
 });
 
-test('C / D / E: F-604 resolves on 292 + 828, F-606 on 990 + 911, F-611 on 621 + 819 — and nothing else', () => {
-  for (const [code, answer, wrong] of [['F-604', 'P-10-292-828', 'P-10-449-828'], ['F-606', 'P-10-990-911', 'P-10-990-807'], ['F-611', 'P-09-621-819', 'P-09-621-340']]) {
+test('C / D / E: F-604 resolves on 292 + 828, F-606 on 990 + 911, F-611 on 621 + 819 + 828 — and nothing else', () => {
+  for (const [code, answer, wrong] of [['F-604', 'P-10-292-828', 'P-10-449-828'], ['F-606', 'P-10-990-911', 'P-10-990-807'], ['F-611', 'P-09-621-819-828', 'P-09-621-340-828']]) {
     assert.deepEqual(def(code).valid_codes, [answer]);
     const game = live(code);
     assert.equal(resolve(game, code, wrong).accepted, false, `${code} took the substituted row's old value`);
@@ -232,14 +235,15 @@ test('I: TIME-CRITICAL is printed on P-10 cards as a word, never a countdown', (
 
 // -- FX10-012 / 013 / F / L / M: nothing existing moved --------------------------------------------
 
-test('FX10-012 / FX10-013: no new specification table, no changed value, every source an indexed row', () => {
+test('FX10-012 / FX10-013: no new specification table, no changed value, every source an indexed row — or, as a P-09\'s third value, the sector\'s own Appendix C', () => {
   assert.equal(SPECS.length, 66);
   assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'content', 'specs.json'), 'utf8')).meta.spec_count, 66);
   for (const code of CODES) {
     for (const r of def(code).spec_refs) {
       const s = SPECS.find((x) => x.spec_id === r.spec_id);
       assert.ok(s, `${code}: ${r.spec_id} is not a specification`);
-      assert.equal(s.buried, false, `${code}: ${r.spec_id} is an Appendix C value`);
+      // Appendix C only as the requesting sector's own, and only as VALUE 3 (2026-10-06).
+      assert.ok(!s.buried || (s.binder === def(code).sector && def(code).spec_refs.indexOf(r) === 2), `${code}: ${r.spec_id} is an Appendix C value`);
       assert.equal(s.row_label, r.row_label);
       assert.ok(/^\d{3}$/.test(String(s.value)));
     }

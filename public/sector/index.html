@@ -191,7 +191,8 @@
           <div class="console-row">
             <label class="cfield">
               <span class="label">Resolution code</span>
-              <input type="text" id="code-input" placeholder="P-00-000" maxlength="16" autocomplete="off" autocapitalize="characters" spellcheck="false">
+              <!-- One field for every code shape — P-01-577, P-05-xxx-xxx and, since 2026-10-06, P-08/P-09-xxx-xxx-xxx — with room for a wrong fourth value, which the server rejects. -->
+              <input type="text" id="code-input" placeholder="P-00-000" maxlength="24" autocomplete="off" autocapitalize="characters" spellcheck="false">
             </label>
             <label class="cfield cfield-workers">
               <span class="label">Workers assigned</span>

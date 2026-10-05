@@ -263,14 +263,15 @@
             "spec_id": "T1-3"
           }
         }
-      ]
+      ],
+      "direct_values": []
     },
     {
       "code": "F-502",
       "round": null,
       "sector": "POW",
       "name": "Core auxiliary feed mismatch",
-      "flavour": "Two interlocks, two authorities. Neither figure is written anywhere in this binder.",
+      "flavour": "Two interlocks, two authorities, and a bus rating of your own. Only the last figure is written in this binder.",
       "severity": 3,
       "decay_per_min": 0,
       "crew_required": 3,
@@ -293,16 +294,23 @@
           "table": "W-3",
           "row_label": "Pump Station 4",
           "buried": false
+        },
+        {
+          "spec_id": "P2-5",
+          "binder": "POW",
+          "table": "P-2",
+          "row_label": "Emergency Bus",
+          "buried": false
         }
       ],
       "valid_codes": [
-        "P-08-390-183"
+        "P-08-390-183-449"
       ],
       "false_alarm": false,
       "deadline_s": null,
       "injures_workforce": 0,
       "triggered_by": null,
-      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN",
+      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN · THIRD VALUE",
       "reference_chain": [
         {
           "first_sector": "MED",
@@ -325,6 +333,17 @@
             "item": "Pump Station 4",
             "spec_id": "W3-4"
           }
+        }
+      ],
+      "direct_values": [
+        {
+          "position": 3,
+          "source_type": "OWN_TABLE",
+          "sector": "POW",
+          "table": "P-2",
+          "item": "Emergency Bus",
+          "spec_id": "P2-5",
+          "overlap": null
         }
       ]
     },
@@ -371,14 +390,15 @@
             "spec_id": "P2-2"
           }
         }
-      ]
+      ],
+      "direct_values": []
     },
     {
       "code": "F-504",
       "round": null,
       "sector": "WTR",
       "name": "Reclaim sterilisation lock",
-      "flavour": "Sterilisation will not release without both a biological clearance and a bypass rating.",
+      "flavour": "Sterilisation will not release without a biological clearance, a bypass rating and an override authorisation.",
       "severity": 3,
       "decay_per_min": 0,
       "crew_required": 3,
@@ -402,16 +422,23 @@
           "table": "P-2",
           "row_label": "Emergency Bus",
           "buried": false
+        },
+        {
+          "spec_id": "WC-1",
+          "binder": "WTR",
+          "table": "App-C",
+          "row_label": "Emergency Sluice Override",
+          "buried": true
         }
       ],
       "valid_codes": [
-        "P-08-915-449"
+        "P-08-915-449-524"
       ],
       "false_alarm": false,
       "deadline_s": null,
       "injures_workforce": 0,
       "triggered_by": null,
-      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN",
+      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN · THIRD VALUE · VALUE 3 row is also F-302's",
       "reference_chain": [
         {
           "first_sector": "MED",
@@ -434,6 +461,17 @@
             "item": "Emergency Bus",
             "spec_id": "P2-5"
           }
+        }
+      ],
+      "direct_values": [
+        {
+          "position": 3,
+          "source_type": "OWN_APPENDIX",
+          "sector": "WTR",
+          "table": "App-C",
+          "item": "Emergency Sluice Override",
+          "spec_id": "WC-1",
+          "overlap": "F-302"
         }
       ]
     },
@@ -480,14 +518,15 @@
             "spec_id": "T6-3"
           }
         }
-      ]
+      ],
+      "direct_values": []
     },
     {
       "code": "F-506",
       "round": null,
       "sector": "MED",
       "name": "ICU failover routing conflict",
-      "flavour": "Failover needs a route rating and a telemetry rating before it will hand over.",
+      "flavour": "Failover needs a route rating, a telemetry rating and a reservoir pressure figure before it will hand over.",
       "severity": 3,
       "decay_per_min": 0,
       "crew_required": 3,
@@ -510,16 +549,23 @@
           "table": "M-5",
           "row_label": "Filter Bank 3",
           "buried": false
+        },
+        {
+          "spec_id": "W4-5",
+          "binder": "WTR",
+          "table": "W-4",
+          "row_label": "Emergency Tank",
+          "buried": false
         }
       ],
       "valid_codes": [
-        "P-08-107-261"
+        "P-08-107-261-142"
       ],
       "false_alarm": false,
       "deadline_s": null,
       "injures_workforce": 0,
       "triggered_by": null,
-      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN",
+      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN · THIRD VALUE",
       "reference_chain": [
         {
           "first_sector": "TRN",
@@ -542,6 +588,17 @@
             "item": "Filter Bank 3",
             "spec_id": "M5-3"
           }
+        }
+      ],
+      "direct_values": [
+        {
+          "position": 3,
+          "source_type": "EXTERNAL",
+          "sector": "WTR",
+          "table": "W-4",
+          "item": "Emergency Tank",
+          "spec_id": "W4-5",
+          "overlap": null
         }
       ]
     },
@@ -588,14 +645,15 @@
             "spec_id": "P1-4"
           }
         }
-      ]
+      ],
+      "direct_values": []
     },
     {
       "code": "F-508",
       "round": null,
       "sector": "TRN",
       "name": "Emergency tunnel routing blackout",
-      "flavour": "The beacons and the diversion both want a figure, and neither is a transport figure.",
+      "flavour": "The beacons, the diversion and the emergency bus each want a figure, and none is a transport figure.",
       "severity": 3,
       "decay_per_min": 0,
       "crew_required": 3,
@@ -618,16 +676,23 @@
           "table": "T-1",
           "row_label": "Tunnel D",
           "buried": false
+        },
+        {
+          "spec_id": "P2-5",
+          "binder": "POW",
+          "table": "P-2",
+          "row_label": "Emergency Bus",
+          "buried": false
         }
       ],
       "valid_codes": [
-        "P-08-331-621"
+        "P-08-331-621-449"
       ],
       "false_alarm": false,
       "deadline_s": null,
       "injures_workforce": 0,
       "triggered_by": null,
-      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN",
+      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN · THIRD VALUE",
       "reference_chain": [
         {
           "first_sector": "COM",
@@ -650,6 +715,17 @@
             "item": "Tunnel D",
             "spec_id": "T1-4"
           }
+        }
+      ],
+      "direct_values": [
+        {
+          "position": 3,
+          "source_type": "EXTERNAL",
+          "sector": "POW",
+          "table": "P-2",
+          "item": "Emergency Bus",
+          "spec_id": "P2-5",
+          "overlap": null
         }
       ]
     },
@@ -696,14 +772,15 @@
             "spec_id": "W3-3"
           }
         }
-      ]
+      ],
+      "direct_values": []
     },
     {
       "code": "F-510",
       "round": null,
       "sector": "AGR",
       "name": "Seed vault climate interlock",
-      "flavour": "The vault will not seal until both its broadcast clearance and its chiller feed are confirmed.",
+      "flavour": "The vault will not seal until its broadcast clearance, its chiller feed and its own humidity setpoint are confirmed.",
       "severity": 3,
       "decay_per_min": 0,
       "crew_required": 3,
@@ -727,16 +804,23 @@
           "table": "M-5",
           "row_label": "Scrubber Unit",
           "buried": false
+        },
+        {
+          "spec_id": "AC-1",
+          "binder": "AGR",
+          "table": "App-C",
+          "row_label": "Seed Vault Humidity Setpoint",
+          "buried": true
         }
       ],
       "valid_codes": [
-        "P-08-390-346"
+        "P-08-390-346-606"
       ],
       "false_alarm": false,
       "deadline_s": null,
       "injures_workforce": 0,
       "triggered_by": null,
-      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN",
+      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN · THIRD VALUE · VALUE 3 row is also F-305's",
       "reference_chain": [
         {
           "first_sector": "MED",
@@ -759,6 +843,17 @@
             "item": "Scrubber Unit",
             "spec_id": "M5-5"
           }
+        }
+      ],
+      "direct_values": [
+        {
+          "position": 3,
+          "source_type": "OWN_APPENDIX",
+          "sector": "AGR",
+          "table": "App-C",
+          "item": "Seed Vault Humidity Setpoint",
+          "spec_id": "AC-1",
+          "overlap": "F-305"
         }
       ]
     },
@@ -805,14 +900,15 @@
             "spec_id": "W3-1"
           }
         }
-      ]
+      ],
+      "direct_values": []
     },
     {
       "code": "F-512",
       "round": null,
       "sector": "COM",
       "name": "Uplink emergency power-route conflict",
-      "flavour": "The uplink wants its feed rating and its cabinet filtration rating. It holds neither.",
+      "flavour": "The uplink wants its feed rating, its cabinet filtration rating and its reset key. It holds only the last.",
       "severity": 3,
       "decay_per_min": 0,
       "crew_required": 3,
@@ -835,16 +931,23 @@
           "table": "M-5",
           "row_label": "HEPA Array",
           "buried": false
+        },
+        {
+          "spec_id": "CC-1",
+          "binder": "COM",
+          "table": "App-C",
+          "row_label": "Master Uplink Reset Key",
+          "buried": true
         }
       ],
       "valid_codes": [
-        "P-08-911-273"
+        "P-08-911-273-243"
       ],
       "false_alarm": false,
       "deadline_s": null,
       "injures_workforce": 0,
       "triggered_by": null,
-      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN",
+      "facilitator_notes": "Reference chain · DUAL REFERENCE CHAIN · THIRD VALUE",
       "reference_chain": [
         {
           "first_sector": "POW",
@@ -867,6 +970,17 @@
             "item": "HEPA Array",
             "spec_id": "M5-4"
           }
+        }
+      ],
+      "direct_values": [
+        {
+          "position": 3,
+          "source_type": "OWN_APPENDIX",
+          "sector": "COM",
+          "table": "App-C",
+          "item": "Master Uplink Reset Key",
+          "spec_id": "CC-1",
+          "overlap": null
         }
       ]
     }

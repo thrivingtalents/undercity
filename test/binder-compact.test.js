@@ -116,18 +116,21 @@ test('ZB-002: every fault card matches the content the server runs, exactly', (t
       const want = Object.entries(f.resources_required).map(([k, v]) => `${v} ${RES[k]}`).sort().join(' · ');
       const got = c.materials.replace(/[⚡💧🔧⚕]\s*/g, '').split(' + ').map((s) => s.trim()).sort().join(' · ');
       assert.equal(got, want, `${f.code} materials`);
-      const n = f.reference_chain ? f.reference_chain.length : f.spec_refs.length;
-      assert.equal(c.format, `${f.procedure}-[VALUE]${n === 2 ? '-[VALUE 2]' : ''}`, `${f.code} format`);
-      if (f.reference_chain) {
-        f.reference_chain.forEach((h, i) => assert.ok((i === 0 ? c.v1 : c.v2).includes(`ASK ${h.first_sector} → ${h.first_reference_name}`), `${f.code} chain ${i + 1}`));
-      } else {
-        f.spec_refs.forEach((s, i) => {
-          const foreign = s.binder !== code;
-          const want2 = s.buried ? `${foreign ? `${s.binder} → ` : 'YOUR '}Appendix C → ${s.row_label}` : `${foreign ? `${s.binder} → ` : 'YOUR '}Table ${s.table} → ${s.row_label}`;
-          assert.equal(i === 0 ? c.v1 : c.v2, want2, `${f.code} value ${i + 1}`);
-        });
-        if (f.spec_refs.length === 1) assert.equal(c.v2, null, `${f.code} has a second value it should not`);
-      }
+      // One [VALUE] slot per value in the code: one, two or (P-08 and P-09 since 2026-10-06) three.
+      const n = f.spec_refs.length;
+      assert.equal(c.format, `${f.procedure}-[VALUE]${n >= 2 ? '-[VALUE 2]' : ''}${n >= 3 ? '-[VALUE 3]' : ''}`, `${f.code} format`);
+      const cell = (i) => [c.v1, c.v2, c.v3][i];
+      const chains = f.reference_chain || [];
+      chains.forEach((h, i) => assert.ok(cell(i).includes(`ASK ${h.first_sector} → ${h.first_reference_name}`), `${f.code} chain ${i + 1}`));
+      // every value after the chains is a row the card names outright: a P-08's VALUE 3, every value of the rest
+      f.spec_refs.slice(chains.length).forEach((s, j) => {
+        const i = chains.length + j;
+        const foreign = s.binder !== code;
+        const want2 = s.buried ? `${foreign ? `${s.binder} → ` : 'YOUR '}Appendix C → ${s.row_label}` : `${foreign ? `${s.binder} → ` : 'YOUR '}Table ${s.table} → ${s.row_label}`;
+        assert.equal(cell(i), want2, `${f.code} value ${i + 1}`);
+      });
+      if (n === 1) assert.equal(c.v2, null, `${f.code} has a second value it should not`);
+      if (n < 3) assert.equal(c.v3 || null, null, `${f.code} has a third value it should not`);
       assert.equal(!!c.time_critical, !!f.time_critical, `${f.code} TIME-CRITICAL`);
     }
     // the escalate list: every code named belongs to the sector it points at

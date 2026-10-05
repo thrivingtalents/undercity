@@ -1,15 +1,16 @@
 {
   "meta": {
     "name": "Reference Chain Mechanic",
-    "version": "1.0",
+    "version": "1.1",
     "generated_into": "content/faults.reference-chain.json",
     "generator": "tools/build_reference_chain_faults.js",
     "collision_rule": "A chain must not end on a spec row the REQUESTING sector has already been sent to by one of its own existing faults, or the team can answer from its notes instead of asking. Checked by tools/build_reference_chain_faults.js.",
     "note": "THE SOURCE OF TRUTH for the twelve reference-chain faults. Hand-edited; the generator reads it. It holds NO resolution codes and NO three-digit values: every number is resolved from content/specs.json at build time by (binder, table, item). Change a spec value in the workbook, re-run the generator, and every code here follows it. If you find a number in this file that is not a crew count or a material count, it does not belong.",
     "procedures": {
-      "P-07": { "chains": 1, "severity": 2, "label": "SINGLE REFERENCE CHAIN" },
-      "P-08": { "chains": 2, "severity": 3, "label": "DUAL REFERENCE CHAIN" }
+      "P-07": { "chains": 1, "direct_values": 0, "severity": 2, "label": "SINGLE REFERENCE CHAIN" },
+      "P-08": { "chains": 2, "direct_values": 1, "severity": 3, "label": "DUAL REFERENCE CHAIN · THIRD VALUE" }
     },
+    "third_value_rule": "THREE VALUES (2026-10-06). A P-08 fault resolves on three values: its two chains give VALUE 1 and VALUE 2 in order, and `direct_values` gives VALUE 3 — a row named outright, not a chain: the requesting sector's own indexed table (OWN_TABLE), its own Appendix C (OWN_APPENDIX) or another sector's indexed table (EXTERNAL). Never another sector's Appendix C. The generator resolves the row from content/specs.json, checks the declared source_type against the row it finds, and refuses an undeclared `overlap`: where the requesting sector is already sent to that row by one of its own faults, the source must name that fault, so the repeat is a decision on record rather than an accident. P-07 is unchanged: one chain, one value.",
     "round": null,
     "round_note": "Deliberately unscheduled (2026-10-04). A fault with round:null is never dealt by activateRound, so these are facilitator-issue only until the mechanic has been playtested and each one is given a round."
   },
@@ -70,12 +71,15 @@
       "sector": "POW",
       "procedure": "P-08",
       "name": "Core auxiliary feed mismatch",
-      "flavour": "Two interlocks, two authorities. Neither figure is written anywhere in this binder.",
+      "flavour": "Two interlocks, two authorities, and a bus rating of your own. Only the last figure is written in this binder.",
       "crew_required": 3,
       "resources_required": { "parts": 2, "water": 1 },
       "chains": [
         { "first_sector": "MED", "reference": "RD-MED-1" },
         { "first_sector": "TRN", "reference": "RD-TRN-1" }
+      ],
+      "direct_values": [
+        { "sector": "POW", "table": "P-2", "item": "Emergency Bus", "source_type": "OWN_TABLE" }
       ]
     },
 
@@ -94,12 +98,15 @@
       "sector": "WTR",
       "procedure": "P-08",
       "name": "Reclaim sterilisation lock",
-      "flavour": "Sterilisation will not release without both a biological clearance and a bypass rating.",
+      "flavour": "Sterilisation will not release without a biological clearance, a bypass rating and an override authorisation.",
       "crew_required": 3,
       "resources_required": { "power": 1, "med": 1, "parts": 1 },
       "chains": [
         { "first_sector": "MED", "reference": "RD-MED-2" },
         { "first_sector": "TRN", "reference": "RD-TRN-2" }
+      ],
+      "direct_values": [
+        { "sector": "WTR", "table": "App-C", "item": "Emergency Sluice Override", "source_type": "OWN_APPENDIX", "overlap": "F-302" }
       ]
     },
 
@@ -118,12 +125,15 @@
       "sector": "MED",
       "procedure": "P-08",
       "name": "ICU failover routing conflict",
-      "flavour": "Failover needs a route rating and a telemetry rating before it will hand over.",
+      "flavour": "Failover needs a route rating, a telemetry rating and a reservoir pressure figure before it will hand over.",
       "crew_required": 3,
       "resources_required": { "power": 2, "med": 1 },
       "chains": [
         { "first_sector": "TRN", "reference": "RD-TRN-3" },
         { "first_sector": "COM", "reference": "RD-COM-1" }
+      ],
+      "direct_values": [
+        { "sector": "WTR", "table": "W-4", "item": "Emergency Tank", "source_type": "EXTERNAL" }
       ],
       "design_note": "The second chain loops back to MED. MED only learns which of its own bio-filter ratings matters after speaking to COM."
     },
@@ -144,12 +154,15 @@
       "sector": "TRN",
       "procedure": "P-08",
       "name": "Emergency tunnel routing blackout",
-      "flavour": "The beacons and the diversion both want a figure, and neither is a transport figure.",
+      "flavour": "The beacons, the diversion and the emergency bus each want a figure, and none is a transport figure.",
       "crew_required": 3,
       "resources_required": { "parts": 2, "power": 1 },
       "chains": [
         { "first_sector": "COM", "reference": "RD-COM-2" },
         { "first_sector": "AGR", "reference": "RD-AGR-2" }
+      ],
+      "direct_values": [
+        { "sector": "POW", "table": "P-2", "item": "Emergency Bus", "source_type": "EXTERNAL" }
       ],
       "design_note": "The second chain loops back to TRN. Only Agriculture logs which tunnel its seedling freight occupies."
     },
@@ -169,12 +182,15 @@
       "sector": "AGR",
       "procedure": "P-08",
       "name": "Seed vault climate interlock",
-      "flavour": "The vault will not seal until both its broadcast clearance and its chiller feed are confirmed.",
+      "flavour": "The vault will not seal until its broadcast clearance, its chiller feed and its own humidity setpoint are confirmed.",
       "crew_required": 3,
       "resources_required": { "water": 2, "power": 1, "med": 1 },
       "chains": [
         { "first_sector": "MED", "reference": "RD-MED-3" },
         { "first_sector": "POW", "reference": "RD-POW-3" }
+      ],
+      "direct_values": [
+        { "sector": "AGR", "table": "App-C", "item": "Seed Vault Humidity Setpoint", "source_type": "OWN_APPENDIX", "overlap": "F-305" }
       ]
     },
 
@@ -193,12 +209,15 @@
       "sector": "COM",
       "procedure": "P-08",
       "name": "Uplink emergency power-route conflict",
-      "flavour": "The uplink wants its feed rating and its cabinet filtration rating. It holds neither.",
+      "flavour": "The uplink wants its feed rating, its cabinet filtration rating and its reset key. It holds only the last.",
       "crew_required": 3,
       "resources_required": { "power": 2, "parts": 1 },
       "chains": [
         { "first_sector": "POW", "reference": "RD-POW-1" },
         { "first_sector": "AGR", "reference": "RD-AGR-3" }
+      ],
+      "direct_values": [
+        { "sector": "COM", "table": "App-C", "item": "Master Uplink Reset Key", "source_type": "OWN_APPENDIX" }
       ]
     }
   ]

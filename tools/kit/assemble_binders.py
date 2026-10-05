@@ -116,9 +116,11 @@ for f in chain["faults"]:
     chain_by_sector.setdefault(f["sector"], []).append(f)
 
 # ---- late-shift faults (generated, not from the workbook) -------------------
-# F-601..F-612 live in content/faults.late-shift.json: P-09 and P-10, two
-# values from two indexed tables, resolved from content/specs.json by
-# tools/build_late_shift_faults.js. They print like any workbook procedure.
+# F-601..F-612 live in content/faults.late-shift.json: P-09 (three values since
+# 2026-10-06 — two indexed rows and a third from its own table, its own
+# Appendix C or a third sector) and P-10 (two values), resolved from
+# content/specs.json by tools/build_late_shift_faults.js. They print like any
+# workbook procedure.
 LATE_PATH = Path(__file__).resolve().parents[2] / "content" / "faults.late-shift.json"
 late = json.loads(LATE_PATH.read_text(encoding="utf-8")) if LATE_PATH.exists() else {"faults": []}
 late_by_sector = {}
@@ -136,6 +138,14 @@ for row in wb["CrossrefMap"].iter_rows(min_row=1, values_only=True):
             if m:
                 entries.append({"code": m.group(1), "owner": m.group(2)})
         escalate[binder] = entries
+
+def code_format(procedure, n):
+    """The ENTER line of a fault card: one slot per value in the code —
+    P-01-[VALUE], P-05-[VALUE]-[VALUE 2], and since 2026-10-06 the twelve
+    three-value cards P-08-[VALUE]-[VALUE 2]-[VALUE 3] / P-09-[VALUE]-[VALUE 2]-[VALUE 3].
+    The slots are never filled here: a binder prints where a value lives, not what it is."""
+    return procedure + "-[VALUE]" + "".join(f"-[VALUE {i}]" for i in range(2, n + 1))
+
 
 # ---- assemble ---------------------------------------------------------------
 binders = {}
@@ -178,7 +188,7 @@ for code, info in SECTOR_INFO.items():
                 sources.append({"row_label": s["row_label"],
                                 "binder": s["binder"], "table_id": s["table_id"],
                                 "foreign": s["binder"] != code, "buried": s["buried"]})
-        fmt = f["procedure"] + "-[VALUE]" + ("-[VALUE 2]" if nparts == 2 else "")
+        fmt = code_format(f["procedure"], nparts)
         procedures.append({
             "id": f["procedure"], "fault_code": f["code"], "title": f["name"],
             "resources": f["resources"], "crew": f["crew"],
@@ -194,33 +204,45 @@ for code, info in SECTOR_INFO.items():
     # A procedure is a data row (binder page 7 or 8); the universal repair
     # flow is printed once, on page 4, never repeated per fault.
     for f in sorted(chain_by_sector.get(code, []), key=lambda x: x["code"]):
-        n = len(f["reference_chain"])
-        fmt = f["procedure"] + "-[VALUE]" + ("-[VALUE 2]" if n == 2 else "")
+        n_chains = len(f["reference_chain"])
+        fmt = code_format(f["procedure"], len(f["spec_refs"]))
         mats = ", ".join(f"{v} {k.title()}" for k, v in f["resources_required"].items())
+        # THREE VALUES (2026-10-06): a P-08's VALUE 3 is a row named outright
+        # after its chains — its own table, its own Appendix C or another
+        # sector's table — so it prints as a source cell, like any late-shift
+        # value. The chains stay chains: "ASK MED → …" and nothing further.
+        sources = []
+        for r in f["spec_refs"][n_chains:]:
+            s = specs[r["spec_id"]]
+            sources.append({"row_label": s["row_label"],
+                            "binder": s["binder"], "table_id": s["table_id"],
+                            "foreign": s["binder"] != code, "buried": s["buried"]})
         procedures.append({
             "id": f["procedure"], "fault_code": f["code"], "title": f["name"],
             "resources": mats, "crew": f["crew_required"],
             "deadline": None, "format": fmt,
-            # No `sources` block: a chain procedure has no table to send the
-            # operator to. The renderer keys off `reference_chain` instead.
-            "sources": [],
+            # The chains come first on the card; `sources` holds only what
+            # follows them (nothing, for a P-07).
+            "sources": sources,
             "reference_chain": [{"first_sector": c["first_sector"],
                                  "first_reference_name": c["first_reference_name"]}
                                 for c in f["reference_chain"]],
             "severity": f["severity"], "time_critical": False,
         })
 
-    # P-09 and P-10 (LATE SHIFT, 2026-10-05): two indexed sources, a row like
-    # any other. A P-10 is TIME-CRITICAL: the card says so — nothing counts
-    # down, Health simply falls faster while the fault stays open.
+    # P-09 and P-10 (LATE SHIFT, 2026-10-05): indexed sources, a row like any
+    # other — three for a P-09 since 2026-10-06, the third of which may be the
+    # sector's own Appendix C ("YOUR Appendix C → …"); two for a P-10. A P-10
+    # is TIME-CRITICAL: the card says so — nothing counts down, Health simply
+    # falls faster while the fault stays open.
     for f in sorted(late_by_sector.get(code, []), key=lambda x: x["code"]):
         sources = []
         for r in f["spec_refs"]:
             s = specs[r["spec_id"]]
             sources.append({"row_label": s["row_label"],
                             "binder": s["binder"], "table_id": s["table_id"],
-                            "foreign": s["binder"] != code, "buried": False})
-        fmt = f["procedure"] + "-[VALUE]-[VALUE 2]"
+                            "foreign": s["binder"] != code, "buried": s["buried"]})
+        fmt = code_format(f["procedure"], len(f["spec_refs"]))
         mats = ", ".join(f"{v} {k.title()}" for k, v in f["resources_required"].items())
         procedures.append({
             "id": f["procedure"], "fault_code": f["code"],

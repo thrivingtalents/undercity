@@ -398,9 +398,9 @@ function chainCell(c) {
 }
 
 function faultCard(p) {
-  const values = p.reference_chain && p.reference_chain.length
-    ? p.reference_chain.map(chainCell)
-    : (p.sources || []).map(sourceCell);
+  // The chains first ("ASK MED → …"), then every row the card names outright:
+  // all of a workbook or late-shift fault's values, and a P-08's VALUE 3 (2026-10-06).
+  const values = [...(p.reference_chain || []).map(chainCell), ...(p.sources || []).map(sourceCell)];
   return {
     code: p.fault_code,
     name: p.title.replace(/\s*—\s*TIME-CRITICAL$/, '').toUpperCase(),
@@ -410,6 +410,7 @@ function faultCard(p) {
     materials: materials(p.resources),
     v1: values[0] || '—',
     v2: values[1] || null,
+    v3: values[2] || null,
     format: p.format,
   };
 }
@@ -423,7 +424,7 @@ function pageFaults(b, part) {
   const blocks = [
     part === 1
       ? P('One card is one whole procedure. The steps are on p.4; your own tables are on p.9. "YOUR Table" is in this binder; "WTR → Table W-4" is in Water\'s binder, fetched by your Liaison by row name.', { small: true })
-      : P('Later faults: two values, other sectors, a REFERENCE that points on, or TIME-CRITICAL. "ASK MED → …": the Liaison asks Medical for that reference; the answer is a number or a sector\'s name to follow.', { small: true }),
+      : P('Later faults: two or three values, other sectors, a REFERENCE that points on, or TIME-CRITICAL. "ASK MED → …": the Liaison asks Medical for that reference; the answer is a number or a sector\'s name to follow.', { small: true }),
     { t: 'faultcards', cards },
   ];
   if (part === 2) {

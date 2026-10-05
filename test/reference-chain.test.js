@@ -8,6 +8,11 @@
  * sentence about where to look next, and everything below defends two halves
  * of it: the chain is real and resolvable, and no player screen ever shows
  * more than its first step.
+ *
+ * THREE VALUES (2026-10-06): a P-08 still has two chains, and its code now
+ * carries a third value named outright (its own table, its own Appendix C or
+ * another sector's table). test/three-value-codes.test.js holds that spec's
+ * acceptance tests; here only the counts changed.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -133,17 +138,19 @@ test('RC-005 / RC-006: two more faults for every sector, P-07 and P-08 each', ()
   assert.deepEqual(chain.faults.map((f) => f.code).sort(), CODES);
 });
 
-test('RC-007 / RC-008: P-07 is one chain and one value, P-08 is two of each', () => {
+test('RC-007 / RC-008: P-07 is one chain and one value; P-08 is two chains and, since 2026-10-06, three values', () => {
   for (const f of chain.faults) {
     const n = f.procedure === 'P-07' ? 1 : 2;
+    const values = f.procedure === 'P-07' ? 1 : 3;
     assert.equal(f.reference_chain.length, n, `${f.code} has the wrong chain count`);
-    assert.equal(f.spec_refs.length, n, `${f.code} has the wrong spec count`);
-    assert.equal(f.valid_codes[0].split('-').length, 2 + n, `${f.code}: ${f.valid_codes[0]}`);
+    assert.equal((f.direct_values || []).length, values - n, `${f.code} has the wrong direct-value count`);
+    assert.equal(f.spec_refs.length, values, `${f.code} has the wrong spec count`);
+    assert.equal(f.valid_codes[0].split('-').length, 2 + values, `${f.code}: ${f.valid_codes[0]}`);
     // Severity follows the existing ladder: two triangles, then three.
     assert.equal(f.severity, n === 1 ? 2 : 3, `${f.code} severity`);
     // Every value in the code is three digits and is a real spec value.
     const parts = f.valid_codes[0].split('-').slice(2);
-    assert.equal(parts.length, n);
+    assert.equal(parts.length, values);
     for (const [i, v] of parts.entries()) {
       assert.match(v, /^\d{3}$/, `${f.code}: ${v} is not three digits`);
       const s = f.spec_refs[i];
@@ -284,8 +291,8 @@ test('the twelve are unscheduled, printed in their own section, and facilitator-
 /** The procedure the binder would print for a sector, rebuilt the way the assembler does. */
 function procedureFor(sector, id) {
   const f = chain.faults.find((x) => x.sector === sector && x.procedure === id);
-  const n = f.reference_chain.length;
+  const values = f.spec_refs.length;
   const steps = f.reference_chain.map((c) =>
     `Obtain the ${c.first_reference_name} from ${c.first_sector}.`);
-  return { steps, format: `${id}-[VALUE]${n === 2 ? '-[VALUE 2]' : ''}` };
+  return { steps, format: `${id}-[VALUE]${values >= 2 ? '-[VALUE 2]' : ''}${values >= 3 ? '-[VALUE 3]' : ''}` };
 }

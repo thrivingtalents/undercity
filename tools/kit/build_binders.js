@@ -260,9 +260,10 @@ function faultCardBlock(c, colour) {
   const frameSize = hot ? 24 : 12;
   const labelled = (label, value, { monoValue = false, size = 20, extra = [] } = {}) => new TableCell({
     width: { size: CARD_W[0], type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP,
-    margins: { top: 35, bottom: 45, left: 110, right: 90 },
+    // Tightened 2026-10-06 so that page 8 still holds five cards once two of them carry a third value and an ENTER line.
+    margins: { top: 25, bottom: 30, left: 110, right: 90 },
     children: [
-      new Paragraph({ spacing: { after: 10 }, children: [new TextRun({ text: label, font: "Arial", size: 13, bold: true, color: MUTED, characterSpacing: 60 })] }),
+      new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: label, font: "Arial", size: 13, bold: true, color: MUTED, characterSpacing: 60 })] }),
       new Paragraph({ spacing: { after: 0 }, children: monoValue ? [mono(value, { bold: true, size })] : runs(value, { bold: true, size }) }),
       ...extra,
     ],
@@ -276,13 +277,13 @@ function faultCardBlock(c, colour) {
     new TableCell({
       width: { size: CARD_W[0], type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
       shading: { type: ShadingType.CLEAR, fill: headFill, color: "auto" },
-      margins: { top: 30, bottom: 30, left: 110, right: 90 },
+      margins: { top: 20, bottom: 20, left: 110, right: 90 },
       children: [new Paragraph({ spacing: { after: 0 }, children: [mono(c.code, { bold: true, size: 36, color: codeInk })] })],
     }),
     new TableCell({
       width: { size: CARD_W[1] + CARD_W[2], type: WidthType.DXA }, columnSpan: 2, verticalAlign: VerticalAlign.CENTER,
       shading: { type: ShadingType.CLEAR, fill: headFill, color: "auto" },
-      margins: { top: 30, bottom: 30, left: 110, right: 90 },
+      margins: { top: 20, bottom: 20, left: 110, right: 90 },
       children: [new Paragraph({ spacing: { after: 0 }, children: [
         body(c.name, { bold: true, size: 22, color: headInk }),
         ...(c.time_critical ? runs("   ⚠ TIME-CRITICAL", { bold: true, size: 20, color: hot ? "FFFFFF" : WARN_RED }) : []),
@@ -294,11 +295,28 @@ function faultCardBlock(c, colour) {
     labelled("CREW", c.crew),
     labelled("MATERIALS", c.materials),
   ] });
-  const values = new TableRow({ cantSplit: true, children: [
-    valueCell("VALUE 1", c.v1),
-    valueCell("VALUE 2", c.v2),
-    labelled("ENTER", c.format, { monoValue: true, size: 22 }),
-  ] });
+  // Two values share their row with ENTER. Three (every sector's P-08 and
+  // P-09, 2026-10-06) fill the row, and ENTER takes one line of its own under
+  // them — label and format side by side, so the card grows by a line and not
+  // a cell — and reads VALUE 1 → 2 → 3 → the code, the order it is built in.
+  const enterLine = (format) => new TableCell({
+    width: { size: W, type: WidthType.DXA }, columnSpan: 3, verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 20, bottom: 25, left: 110, right: 90 },
+    children: [new Paragraph({ spacing: { after: 0 }, children: [
+      new TextRun({ text: "ENTER    ", font: "Arial", size: 13, bold: true, color: MUTED, characterSpacing: 60 }),
+      mono(format, { bold: true, size: 22 }),
+    ] })],
+  });
+  const values = c.v3
+    ? [
+      new TableRow({ cantSplit: true, children: [valueCell("VALUE 1", c.v1), valueCell("VALUE 2", c.v2), valueCell("VALUE 3", c.v3)] }),
+      new TableRow({ cantSplit: true, children: [enterLine(c.format)] }),
+    ]
+    : [new TableRow({ cantSplit: true, children: [
+      valueCell("VALUE 1", c.v1),
+      valueCell("VALUE 2", c.v2),
+      labelled("ENTER", c.format, { monoValue: true, size: 22 }),
+    ] })];
   return new Table({
     columnWidths: CARD_W, width: { size: W, type: WidthType.DXA },
     borders: {
@@ -306,7 +324,7 @@ function faultCardBlock(c, colour) {
       left: { style: BorderStyle.SINGLE, size: frameSize, color: frame }, right: { style: BorderStyle.SINGLE, size: frameSize, color: frame },
       insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: RULE }, insideVertical: { style: BorderStyle.SINGLE, size: 4, color: RULE },
     },
-    rows: [head, facts, values],
+    rows: [head, facts, ...values],
   });
 }
 
@@ -395,7 +413,7 @@ function renderBlock(blk, b) {
     case "kv": return [kvBlock(blk.rows.map(([k, v]) => [f(k), f(v)]), blk), gap(100)];
     case "box": return [boxBlock(blk.kind, f(blk.title), blk.lines.map(f), b.colour), gap(120)];
     case "flow": return [flowBlock(blk.steps.map(f), b.colour, blk), gap(120)];
-    case "faultcards": return blk.cards.flatMap((c) => [faultCardBlock(c, b.colour), gap(40)]);
+    case "faultcards": return blk.cards.flatMap((c) => [faultCardBlock(c, b.colour), gap(24)]);
     case "legend": return [legendBlock(blk.items), gap(80)];
     case "spectable": return specTableBlock(blk, b.colour);
     case "gap": return [gap(blk.n)];
