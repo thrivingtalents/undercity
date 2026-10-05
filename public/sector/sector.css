@@ -478,6 +478,13 @@ button.wide { width: 100%; }
 .agr-sum-col.gain { border-left-color: var(--green); }
 .agr-sum-col.trade { border-left-color: var(--amber); background: rgba(233, 180, 94, 0.06); }
 .agr-sum-label { font-size: 9px; letter-spacing: 0.18em; font-weight: 700; color: var(--ink-faint); }
+.agr-sum-affects { font-weight: 400; letter-spacing: 0.12em; color: var(--ink); }
+/* TARGETS (2026-10-05): the last decision, per sector, until the next round deals. */
+.agr-result { display: flex; flex-direction: column; gap: 3px; margin: 0 0 8px; padding: 6px 8px; border: 1px solid var(--line); border-left: 2px solid var(--green); font-size: 11px; }
+.agr-result-title { font-size: 9px; letter-spacing: 0.16em; font-weight: 700; color: var(--green); }
+.agr-result-row { display: grid; grid-template-columns: 36px 1fr; gap: 6px; align-items: baseline; }
+.agr-result-sector { font-weight: 700; letter-spacing: 0.08em; }
+.agr-result-lines { color: var(--ink-dim); }
 .agr-sum-col.gain .agr-sum-label { color: var(--green); }
 .agr-sum-col.trade .agr-sum-label { color: var(--amber); }
 .agr-sum-line { display: flex; flex-direction: column; gap: 1px; }

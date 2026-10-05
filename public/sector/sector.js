@@ -1032,7 +1032,7 @@
         <div class="rx-top"><span class="rx-state" data-label="AGR PROPOSAL">AGR PROPOSAL</span><span class="rx-id">${esc(r.id)}</span><span class="rx-age"></span></div>
         <div class="rx-line"><span class="rx-route">AGR → TRN</span><span class="rx-item">${esc(r.title)}</span></div>
         <div class="rx-slot-body">${esc(r.short_description || r.description || '')}</div>
-        <div class="agr-sum">${agrLinesHtml('gain', 'GAIN', r.gain, (l) => l.text)}${agrLinesHtml('trade', 'TRADE-OFF', r.trade_off, (l) => l.text)}</div>
+        <div class="agr-sum">${agrLinesHtml('gain', 'GAIN', r.gain, (l) => l.text, agrAffectsText((r.affects || {}).gain))}${agrLinesHtml('trade', 'TRADE-OFF', r.trade_off, (l) => l.text, agrAffectsText((r.affects || {}).tradeoff))}</div>
         <div class="agr-rule">BOTH EFFECTS APPLY IF ACCEPTED.</div>
         <div class="mv-btns"><button type="button" class="primary" data-slot-accept="${esc(r.id)}">ACCEPT</button><button type="button" class="ghost" data-slot-decline="${esc(r.id)}">DECLINE</button></div>
         <div class="mv-msg" hidden></div>
@@ -1477,7 +1477,7 @@
     only writes the table's current pick into them.
   */
   const TIMING_LABEL = { NOW: 'NOW', IMMEDIATE: 'NOW', THIS_ROUND: 'THIS ROUND', UNTIL_ROUND_END: 'UNTIL ROUND END', NEXT_UPKEEP: 'NEXT UPKEEP', NEXT_2_UPKEEPS: 'NEXT 2 UPKEEPS', NEXT_ROUND: 'NEXT ROUND', MIXED: 'NOW + NEXT UPKEEP' };
-  const WHO_LABEL = { CHOSEN: 'CHOSEN SECTOR', LOWEST: 'LOWEST SECTOR', ALL: 'ALL SECTORS' };
+  const WHO_LABEL = { CHOSEN: 'CHOSEN SECTOR', LOWEST: 'LOWEST SECTOR', ALL: 'ALL SECTORS', RANDOM2: '2 RANDOM SECTORS' };
   const RES_SHORT = { power: 'POWER', water: 'WATER', med: 'MED', parts: 'PARTS' };
   /** The timing of a line, in the standard short words. */
   function timingWord(t) { return TIMING_LABEL[t] || String(t || '').replace(/_/g, ' '); }
@@ -1502,15 +1502,34 @@
     return `${who} ${what}`;
   }
 
-  /** One column of the block: its label, then each line as number-first text over its timing. */
-  function agrLinesHtml(cls, label, lines, textOf) {
+  /** Who a half of the card AFFECTS, as the label says it: "POW · MED", "ALL SECTORS", the pick once made. */
+  function agrAffectsText(tokens, card, pick) {
+    const sector = pick && pick.sector ? pick.sector : (card && card.ties && card.ties.length === 1 ? card.ties[0] : null);
+    return (tokens || []).map((t) => (t === 'CHOSEN' || t === 'LOWEST') ? (sector || WHO_LABEL[t]) : (WHO_LABEL[t] || t)).join(' · ');
+  }
+
+  /** One column of the block: its label and who it affects, then each line as number-first text over its timing. */
+  function agrLinesHtml(cls, label, lines, textOf, affects) {
     const rows = (lines || []).map((l) => `<div class="agr-sum-line"><span class="agr-sum-what">${esc(textOf(l))}</span>${l.when ? `<span class="agr-sum-when">${esc(timingWord(l.when))}</span>` : ''}</div>`).join('');
-    return `<div class="agr-sum-col ${cls}"><span class="agr-sum-label">${label}</span>${rows || '<div class="agr-sum-line"><span class="agr-sum-what">—</span></div>'}</div>`;
+    return `<div class="agr-sum-col ${cls}"><span class="agr-sum-label">${label}${affects ? `<span class="agr-sum-affects"> — AFFECTS ${esc(affects)}</span>` : ''}</span>${rows || '<div class="agr-sum-line"><span class="agr-sum-what">—</span></div>'}</div>`;
   }
 
   /** The card's one GAIN / TRADE-OFF block. Rendered once per card, after any selector. */
   function agrSummary(card, pick) {
-    return `<div class="agr-sum">${agrLinesHtml('gain', 'GAIN', card.gain, (l) => agrLineText(card, l, pick))}${agrLinesHtml('trade', 'TRADE-OFF', card.trade_off, (l) => agrLineText(card, l, pick))}</div>`;
+    const aff = card.affects || {};
+    return `<div class="agr-sum">${agrLinesHtml('gain', 'GAIN', card.gain, (l) => agrLineText(card, l, pick), agrAffectsText(aff.gain, card, pick))}${agrLinesHtml('trade', 'TRADE-OFF', card.trade_off, (l) => agrLineText(card, l, pick), agrAffectsText(aff.tradeoff, card, pick))}</div>`;
+  }
+
+  /** What the decision did, per sector — AGR's own result, kept until the next round deals. */
+  function renderAgrResult(a) {
+    const host = $('agr-result');
+    if (!host) return;
+    const r = a && a.last_result;
+    if (!r || !r.sectors) { show(host, false); host.innerHTML = ''; return; }
+    const html = `<div class="agr-result-title">DECISION RESULT — ${esc(r.title)}</div>${Object.entries(r.sectors).map(([code, lines]) =>
+      `<div class="agr-result-row"><span class="agr-result-sector">${esc(code)}</span><span class="agr-result-lines">${lines.map((l) => esc(l)).join(' · ')}</span></div>`).join('')}`;
+    if (host.dataset.sig !== html) { host.dataset.sig = html; host.innerHTML = html; }
+    show(host, true);
   }
 
   /** The selector's first option, so the block names a real pick from the first frame of the review. */
@@ -1571,6 +1590,7 @@
 
     // THE ONE-TIME NOTICE. Modal, AGR only, until acknowledged.
     show($('agr-notice'), !!a.notice);
+    renderAgrResult(a);
 
     /*
       AGR DECISIONS (2026-10-04). Before the mechanic's round the card is the
@@ -1953,6 +1973,8 @@
       case 'no_production': return 'NO ROUND OUTPUT';
       case 'trn_capacity':  return 'TRANSPORT CAPACITY REDUCED';
       case 'com_blind':     return 'TELEMETRY OFFLINE';
+      // a worker lent to another table (an AGR decision) reads as the loan it is, not as a bonus
+      case 'extra_workers': return Number(e.delta) < 0 ? 'WORKER ON LOAN' : 'EXTRA WORKER';
       default:              return String(e.kind || 'EFFECT').toUpperCase().replace(/_/g, ' ');
     }
   }

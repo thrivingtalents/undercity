@@ -320,12 +320,18 @@ ALL), and:
   `offered[]` is the three dealt cards with `{ id, title, summary, category,
   target, risk }` plus `sectors[]`, `choices{}` or `ties[]` where a choice is
   needed; from the round the decision mechanic is live each card also carries
-  `short_description`, `action_label`, `target_label`, `gain[]` and
-  `trade_off[]` (card UI v3, 2026-10-04: lines `{ who, what, when, text }`
+  `short_description`, `action_label`, `target_label`, `gain[]`,
+  `trade_off[]` and `affects { gain[], tradeoff[] }` (targets, 2026-10-05:
+  the tokens each half lands on — codes, ALL, CHOSEN, LOWEST — printed as
+  "GAIN — AFFECTS POW"; card UI v3, 2026-10-04: lines `{ who, what, when, text }`
   derived from the card's effect data by lib/agr-copy.js — `who` may be a
   placeholder CHOSEN / LOWEST / ALL the console resolves from the selector,
   `when` a standard timing key) beside the sentence forms `description`,
-  `immediate_gain`, `consequence` and `consequence_timing`. `slot_result` is
+  `immediate_gain`, `consequence` and `consequence_timing`. `last_result
+  { card, title, round, at, sectors{ CODE: [lines] } }` is what AGR's last
+  decision did, per sector, until the next round deals; every other sector a
+  decision touched is sent a per-sector announcement ("CITY DECISION — AGR:
+  … POW +3 POWER · NOW") that its console shows as a notice. `slot_result` is
   Transport's answer to this round's freight-slot proposal while AGR has not
   moved on from it, read from the request itself. Never the deck. **No other
   role is sent this key.**

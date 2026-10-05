@@ -20,7 +20,7 @@ const path = require('path');
 const { newGame, logEvents, loadContent } = require('./helpers');
 const { forSector, forControl, forBigscreen } = require('../lib/visibility');
 const economy = require('../lib/economy');
-const CARDS = require('../lib/agr-cards.json').cards;
+const CARDS = require('../lib/agr-deck').cards;   // the deck as the engine reads it: each half with its targets
 
 const ROOT = path.join(__dirname, '..');
 const SECTOR_INDEX = fs.readFileSync(path.join(ROOT, 'public/sector/index.html'), 'utf8');

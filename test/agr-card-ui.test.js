@@ -19,7 +19,7 @@ const path = require('path');
 const { newGame } = require('./helpers');
 const { forSector } = require('../lib/visibility');
 const { agrCardSummary, lineText, timingLabel, TIMING_LABELS } = require('../lib/agr-copy');
-const DECK = require('../lib/agr-cards.json').cards;
+const DECK = require('../lib/agr-deck').cards;   // normalised: `effect` / `consequences` derived from each half's targets
 const STANDARD = require('../config/scenarios/haven9-standard.json');
 
 const ROOT = path.join(__dirname, '..');
@@ -60,15 +60,17 @@ const SPEC_ACTION = {
 
 /** The approved effects, frozen at the commit before this UI change (git show 0b0eebb:lib/agr-cards.json). */
 const APPROVED = {
-  AGR_CITY_RECOVERY: { risk: 'HIGH', target: null, requires: null, effect: { type: 'health_all', delta: 10 }, consequences: [{ type: 'integrity', sector: 'AGR', delta: -12 }, { type: 'upkeep_extra', sector: 'AGR', add: { water: 1 }, cycles: 1 }] },
-  AGR_EMERGENCY_STOCKPILE: { risk: 'HIGH', target: null, requires: null, effect: { type: 'stock', sector: 'AGR', add: { power: 5, water: 5, med: 2, parts: 1 } }, consequences: [{ type: 'integrity', sector: 'AGR', delta: -8 }, { type: 'upkeep_extra', sector: 'AGR', add: { power: 1, water: 1 }, cycles: 1 }] },
-  AGR_WORKFORCE_RECOVERY: { risk: 'LOW', target: 'worker', requires: null, effect: { type: 'workforce_recovery', quantity: 1 }, consequences: [] },
+  // Targets (2026-10-05, approved table): the two balance-watch cards and the
+  // two below carry costs beyond AGR now; every gain is as it was.
+  AGR_CITY_RECOVERY: { risk: 'HIGH', target: null, requires: null, effect: { type: 'health_all', delta: 10 }, consequences: [{ type: 'workers', sector: 'ALL', delta: -1 }, { type: 'integrity', sector: 'AGR', delta: -8 }, { type: 'upkeep_extra', sector: 'WTR', add: { water: 1 }, cycles: 1 }] },
+  AGR_EMERGENCY_STOCKPILE: { risk: 'HIGH', target: null, requires: null, effect: { type: 'stock', sector: 'AGR', add: { power: 5, water: 5, med: 2, parts: 1 } }, consequences: [{ type: 'integrity', sector: 'AGR', delta: -6 }, { type: 'integrity', sector: 'ALL', delta: -2 }, { type: 'upkeep_extra', sector: 'AGR', add: { power: 1, water: 1 }, cycles: 1 }] },
+  AGR_WORKFORCE_RECOVERY: { risk: 'LOW', target: 'worker', requires: null, effect: { type: 'workforce_recovery', sector: 'AGR', quantity: 1 }, consequences: [] },
   AGR_POWER_SURGE: { risk: 'LOW', target: null, requires: null, effect: { type: 'stock', sector: 'POW', add: { power: 3 } }, consequences: [{ type: 'upkeep_extra', sector: 'AGR', add: { power: 1 }, cycles: 1 }] },
   AGR_WATER_RESERVE: { risk: 'MEDIUM', target: null, requires: null, effect: { type: 'stock', sector: 'WTR', add: { water: 3 } }, consequences: [{ type: 'upkeep_extra', sector: 'AGR', add: { water: 1 }, cycles: 2 }] },
-  AGR_MEDICAL_REINFORCEMENT: { risk: 'MEDIUM', target: null, requires: null, effect: { type: 'capacity', kind: 'med_capacity', sector: 'MED', delta: 1 }, consequences: [{ type: 'upkeep_extra', sector: 'AGR', add: { water: 1 }, cycles: 1 }] },
+  AGR_MEDICAL_REINFORCEMENT: { risk: 'MEDIUM', target: null, requires: null, effect: { type: 'capacity', kind: 'med_capacity', sector: 'MED', delta: 1 }, consequences: [{ type: 'workers', sector: 'MED', delta: -1 }] },
   AGR_LOGISTICS_BOOST: { risk: 'MEDIUM', target: null, requires: 'TRN', effect: { type: 'capacity', kind: 'trn_capacity', sector: 'TRN', delta: 1 }, consequences: [{ type: 'capacity', kind: 'trn_capacity', sector: 'TRN', delta: -1, apply_at: 'round_start' }] },
   AGR_CRISIS_RESPONSE: { risk: 'HIGH', target: null, requires: null, effect: { type: 'health_lowest', delta: 20 }, consequences: [{ type: 'integrity', sector: 'AGR', delta: -10 }] },
-  AGR_STABILISE_SECTOR: { risk: 'MEDIUM', target: 'sector', requires: null, effect: { type: 'health_one', delta: 15 }, consequences: [{ type: 'upkeep_extra', sector: 'AGR', add: { power: 1, water: 1 }, cycles: 1 }] },
+  AGR_STABILISE_SECTOR: { risk: 'MEDIUM', target: 'sector', requires: null, effect: { type: 'health_one', delta: 15 }, consequences: [{ type: 'upkeep_extra', sector: 'AGR', add: { power: 1, water: 1 }, cycles: 1 }, { type: 'workers', sector: 'CHOSEN', delta: -1 }] },
   AGR_EMERGENCY_PARTS: { risk: 'MEDIUM', target: null, requires: null, effect: { type: 'stock', sector: 'AGR', add: { parts: 3 } }, consequences: [{ type: 'integrity', sector: 'AGR', delta: -6, apply_at: 'round_start' }] },
   AGR_RELIEF_CREW: { risk: 'LOW', target: 'sector', requires: null, effect: { type: 'relief_crew', workers: 1 }, consequences: [{ type: 'workers', sector: 'AGR', delta: -1 }] },
   AGR_RESERVE_CACHE: { risk: 'LOW', target: 'resource_type', requires: null, effect: { type: 'cache', sector: 'AGR', choices: { power: 3, water: 3, med: 2, parts: 2 } }, consequences: [{ type: 'upkeep_extra', sector: 'AGR', add: 'chosen', amount: 1, cycles: 1 }] },
@@ -170,7 +172,7 @@ test('UI-AGR-005: timing uses the standard short labels', () => {
   assert.ok(!/AT NEXT UPKEEP|UNTIL THE ROUND ENDS|AT THE START OF NEXT ROUND/.test(SCRIPT), 'the long timing words are back');
   // MIXED cards get one line per timing rather than a blended word.
   const city = viewOf('AGR_CITY_RECOVERY');
-  assert.deepEqual(city.trade_off.map((l) => [l.text, l.when]), [['AGR −12 INTEGRITY', 'NOW'], ['AGR +1 WATER UPKEEP', 'NEXT_UPKEEP']]);
+  assert.deepEqual(city.trade_off.map((l) => [l.text, l.when]), [['ALL SECTORS −1 WORKER', 'THIS_ROUND'], ['AGR −8 INTEGRITY', 'NOW'], ['WTR +1 WATER UPKEEP', 'NEXT_UPKEEP']]);
   assert.deepEqual(viewOf('AGR_WATER_RESERVE').trade_off.map((l) => [l.text, l.when]), [['AGR +1 WATER UPKEEP', 'NEXT_2_UPKEEPS']]);
   assert.deepEqual(viewOf('AGR_EMERGENCY_PARTS').trade_off.map((l) => [l.text, l.when]), [['AGR −6 INTEGRITY', 'NEXT_ROUND']]);
   assert.deepEqual(viewOf('AGR_LOGISTICS_BOOST').trade_off.map((l) => [l.text, l.when]), [['TRN −1 APPROVAL', 'NEXT_ROUND']]);
@@ -211,7 +213,7 @@ test('UI-AGR-007: no approved card effect has changed', () => {
     assert.deepEqual({ risk: c.risk, target: c.target || null, requires: c.requires || null, effect: c.effect, consequences: c.consequences }, a, `${c.id} changed`);
   }
   // The lines are derived from those effects, never stored beside them.
-  for (const c of DECK) assert.ok(!('gain' in c) && !('trade_off' in c) && !('gain_text' in c), `${c.id} stores a hand-written summary`);
+  for (const c of DECK) assert.ok(Array.isArray(c.gain.effects) && !('trade_off' in c) && !('gain_text' in c) && !c.gain.text, `${c.id} stores a hand-written summary`);
   // And they still apply as before: a decision in Round 2 lands its gain and its trade-off.
   const g = live();
   viewOf('AGR_RELIEF_CREW', g);
