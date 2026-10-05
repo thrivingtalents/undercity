@@ -421,6 +421,10 @@ status:PENDING|READY|FIRED|SKIPPED}`), `round_elapsed_s`, `scheduled[]`,
 `effects[]`, `intel[]`, `cycle_summary`, `council_detail`,
 `continuity_order_detail`, `blackout_detail`, `phases[]`, `config` (the live
 scenario defaults) and `scenario { id name sectors events fault_presets }`.
+Since 2026-10-06 also `city_events { version events[] active_effects[] history[] }`:
+the ten City Events with each card's `status` (available | used | pending) and
+`button` word, the live round and upkeep effects they created (grouped, with the
+ACTIVE CITY EFFECTS line), and the run's activations (§8.12).
 
 ### 8.6 Sector → server (new)
 
@@ -495,6 +499,7 @@ requires stock.
 { "type": "set_sound", "on": false }
 { "type": "alert", "title": "COUNCIL SUMMONED", "subtitle": "CHIEFS + LIAISONS REPORT IMMEDIATELY" }
 { "type": "dismiss_alert" }
+{ "type": "activate_city_event", "event_id": "MONSTER_ATTACK" }   // CITY EVENTS (2026-10-06): one press, no confirmation → city_event_result (§8.12)
 { "type": "call_council" }   { "type": "end_council" }   // the discussion timer: one minute, then CLOSE
 { "type": "clock", "which": "council", "action": "pause" }   // pause | start | add (±seconds) | set | reset | end
 { "type": "rolling_blackout", "confirm": true }   { "type": "end_blackout" }
@@ -574,6 +579,8 @@ exists, else a synthesised placeholder.
 `agr_round_offer_archived`, `agr_admin_reroll`, `agr_admin_force_activate`, `agr_card_enabled`,
 `council_called/ended/no_order`, `continuity_order`, `blackout_started/rotated/ended`,
 `event_fired`, `effect_started/ended`, `scheduled`, `preset_fired`,
+`city_event_activated { activation round event_id event_name event_type by effects_requested effects_applied affected_sectors health duration expiry repeat_policy }`,
+`city_event_effect_expired`, `city_event_upkeep_effect_consumed` (2026-10-06),
 `timeline_fired/skipped/delayed`, `alert`, `config_patched`, `set_stability`,
 `intel`, `sound`. Every line also carries `round` and `phase`.
 
@@ -866,3 +873,34 @@ REQUEST and DECLINE, the asking table's WITHDRAW. Workers are still asked
 for through the same form, so a loan now travels the request path too.
 There is no OFFER RESOURCE: a table that wants to help asks the other
 table to request it.
+
+### 8.12 City Events (CITY_EVENTS_V1, 2026-10-06)
+
+Ten facilitator-triggered, city-wide events — five GOOD, five BAD — defined once
+in `lib/city-events.json` and applied by `lib/city-events.js`. They are not
+faults: no procedure, no code, nothing on ACTIVE FAULTS, nothing for a table to
+acknowledge. The control panel's EVENTS › CITY EVENTS tab shows each card
+(name, GOOD/BAD, situation, the effect line derived from its effects, duration)
+with one ACTIVATE button and no confirmation step.
+
+`activate_city_event { event_id }` → `city_event_result { ok, activation,
+event_id, name, type, round, applied[], health{}, affected[] }` or `{ ok: false,
+reason }` with `unknown_city_event`, `run_ended`, `city_event_used_this_round`
+(repeat_policy ONCE_PER_ROUND) or `city_event_pending` (BLOCK_WHILE_PENDING,
+while an upkeep modifier it created is still pending). The server validates
+every effect before applying any, then applies all of them through the engine's
+existing helpers: Health through `setIntegrity` (clamped 0–100, DARK at 0 as
+ever; a gain skips DARK sectors — Emergency Restart is the only way back),
+injuries through `injure()` (MED heals them through its normal queue),
+temporary Workers through the `extra_workers` effect, Transport capacity
+through `trn_capacity`, Medical capacity through `med_capacity`, and upkeep
+modifiers through the `upkeep_extra` obligation `upkeepFor` adds (never below
+zero) and the economy pass consumes. Round effects end with the round; upkeep
+modifiers end when an upkeep is actually processed. Every effect carries
+`source: "city_event"`, `event_id`, `activation` and a `player_label` the
+sector console prints on its effect chip.
+
+The room is told through the existing City Alert (`alert` on every frame:
+console overlay then banner; wall strip and feed). Nothing event-specific
+reaches a sector or the wall beyond that alert and the effect chip. Everything
+survives save/restore inside `state`; RESET clears it with the run.

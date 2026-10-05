@@ -1981,6 +1981,8 @@
   }
 
   function effectLabel(e) {
+    // A City Event names its own effect for the table (2026-10-06), in the standard short timing words.
+    if (e.player_label) return e.player_label;
     switch (e.kind) {
       case 'no_production': return 'NO ROUND OUTPUT';
       case 'trn_capacity':  return 'TRANSPORT CAPACITY REDUCED';

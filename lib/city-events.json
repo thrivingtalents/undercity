@@ -1,0 +1,187 @@
+{
+  "version": "CITY_EVENTS_V1",
+  "source": "ADMIN CITY EVENTS specification (2026-10-06)",
+  "note": "THE ONE SOURCE for the facilitator's City Events: ten city-wide events, five GOOD and five BAD, fired by one press of ACTIVATE on the Admin Control Panel. They are not faults: no procedure, no code, no card on ACTIVE FAULTS. Edit here and nowhere else — the control panel reads these through the control frame and prints the effect line that lib/city-events.js derives from `effects`, so no number is typed twice. Effect kinds are the specification's words; the engine maps each onto something it already has: health → setIntegrity (a gain never revives a DARK sector), injure_workers → injure(), extra_workers → the extra_workers effect availableWorkers reads, trn_capacity → the trn_capacity effect trnCapacity reads, med_healing_capacity → the med_capacity effect medCapacity reads, upkeep_modifier → the upkeep_extra obligation upkeepFor adds and the economy pass retires. Targets: ALL_SECTORS, ALL_NON_DARK_SECTORS, or a sector code. `expires: round` ends with the round; `cycles_remaining: 1` is consumed by the next upkeep actually processed.",
+  "health": { "min": 0, "max": 100 },
+  "repeat_policies": {
+    "ONCE_PER_ROUND": "the same event cannot be activated again in the same round",
+    "BLOCK_WHILE_PENDING": "the same event cannot be activated again while an effect it created is still pending"
+  },
+  "events": [
+    {
+      "id": "CITY_SYSTEMS_STABILISED",
+      "name": "CITY SYSTEMS STABILISED",
+      "type": "GOOD",
+      "description": "Core oscillation has temporarily stabilised. System stress across HAVEN-9 is decreasing.",
+      "player_message": "CITY SYSTEMS STABILISED — All operating sectors recover 10 Health.",
+      "duration": "IMMEDIATE",
+      "effects": [
+        { "kind": "health", "target": "ALL_NON_DARK_SECTORS", "delta": 10, "cap": 100 }
+      ],
+      "rules": [
+        "Do not revive a DARK sector.",
+        "DARK sectors remain at 0 Health and still require the existing Emergency Restart process.",
+        "Health may not exceed 100."
+      ],
+      "repeat_policy": "ONCE_PER_ROUND"
+    },
+    {
+      "id": "TRANSPORT_CORRIDOR_CLEARED",
+      "name": "TRANSPORT CORRIDOR CLEARED",
+      "type": "GOOD",
+      "description": "Maintenance crews have reopened an abandoned freight corridor.",
+      "player_message": "TRANSPORT CORRIDOR CLEARED — TRN receives 2 additional transfer approvals this round.",
+      "duration": "THIS_ROUND",
+      "effects": [
+        { "kind": "trn_capacity", "target": "TRN", "delta": 2, "expires": "round" }
+      ],
+      "rules": [
+        "Do not reset approvals already used.",
+        "Increase the maximum allowance for the current round only.",
+        "Expire automatically when the round changes."
+      ],
+      "repeat_policy": "ONCE_PER_ROUND"
+    },
+    {
+      "id": "EMERGENCY_MAINTENANCE_CREW",
+      "name": "EMERGENCY MAINTENANCE CREW",
+      "type": "GOOD",
+      "description": "Reserve maintenance personnel have been released to support city operations.",
+      "player_message": "EMERGENCY MAINTENANCE CREW — Every operating sector receives 1 additional Worker this round.",
+      "duration": "THIS_ROUND",
+      "effects": [
+        { "kind": "extra_workers", "target": "ALL_NON_DARK_SECTORS", "delta": 1, "expires": "round" }
+      ],
+      "rules": [
+        "Use the existing temporary-worker effect.",
+        "Do not permanently increase starting workforce.",
+        "Temporary capacity disappears automatically at round change.",
+        "Expiry never creates negative available Workers."
+      ],
+      "repeat_policy": "ONCE_PER_ROUND"
+    },
+    {
+      "id": "UTILITY_RESERVE_RELEASED",
+      "name": "UTILITY RESERVE RELEASED",
+      "type": "GOOD",
+      "description": "Emergency electrical reserves have been released to reduce the city's operating burden.",
+      "player_message": "UTILITY RESERVE RELEASED — Every sector requires 1 less Power at its next upkeep.",
+      "duration": "NEXT_UPKEEP",
+      "effects": [
+        { "kind": "upkeep_modifier", "target": "ALL_SECTORS", "resource": "power", "delta": -1, "cycles_remaining": 1 }
+      ],
+      "rules": [
+        "The modifier appears immediately in each sector's NEXT UPKEEP display.",
+        "It applies to the next upkeep actually processed, then goes.",
+        "A requirement never falls below zero."
+      ],
+      "repeat_policy": "BLOCK_WHILE_PENDING"
+    },
+    {
+      "id": "CITY_RECOVERY_PROTOCOL",
+      "name": "CITY RECOVERY PROTOCOL",
+      "type": "GOOD",
+      "description": "Emergency medical and engineering protocols have been authorised across HAVEN-9.",
+      "player_message": "CITY RECOVERY PROTOCOL — All operating sectors recover 5 Health. MED receives 2 additional heals this round.",
+      "duration": "MIXED",
+      "effects": [
+        { "kind": "health", "target": "ALL_NON_DARK_SECTORS", "delta": 5, "cap": 100 },
+        { "kind": "med_healing_capacity", "target": "MED", "delta": 2, "expires": "round" }
+      ],
+      "rules": [
+        "Do not revive DARK sectors.",
+        "Do not automatically heal Workers: MED still chooses who to heal.",
+        "Only MED receives the increased healing allowance, and it expires at round change."
+      ],
+      "repeat_policy": "ONCE_PER_ROUND"
+    },
+    {
+      "id": "MONSTER_ATTACK",
+      "name": "MONSTER ATTACK",
+      "type": "BAD",
+      "description": "Hostile creatures have breached HAVEN-9's outer tunnel network. Casualties and structural damage are reported across the city.",
+      "player_message": "MONSTER ATTACK — All sectors lose 10 Health. 1 Worker is injured in every sector.",
+      "duration": "IMMEDIATE",
+      "effects": [
+        { "kind": "health", "target": "ALL_SECTORS", "delta": -10, "floor": 0 },
+        { "kind": "injure_workers", "target": "ALL_SECTORS", "quantity": 1 }
+      ],
+      "rules": [
+        "Use the existing Worker injury pipeline: the injured Worker appears in the existing injured-worker system and MED's healing rules apply.",
+        "A sector with no Worker to injure injures none; counts never go negative.",
+        "Health may fall to 0 and trigger the normal DARK behaviour."
+      ],
+      "repeat_policy": "ONCE_PER_ROUND"
+    },
+    {
+      "id": "TUNNEL_NETWORK_DAMAGE",
+      "name": "TUNNEL NETWORK DAMAGE",
+      "type": "BAD",
+      "description": "Structural damage has closed one of HAVEN-9's main logistics corridors.",
+      "player_message": "TUNNEL NETWORK DAMAGE — TRN loses 1 transfer approval this round.",
+      "duration": "THIS_ROUND",
+      "effects": [
+        { "kind": "trn_capacity", "target": "TRN", "delta": -1, "expires": "round" }
+      ],
+      "rules": [
+        "Never revoke transfers already approved.",
+        "If approvals used already meet the new capacity, only further approvals are prevented.",
+        "Capacity never becomes negative; the effect expires at the next round change."
+      ],
+      "repeat_policy": "ONCE_PER_ROUND"
+    },
+    {
+      "id": "CORE_ENERGY_INSTABILITY",
+      "name": "CORE ENERGY INSTABILITY",
+      "type": "BAD",
+      "description": "Core instability is increasing electrical demand across all station systems.",
+      "player_message": "CORE ENERGY INSTABILITY — Every sector requires 1 additional Power at its next upkeep.",
+      "duration": "NEXT_UPKEEP",
+      "effects": [
+        { "kind": "upkeep_modifier", "target": "ALL_SECTORS", "resource": "power", "delta": 1, "cycles_remaining": 1 }
+      ],
+      "rules": [
+        "The increased cost shows immediately in NEXT UPKEEP.",
+        "It applies once, to the next upkeep actually processed, then goes."
+      ],
+      "repeat_policy": "BLOCK_WHILE_PENDING"
+    },
+    {
+      "id": "CITYWIDE_STRUCTURAL_DAMAGE",
+      "name": "CITYWIDE STRUCTURAL DAMAGE",
+      "type": "BAD",
+      "description": "A subterranean tremor has damaged work areas throughout HAVEN-9.",
+      "player_message": "CITYWIDE STRUCTURAL DAMAGE — All sectors lose 5 Health and operate with 1 fewer Worker this round.",
+      "duration": "MIXED",
+      "effects": [
+        { "kind": "health", "target": "ALL_SECTORS", "delta": -5, "floor": 0 },
+        { "kind": "extra_workers", "target": "ALL_NON_DARK_SECTORS", "delta": -1, "expires": "round" }
+      ],
+      "rules": [
+        "This is NOT an injury event: no Worker goes to MED.",
+        "The lost Worker capacity returns automatically at the next round.",
+        "Available Workers never fall below 0; Health may reach 0 and use the normal DARK behaviour."
+      ],
+      "repeat_policy": "ONCE_PER_ROUND"
+    },
+    {
+      "id": "EMERGENCY_LOCKDOWN",
+      "name": "EMERGENCY LOCKDOWN",
+      "type": "BAD",
+      "description": "Multiple containment alarms have triggered an Authority-wide emergency lockdown.",
+      "player_message": "EMERGENCY LOCKDOWN — All sectors lose 5 Health. TRN loses 1 transfer approval and MED loses 1 healing capacity this round.",
+      "duration": "MIXED",
+      "effects": [
+        { "kind": "health", "target": "ALL_SECTORS", "delta": -5, "floor": 0 },
+        { "kind": "trn_capacity", "target": "TRN", "delta": -1, "expires": "round" },
+        { "kind": "med_healing_capacity", "target": "MED", "delta": -1, "expires": "round" }
+      ],
+      "rules": [
+        "Approvals and heals already completed are not undone; only future actions are blocked.",
+        "Health may reach 0 and use the normal DARK behaviour.",
+        "Both capacity modifiers expire at the next round."
+      ],
+      "repeat_policy": "ONCE_PER_ROUND"
+    }
+  ]
+}

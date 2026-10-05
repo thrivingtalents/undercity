@@ -466,3 +466,28 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: none;
 .pf.chain .rd { color: var(--purple, #A855F7); letter-spacing: 0.08em; }
 .cc-chain { margin-top: 8px; padding: 6px 8px; border-left: 2px solid var(--purple, #A855F7); background: rgba(168,85,247,0.07); font-size: 11px; line-height: 1.7; }
 .cc-chain em { display: block; margin-top: 4px; color: var(--ink-faint); font-style: normal; font-size: 10px; letter-spacing: 0.08em; }
+
+/* CITY EVENTS (2026-10-06): operational controls, not collectible cards. A GOOD
+   event carries a green rule, a BAD one a red rule; both keep the panel's grey. */
+.ce-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ce-list { display: flex; flex-direction: column; gap: 6px; }
+.ce-card { border: 1px solid var(--line); border-left: 3px solid var(--ink-dim); background: var(--panel-2); padding: 7px 10px; display: flex; flex-direction: column; gap: 3px; }
+.ce-card.good { border-left-color: var(--green); }
+.ce-card.bad { border-left-color: var(--red); }
+.ce-head { display: flex; gap: 8px; align-items: baseline; }
+.ce-type { font-size: 8.5px; letter-spacing: 0.2em; padding: 1px 5px; border: 1px solid var(--line); color: var(--ink-faint); }
+.ce-card.good .ce-type { border-color: var(--green); color: var(--green); }
+.ce-card.bad .ce-type { border-color: var(--red); color: var(--red); }
+.ce-name { font-size: 12px; letter-spacing: 0.04em; }
+.ce-desc { margin: 0; font-size: 10.5px; color: var(--ink-dim); line-height: 1.4; }
+.ce-fx { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; }
+.ce-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
+.ce-dur { font-size: 9px; letter-spacing: 0.16em; color: var(--ink-faint); }
+.ce-card button:disabled { opacity: 0.55; cursor: default; }
+.ce-active .ce-eff { font-size: 11px; display: flex; gap: 10px; align-items: baseline; padding: 3px 0; }
+.ce-active .ce-eff b { color: var(--amber); }
+.ce-history .ce-hist { font-size: 10px; display: flex; gap: 8px; align-items: baseline; padding: 2px 0; }
+.ce-history .ce-hist .ft { color: var(--ink-faint); min-width: 62px; }
+.tag.good { border-color: var(--green); color: var(--green); }
+.tag.bad  { border-color: var(--red); color: var(--red); }
+.dtl.city_event { color: var(--amber); }

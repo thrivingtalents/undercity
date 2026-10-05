@@ -3270,7 +3270,8 @@ test('Overview initial state: CALL COUNCIL is among the live controls and the Br
 test('Events navigation: the Council tab is gone; FAULTS, TIMELINE and PRESSURE remain', () => {
   const html = CONTROL_INDEX;
   const nav = [...html.matchAll(/<nav class="subnav" data-for="events">([\s\S]*?)<\/nav>/g)][0][1];
-  assert.deepEqual([...nav.matchAll(/data-sub="([a-z]+)"/g)].map((m) => m[1]), ['faults', 'timeline', 'pressure']);
+  // CITY EVENTS (2026-10-06) joined the three; the Council never came back.
+  assert.deepEqual([...nav.matchAll(/data-sub="([a-z]+)"/g)].map((m) => m[1]), ['faults', 'timeline', 'pressure', 'city']);
   assert.ok(!/id="sub-council"|nom-grid|order-pick|council-aggregate|btn-close-nominations|CONTINUITY ORDER/.test(html), 'old Council UI is still on EVENTS');
   assert.ok(!/council_nomination|continuity_order|renderOrder|orderDraft/.test(CONTROL_SCRIPT));
   assert.ok(!/id="council-stage"|id="nom-view"|id="cnl-view"|PRIVATE NOMINATION/.test(SECTOR_INDEX) && !/council_nomination|continuity_order/.test(SECTOR_SCRIPT), 'a table still votes');

@@ -171,6 +171,7 @@
         <button data-sub="faults" class="on">FAULTS</button>
         <button data-sub="timeline">TIMELINE</button>
         <button data-sub="pressure">PRESSURE</button>
+        <button data-sub="city">CITY EVENTS</button>
       </nav>
 
       <div class="sub on panel" id="sub-faults">
@@ -270,6 +271,25 @@
             <button data-sting="silence">SILENCE</button>
           </div>
           <div class="hint">R0 klaxon is the audio join key — fire it once, on the record.</div>
+        </div>
+      </div>
+
+      <!-- CITY EVENTS (2026-10-06): ten facilitator-triggered city-wide events, five GOOD and five
+           BAD, from lib/city-events.json. ACTIVATE is one press — no modal, no second button — and the
+           server applies every effect at once, logs it and raises the City Alert. Not faults. -->
+      <div class="sub panel" id="sub-city">
+        <h2 class="col-title">CITY EVENTS <span class="hint">one press applies the event city-wide and alerts every console · not faults, no code to enter</span></h2>
+        <div class="ce-groups">
+          <div class="block"><span class="label">GOOD EVENTS</span><div class="ce-list" id="ce-good"></div></div>
+          <div class="block"><span class="label">BAD EVENTS</span><div class="ce-list" id="ce-bad"></div></div>
+        </div>
+        <div class="block">
+          <span class="label">Active city effects <em>— still in force or pending; immediate Health changes are history, below</em></span>
+          <div class="ce-active" id="ce-active"><div class="hint">None.</div></div>
+        </div>
+        <div class="block">
+          <span class="label">Event history</span>
+          <div class="ce-history" id="ce-history"><div class="hint">None this run.</div></div>
         </div>
       </div>
 

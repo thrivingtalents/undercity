@@ -116,6 +116,11 @@
       if (msg.type === 'transfer_result' && msg.ok === false) toast(`Transfer: ${msg.reason}`);
       if (msg.type === 'fire_result' && msg.ok === false) toast(`Not fired: ${msg.reason}`);
       if (msg.type === 'event_result' && msg.ok === false) toast(`Event: ${msg.reason}`);
+      // CITY EVENTS (2026-10-06): the server's answer to ACTIVATE. The cards follow the next frame.
+      if (msg.type === 'city_event_result') {
+        if (msg.ok) toast(`CITY EVENT ACTIVATED — ${msg.name}${Array.isArray(msg.affected) && msg.affected.length ? ' · ' + msg.affected.join(' ') : ''}`, 'ok');
+        else { toast(`City event refused: ${String(msg.reason || '').toUpperCase().replace(/_/g, ' ')}`); for (const h of ['ce-good', 'ce-bad']) $(h).dataset.sig = ''; if (state) renderCityEvents(); }
+      }
       if (msg.type === 'output_result' && msg.ok === false) toast(`Output: ${msg.reason}`);
       if (msg.type === 'override_result') {
         if (msg.ok) toast(`OVERRIDE LOGGED — ${String(msg.action || '').toUpperCase().replace(/_/g, ' ')}${msg.target ? ' · ' + msg.target : ''}`, 'ok');
@@ -1125,6 +1130,52 @@
     $('effects').innerHTML = eff.map((e) => `<div class="ef"><b>${esc(e.kind)}</b> ${esc(e.target)} ${e.remaining_s != null ? `<span data-cd-effect="${e.id}">${U.mmss(e.remaining_s)}</span>` : ''}${e.cycles_remaining != null ? `${e.cycles_remaining} round(s)` : ''} <span class="hint">${esc(e.source || '')}</span></div>`).join('') || '<div class="hint">None.</div>';
   }
 
+  // -- EVENTS: city events (CITY_EVENTS_V1, 2026-10-06) ----------------------------------------
+  /*
+    Ten facilitator-triggered, city-wide events — five GOOD, five BAD — from
+    lib/city-events.json, read off the control frame (state.city_events) so
+    no number is typed here. ACTIVATE is one press: no modal, no second
+    button. The server is authoritative: the press sends activate_city_event
+    and the card changes only when the next frame says so (USED THIS ROUND /
+    PENDING). The button is disabled the moment it is pressed, and the server
+    refuses a repeat anyway, so a double-click applies the event once.
+  */
+  function renderCityEvents() {
+    const ce = state.city_events;
+    if (!ce) return;
+    const cardHtml = (e) => `<div class="ce-card ${e.type === 'GOOD' ? 'good' : 'bad'}">
+        <div class="ce-head"><span class="ce-type">${esc(e.type)}</span><b class="ce-name">${esc(e.name)}</b></div>
+        <p class="ce-desc">${esc(e.description)}</p>
+        <div class="ce-fx">${esc(e.effect_summary)}</div>
+        <div class="ce-foot"><span class="ce-dur">${esc(String(e.duration || '').replace(/_/g, ' '))}</span><button data-ce="${esc(e.id)}" class="${e.status === 'available' ? 'primary' : ''}"${e.status === 'available' ? '' : ' disabled'}>${esc(e.button)}</button></div>
+      </div>`;
+    for (const [host, type] of [['ce-good', 'GOOD'], ['ce-bad', 'BAD']]) {
+      const html = (ce.events || []).filter((e) => e.type === type).map(cardHtml).join('');
+      if ($(host).dataset.sig !== html) {
+        $(host).dataset.sig = html;
+        $(host).innerHTML = html;
+        for (const b of $(host).querySelectorAll('[data-ce]')) {
+          b.addEventListener('click', () => {
+            if (b.disabled) return;
+            b.disabled = true;
+            b.textContent = 'SENDING…';
+            send({ type: 'activate_city_event', event_id: b.dataset.ce });
+          });
+        }
+      }
+    }
+    const act = ce.active_effects || [];
+    const ah = act.length
+      ? act.map((a) => `<div class="ce-eff"><b>${esc(a.text)}</b><span class="hint">${esc(a.name)}</span></div>`).join('')
+      : '<div class="hint">None. An immediate Health event does not stay here; the history below keeps it.</div>';
+    if ($('ce-active').dataset.sig !== ah) { $('ce-active').dataset.sig = ah; $('ce-active').innerHTML = ah; }
+    const hist = ce.history || [];
+    const hh = hist.length
+      ? hist.map((h) => `<div class="ce-hist"><span class="ft">${new Date(h.t).toLocaleTimeString([], { hour12: false })}</span><span class="tag ${h.type === 'GOOD' ? 'good' : 'bad'}">${esc(h.type)}</span><b>${esc(h.name)}</b><span class="hint">ROUND ${esc(String(h.round || '').replace(/^R/, ''))} · ${esc(h.by || 'facilitator')}</span></div>`).join('')
+      : '<div class="hint">None this run.</div>';
+    if ($('ce-history').dataset.sig !== hh) { $('ce-history').dataset.sig = hh; $('ce-history').innerHTML = hh; }
+  }
+
   $('btn-alert').addEventListener('click', () => {
     const title = $('alert-title').value.trim();
     if (!title) return;
@@ -1689,6 +1740,7 @@
     renderPresets();
     renderTimeline();
     renderEvents();
+    renderCityEvents();
     renderBlackout();
     renderCouncil();
     renderTransfersView();

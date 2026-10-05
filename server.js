@@ -1265,6 +1265,11 @@ function handleControl(client, entry, msg) {
     case 'fire_event':
       reply({ type: 'event_result', ...game.fireEvent(msg.event_id, { target: msg.target }) });
       return ok();
+    // CITY EVENTS (2026-10-06): one press, no confirmation. The engine validates, applies every
+    // effect at once, logs it and raises the City Alert; the broadcast carries the result to the room.
+    case 'activate_city_event':
+      reply({ type: 'city_event_result', ...game.activateCityEvent(msg.event_id, { by: 'facilitator' }) });
+      return ok();
     case 'cancel_scheduled': game.cancelScheduled(msg.id); return ok();
     case 'timeline_fire':  reply({ type: 'timeline_result', ...game.fireTimelineItem(msg.id) }); return ok();
     case 'timeline_skip':  game.skipTimelineItem(msg.id); return ok();
