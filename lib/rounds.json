@@ -1,5 +1,5 @@
 {
-  "note": "Derived from undercity-spec.md §8 (Round Configuration), converted to CONTINUOUS GAMEFLOW (2026-09-21) and then to the SIMPLIFIED ROUND DISPLAY (2026-09-21): the visible flow is Round 0 → Round 4 and nothing else. One phase per round, so what the engine tracks and what a screen shows are the same thing and no internal pacing name can leak onto a projector. The descriptive names those rounds used to carry — Stable Ops, Interdependence, Core Failure, Aftershock — live in the facilitator's runbook, on paper, and nowhere in this file. A round still carries its own inject timeline and fault pool (timelines[] in the scenario), and still resets NOTHING when it changes: the round is the period (2026-09-28): activating the next round charges the outgoing round's production and upkeep (Round 0 is never charged) and hands every allowance back, and each round's length_s is its ROUND TIMER (2026-09-28): a round change loads it at its full length in READY, START runs it, it stops at 00:00 and never carries time into the next round. NEXT ROUND stays the facilitator's call. Balance numbers live in config/scenarios/*.json, which override these defaults.",
+  "note": "Derived from undercity-spec.md §8 (Round Configuration), converted to CONTINUOUS GAMEFLOW (2026-09-21), then to the SIMPLIFIED ROUND DISPLAY (2026-09-21), and extended to EIGHT ROUNDS (2026-10-05): the visible flow is Round 0 → Round 7 and nothing else. One phase per round, so what the engine tracks and what a screen shows are the same thing and no internal pacing name can leak onto a projector. A round has NO NAME anywhere — not here, not on a console, not in the guidebook: it is its number, and what it is for is written in `purpose`, for the facilitator's eyes, as guidance rather than a title. Rounds 0 to 3 teach the mechanics; Rounds 4 to 7 mix them under rising pressure, with nothing new to learn. A round still carries its own inject timeline (timelines[] in the scenario) and resets NOTHING when it changes: the round is the period (2026-09-28): activating the next round charges the outgoing round's production and upkeep and hands every allowance back, and each round's length_s is its ROUND TIMER (2026-09-28): a round change loads it at its full length in READY, START runs it, it stops at 00:00 and never carries time into the next round. NEXT ROUND stays the facilitator's call, and so does every fault (2026-10-04): no round deals one. Balance numbers live in config/scenarios/*.json, which override these defaults.",
   "defaults": {
     "resolve_recovery": 0,
     "lockout_s": 20,
@@ -21,51 +21,81 @@
   "rounds": [
     {
       "id": "R0",
-      "name": "Onboarding",
+      "name": "Round 0",
       "length_s": 1200,
       "injects": "1 tutorial fault per sector (self-contained)",
       "mechanics": "Everything, zero stakes",
-      "purpose": "Interface fluency; role self-assignment observation",
+      "purpose": "Orientation: learn station roles, the console, the binder and basic operations. Interface fluency; role self-assignment observation.",
       "breather_after_s": 0,
       "beats": []
     },
     {
       "id": "R1",
-      "name": "Stable Ops",
+      "name": "Round 1",
       "length_s": 900,
       "injects": "1 minor per sector, staggered",
       "mechanics": "Intra-sector only",
-      "purpose": "Baseline capture — must feel comfortably manageable",
+      "purpose": "Normal sector operations and basic fault resolution. Baseline capture — must feel comfortably manageable.",
       "breather_after_s": 0,
       "beats": []
     },
     {
       "id": "R2",
-      "name": "Interdependence",
+      "name": "Round 2",
       "length_s": 900,
       "injects": "Cross-sector cascades, two per sector; discrepancy live",
       "mechanics": "Transfers, liaisons, Council #1 at ~18:00",
-      "purpose": "First stress delta; information-sharing latency",
+      "purpose": "Cross-sector interaction, resources, transfers and AGR trade-offs. First stress delta; information-sharing latency.",
       "breather_after_s": 0,
       "beats": []
     },
     {
       "id": "R3",
-      "name": "Core Failure",
+      "name": "Round 3",
       "length_s": 720,
-      "injects": "Critical stack x3; Core drops to 60% at 05:00; Continuity Order due 25:00",
-      "mechanics": "Triage, irreversibility, brownouts",
-      "purpose": "Peak stress; values conflict; decision under deadline",
+      "injects": "Critical stack x3; Core drops to 60% at 02:00; Continuity Order due",
+      "mechanics": "Triage, irreversibility, brownouts, reference chains",
+      "purpose": "Advanced dependency and the Reference Chain. Peak stress of the learning phase; values conflict; decision under pressure.",
       "breather_after_s": 0,
       "beats": []
     },
     {
       "id": "R4",
-      "name": "Aftershock",
+      "name": "Round 4",
       "length_s": 480,
-      "injects": "6 novel-combination faults, one per sector, + 1 mini-triage",
-      "mechanics": "Same systems, fresh crisis",
-      "purpose": "Post-measurement — the delta is the product",
+      "injects": "6 novel-combination faults, one per sector, plus the LATE SHIFT library from here",
+      "mechanics": "Same systems, fresh crisis — the mixed phase begins",
+      "purpose": "Mixed operations begin: familiar faults with one or two advanced dependencies, at medium pressure. Post-measurement starts here.",
+      "breather_after_s": 0,
+      "beats": []
+    },
+    {
+      "id": "R5",
+      "name": "Round 5",
+      "length_s": 600,
+      "injects": "Hand-fired: several sectors needing the same limited capability or resource at once",
+      "mechanics": "All learned mechanics; competing priorities and bottlenecks",
+      "purpose": "Competing priorities, at medium-high pressure. Several sectors require support at the same time; a strategically important sector (POW, WTR or TRN) becomes a bottleneck, and earlier AGR decisions and delayed effects begin to influence choices.",
+      "breather_after_s": 0,
+      "beats": []
+    },
+    {
+      "id": "R6",
+      "name": "Round 6",
+      "length_s": 600,
+      "injects": "Hand-fired: one problem that makes another harder — reduced capacity, delayed movements, falling Integrity",
+      "mechanics": "All learned mechanics; cascading consequences, TIME-CRITICAL faults",
+      "purpose": "Cascading pressure, at high pressure. Earlier trade-offs land, accumulated upkeep and delayed consequences bite, and the number of interdependent problems rises — adaptability when the previous plan no longer works.",
+      "breather_after_s": 0,
+      "beats": []
+    },
+    {
+      "id": "R7",
+      "name": "Round 7",
+      "length_s": 600,
+      "injects": "Hand-fired: a smaller number of strategically connected critical problems — never a flood",
+      "mechanics": "Everything, including Council if the facilitator calls it",
+      "purpose": "The final round: city-wide prioritisation, very high but controlled pressure. Participants should feel that not every problem can be solved and must decide what matters most; coordination is rewarded over attempting everything.",
       "breather_after_s": 0,
       "beats": []
     }
@@ -107,10 +137,31 @@
       "mode": "PLAY"
     },
     {
+      "id": "ROUND_5",
+      "name": "Round 5",
+      "number": 5,
+      "round": "R5",
+      "mode": "PLAY"
+    },
+    {
+      "id": "ROUND_6",
+      "name": "Round 6",
+      "number": 6,
+      "round": "R6",
+      "mode": "PLAY"
+    },
+    {
+      "id": "ROUND_7",
+      "name": "Round 7",
+      "number": 7,
+      "round": "R7",
+      "mode": "PLAY"
+    },
+    {
       "id": "ENDED",
       "name": "Ended",
       "number": null,
-      "round": "R4",
+      "round": "R7",
       "mode": "ENDED"
     }
   ]

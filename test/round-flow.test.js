@@ -54,16 +54,16 @@ function live(phase = 'ROUND_2') {
 
 // -- the sequence --------------------------------------------------------------
 
-test('the visible sequence is Round 0 to Round 4, and then the end', () => {
+test('the visible sequence is Round 0 to Round 7, and then the end', () => {
   const game = newGame();
   const seen = [game.state.phase];
   while (game.nextPhase()) seen.push(game.state.phase);
-  assert.deepEqual(seen, ['ROUND_0', 'ROUND_1', 'ROUND_2', 'ROUND_3', 'ROUND_4', 'ENDED']);
+  assert.deepEqual(seen, ['ROUND_0', 'ROUND_1', 'ROUND_2', 'ROUND_3', 'ROUND_4', 'ROUND_5', 'ROUND_6', 'ROUND_7', 'ENDED']);
   // One phase per round: what the engine tracks and what a screen shows cannot
   // drift apart, because they are the same thing.
   const phases = rounds.phases.filter((p) => p.mode !== 'ENDED');
-  assert.deepEqual(phases.map((p) => p.number), [0, 1, 2, 3, 4]);
-  assert.deepEqual(phases.map((p) => p.round), ['R0', 'R1', 'R2', 'R3', 'R4']);
+  assert.deepEqual(phases.map((p) => p.number), [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(phases.map((p) => p.round), ['R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7']);
   for (const p of rounds.phases) {
     assert.ok(!FORBIDDEN.some((w) => String(p.name).includes(w)), `${p.id} is named "${p.name}"`);
   }
@@ -94,7 +94,7 @@ test('ROUND-002: Admin in Round 3 sees "Round 3", and keeps its round and timer 
   assert.equal(f.round_name, undefined, 'the console was sent a round name');
   assert.equal(f.phase_name, undefined, 'the console was sent a phase name');
   assert.equal(f.phase, 'ROUND_3', 'the console still needs the id to navigate and to log');
-  assert.deepEqual(f.phases.map((p) => p.number), [0, 1, 2, 3, 4, null]);
+  assert.deepEqual(f.phases.map((p) => p.number), [0, 1, 2, 3, 4, 5, 6, 7, null]);
   assert.ok(f.phases.every((p) => p.name === undefined), 'the navigator carries names it could print');
 
   // The controls the spec asks for are all present.

@@ -537,7 +537,7 @@ Replies: `fire_result`, `event_result`, `order_result`, `timeline_result`,
 | Route | Purpose |
 |---|---|
 | `GET /api/content?session&token` | faults, specs, sectors, rounds, scenarios, public URLs |
-| `GET /api/debrief?session&token` | `lib/analytics` output: per-round stats, `comparison` (R3 vs R4), timeline |
+| `GET /api/debrief?session&token` | `lib/analytics` output: per-round stats, `comparison` (R3 vs R7 — the last learning round against the final round), timeline |
 | `GET /api/scenarios?…` · `GET /api/scenarios/:id` | list / raw document |
 | `POST /api/scenarios` `{ name, id?, from_live: true }` | SAVE AS SCENARIO from the running configuration |
 | `DELETE /api/scenarios/:id` | remove a saved copy (built-ins cannot be deleted) |
@@ -777,7 +777,7 @@ remaining_ms }` (also on session pause and resume), on top of the `clock`
 event.
 
 **ROUND ACTIVATION** (2026-09-28; faults made manual 2026-10-04). Every
-round button on the console — R0 to R4, NEXT ROUND, PREV ROUND — sends
+round button on the console — R0 to R7, NEXT ROUND, PREV ROUND — sends
 `activate_round { round, restart? }`, and the server does two things as one
 action: the round changes and its timer loads at full length in `ready`
 (the outgoing round's upkeep is charged if its clock was started). **It

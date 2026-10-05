@@ -42,19 +42,19 @@ function nextRound(game) {
 
 // -- phases -------------------------------------------------------------------
 
-test('the phases ARE the rounds: ROUND_0 → ROUND_4, and then the end', () => {
+test('the phases ARE the rounds: ROUND_0 → ROUND_7, and then the end', () => {
   const game = newGame();
   assert.equal(game.state.phase, 'ROUND_0');
   assert.equal(game.phaseConfig().mode, 'BRIEFING');
   const seen = [];
   while (game.nextPhase()) seen.push(game.state.phase);
-  assert.deepEqual(seen, ['ROUND_1', 'ROUND_2', 'ROUND_3', 'ROUND_4', 'ENDED']);
+  assert.deepEqual(seen, ['ROUND_1', 'ROUND_2', 'ROUND_3', 'ROUND_4', 'ROUND_5', 'ROUND_6', 'ROUND_7', 'ENDED']);
   assert.ok(!seen.some((id) => /DEBRIEF|REST|BREATHER|REFLECT/.test(id)), 'no scheduled break is a phase');
-  assert.equal(game.state.round, 'R4');
+  assert.equal(game.state.round, 'R7');
   assert.equal(game.state.mode, 'ENDED');
   assert.equal(game.nextPhase(), false, 'ENDED is the end');
   const phases = logEvents(game, 'phase');
-  assert.equal(phases.length, 5);
+  assert.equal(phases.length, 8);
   assert.ok(phases.every((p) => p.t && p.phase && p.round), 'every phase change is timestamped');
 });
 
@@ -1755,7 +1755,7 @@ test("the charter's history keeps its Cycles; the scenario phases keep their nam
   assert.ok(ids.includes('ROUND_0') && ids.includes('ROUND_4'), 'the phases are not the rounds');
   // The round's own name survives in the data file as history for the
   // facilitator's runbook — and reaches no screen. See round-flow.test.js.
-  assert.equal(game.roundConfig('R2').name, 'Interdependence');
+  assert.equal(game.roundConfig('R2').name, 'Round 2');   // a round is its number since 2026-10-05: no title, not even in the table
 });
 
 test('MED sees the round timer and no production line', () => {
@@ -4593,7 +4593,7 @@ test('wall feed shows public kinds only; facilitator-only and sector-scoped line
 
 // -- analytics -----------------------------------------------------------------------------
 
-test('the debrief folds the log into per-round figures and a Round 3 vs Aftershock comparison', () => {
+test('the debrief folds the log into per-round figures and a Round 3 vs Round 7 comparison', () => {
   const game = newGame();
   game.setPhase('ROUND_3');
   game.clock('start');
@@ -4615,7 +4615,7 @@ test('the debrief folds the log into per-round figures and a Round 3 vs Aftersho
   game.tick(2000);
 
   game.setPhase('DEBRIEF_1');
-  game.setPhase('ROUND_4');
+  game.setPhase('ROUND_7');
   game.clock('start');
   game.fireFault('F-401', 'POW');
   game.tick(10000);
@@ -4641,15 +4641,16 @@ test('the debrief folds the log into per-round figures and a Round 3 vs Aftersho
   assert.equal(r3.council.avg_time_used_s, 60, 'council time used is the minute the clock ran');
   assert.equal(r3.sectors.brownouts, 2);
 
-  const r4 = d.rounds.R4;
-  assert.equal(r4.faults.fired, 1);
-  assert.equal(r4.faults.resolution_rate, 100);
-  assert.equal(r4.council.called, 0);
+  const r7 = d.rounds.R7;
+  assert.equal(r7.faults.fired, 1);
+  assert.equal(r7.faults.resolution_rate, 100);
+  assert.equal(r7.council.called, 0);
 
+  assert.deepEqual([d.comparison.from, d.comparison.to], ['R3', 'R7']);
   assert.equal(d.comparison.R3.resolution_rate, 50);
-  assert.equal(d.comparison.R4.resolution_rate, 100);
+  assert.equal(d.comparison.R7.resolution_rate, 100);
   assert.equal(d.comparison.R3.failed_console_entries, 1);
-  assert.equal(d.comparison.R4.failed_console_entries, 0);
+  assert.equal(d.comparison.R7.failed_console_entries, 0);
   assert.ok(d.comparison.rows.length >= 8);
   assert.ok(d.timeline.length > 5 && d.timeline.every((e) => e.t));
   assert.equal(d.overall.faults.fired, 3);
@@ -4665,8 +4666,8 @@ test('analytics durations are computed from the log timestamps', () => {
     { t: T(60), ev: 'submit', round: 'R3', sector: 'POW', fault: 'F-301', accepted: true, attempts: 2, consumed: { parts: 3 } },
     { t: T(70), ev: 'transfer_requested', round: 'R3', id: 'T-1', from: 'WTR', to: 'POW', resource: 'water', amount: 1 },
     { t: T(90), ev: 'transfer_stamped', round: 'R3', id: 'T-1', from: 'WTR', to: 'POW', resource: 'water', amount: 1, delivered: true },
-    { t: T(100), ev: 'fault_fired', round: 'R4', sector: 'MED', fault: 'F-402', severity: 2 },
-    { t: T(110), ev: 'submit', round: 'R4', sector: 'MED', fault: 'F-402', accepted: true, attempts: 1 },
+    { t: T(100), ev: 'fault_fired', round: 'R7', sector: 'MED', fault: 'F-402', severity: 2 },
+    { t: T(110), ev: 'submit', round: 'R7', sector: 'MED', fault: 'F-402', accepted: true, attempts: 1 },
   ].map((l) => JSON.stringify(l)).join('\n');
   const d = analyse(lines);
   const f = d.rounds.R3.faults.list[0];
@@ -4678,8 +4679,8 @@ test('analytics durations are computed from the log timestamps', () => {
   assert.equal(d.rounds.R3.transfers.avg_request_to_stamp_s, 20);
   assert.equal(d.rounds.R3.transfers.avg_request_to_delivery_s, 20);
   assert.equal(d.comparison.R3.avg_resolution_s, 60);
-  assert.equal(d.comparison.R4.avg_resolution_s, 10);
-  assert.equal(d.comparison.R4.avg_first_action_s, 10, 'a submit is a first action too');
+  assert.equal(d.comparison.R7.avg_resolution_s, 10);
+  assert.equal(d.comparison.R7.avg_first_action_s, 10, 'a submit is a first action too');
 });
 
 // -- configuration for spec §5 / §44: thresholds, core start, round lengths,
@@ -4739,7 +4740,7 @@ const timerShown = (game) => [forControl(game), forSector(game, 'POW'), forBigsc
 test('round timer: R0 loads at 20:00 READY; every round change resets to that round\'s length and never starts on its own', () => {
   const game = newGame();
   assert.deepEqual([TIMER(game).status, TIMER(game).remaining_s, TIMER(game).duration_s, TIMER(game).running], ['ready', 1200, 1200, false], 'R0 initial load');
-  assert.deepEqual(['R0', 'R1', 'R2', 'R3', 'R4'].map((r) => game.roundConfig(r).length_s), [1200, 900, 900, 720, 480]);
+  assert.deepEqual(['R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7'].map((r) => game.roundConfig(r).length_s), [1200, 900, 900, 720, 480, 600, 600, 600]);
   game.setPhase('ROUND_1'); game.clock('start'); game.tick(200000);   // 03:20 into Round 1
   assert.equal(TIMER(game).remaining_s, 700);
   for (const [phase, len] of [['ROUND_2', 900], ['ROUND_3', 720], ['ROUND_4', 480]]) {

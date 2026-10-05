@@ -55,10 +55,11 @@ const SECTOR = {
   AGR: { name: "AGRICULTURE",         colour: "5AB86A" },
   COM: { name: "COMMS & SENSORS",     colour: "B07AD8" },
 };
+// A round is its number, on the card as everywhere (2026-10-05): the tab is
+// the library's grouping, never a title the table can read a plan from.
 const ROUND_LABEL = {
-  R0: "ORIENTATION", R1: "SHIFT 1", R2: "SHIFT 2", R3: "SHIFT 3", R4: "AFTERSHOCK",
-  // Unscheduled by design: the facilitator deals these by hand until the
-  // mechanic has been playtested and each one is given a round.
+  R0: "ROUND 0", R1: "ROUND 1", R2: "ROUND 2", R3: "ROUND 3", R4: "ROUND 4", R5: "ROUND 5", R6: "ROUND 6", R7: "ROUND 7",
+  // Unscheduled by design: the facilitator fires these by hand.
   null: "REFERENCE CHAIN",
 };
 // The tab line: a generated deck names its own section; everything else is its round.
@@ -164,7 +165,7 @@ const blankCell = () => new TableCell({
 // Print order: grouped by round so the deck can be tabbed and reset fast.
 // REFERENCE CHAIN is an unnumbered section at the back — the same card, the
 // same tab line, no round number, because these are not dealt by a round.
-const ORDER = ["R0", "R1", "R2", "R3", "R4"];
+const ORDER = ["R0", "R1", "R2", "R3", "R4", "R5", "R6", "R7"];
 const deck = [];
 for (const r of ORDER) {
   deck.push(...faults.filter((f) => f.round === r).sort((a, b) => a.code.localeCompare(b.code)));

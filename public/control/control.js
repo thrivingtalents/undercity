@@ -298,6 +298,8 @@
 
   /** How a round is written, everywhere, for everyone: ROUND 2. Never a name. */
   const roundLabel = (p) => (p && p.number !== null && p.number !== undefined ? `ROUND ${p.number}` : 'END');
+  /** A round id as the debrief prints it: ROUND 7. Never a title. */
+  const cmpLabel = (id) => `ROUND ${String(id || '').replace(/^R/, '')}`;
 
   // the ••• menu
   $('btn-more').addEventListener('click', (e) => { e.stopPropagation(); $('more').classList.toggle('hidden'); });
@@ -1485,7 +1487,8 @@
     ['core_start_output', 'Core output at start (%) — applies on reset', 'n'],
     ['round_length_s.R0', 'Round 0 length (s) — every round has its own timer', 'n'], ['round_length_s.R1', 'Round 1 length (s)', 'n'],
     ['round_length_s.R2', 'Round 2 length (s)', 'n'], ['round_length_s.R3', 'Round 3 length (s)', 'n'],
-    ['round_length_s.R4', 'Round 4 length (s)', 'n'],
+    ['round_length_s.R4', 'Round 4 length (s)', 'n'], ['round_length_s.R5', 'Round 5 length (s)', 'n'],
+    ['round_length_s.R6', 'Round 6 length (s)', 'n'], ['round_length_s.R7', 'Round 7 length (s)', 'n'],
     ['ECONOMY'],
     ['auto_economy', 'Digital economy on (production, upkeep, stock moves)', 'b'],
     ['deduct_resources_on_resolve', 'Deduct resources on resolve', 'b'],
@@ -1649,9 +1652,9 @@
         ${stat(o.sectors.critical_entries, 'CRITICAL ENTRIES')}
         ${stat(o.council.avg_time_used_s != null ? U.mmss(o.council.avg_time_used_s) : '—', 'COUNCIL DECISION')}
       </div>
-      <div class="cmp"><div class="label">ROUND 3 vs AFTERSHOCK <em>— neutral: the delta is the product, not a score</em></div>
-        <table><tr><th></th><th>ROUND 3</th><th>AFTERSHOCK</th></tr>
-        ${cmp.rows.map((r) => `<tr><td>${esc(r.label)}</td><td>${cell(cmp.R3, r)}</td><td>${cell(cmp.R4, r)}</td></tr>`).join('')}
+      <div class="cmp"><div class="label">${esc(cmpLabel(cmp.from))} vs ${esc(cmpLabel(cmp.to))} <em>— neutral: the delta is the product, not a score</em></div>
+        <table><tr><th></th><th>${esc(cmpLabel(cmp.from))}</th><th>${esc(cmpLabel(cmp.to))}</th></tr>
+        ${cmp.rows.map((r) => `<tr><td>${esc(r.label)}</td><td>${cell(cmp[cmp.from], r)}</td><td>${cell(cmp[cmp.to], r)}</td></tr>`).join('')}
         </table></div>
       <div class="rounds-list">${Object.values(d.rounds).map((R) => `<details><summary>${R.round} — ${R.faults.fired} faults · ${R.faults.resolved} resolved · ${R.console.invalid_code} bad entries · ${R.transfers.requested} transfers · council ${R.council.called}${R.overrides ? ` · ${R.overrides} overrides` : ''}</summary>
         ${R.faults.list.map((f) => `<div class="dtl"><span class="t">${f.code} ${f.sector}</span><span>${f.outcome}</span><span>first ${fmtS(f.time_to_first_action_s)}</span><span>solve ${fmtS(f.time_to_resolution_s)}</span><span>${f.attempts} att</span>${f.cross_sector ? '<span>x-sector</span>' : ''}</div>`).join('')}

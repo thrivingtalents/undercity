@@ -115,10 +115,10 @@ C.push(dash("Whether dissent is welcomed or shut down, and by whom."));
 C.push(dash("The change in all of the above between the early shift and the late shift — the same people, a full shift of rising load apart."));
 
 C.push(H2("The design logic in one page"));
-C.push(p(t("The opening stretch is deliberately easy. It is the baseline: you cannot say someone dominates under pressure unless you know how they speak when there is none. Every wave after it raises the load in a defined step, and the late shift — the aftershock and the final crisis — lands on a city the room has already half-broken. The diagnostic is the difference between the early shift and the late one, not the behaviour at any single moment.")));
+C.push(p(t("The opening stretch is deliberately easy. It is the baseline: you cannot say someone dominates under pressure unless you know how they speak when there is none. Every wave after it raises the load in a defined step, and the late shift — Rounds 4 to 7 — lands on a city the room has already half-broken. The diagnostic is the difference between the early shift and the late one, not the behaviour at any single moment.")));
 C.push(p(t("The shift is continuous on purpose. Real operational pressure does not come with scheduled pauses, and a group that is handed one recomposes itself: the second half stops being a measurement of the same people under load and becomes a measurement of people who have just had a rest. Recovery in this design is earned inside the simulation — there are stretches where fewer new things break — but the clock, the faults, the transfers and the consequences never stop.")));
 C.push(p(t("The debrief comes after the shift ends, not inside it. Participants read their own numbers with the whole arc behind them, and the behavioural commitment each of them writes is for a named meeting in their own week, with a named date and a named partner. That is where the change is checked — not in another round of a game.")));
-C.push(callout("Never cut the late shift.", "If the day is running late, shorten Escalation and Temporary Stabilisation — the connective waves — or trim Debrief 1. The aftershock, the final crisis and the delta readout are the deliverable. Everything before them is setup."));
+C.push(callout("Never cut the late shift.", "If the day is running late, shorten the second half of Round 2 and the quiet two minutes of Round 3 — the connective stretches — or trim Debrief 1. Rounds 4 to 7 and the delta readout are the deliverable. Everything before them is setup."));
 
 C.push(H2("Three deliberate design choices you will be asked about"));
 C.push(H3("Nobody is ever eliminated"));
@@ -173,11 +173,11 @@ C.push(p(t("All paper is generated from the crossref matrix. Never hand-edit a p
 C.push(tbl([
   headRow(["ARTIFACT", "QUANTITY", "NOTES"], [3000, 1800, W - 4800]),
   row(["Sector binders", "6", "Two-ring binder each, sector-coloured. Log sheet loose-leaf — the only consumable page."], [3000, 1800, W - 4800]),
-  row(["Fault cards", "36", "9 A4 landscape sheets, 4-up. Cut and tab by wave (R0–R4 on the sheet, ORIENTATION / SHIFT 1–3 / AFTERSHOCK on the card). The tabs are your filing, not a schedule the room is shown."], [3000, 1800, W - 4800]),
+  row(["Fault cards", "60", "15 A4 landscape sheets, 4-up. Cut and tab by section — ROUND 0 to ROUND 4, REFERENCE CHAIN and LATE SHIFT on the card. The tabs are your filing, not a schedule the room is shown."], [3000, 1800, W - 4800]),
   row(["Answer key", "1", "Game Master only. Never leaves the control table."], [3000, 1800, W - 4800]),
   row(["Transfer chits", "~120", "40 sheets, 2-up. Overprint — teams waste them early and hoard them late."], [3000, 1800, W - 4800]),
   row(["City Charter", "1", "Two pages plus Continuity Order. Goes to COM at orientation."], [3000, 1800, W - 4800]),
-  row(["Continuity Order", "2", "One for use, one spare. The Core Failure wave only."], [3000, 1800, W - 4800]),
+  row(["Continuity Order", "2", "One for use, one spare. Round 3 only."], [3000, 1800, W - 4800]),
   row(["Role cards", "1 set per sector", "Four cards per sector, cut."], [3000, 1800, W - 4800]),
   row(["Table tents", "6", "Fold and place before participants enter."], [3000, 1800, W - 4800]),
   row(["Consent forms", "1 per participant", "Plus five spares."], [3000, 1800, W - 4800]),
@@ -220,12 +220,12 @@ C.push(H2("3.3 Pacing a shift that never stops"));
 C.push(p(t("There are no breathers and no round breaks to hide behind. The only instrument you have for easing pressure is what you inject, and how much of it: a wave where nothing new fires is a recovery window, and from the floor it reads as the city settling rather than as a break the facilitator granted. Never announce one, never name it, and never stop a clock to make one.")));
 C.push(p([t("What continues during a quiet stretch: "), t("everything", { bold: true }),
   t(". The round timer, open faults and their decay, repairs, transfers, healing, generator upgrades, COM’s board, Council consequences, and the upkeep the next round will charge. A team can use the stretch to catch up on all of it. That is the recovery — operational, earned, and visible in the log.")]));
-C.push(p([t("The internal phases in the console — Stable Operations, Interdependence, Escalation, Core Failure, Temporary Stabilisation, Aftershock, Final Crisis — are "), t("yours, not theirs", { bold: true }),
+C.push(p([t("The rounds have no names — not in the console, not in the log, not in this guide. A round is its number, and what each one is for is written in Part 4 and in the runbook below as "), t("guidance to you, never as a title", { bold: true }),
   t(". Pressing NEXT ROUND changes what you may fire next and stamps the log for analysis. It changes nothing else: no clock resets, no stock, health, worker, transfer or upgrade moves, and the wall says only the new number for three seconds. If you want the room to feel a change, fire something.")]));
 
 C.push(p([t("The waves named in Part 5 are ", { bold: true }), t("yours and the paper's. "),
-  t("Every screen in the building — yours included — shows one thing: "), t("Round 0 to Round 4", { bold: true }),
-  t(". A title like “Core Failure” on a console is one screenshot away from the room, and a table that can name what is coming stops behaving like a table under pressure. So the runbook below names the waves, the console counts them, and only four of them are a button.")]));
+  t("Every screen in the building — yours included — shows one thing: "), t("Round 0 to Round 7", { bold: true }),
+  t(". A title on a console is one screenshot away from the room, and a table that can name what is coming stops behaving like a table under pressure. So this guide says what each round is for, the console counts them, and every one of them is a button.")]));
 C.push(callout("The only full stop is an emergency.", "PAUSE freezes every clock and every decay for a technical failure, a safety issue or an equipment problem. It is not a pacing tool and it is not a rest. Resume continues from the exact frozen state — nothing is replenished, nothing is cleared."));
 
 C.push(H2("3.4 The two seeded probes"));
@@ -234,10 +234,10 @@ C.push(H3("The discrepancy — Water's reservoir pressure"));
 C.push(p([t("The WTR binder prints the Lower Reservoir at "), mono("340"), t(". The big screen telemetry shows "), mono("290"),
   t(". Both are accepted by the console, so the game never punishes either. The question is purely whether anyone notices, whether they say so, and how the group treats them when they do. The binder also carries a line saying printed values take precedence over instrumentation, which gives a dissenter a basis to stand on. Tag every mention.")]));
 C.push(H3("The buried appendices"));
-C.push(p(t("Every binder holds one Appendix C value that appears in no index. Water and Agriculture need their own during Core Failure; every one of the six is raided by another sector in the late shift. Teams that never open the back of the binder will stall. That stall is a finding about how people behave when the documentation fights back.")));
+C.push(p(t("Every binder holds one Appendix C value that appears in no index. Water and Agriculture need their own during Round 3; every one of the six is raided by another sector in the late shift. Teams that never open the back of the binder will stall. That stall is a finding about how people behave when the documentation fights back.")));
 
 C.push(H3("The late shift"));
-C.push(p(t("Every binder's Fault Code Index ends with two more procedures, P-09 and P-10, and the card deck has a LATE SHIFT section after REFERENCE CHAIN. They add no mechanic. A P-09 fault needs two values from two other binders, exactly as Round 3's did. A P-10 fault is the same with three crew, heavier materials and Integrity falling three points a minute while it stays open: the card says TIME-CRITICAL and nothing counts down, because nothing does — the control panel's preview shows you a target time to call out loud if the room needs the pressure, and that is all it is. They exist so Round 4, and whatever follows it when the round table grows, can mix every kind of fault the room has learned without repeating one. Fire them from the library like everything else; the preview shows you the two sources and the answer, and no table ever sees that.")));
+C.push(p(t("Every binder's Fault Code Index ends with two more procedures, P-09 and P-10, and the card deck has a LATE SHIFT section after REFERENCE CHAIN. They add no mechanic. A P-09 fault needs two values from two other binders, exactly as Round 3's did. A P-10 fault is the same with three crew, heavier materials and Integrity falling three points a minute while it stays open: the card says TIME-CRITICAL and nothing counts down, because nothing does — the control panel's preview shows you a target time to call out loud if the room needs the pressure, and that is all it is. They exist so Rounds 4 to 7 can mix every kind of fault the room has learned without repeating one. Fire them from the library like everything else; the preview shows you the two sources and the answer, and no table ever sees that.")));
 C.push(brk());
 
 C.push(H2("3.5 Agriculture's operational decisions"));
@@ -258,26 +258,28 @@ C.push(p(t("Two blocks the room can feel: a shift, then a reckoning. Everything 
 C.push(tbl([
   headRow(["BLOCK", "TIME", "PURPOSE"], [3400, 1600, W - 5000]),
   row(["Arrival, consent, briefing", "20 min", "Consent signed. Story set. Roles assigned."], [3400, 1600, W - 5000]),
-  row(["Orientation", "20 min", "Learn the console. Zero stakes. The only calm stretch of the day — spend it."], [3400, 1600, W - 5000]),
-  row(["THE SHIFT — four timed rounds", "50 min", "One crisis in seven waves. Each round runs on its own clock — started by you, stopped by 00:00 — and between rounds nothing is reset and nothing on any screen says pause."], [3400, 1600, W - 5000]),
+  row(["Round 0", "20 min", "Learn the console. Zero stakes. The only calm stretch of the day — spend it."], [3400, 1600, W - 5000]),
+  row(["THE SHIFT — seven timed rounds", "80 min", "One crisis, Round 1 to Round 7: three rounds that teach, four that mix everything learned under rising pressure. Each round runs on its own clock — started by you, stopped by 00:00 — and between rounds nothing is reset and nothing on any screen says pause."], [3400, 1600, W - 5000]),
   row(["Lunch", "45 min", "The simulation has ENDED and the final city state stays on the wall. Council audio is transcribed during this."], [3400, 1600, W - 5000]),
   row(["Debrief 1 — the person", "60 min", "Personal metrics. Triggers. Reactive and creative."], [3400, 1600, W - 5000]),
   row(["Debrief 2 — the delta and the transfer", "45 min", "Early shift against late shift. One commitment, one named meeting, one date."], [3400, 1600, W - 5000]),
 ], [3400, 1600, W - 5000]));
 
-C.push(H2("The seven waves inside the shift"));
-C.push(p(t("These are internal phases in the control panel. Participants never see a name or a boundary — they see the round number, its clock running down and faults arriving. Times are minutes into the round.")));
+C.push(H2("The rounds inside the shift"));
+C.push(p(t("Participants see the round number, its clock running down and faults arriving — never a name or a boundary. What each round is for is yours. Times are minutes into the round.")));
 C.push(tbl([
-  headRow(["WAVE", "ROUND · TIME", "WHAT IT IS FOR"], [3400, 1600, W - 5000]),
-  row(["Stable Operations", "R1 00:00–15:00", "Baseline capture. Intra-sector faults only. Comfortable on purpose."], [3400, 1600, W - 5000]),
-  row(["Interdependence", "R2 00:00–11:00", "Sectors collide. Cross-sector specs, transfers, Council sitting one."], [3400, 1600, W - 5000]),
-  row(["Escalation", "R2 11:00–15:00", "Simultaneous faults and competing priorities. Off-script injects live here."], [3400, 1600, W - 5000]),
-  row(["Core Failure", "R3 00:00–10:00", "Peak pressure. Core decline, Continuity Order, brownouts."], [3400, 1600, W - 5000]),
-  row(["Temporary Stabilisation", "R3 10:00–12:00", "Fewer NEW majors so tables can catch up operationally. NOT a break. Say nothing."], [3400, 1600, W - 5000]),
-  row(["Aftershock", "R4 00:00–05:00", "A late wave onto the city they are already carrying. POST-MEASUREMENT begins."], [3400, 1600, W - 5000]),
-  row(["Final Crisis", "R4 05:00–08:00", "The last sustained push into the end state."], [3400, 1600, W - 5000]),
+  headRow(["ROUND", "TIME", "WHAT IT IS FOR"], [3400, 1600, W - 5000]),
+  row(["Round 1", "00:00–15:00", "Baseline capture. Intra-sector faults only. Comfortable on purpose."], [3400, 1600, W - 5000]),
+  row(["Round 2", "00:00–11:00", "Sectors collide. Cross-sector specs, transfers, Council sitting one, AGR's first trade-offs."], [3400, 1600, W - 5000]),
+  row(["Round 2", "11:00–15:00", "Simultaneous faults and competing priorities. Off-script injects live here."], [3400, 1600, W - 5000]),
+  row(["Round 3", "00:00–10:00", "Peak pressure of the learning phase. Core decline, Continuity Order, brownouts, the reference chains."], [3400, 1600, W - 5000]),
+  row(["Round 3", "10:00–12:00", "Fewer NEW majors so tables can catch up operationally. NOT a break. Say nothing."], [3400, 1600, W - 5000]),
+  row(["Round 4", "00:00–08:00", "The mixed phase opens: a fresh crisis onto the city they are already carrying, every learned mechanic in play, medium pressure. POST-MEASUREMENT begins."], [3400, 1600, W - 5000]),
+  row(["Round 5", "00:00–10:00", "Competing priorities, medium-high pressure. Several sectors need the same limited capability or resource at once, and one of them is a bottleneck."], [3400, 1600, W - 5000]),
+  row(["Round 6", "00:00–10:00", "Cascading pressure, high. Earlier trade-offs land, delayed consequences bite, and one problem makes another harder to solve."], [3400, 1600, W - 5000]),
+  row(["Round 7", "00:00–10:00", "The final round, very high but controlled. City-wide prioritisation: fewer, connected, critical problems, and the discovery that not everything can be solved."], [3400, 1600, W - 5000]),
 ], [3400, 1600, W - 5000]));
-C.push(callout("If you are running late.", "Cut from Escalation and Temporary Stabilisation first — they are connective, not diagnostic — then trim fifteen minutes from Debrief 1. Never the aftershock, never the final crisis, never the delta readout. Use the − button beside ROUND TIME: one click, one minute off this round, and nothing else in the city moves."));
+C.push(callout("If you are running late.", "Cut from the second half of Round 2 and the quiet two minutes of Round 3 first — they are connective, not diagnostic — then trim fifteen minutes from Debrief 1. Never Rounds 4 to 7, never the delta readout. Use the − button beside ROUND TIME: one click, one minute off this round, and nothing else in the city moves."));
 C.push(brk());
 
 // ---------------------------------------------------------------- 5. runbook
@@ -301,12 +303,12 @@ C.push(tbl([
 ], BW));
 
 C.push(H2("5.1 The Shift — starting it (00:00)"));
-C.push(callout("Every round has its own clock.", "Press NEXT ROUND to Round 1, then START. NEXT ROUND deals every fault of the round onto the tables at once and loads the round's clock at its full length, waiting; START runs the clock. The pair is pressed four times — Rounds 1, 2, 3 and 4 — and the day ends with END SIMULATION. A clock that reaches 00:00 stops on its own and moves nothing, and the city keeps bleeding until the next START, so do not dawdle between rounds. Pressing the round you are already in offers a restart: the clock reloads and that round's faults go back to active. STOP CLOCK and PAUSE are not part of the script."));
+C.push(callout("Every round has its own clock.", "Press NEXT ROUND to Round 1, then START. NEXT ROUND loads the round's clock at its full length, waiting, and deals nothing — every fault is yours to fire from the library; START runs the clock, and from Round 4 on it also plays that round's city broadcast. The pair is pressed seven times — Rounds 1 to 7 — and the day ends with END SIMULATION. A clock that reaches 00:00 stops on its own and moves nothing, and the city keeps bleeding until the next START, so do not dawdle between rounds. Pressing the round you are already in offers a restart: the clock reloads and that round's faults go back to active. STOP CLOCK and PAUSE are not part of the script."));
 C.push(p([t("What the room sees from now on: the round number and its clock counting down, their own health and stock, and their faults. What they never see: a phase name, a debrief screen, or a screen telling them to rest. "),
   t("The round is the period", { bold: true }),
   t(": when you activate the next round the city pays the outgoing round’s upkeep — POW and WTR generate their output by button during the round, and it lands then — and Transport’s approvals, Medical’s heals and Agriculture’s intervention cards come back for the new round. Round 0 is orientation and is never charged.")]));
 
-C.push(H3("Wave 1 · Stable Operations · Round 1 (00:00 – 15:00)"));
+C.push(H3("Round 1 (00:00 – 15:00)"));
 C.push(callout("This stretch should feel easy.", "It is the baseline measurement. If you make it hard, you have no calm-state reading and the whole delta collapses. Resist the urge to add pressure. Boring is correct.", "E8F5E8", "2E7D32"));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
@@ -317,7 +319,7 @@ C.push(tbl([
   beat("14:00", "Let the tables clear what they hold.", "Which tables are relaxed and which are already tense at low load."),
 ], BW));
 
-C.push(H3("Wave 2 · Interdependence · Round 2 (00:00 – 11:00)"));
+C.push(H3("Round 2 (00:00 – 11:00)"));
 C.push(p(t("The first cross-sector wave. Every fault now requires a value that lives in another sector’s binder. Liaisons must move; the room gets loud. Press NEXT ROUND and say nothing — the faults are the announcement.")));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
@@ -331,16 +333,16 @@ C.push(tbl([
 ], BW));
 C.push(callout("Council sittings are your richest data.", "Whole-group, compressed, high stakes, one microphone. If you tag nothing else in the shift, tag the Council. Remember the pressure it creates is that the stations are running short-handed while it sits — it is not a rest for anyone."));
 
-C.push(H3("Wave 3 · Escalation · Round 2 (11:00 – 15:00)"));
+C.push(H3("Round 2 (11:00 – 15:00)"));
 C.push(p(t("No new script: this wave is where you spend the off-script inject library on the tables that are coping, and let the ones that are behind stay behind. Competing priorities are the point.")));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
   beat("11:30", "No button — this wave is inside Round 2. Nothing new is scripted; whatever of the twelve you fired is still on the tables.", "The room is now carrying unresolved work from the last wave into this one. Nobody gets a clean sheet."),
   beat("13:00", "INJURE WORKER on the busiest sector. Fire one off-script fault at any table that is clear.", "Who asks for help first, and whether anyone offers before being asked."),
-  beat("14:00", "Fire one more off-script fault into the loudest sector. Say nothing to the quiet ones.", "Sectors below 50 health. Note them; Core Failure will land on them hardest."),
+  beat("14:00", "Fire one more off-script fault into the loudest sector. Say nothing to the quiet ones.", "Sectors below 50 health. Note them; Round 3 will land on them hardest."),
 ], BW));
 
-C.push(H3("Wave 4 · Core Failure · Round 3 (00:00 – 10:00)"));
+C.push(H3("Round 3 (00:00 – 10:00)"));
 C.push(p(t("The climax. Two-spec faults, fast decay, and a decision with no right answer — landing on a city that has had no break since the shift began.")));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
@@ -354,7 +356,7 @@ C.push(tbl([
   beat("08:30", "Redeploy brownout sectors as aid crews to other tables. Nobody sits out.", "How brownout participants are treated by the sectors they join."),
 ], BW));
 
-C.push(H3("Wave 5 · Temporary Stabilisation · Round 3 (10:00 – 12:00)"));
+C.push(H3("Round 3 (10:00 – 12:00)"));
 C.push(callout("This is not a break, and it must never be called one.", "Fire nothing new for two minutes — no button, this wave is inside Round 3. The clock runs, faults decay, repairs and transfers continue, upkeep waits for the next round. Tables use the stretch to catch up. If you announce anything at all, announce it in-world: \"Core output is holding.\"", "E8F5E8", "2E7D32"));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
@@ -362,7 +364,7 @@ C.push(tbl([
   beat("11:30", "Walk the floor. Tag. Do not fix anything and do not explain anything.", "Who starts talking about the day while it is still running — that is a table that has decided it is over."),
 ], BW));
 
-C.push(H3("Wave 6 · Aftershock · Round 4 (00:00 – 05:00)"));
+C.push(H3("Round 4 (00:00 – 05:00)"));
 C.push(p(t("Same teams, same roles, a fresh crisis onto the city they have left. Every fault needs a value buried in another sector’s Appendix C, so nothing can be solved from memory. Nothing is restored, refilled or healed for this wave — they carry what they built and what they broke. This is where the post-measurement begins.")));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
@@ -372,12 +374,44 @@ C.push(tbl([
   beat("03:30", "Optional short Council if the group is coping well. Skip if they are not.", "Compare directly against the first sitting. Same people, same format, measurable difference."),
 ], BW));
 
-C.push(H3("Wave 7 · Final Crisis · Round 4 (05:00 – 08:00)"));
+C.push(H3("Round 4 (05:00 – 08:00)"));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("05:00", "No button — still Round 4. Fire into whichever two sectors are weakest.", "Triage under exhaustion. Who is still asking questions and who has stopped."),
+  beat("05:00", "No button — still Round 4. Fire into whichever two sectors are weakest.", "Triage under fatigue. Who is still asking questions and who has stopped."),
   beat("06:00", "Last two minutes. Announce the time remaining once, plainly.", "What a table chooses to spend its last minutes on."),
-  beat("08:00", "END SIMULATION. Every clock stops and the final city state stays exactly as they left it.", "Silence, then talk. Do not explain anything yet."),
+  beat("08:00", "NEXT ROUND → Round 5, then START. The city broadcast SYSTEM LOAD INCREASING plays on START — say nothing yourself. Nothing is reset; whatever is open stays open.", "Whether anyone reads the broadcast aloud, and whether a table that is behind notices the clock is new."),
+], BW));
+
+C.push(H3("Round 5 (00:00 – 10:00)"));
+C.push(p(t("Competing priorities. The pressure here is not more faults but the same capability wanted by several tables at once: three sectors needing something only Power Grid can give while Power Grid carries its own fault, or two tables waiting on one Transport approval. Fire fewer things and connect them. Mix the families — a workbook fault, a reference chain, a P-09 — rather than repeating a type.")));
+C.push(tbl([
+  headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
+  beat("00:00", "Fire two or three faults whose values or materials all come from one sector — POW, WTR or TRN — and one fault into that sector itself.", "Who goes to the bottleneck first, and whether the bottleneck sector serves in the order asked, in the order shouted, or in the order it prefers."),
+  beat("02:00", "Walk the floor. Say nothing.", "A table that waits silently for a value it has not asked for. A liaison who asks for two things in one trip."),
+  beat("05:00", "One TIME-CRITICAL P-10 into a sector already carrying a fault. Let the pending AGR trade-off and the upkeep line do their work.", "Whether the table drops the old fault for the loud new one, and who decides that."),
+  beat("08:00", "Last two minutes. Announce the time once.", "Whether anyone starts a transfer they cannot finish."),
+  beat("10:00", "NEXT ROUND → Round 6, then START. CASCADE CONDITIONS DETECTED plays on START.", "Upkeep lands now: watch the NEXT ROUND UPKEEP lines on the consoles turn into real shortages."),
+], BW));
+
+C.push(H3("Round 6 (00:00 – 10:00)"));
+C.push(p(t("Cascading pressure. The rule for this round is that one problem should make another problem harder to solve: Transport's capacity is down from a freight slot it accepted, so the movement Medical needs is late while Medical's Integrity is already falling; Agriculture is paying an extra unit at upkeep from a card it played two rounds ago. You are not adding faults so much as letting the earlier decisions arrive. Add only what connects.")));
+C.push(tbl([
+  headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
+  beat("00:00", "Fire one fault into the sector whose Integrity is lowest and one into the sector it depends on. A TIME-CRITICAL P-10 where a movement is already waiting.", "Whether the room recognises the chain — the fault, the missing resource, the sector that holds it — or treats each as separate."),
+  beat("03:00", "Walk the floor. If a table is drowning rather than struggling, fire nothing more at it.", "A plan from Round 5 that no longer works, and how long before someone says so out loud."),
+  beat("06:00", "A second P-10 if the room is coping; nothing if it is not. The pressure is high, not maximal.", "Who protects their own sector and who gives up a value or a unit to another."),
+  beat("10:00", "NEXT ROUND → Round 7, then START. FINAL OPERATING WINDOW plays on START.", "Silence or noise at the transition: both are data."),
+], BW));
+
+C.push(H3("Round 7 (00:00 – 10:00)"));
+C.push(p(t("The final round. Do not flood every sector with faults. Use a small number of strategically connected critical problems and let the city decide what matters: the point of the round is that not everything can be solved, and that choosing is the work. Call Council if the group needs a sitting to decide; otherwise let them find the conversation themselves.")));
+C.push(tbl([
+  headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
+  beat("00:00", "Fire three connected problems across the city, no more: a TIME-CRITICAL P-10 on a sector near CRITICAL, a reference chain through a sector that is busy, a late-shift fault whose values sit in two sectors that are not talking.", "Whether anyone says the word priority. Whether a table abandons a fault deliberately, and announces it, or just stops."),
+  beat("03:00", "Optional Council if the group is choosing well; skip it if they are already choosing. Compare directly against the first sitting.", "Same people, same format, a measurably different conversation — or not."),
+  beat("05:00", "Nothing new unless a table has gone quiet. The last five minutes belong to them.", "Coordination over completion: who stops repairing to help a neighbour hold Integrity."),
+  beat("08:00", "Last two minutes. Announce the time remaining once, plainly.", "What a city chooses to spend its last minutes on."),
+  beat("10:00", "END SIMULATION. Every clock stops and the final city state stays exactly as they left it.", "Silence, then talk. Do not explain anything yet."),
 ], BW));
 C.push(callout("End it deliberately.", "END SIMULATION on the control panel stops the round timer and every decay, and leaves the city as it stands. It clears nothing and scores nothing away, and no screen in the room turns into a debrief. The wall is your lunch exhibit — leave it up."));
 
@@ -404,7 +438,7 @@ C.push(tbl([
   beat("00:00", "Put the aggregate deltas on the big screen. Interruptions, talk-time balance, questions asked — early shift against late shift.", "This is the product shot. Let it sit on screen while people absorb it."),
   beat("08:00", "Individual deltas handed out. \"What did you do differently by the end, and was it a choice?\"", "Honest reporting of the moments it slipped. Reward it visibly, or the room learns to perform success."),
   beat("18:00", "Each participant writes ONE behavioural commitment. Observable, not aspirational.", "\"Be more collaborative\" is not usable. \"Ask one question before offering my answer\" is. Push until every commitment is countable."),
-  beat("26:00", "Map to work. \"Which meeting next week is your Core Failure?\" Name the actual meeting, the actual people.", "Vagueness. Push for a named meeting and a date."),
+  beat("26:00", "Map to work. \"Which meeting next week is your Round 3?\" Name the actual meeting, the actual people.", "Vagueness. Push for a named meeting and a date."),
   beat("34:00", "Pairs commit to one specific behaviour in one specific meeting, and to a check-in date.", "Peer accountability outlasts facilitator accountability. This is where the change is checked — the simulation is finished."),
   beat("40:00", "Close. Explain what arrives afterwards: full personal report to each individual, aggregate report to the organisation, nothing else.", "Restate the confidentiality position. It is the last thing they should hear."),
 ], BW));
