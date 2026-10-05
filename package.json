@@ -17,7 +17,7 @@
     "kit:extras": "node tools/kit/build_kit.js kit && node tools/kit/build_guidebook.js kit",
     "kit:manifest": "node tools/kit/manifest.js kit tools/undercity-crossref-matrix.xlsx content",
     "demo": "node scripts/demo.js",
-    "start:lan": "node -e \"process.env.MODE='lan';require('./server.js')\"",
+    "start:lan": "node -e \"process.env.MODE='lan';process.argv[1]=require('path').resolve('server.js');require('module').runMain()\"",
     "kit:bw": "node tools/kit/build_binders.js build/binder_content.json \"B&W Kit\" --mono && node tools/kit/build_cards.js content/faults.json \"B&W Kit\" --mono && node tools/kit/build_kit.js \"B&W Kit\" --mono && node tools/kit/build_guidebook.js \"B&W Kit\" --mono"
   },
   "engines": {
