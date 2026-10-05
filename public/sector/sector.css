@@ -806,3 +806,16 @@ body.is-dark #restart-panel { position: relative; z-index: 52; }
 .bsp-focus-now { margin-top: 8px; font-size: 11px; letter-spacing: 0.1em; color: var(--ink-dim); }
 .bsp-focus-now b { color: var(--accent); }
 .bsp-focus-now i { font-style: normal; color: var(--ink-faint); }
+
+/* FALSE TELEMETRY (2026-10-06): COM's private TELEMETRY ANOMALY card, in the CITY INTELLIGENCE file. */
+.intel-anomaly { border: 1px solid var(--amber); border-left-width: 3px; border-radius: var(--r-sm); padding: 6px 8px; margin-bottom: 6px; display: flex; flex-direction: column; gap: 3px; background: rgba(255, 196, 92, 0.06); }
+.intel-anomaly.done { border-color: var(--green); background: rgba(80, 200, 120, 0.06); }
+.intel-anomaly .ia-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; letter-spacing: 0.12em; }
+.intel-anomaly .ia-status { font-size: 9px; letter-spacing: 0.16em; color: var(--ink-faint); }
+.intel-anomaly.done .ia-status { color: var(--green); }
+.intel-anomaly .ia-row { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; letter-spacing: 0.06em; }
+.intel-anomaly .ia-row span { color: var(--ink-faint); }
+.intel-anomaly .ia-verdict { color: var(--amber); }
+.intel-anomaly .ia-note { font-size: 10.5px; color: var(--ink-dim); margin-top: 2px; }
+.intel-anomaly .ia-prepare { align-self: flex-start; margin-top: 4px; font-size: 10px; padding: 4px 10px; }
+.bc-correction { font-size: 10px; letter-spacing: 0.08em; color: var(--amber); border-left: 2px solid var(--amber); padding: 3px 6px; margin-bottom: 4px; }

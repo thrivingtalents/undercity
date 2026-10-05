@@ -117,6 +117,18 @@
       if (msg.type === 'fire_result' && msg.ok === false) toast(`Not fired: ${msg.reason}`);
       if (msg.type === 'event_result' && msg.ok === false) toast(`Event: ${msg.reason}`);
       // CITY EVENTS (2026-10-06): the server's answer to ACTIVATE. The cards follow the next frame.
+      // FALSE TELEMETRY (2026-10-06): the server's answer to FIRE / CANCEL / FORCE CLEAR.
+      if (msg.type === 'false_alert_result') {
+        if (msg.ok) {
+          const what = msg.action === 'fire' ? `FALSE ALERT ${msg.alert.fault_code} FIRED AT ${msg.alert.target_sector} — only COM is told`
+            : msg.action === 'cancel' ? `FALSE ALERT ${msg.fault_code} CANCELLED — withdrawn quietly` : `FALSE ALERT ${msg.fault_code} CLEARED — ${msg.target_sector} told it was withdrawn`;
+          toast(what, 'ok');
+        } else if (msg.reason === 'com_telemetry_unavailable' && msg.action === 'fire') {
+          if (confirm(`${msg.warn || 'COM telemetry is currently unavailable.'}\n\nFire the false alert anyway?`)) send({ ...ftPayload(), override: true });
+        } else {
+          toast(`False telemetry: ${String(msg.reason || '').toUpperCase().replace(/_/g, ' ')}`);
+        }
+      }
       if (msg.type === 'city_event_result') {
         if (msg.ok) toast(`CITY EVENT ACTIVATED — ${msg.name}${Array.isArray(msg.affected) && msg.affected.length ? ' · ' + msg.affected.join(' ') : ''}`, 'ok');
         else { toast(`City event refused: ${String(msg.reason || '').toUpperCase().replace(/_/g, ' ')}`); for (const h of ['ce-good', 'ce-bad']) $(h).dataset.sig = ''; if (state) renderCityEvents(); }
@@ -1049,6 +1061,107 @@
     }
   }
 
+  // -- EVENTS: false telemetry (FALSE_TELEMETRY_V1, 2026-10-06) ------------------------------
+  /*
+    A fault that is not one. The admin aims a template at a sector; the target
+    sees an alert with no procedure, COM alone is told it is false, and COM
+    withdraws it with a correction on the City Broadcast. The templates and the
+    alerts come off the control frame (state.false_telemetry); nothing here is
+    typed twice. Health, stock, workers and real faults are never touched.
+  */
+  let ftBuilt = false;
+  function ftPayload() {
+    return {
+      type: 'false_alert_fire', sector: $('ft-sector').value, template: $('ft-template').value,
+      severity: Number($('ft-sev').value), decay: Number($('ft-decay').value),
+    };
+  }
+  function ftTemplates() {
+    const ft = (state && state.false_telemetry) || { templates: [] };
+    const sector = $('ft-sector').value;
+    // the sector's own templates first, then the rest (a template may be aimed anywhere)
+    return [...ft.templates.filter((x) => x.sector === sector), ...ft.templates.filter((x) => x.sector !== sector)];
+  }
+  function ftFillTemplates() {
+    const sel = $('ft-template');
+    const keep = sel.value;
+    const list = ftTemplates();
+    sel.innerHTML = list.map((x) => `<option value="${esc(x.code)}">${esc(x.code)} · ${esc(x.name)}${x.sector !== $('ft-sector').value ? ` (${esc(x.sector)})` : ''}</option>`).join('');
+    if (list.some((x) => x.code === keep)) sel.value = keep;
+    const tpl = list.find((x) => x.code === sel.value);
+    if (tpl && !$('ft-sev').dataset.touched) $('ft-sev').value = String(tpl.default_severity);
+    if (tpl && !$('ft-decay').dataset.touched) $('ft-decay').value = String(tpl.default_display_decay_rate);
+  }
+  function ftFire() {
+    const ft = state.false_telemetry || {};
+    if (!$('ft-template').value) return;
+    if (ft.com_blind && !confirm(`${ft.warn_com_blind || 'COM telemetry is currently unavailable.'}\n\nFire the false alert anyway?`)) return;
+    send({ ...ftPayload(), override: !!ft.com_blind });
+  }
+  function ftView(id) {
+    const a = ((state.false_telemetry || {}).alerts || []).find((x) => x.id === id);
+    if (!a) return;
+    const when = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour12: false }) : '—');
+    openPicker(`FALSE TELEMETRY — ${a.fault_code} → ${a.target_sector}`, `
+      <div class="confirm-card">
+        <div class="cc-title">${esc(a.fault_code)} · ${esc(a.name)}</div>
+        <div class="cc-line">${esc(a.description)}</div>
+        <div class="cc-line">displayed ${U.severityPips(a.display_severity)} · decay shown −${a.display_decay_rate}/min · real decay 0 · status ${esc(a.status)}${a.resolution ? ` (${esc(a.resolution)})` : ''}</div>
+        <div class="cc-chain">
+          <div>FIRED ${esc(when(a.created_at))} · ROUND ${esc(String(a.created_round).replace(/^R/, ''))} · by ${esc(a.created_by)}${a.com_telemetry_blind_at_fire ? ' · COM BLIND AT FIRE' : ''}</div>
+          <div>TARGET OPENED ${esc(when(a.target_opened_at))} · REPAIR ATTEMPTS ${a.repair_attempts}${a.first_repair_attempt_at ? ` (first ${esc(when(a.first_repair_attempt_at))})` : ''} · REQUESTS RAISED WHILE LIVE ${a.related_requests}</div>
+          <div>COM NOTIFIED ${esc(when(a.com_notified_at))} · CORRECTION PREPARED ${esc(when(a.prepared_at))} · PUBLISHED ${esc(when(a.com_published_at))}${a.resolved_at ? ` · ENDED ${esc(when(a.resolved_at))} after ${U.mmss(a.elapsed_s)}` : ''}</div>
+          ${a.correction ? `<div>CORRECTION: "${esc(a.correction.headline)}" — ${esc(a.correction.message)}</div>` : ''}
+          <em>Facilitator only — the target sees a fault with no procedure; COM sees FALSE POSITIVE CONFIRMED.</em>
+        </div>
+      </div>`);
+  }
+  function renderFalseTelemetry() {
+    const ft = state.false_telemetry;
+    if (!ft) return;
+    if (!ftBuilt) {
+      ftBuilt = true;
+      $('ft-sector').innerHTML = sectorCodes().map((c) => `<option value="${c}">${c}</option>`).join('');
+      $('ft-sector').addEventListener('change', () => { delete $('ft-sev').dataset.touched; delete $('ft-decay').dataset.touched; ftFillTemplates(); renderFalseTelemetry(); });
+      $('ft-template').addEventListener('change', () => { delete $('ft-sev').dataset.touched; delete $('ft-decay').dataset.touched; ftFillTemplates(); });
+      $('ft-sev').addEventListener('change', () => { $('ft-sev').dataset.touched = '1'; });
+      $('ft-decay').addEventListener('change', () => { $('ft-decay').dataset.touched = '1'; });
+      $('ft-fire').addEventListener('click', ftFire);
+      ftFillTemplates();
+    }
+    const live = (ft.alerts || []).filter((a) => a.live);
+    $('fv-ft-n').textContent = String(live.length);
+    const warn = [];
+    if ($('ft-sector').value === 'COM') warn.push('Targeting COM is allowed, but the learning value is lower because COM is also the sector that receives private verification.');
+    if (ft.com_blind) warn.push(`${ft.warn_com_blind} (COM is ${ft.com_status}.)`);
+    if (live.length >= 1) warn.push(`${live.length} false alert${live.length === 1 ? '' : 's'} live — one at a time is the recommendation.`);
+    $('ft-warn').textContent = warn.join(' ');
+    const when = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour12: false }) : '—');
+    const flag = (on, word) => `<span class="ft-flag${on ? ' on' : ''}">${on ? '✓' : '·'} ${word}</span>`;
+    const rows = [...live, ...(ft.alerts || []).filter((a) => !a.live).slice(0, 8)];
+    const html = rows.length ? rows.map((a) => `<div class="ft-row${a.live ? ' live' : ''}" data-id="${esc(a.id)}">
+        <span><b>${esc(a.fault_code)}</b> → <b>${esc(a.target_sector)}</b></span>
+        <span>${esc(when(a.created_at))} · R${esc(String(a.created_round).replace(/^R/, ''))}</span>
+        <span class="ft-status ${esc(a.status)}">${esc(a.status.replace(/_/g, ' '))}</span>
+        <span class="ft-flags">${flag(a.target_opened, 'OPENED')}${flag(a.target_attempted, 'TRIED A CODE')}${flag(a.com_notified, 'COM TOLD')}${flag(!!a.prepared_at, 'PREPARED')}${flag(a.com_published, 'PUBLISHED')}</span>
+        <span class="ft-elapsed" data-ft-elapsed="${a.live ? esc(a.created_at) : ''}">${U.mmss(a.elapsed_s)}</span>
+        <span class="fa-acts"><button data-ft-view="${esc(a.id)}">VIEW</button>${a.live ? `<button data-ft-cancel="${esc(a.id)}">CANCEL ALERT</button><button data-ft-clear="${esc(a.id)}" class="danger">FORCE CLEAR</button>` : ''}</span>
+      </div>`).join('') : '<div class="hint">None. Fire one above — Round 4 onward is the recommendation, and one at a time.</div>';
+    if ($('ft-list').dataset.sig !== html) {
+      $('ft-list').dataset.sig = html;
+      $('ft-list').innerHTML = html;
+      for (const b of $('ft-list').querySelectorAll('[data-ft-view]')) b.addEventListener('click', () => ftView(b.dataset.ftView));
+      for (const b of $('ft-list').querySelectorAll('[data-ft-cancel]')) b.addEventListener('click', () => send({ type: 'false_alert_cancel', id: b.dataset.ftCancel }));
+      for (const b of $('ft-list').querySelectorAll('[data-ft-clear]')) b.addEventListener('click', () => send({ type: 'false_alert_force_clear', id: b.dataset.ftClear }));
+    }
+  }
+  setInterval(() => {
+    for (const el of document.querySelectorAll('[data-ft-elapsed]')) {
+      if (!el.dataset.ftElapsed) continue;
+      el.textContent = U.mmss(Math.max(0, Math.round((Date.now() - Date.parse(el.dataset.ftElapsed)) / 1000)));
+    }
+  }, 1000);
+
   // -- EVENTS: timeline ----------------------------------------------------------------
 
   function describe(item) {
@@ -1741,6 +1854,7 @@
     renderTimeline();
     renderEvents();
     renderCityEvents();
+    renderFalseTelemetry();
     renderBlackout();
     renderCouncil();
     renderTransfersView();

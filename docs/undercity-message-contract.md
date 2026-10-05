@@ -430,6 +430,7 @@ ACTIVE CITY EFFECTS line), and the run's activations (§8.12).
 
 ```json
 { "type": "fault_open", "fault_code": "F-201" }
+{ "type": "false_alert_prepare", "id": "F-0042" }   // COM only (2026-10-06): PREPARE CORRECTION on a TELEMETRY ANOMALY card → false_alert_prepare_result { ok, id, fault_code, target_sector, headline, message } (§8.13)
 { "type": "transfer_request", "from": "POW", "to": "MED", "resource": "power", "amount": 2 }  // ASK — any sector
 { "type": "transfer_create",  "to": "MED", "resource": "power", "amount": 2 }   // REMOVED for participants (v20) — refused `direct_transfer_removed`
 { "type": "request_fulfill",  "id": "R-0007" }   // SUPPLIER only — raises a transfer; NOT approval
@@ -443,7 +444,7 @@ ACTIVE CITY EFFECTS line), and the run's activations (§8.12).
 { "type": "heal_decline", "id": "H-0009" }       // MED only
 { "type": "heal_cancel",  "id": "H-0009" }       // the asking sector
 { "type": "com_board_set", "row": "POW", "values": { "power": 5, "water": 1, "med": 0, "parts": 2 } }  // COM ONLY — row, not sector
-{ "type": "com_announce", "headline": "MED NEEDS POWER", "message": "…" }   // COM only; 40 / 160 chars
+{ "type": "com_announce", "headline": "MED NEEDS POWER", "message": "…" }   // COM only; 40 / 160 chars; with "correction_for": "<false alert id>" it is PUBLISH CORRECTION (§8.13)
 { "type": "com_announce_clear" }                                             // COM only
 { "type": "agr_select",   "card": "AGR_STABILISE_SECTOR" }                   // AGR only — inspect, spends nothing
 { "type": "agr_activate", "card": "AGR_STABILISE_SECTOR", "target": { "sector": "POW" } }   // AGR ONLY
@@ -500,6 +501,8 @@ requires stock.
 { "type": "alert", "title": "COUNCIL SUMMONED", "subtitle": "CHIEFS + LIAISONS REPORT IMMEDIATELY" }
 { "type": "dismiss_alert" }
 { "type": "activate_city_event", "event_id": "MONSTER_ATTACK" }   // CITY EVENTS (2026-10-06): one press, no confirmation → city_event_result (§8.12)
+{ "type": "false_alert_fire", "sector": "AGR", "template": "F-705", "severity": 2, "decay": 2.0, "override": false }   // FALSE TELEMETRY (2026-10-06) → false_alert_result (§8.13)
+{ "type": "false_alert_cancel", "id": "F-0042" }   { "type": "false_alert_force_clear", "id": "F-0042" }
 { "type": "call_council" }   { "type": "end_council" }   // the discussion timer: one minute, then CLOSE
 { "type": "clock", "which": "council", "action": "pause" }   // pause | start | add (±seconds) | set | reset | end
 { "type": "rolling_blackout", "confirm": true }   { "type": "end_blackout" }
@@ -905,3 +908,43 @@ The room is told through the existing City Alert (`alert` on every frame:
 console overlay then banner; wall strip and feed). Nothing event-specific
 reaches a sector or the wall beyond that alert and the effect chip. Everything
 survives save/restore inside `state`; RESET clears it with the run.
+
+### 8.13 False telemetry (FALSE_TELEMETRY_V1, 2026-10-06)
+
+A phantom alert the facilitator fires at a sector. It looks like a fault to
+the room and is not one: it lives in `state.false_alerts` (lib/false-telemetry.js,
+templates in lib/false-telemetry.json, codes F-701 to F-706), never in a
+sector's `faults`, so nothing decays, nothing is consumed, nothing can be
+repaired and nothing is paid. The target's frame carries it inside
+`sectors[own].faults` in exactly a real fault's shape (displayed severity and
+decay, a REPAIR REWARD line, no extra field); COM's live feed and the wall's
+count include it; the room hears the usual feed line and sting. A code typed
+at it gets the existing `no_procedure` reply with `attempts: 0` — no attempt
+counted, no lockout, no crew or materials read.
+
+Only COM is told. While COM's telemetry is up, COM's frame carries
+`intel.anomalies[]` — `{ id, title: "TELEMETRY ANOMALY", affected_sector,
+fault_code, fault_name, verification_result: "FALSE POSITIVE CONFIRMED",
+detected_at, instruction, publication_status: UNPUBLISHED | CORRECTION PREPARED |
+CITY NOTIFIED, prepared }` — and nothing while COM is BROWNOUT-blind or DARK (the
+card appears the moment telemetry returns). `false_alert_prepare { id }` marks
+the alert and returns the default headline and message; COM edits them in the
+existing broadcast editor and publishes with `com_announce { headline, message,
+correction_for: id }`. Only that metadata withdraws the alert (`broadcast_result`
+then carries `correction { ok }`); a normal broadcast never does. On
+withdrawal the target's console shows the sector notice "ALERT WITHDRAWN — COM
+has verified F-705 as false telemetry. No repair action is required.", every
+console gets the existing CITY ANNOUNCEMENT UPDATED nudge, and nothing real
+moves.
+
+Control: `false_alert_fire { sector, template, severity, decay, override }` →
+`false_alert_result` (`com_telemetry_unavailable` with a `warn` line while COM
+is blind, unless `override`), `false_alert_cancel { id }` (quiet),
+`false_alert_force_clear { id }` (with the withdrawal notice). The control frame
+carries `false_telemetry { templates[], com_blind, com_status, alerts[] }`, each
+alert with its status (ACTIVE → COM_NOTIFIED → CORRECTION_PREPARED → CORRECTED |
+ADMIN_CANCELLED), timestamps, `elapsed_s`, `target_opened`, `target_attempted`,
+`com_notified`, `com_published` and `related_requests`. Alerts carry across
+rounds until corrected or cancelled, survive save/restore inside `state`, and
+RESET removes them with the run. The analytics timeline carries them as kind
+`telemetry`, never as faults.

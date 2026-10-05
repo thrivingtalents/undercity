@@ -884,6 +884,13 @@ function handleSector(client, entry, msg) {
     case 'fault_open':
       game.openFault(mine, msg.fault_code);
       return broadcast(entry);
+    // FALSE TELEMETRY (2026-10-06): COM prepares a correction from its private card; the broadcast
+    // editor is handed the words to edit. COM only — the card exists on no other console.
+    case 'false_alert_prepare': {
+      if (mine !== 'COM') return send(client.ws, { type: 'error', reason: 'com_only' });
+      send(client.ws, { type: 'false_alert_prepare_result', ...game.falseAlertPrepare(msg.id, { by: 'COM' }) });
+      return broadcast(entry);
+    }
 
     /**
      * A REQUEST: we ask another sector for stock. Every sector may raise one.
@@ -1269,6 +1276,16 @@ function handleControl(client, entry, msg) {
     // effect at once, logs it and raises the City Alert; the broadcast carries the result to the room.
     case 'activate_city_event':
       reply({ type: 'city_event_result', ...game.activateCityEvent(msg.event_id, { by: 'facilitator' }) });
+      return ok();
+    // FALSE TELEMETRY (2026-10-06): a phantom alert fired at a sector; only COM is told it is false.
+    case 'false_alert_fire':
+      reply({ type: 'false_alert_result', action: 'fire', ...game.fireFalseAlert({ sector: msg.sector, template: msg.template, severity: msg.severity, decay: msg.decay, notes: msg.notes }, { by: 'facilitator', override: !!msg.override }) });
+      return ok();
+    case 'false_alert_cancel':
+      reply({ type: 'false_alert_result', action: 'cancel', ...game.falseAlertCancel(msg.id, { by: 'facilitator' }) });
+      return ok();
+    case 'false_alert_force_clear':
+      reply({ type: 'false_alert_result', action: 'force_clear', ...game.falseAlertCorrected(msg.id, { by: 'facilitator', force: true }) });
       return ok();
     case 'cancel_scheduled': game.cancelScheduled(msg.id); return ok();
     case 'timeline_fire':  reply({ type: 'timeline_result', ...game.fireTimelineItem(msg.id) }); return ok();

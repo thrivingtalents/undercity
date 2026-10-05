@@ -180,6 +180,7 @@
             <button data-fv="active" class="on">ACTIVE <b id="fv-active-n">0</b></button>
             <button data-fv="scheduled">SCHEDULED <b id="fv-sched-n">0</b></button>
             <button data-fv="library">LIBRARY</button>
+            <button data-fv="telemetry">FALSE TELEMETRY <b id="fv-ft-n">0</b></button>
           </span>
         </h2>
         <div class="hint" id="fault-budget"></div>
@@ -206,6 +207,26 @@
             <input type="text" id="f-text" placeholder="search code or title…" autocomplete="off">
           </div>
           <div class="injects" id="injects"></div>
+        </div>
+        <!-- FALSE TELEMETRY (2026-10-06): a fault that is not one. The target sees an alert with no
+             procedure and nothing else; only COM is told it is false, and COM withdraws it with a
+             correction on the City Broadcast. Nothing here touches Health, stock, workers or real faults. -->
+        <div class="fv" id="fv-telemetry">
+          <div class="block">
+            <span class="label">Fire a false alert <em>— the target sees a fault with no procedure; only COM is told it is false and must publish the correction</em></span>
+            <div class="filters ft-form">
+              <select id="ft-sector" title="target sector"></select>
+              <select id="ft-template" title="false alert"></select>
+              <select id="ft-sev" title="displayed severity"><option value="1">▲</option><option value="2" selected>▲▲</option><option value="3">▲▲▲</option></select>
+              <input type="number" id="ft-decay" min="0" step="0.5" value="2.0" class="short" title="displayed decay rate — the real rate is always 0">
+              <button id="ft-fire" class="primary">FIRE FALSE ALERT</button>
+            </div>
+            <div class="hint" id="ft-warn"></div>
+          </div>
+          <div class="block">
+            <span class="label">False alerts <em>— live first; the target's moves and COM's, as they happen</em></span>
+            <div class="ft-list" id="ft-list"><div class="hint">None.</div></div>
+          </div>
         </div>
       </div>
 

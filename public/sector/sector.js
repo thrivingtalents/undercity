@@ -79,6 +79,8 @@
   const healSeen = new Set();     // healing-queue ids (MED) already rung for
   let requestBannerUntil = 0;     // when the arrival banner retires
   let alertSeen = null;       // { id, age, at } — age from the frame + local elapsed
+  // FALSE TELEMETRY (2026-10-06, COM only): the anomaly card the broadcast editor is correcting, if any.
+  let correctionFor = null;   // { id, code, sector }
   let resultBanner = null;    // { until }
   let pendingTransferAction = null; // 'transfer' | 'stamp' — routes transfer_result to a panel
   let lastDisabled = null;
@@ -97,6 +99,7 @@
         el.hidden = false;
       }
       if (msg.type === 'submit_result') handleResult(msg);
+      if (msg.type === 'false_alert_prepare_result') handlePrepareResult(msg);
       if (msg.type === 'opportunity_result') handleOpportunityResult(msg);
       if (['transfer_result', 'heal_result', 'broadcast_result', 'agr_result', 'output_result'].includes(msg.type)) handleTransferResult(msg);
       if (msg.type === 'sting') U.playSting(msg.sound);
@@ -481,6 +484,14 @@
       const word = msg.action === 'row' ? `ROW SAVED — LAST UPDATED: ROUND ${state ? state.broadcast.round_number : ''}`
         : msg.action === 'announce' ? 'ANNOUNCEMENT PUBLISHED' : 'ANNOUNCEMENT CLEARED';
       if (msg.action === 'announce') { $('bc-head').value = ''; $('bc-msg').value = ''; }
+      // FALSE TELEMETRY: a correction published — the alert is withdrawn from its sector; say so, then back to a plain editor.
+      if (msg.action === 'announce' && correctionFor) {
+        const corrected = !msg.correction || msg.correction.ok;
+        correctionFor = null;
+        renderCorrectionMode();
+        transientMsg(target, corrected ? 'TELEMETRY CORRECTION PUBLISHED' : 'ANNOUNCEMENT PUBLISHED — the alert was already withdrawn', corrected ? 'ok' : 'warn', 6000);
+        return;
+      }
       transientMsg(target, word, 'ok', 5000);
       return;
     }
@@ -1354,12 +1365,44 @@
 
   function publishAnnouncement() {
     pendingTransferAction = 'broadcast';
-    socket.send({ type: 'com_announce', headline: $('bc-head').value, message: $('bc-msg').value });
+    // FALSE TELEMETRY (2026-10-06): PUBLISH CORRECTION is this same message with the alert's id as
+    // hidden metadata. The words are COM's; the id is what withdraws the alert.
+    const payload = { type: 'com_announce', headline: $('bc-head').value, message: $('bc-msg').value };
+    if (correctionFor) payload.correction_for = correctionFor.id;
+    socket.send(payload);
   }
 
   function clearAnnouncement() {
     pendingTransferAction = 'broadcast';
+    correctionFor = null;
+    renderCorrectionMode();
     socket.send({ type: 'com_announce_clear' });
+  }
+
+  /** COM pressed PREPARE CORRECTION on a private card: the server marks it and hands over the words to edit. */
+  function handlePrepareResult(msg) {
+    if (!msg.ok) {
+      transientMsg('broadcast-msg', msg.reason === 'com_telemetry_unavailable' ? 'CORRECTION UNAVAILABLE — TELEMETRY OFFLINE' : 'CORRECTION UNAVAILABLE', 'bad', 5000);
+      return;
+    }
+    correctionFor = { id: msg.id, code: msg.fault_code, sector: msg.target_sector };
+    $('bc-head').value = msg.headline || '';
+    $('bc-msg').value = msg.message || '';
+    goto('bigscreen');
+    renderCorrectionMode();
+    $('bc-msg').focus();
+  }
+
+  /** The editor says what it is doing: a plain broadcast, or a correction that will withdraw an alert. */
+  function renderCorrectionMode() {
+    const on = !!correctionFor;
+    const btn = $('bc-publish');
+    if (btn) btn.textContent = on ? 'PUBLISH CORRECTION' : 'PUBLISH';
+    const line = $('bc-correction');
+    if (line) {
+      setText(line, on ? `CORRECTION FOR ${correctionFor.code} — publishing withdraws the alert from ${correctionFor.sector}'s console` : '');
+      show(line, on);
+    }
   }
 
   function freshWord(f) { return f || 'NOT UPDATED'; }
@@ -1918,7 +1961,7 @@
           case 'invalid_workers':        text = 'WORKER ASSIGNMENT INVALID'; break;
           case 'insufficient_resources': text = 'MATERIALS NOT READY — CHECK YOUR BINDER'; break;
           // Driven by an empty valid_codes array, never by the fault code (§3).
-          case 'no_procedure':  text = 'NO MATCHING PROCEDURE — VERIFY THIS ALERT'; break;
+          case 'no_procedure':  text = 'NO MATCHING PROCEDURE — VERIFY THIS ALERT · Stop entering codes. Log it, tell COM, then work the faults you can repair.'; break;
           case 'sector_dark':   text = 'SECTOR IS DARK'; break;
           case 'locked':        text = 'CONSOLE LOCKED'; break;
           case 'unknown_fault': text = 'FAULT NO LONGER ACTIVE'; break;
@@ -2181,12 +2224,33 @@
     // Big Screen page.
     if (!intel) return;
     show($('intel-degraded'), !!intel.degraded);
-    const html = (intel.items || []).map((i) => {
+    // FALSE TELEMETRY (2026-10-06): COM's private TELEMETRY ANOMALY cards, above the file. PREPARE
+    // CORRECTION opens the existing broadcast editor with the words ready; nothing here publishes.
+    const when = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour12: false }) : '—');
+    const cards = (intel.anomalies || []).map((a) => {
+      const done = a.publication_status === 'CITY NOTIFIED';
+      return `<div class="intel-anomaly${done ? ' done' : ''}" data-id="${esc(a.id)}">
+        <div class="ia-head"><b>${esc(a.title)}</b><span class="ia-status">${esc(a.publication_status)}</span></div>
+        <div class="ia-row"><span>AFFECTED SECTOR</span><b>${esc(a.affected_sector)}</b></div>
+        <div class="ia-row"><span>FAULT</span><b>${esc(a.fault_code)} · ${esc(a.fault_name)}</b></div>
+        <div class="ia-row"><span>VERIFICATION</span><b class="ia-verdict">${esc(a.verification_result)}</b></div>
+        <div class="ia-row"><span>TIME DETECTED</span><b>${esc(when(a.detected_at))}</b></div>
+        <div class="ia-note">${esc(done ? 'TELEMETRY CORRECTION PUBLISHED' : a.instruction)}</div>
+        ${done ? '' : `<button type="button" class="primary ia-prepare" data-prepare="${esc(a.id)}">${a.prepared ? 'EDIT CORRECTION' : 'PREPARE CORRECTION'}</button>`}
+      </div>`;
+    }).join('');
+    const rows = (intel.items || []).map((i) => {
       const unknown = String(i.value).toUpperCase() === 'UNKNOWN';
       return `<div class="intel-row${unknown ? ' unknown' : ''}"><span class="i-label">${esc(i.label || i.key)}</span><b class="i-val">${esc(i.value)}</b></div>`;
-    }).join('') || '<div class="empty">No intelligence on file.</div>';
+    }).join('');
+    const html = (cards + rows) || '<div class="empty">No intelligence on file.</div>';
     const host = $('intel');
-    if (host.innerHTML !== html) host.innerHTML = html;
+    if (host.innerHTML !== html) {
+      host.innerHTML = html;
+      for (const b of host.querySelectorAll('[data-prepare]')) {
+        b.addEventListener('click', () => { pendingTransferAction = 'broadcast'; socket.send({ type: 'false_alert_prepare', id: b.dataset.prepare }); });
+      }
+    }
   }
 
   function renderResolved() {

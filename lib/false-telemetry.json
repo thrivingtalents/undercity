@@ -1,0 +1,63 @@
+{
+  "version": "FALSE_TELEMETRY_V1",
+  "source": "False Telemetry / Phantom Fault System specification (2026-10-06)",
+  "note": "THE ONE SOURCE of the facilitator's false telemetry templates. A phantom alert LOOKS like a fault to the room — a code, a name, a symptom, a severity, a displayed decay rate — and is not one: it lives in state.false_alerts, never in a sector's faults, so nothing decays, nothing is consumed, nothing can be repaired and nothing is paid. Its code must be one no real fault carries (F-7xx; the engine refuses a collision). Only COM is told, privately, that it is false; COM withdraws it with a PUBLISH CORRECTION on the existing City Broadcast. `display_reward` is the REPAIR REWARD line the card prints so the card reads like every other; it is never paid.",
+  "code_range": "F-701 to F-706",
+  "participant_words_never_used": ["fake", "false", "false positive", "telemetry ghost", "simulation probe", "admin generated", "actual decay", "verification"],
+  "templates": [
+    {
+      "code": "F-701",
+      "sector": "POW",
+      "name": "Turbine bearing thermal spike",
+      "description": "Turbine C bearing sensors report a sudden thermal rise.",
+      "default_severity": 2,
+      "default_display_decay_rate": 2.0,
+      "display_reward": { "type": "RESOURCE", "resource": "parts", "amount": 1 }
+    },
+    {
+      "code": "F-702",
+      "sector": "WTR",
+      "name": "Reclaim contamination spike",
+      "description": "Reclaim outlet sensors report a sudden contamination increase.",
+      "default_severity": 2,
+      "default_display_decay_rate": 2.0,
+      "display_reward": { "type": "RESOURCE", "resource": "parts", "amount": 1 }
+    },
+    {
+      "code": "F-703",
+      "sector": "MED",
+      "name": "ICU oxygen purity anomaly",
+      "description": "ICU oxygen-line telemetry reports abnormal purity readings.",
+      "default_severity": 2,
+      "default_display_decay_rate": 2.0,
+      "display_reward": { "type": "RESOURCE", "resource": "med", "amount": 1 }
+    },
+    {
+      "code": "F-704",
+      "sector": "TRN",
+      "name": "Tunnel structural movement alert",
+      "description": "Seismic sensors report movement near Tunnel C supports.",
+      "default_severity": 2,
+      "default_display_decay_rate": 2.0,
+      "display_reward": { "type": "RESOURCE", "resource": "parts", "amount": 1 }
+    },
+    {
+      "code": "F-705",
+      "sector": "AGR",
+      "name": "Nutrient contamination alert",
+      "description": "Bay 3 nutrient sensors report possible contamination.",
+      "default_severity": 2,
+      "default_display_decay_rate": 2.0,
+      "display_reward": { "type": "RESOURCE", "resource": "parts", "amount": 1 }
+    },
+    {
+      "code": "F-706",
+      "sector": "COM",
+      "name": "Relay timing anomaly",
+      "description": "Relay timing telemetry reports unstable synchronisation across the Core Ring.",
+      "default_severity": 2,
+      "default_display_decay_rate": 2.0,
+      "display_reward": { "type": "RESOURCE", "resource": "power", "amount": 1 }
+    }
+  ]
+}
