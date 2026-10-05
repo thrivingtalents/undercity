@@ -489,7 +489,7 @@
         const corrected = !msg.correction || msg.correction.ok;
         correctionFor = null;
         renderCorrectionMode();
-        transientMsg(target, corrected ? 'TELEMETRY CORRECTION PUBLISHED' : 'ANNOUNCEMENT PUBLISHED — the alert was already withdrawn', corrected ? 'ok' : 'warn', 6000);
+        transientMsg(target, corrected ? 'TELEMETRY CORRECTION PUBLISHED — the alert stays until the round ends' : 'ANNOUNCEMENT PUBLISHED — that alert is no longer live', corrected ? 'ok' : 'warn', 6000);
         return;
       }
       transientMsg(target, word, 'ok', 5000);
@@ -1400,7 +1400,7 @@
     if (btn) btn.textContent = on ? 'PUBLISH CORRECTION' : 'PUBLISH';
     const line = $('bc-correction');
     if (line) {
-      setText(line, on ? `CORRECTION FOR ${correctionFor.code} — publishing withdraws the alert from ${correctionFor.sector}'s console` : '');
+      setText(line, on ? `CORRECTION FOR ${correctionFor.code} — publishing tells the city; the alert stays on ${correctionFor.sector}'s console until the round ends` : '');
       show(line, on);
     }
   }
@@ -2235,7 +2235,7 @@
         <div class="ia-row"><span>FAULT</span><b>${esc(a.fault_code)} · ${esc(a.fault_name)}</b></div>
         <div class="ia-row"><span>VERIFICATION</span><b class="ia-verdict">${esc(a.verification_result)}</b></div>
         <div class="ia-row"><span>TIME DETECTED</span><b>${esc(when(a.detected_at))}</b></div>
-        <div class="ia-note">${esc(done ? 'TELEMETRY CORRECTION PUBLISHED' : a.instruction)}</div>
+        <div class="ia-note">${esc(done ? 'TELEMETRY CORRECTION PUBLISHED — the alert clears when the round ends' : a.instruction)}</div>
         ${done ? '' : `<button type="button" class="primary ia-prepare" data-prepare="${esc(a.id)}">${a.prepared ? 'EDIT CORRECTION' : 'PREPARE CORRECTION'}</button>`}
       </div>`;
     }).join('');

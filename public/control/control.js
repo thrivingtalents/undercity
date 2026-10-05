@@ -121,7 +121,7 @@
       if (msg.type === 'false_alert_result') {
         if (msg.ok) {
           const what = msg.action === 'fire' ? `FALSE ALERT ${msg.alert.fault_code} FIRED AT ${msg.alert.target_sector} — only COM is told`
-            : msg.action === 'cancel' ? `FALSE ALERT ${msg.fault_code} CANCELLED — withdrawn quietly` : `FALSE ALERT ${msg.fault_code} CLEARED — ${msg.target_sector} told it was withdrawn`;
+            : msg.action === 'cancel' ? `FALSE ALERT ${msg.fault_code} CANCELLED — withdrawn quietly` : `FALSE ALERT ${msg.fault_code} FORCE-CLEARED — ${msg.target_sector} told it was withdrawn`;
           toast(what, 'ok');
         } else if (msg.reason === 'com_telemetry_unavailable' && msg.action === 'fire') {
           if (confirm(`${msg.warn || 'COM telemetry is currently unavailable.'}\n\nFire the false alert anyway?`)) send({ ...ftPayload(), override: true });
@@ -1106,7 +1106,7 @@
       <div class="confirm-card">
         <div class="cc-title">${esc(a.fault_code)} · ${esc(a.name)}</div>
         <div class="cc-line">${esc(a.description)}</div>
-        <div class="cc-line">displayed ${U.severityPips(a.display_severity)} · decay shown −${a.display_decay_rate}/min · real decay 0 · status ${esc(a.status)}${a.resolution ? ` (${esc(a.resolution)})` : ''}</div>
+        <div class="cc-line">displayed ${U.severityPips(a.display_severity)} · decay shown −${a.display_decay_rate}/min · real decay 0 · ${esc(a.status_word || a.status)}${a.live ? ' · expires at round end' : ''}${a.round_ended ? ` · round ${esc(String(a.round_ended).replace(/^R/, ''))} ended` : ''}${a.com_published_before_expiry ? ` · COM communicated before expiry: ${esc(a.com_published_before_expiry)}` : ''}</div>
         <div class="cc-chain">
           <div>FIRED ${esc(when(a.created_at))} · ROUND ${esc(String(a.created_round).replace(/^R/, ''))} · by ${esc(a.created_by)}${a.com_telemetry_blind_at_fire ? ' · COM BLIND AT FIRE' : ''}</div>
           <div>TARGET OPENED ${esc(when(a.target_opened_at))} · REPAIR ATTEMPTS ${a.repair_attempts}${a.first_repair_attempt_at ? ` (first ${esc(when(a.first_repair_attempt_at))})` : ''} · REQUESTS RAISED WHILE LIVE ${a.related_requests}</div>
@@ -1138,15 +1138,18 @@
     $('ft-warn').textContent = warn.join(' ');
     const when = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour12: false }) : '—');
     const flag = (on, word) => `<span class="ft-flag${on ? ' on' : ''}">${on ? '✓' : '·'} ${word}</span>`;
+    // what is left of the round: the alert goes when it ends, by the existing round change
+    const clk = state.round_clock || {};
+    const left = Number.isFinite(Number(clk.remaining_s)) ? U.mmss(Math.max(0, Number(clk.remaining_s))) : null;
     const rows = [...live, ...(ft.alerts || []).filter((a) => !a.live).slice(0, 8)];
     const html = rows.length ? rows.map((a) => `<div class="ft-row${a.live ? ' live' : ''}" data-id="${esc(a.id)}">
         <span><b>${esc(a.fault_code)}</b> → <b>${esc(a.target_sector)}</b></span>
         <span>${esc(when(a.created_at))} · R${esc(String(a.created_round).replace(/^R/, ''))}</span>
-        <span class="ft-status ${esc(a.status)}">${esc(a.status.replace(/_/g, ' '))}</span>
+        <span class="ft-status ${esc(a.status)}">${esc(a.status_word || a.status)}${a.live ? `<em>EXPIRES AT ROUND END${left ? ` · ${left} LEFT` : ''}</em>` : ''}</span>
         <span class="ft-flags">${flag(a.target_opened, 'OPENED')}${flag(a.target_attempted, 'TRIED A CODE')}${flag(a.com_notified, 'COM TOLD')}${flag(!!a.prepared_at, 'PREPARED')}${flag(a.com_published, 'PUBLISHED')}</span>
         <span class="ft-elapsed" data-ft-elapsed="${a.live ? esc(a.created_at) : ''}">${U.mmss(a.elapsed_s)}</span>
-        <span class="fa-acts"><button data-ft-view="${esc(a.id)}">VIEW</button>${a.live ? `<button data-ft-cancel="${esc(a.id)}">CANCEL ALERT</button><button data-ft-clear="${esc(a.id)}" class="danger">FORCE CLEAR</button>` : ''}</span>
-      </div>`).join('') : '<div class="hint">None. Fire one above — Round 4 onward is the recommendation, and one at a time.</div>';
+        <span class="fa-acts"><button data-ft-view="${esc(a.id)}">VIEW</button>${a.live ? `<button data-ft-cancel="${esc(a.id)}" title="recovery only: withdraws the alert quietly">CANCEL ALERT</button><button data-ft-clear="${esc(a.id)}" class="danger" title="recovery only: the alert leaves on its own when the round ends">FORCE CLEAR</button>` : ''}</span>
+      </div>`).join('') : '<div class="hint">None. Fire one above — Round 4 onward is the recommendation, and one at a time. An alert lives until its round ends; COM\'s correction informs the city and does not remove it.</div>';
     if ($('ft-list').dataset.sig !== html) {
       $('ft-list').dataset.sig = html;
       $('ft-list').innerHTML = html;

@@ -1285,7 +1285,7 @@ function handleControl(client, entry, msg) {
       reply({ type: 'false_alert_result', action: 'cancel', ...game.falseAlertCancel(msg.id, { by: 'facilitator' }) });
       return ok();
     case 'false_alert_force_clear':
-      reply({ type: 'false_alert_result', action: 'force_clear', ...game.falseAlertCorrected(msg.id, { by: 'facilitator', force: true }) });
+      reply({ type: 'false_alert_result', action: 'force_clear', ...game.falseAlertForceClear(msg.id, { by: 'facilitator' }) });
       return ok();
     case 'cancel_scheduled': game.cancelScheduled(msg.id); return ok();
     case 'timeline_fire':  reply({ type: 'timeline_result', ...game.fireTimelineItem(msg.id) }); return ok();

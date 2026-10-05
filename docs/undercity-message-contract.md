@@ -909,42 +909,59 @@ console overlay then banner; wall strip and feed). Nothing event-specific
 reaches a sector or the wall beyond that alert and the effect chip. Everything
 survives save/restore inside `state`; RESET clears it with the run.
 
-### 8.13 False telemetry (FALSE_TELEMETRY_V1, 2026-10-06)
+### 8.13 False telemetry (FALSE_TELEMETRY_V1, 2026-10-06; one-round lifetime)
 
 A phantom alert the facilitator fires at a sector. It looks like a fault to
 the room and is not one: it lives in `state.false_alerts` (lib/false-telemetry.js,
 templates in lib/false-telemetry.json, codes F-701 to F-706), never in a
 sector's `faults`, so nothing decays, nothing is consumed, nothing can be
-repaired and nothing is paid. The target's frame carries it inside
-`sectors[own].faults` in exactly a real fault's shape (displayed severity and
-decay, a REPAIR REWARD line, no extra field); COM's live feed and the wall's
-count include it; the room hears the usual feed line and sting. A code typed
-at it gets the existing `no_procedure` reply with `attempts: 0` — no attempt
-counted, no lockout, no crew or materials read.
+repaired, nothing is paid and nothing is ever "resolved". The target's frame
+carries it inside `sectors[own].faults` in exactly a real fault's shape
+(displayed severity and decay, a REPAIR REWARD line, no extra field); COM's
+live feed and the wall's count include it; the room hears the usual feed line
+and sting. A code typed at it gets the existing `no_procedure` reply with
+`attempts: 0` — no attempt counted, no lockout, no crew or materials read.
 
 Only COM is told. While COM's telemetry is up, COM's frame carries
 `intel.anomalies[]` — `{ id, title: "TELEMETRY ANOMALY", affected_sector,
 fault_code, fault_name, verification_result: "FALSE POSITIVE CONFIRMED",
 detected_at, instruction, publication_status: UNPUBLISHED | CORRECTION PREPARED |
-CITY NOTIFIED, prepared }` — and nothing while COM is BROWNOUT-blind or DARK (the
-card appears the moment telemetry returns). `false_alert_prepare { id }` marks
-the alert and returns the default headline and message; COM edits them in the
-existing broadcast editor and publishes with `com_announce { headline, message,
-correction_for: id }`. Only that metadata withdraws the alert (`broadcast_result`
-then carries `correction { ok }`); a normal broadcast never does. On
-withdrawal the target's console shows the sector notice "ALERT WITHDRAWN — COM
-has verified F-705 as false telemetry. No repair action is required.", every
-console gets the existing CITY ANNOUNCEMENT UPDATED nudge, and nothing real
-moves.
+CITY NOTIFIED, prepared, expires: "ROUND_END" }` — and nothing while COM is
+BROWNOUT-blind or DARK (the card appears the moment telemetry returns).
+`false_alert_prepare { id }` notes the moment and returns the default headline
+and message; COM edits them in the existing broadcast editor and publishes with
+`com_announce { headline, message, correction_for: id }`. Publishing is
+communication only: the wall carries the words (`broadcast.announcement` keeps
+`correction_for` as metadata), every console gets the existing CITY ANNOUNCEMENT
+UPDATED nudge, the target's console shows the sector notice "COM has issued a
+telemetry correction. No repair action is required. Alert remains logged until
+the end of the round.", the alert becomes ACTIVE_CITY_NOTIFIED — and it stays in
+the target's ACTIVE FAULTS. Nothing withdraws it before the round ends; a normal
+broadcast changes nothing about it.
+
+A phantom lives for one round. At the existing round transition (the
+`cycleRefresh` beat where every "this round" effect ends) every live alert fired
+in the round that just ended becomes EXPIRED_AT_ROUND_END, leaves the target's
+list and COM's file, and the broadcast that answered it — identified by
+`correction_for`, never by its words — is cleared from the wall; an unrelated
+broadcast stays, and real faults are untouched. A restart of the same round is
+not an end. No clock of the alert's own exists.
 
 Control: `false_alert_fire { sector, template, severity, decay, override }` →
 `false_alert_result` (`com_telemetry_unavailable` with a `warn` line while COM
-is blind, unless `override`), `false_alert_cancel { id }` (quiet),
-`false_alert_force_clear { id }` (with the withdrawal notice). The control frame
-carries `false_telemetry { templates[], com_blind, com_status, alerts[] }`, each
-alert with its status (ACTIVE → COM_NOTIFIED → CORRECTION_PREPARED → CORRECTED |
-ADMIN_CANCELLED), timestamps, `elapsed_s`, `target_opened`, `target_attempted`,
-`com_notified`, `com_published` and `related_requests`. Alerts carry across
-rounds until corrected or cancelled, survive save/restore inside `state`, and
-RESET removes them with the run. The analytics timeline carries them as kind
-`telemetry`, never as faults.
+is blind, unless `override`); recovery only: `false_alert_cancel { id }` (quiet)
+and `false_alert_force_clear { id }` (with a withdrawal notice), both also
+clearing the alert's broadcast if it is on the wall. The control frame carries
+`false_telemetry { templates[], com_blind, com_status, alerts[] }`, each alert
+with `status` (ACTIVE_UNVERIFIED → ACTIVE_COM_VERIFIED → ACTIVE_CITY_NOTIFIED →
+EXPIRED_AT_ROUND_END | ADMIN_CANCELLED | ADMIN_FORCE_CLEARED), `status_word`
+("ACTIVE - WAITING FOR COM", "ACTIVE - COM VERIFIED", "ACTIVE - CITY NOTIFIED",
+"EXPIRED", …), `expires: "ROUND_END"` while live, timestamps, `elapsed_s`,
+`target_opened`, `target_attempted`, `com_notified`, `com_published`,
+`com_published_before_expiry` (YES | NO once ended) and `related_requests`.
+Alerts survive save/restore inside `state`; RESET removes them with the run. Log:
+`false_alert_fired/opened/repair_attempt/com_notified/correction_prepared/
+correction_published/expired/broadcast_cleared/force_cleared/cancelled`; the
+analytics timeline carries them as kind `telemetry`, never as faults, with
+`time_until_com_broadcast_s`, `round_end_time` and the metric
+`com_communicated_before_expiry`.
