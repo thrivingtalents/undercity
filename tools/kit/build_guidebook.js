@@ -306,7 +306,7 @@ C.push(tbl([
 ], BW));
 
 C.push(H2("5.1 The Shift — starting it (00:00)"));
-C.push(callout("Every round has its own clock.", "Press NEXT ROUND to Round 1, then START. NEXT ROUND loads the round's clock at its full length, waiting, and deals nothing — every fault is yours to fire from the library; START runs the clock, and from Round 4 on it also plays that round's city broadcast. The pair is pressed seven times — Rounds 1 to 7 — and the day ends with END SIMULATION. A clock that reaches 00:00 stops on its own and moves nothing, and the city keeps bleeding until the next START, so do not dawdle between rounds. Pressing the round you are already in offers a restart: the clock reloads and that round's faults go back to active. STOP CLOCK and PAUSE are not part of the script."));
+C.push(callout("Every round has its own clock.", "Press NEXT ROUND to Round 1, then START. NEXT ROUND loads the round's clock at its full length, waiting, and deals nothing — every fault is yours to fire from the library; START runs the clock and plays nothing: where the runbook wants a city broadcast at the top of a round, it waits on the EVENTS timeline as READY TO FIRE, and it is your press, after START, that plays it. The pair is pressed seven times — Rounds 1 to 7 — and the day ends with END SIMULATION. A clock that reaches 00:00 stops on its own and moves nothing, and the city keeps bleeding until the next START, so do not dawdle between rounds. Pressing the round you are already in offers a restart: the clock reloads and that round's faults go back to active. STOP CLOCK and PAUSE are not part of the script."));
 C.push(p([t("What the room sees from now on: the round number and its clock counting down, their own health and stock, and their faults. What they never see: a phase name, a debrief screen, or a screen telling them to rest. "),
   t("The round is the period", { bold: true }),
   t(": when you activate the next round the city pays the outgoing round’s upkeep — 2 Power and 1 Water from every sector, the whole bill or none of it: a table that cannot pay in full keeps its stock and loses 10 Sector Health instead, once, and its console says UPKEEP SHORTFALL — POW and WTR generate their output by button during the round, and it lands then — and Transport’s approvals, Medical’s heals and Agriculture’s intervention cards come back for the new round. Round 0 is orientation and is never charged, and no round is ever charged twice.")]));
@@ -371,7 +371,7 @@ C.push(H3("Round 4 (00:00 – 05:00)"));
 C.push(p(t("Same teams, same roles, a fresh crisis onto the city they have left. Every fault needs a value buried in another sector’s Appendix C, so nothing can be solved from memory. Nothing is restored, refilled or healed for this wave — they carry what they built and what they broke. This is where the post-measurement begins.")));
 C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
-  beat("00:00", "NEXT ROUND → Round 4. START, then fire its six faults from the library, each needing another sector’s buried appendix. Announce in-world: \"Seismic activity detected.\" Restore brownout sectors to active.", "Whether anyone notices that nothing else was given back."),
+  beat("00:00", "NEXT ROUND → Round 4. START — nothing plays by itself; if you want the TRAINING PROTOCOLS CONCLUDED broadcast, FIRE it from the EVENTS timeline. Then fire its six faults from the library, each needing another sector’s buried appendix. Announce in-world: \"Seismic activity detected.\" Restore brownout sectors to active.", "Whether anyone notices that nothing else was given back."),
   beat("01:00", "The library's LATE SHIFT section is yours from here: twelve more faults, P-09 (three values — two from other binders, a third from its own binder or a third sector; best introduced from Round 5) and P-10 (two values, TIME-CRITICAL — Integrity falls three a minute while it stays open). Mix them with Round 4's own six and the reference chains. Keep every table at two live faults; three only as a deliberate overload. Across the late shift, make each sector somebody's dependency at least once.", "Who is asked for a value by two tables at once, and whether they queue the asks or pick a favourite."),
   beat("01:00", "Walk the floor.", "Six sectors, six raids on six appendices. The asking behaviour should look different from the early shift — that difference is the deliverable. Watch who is asked twice and how they answer the second time. TRN’s fault is the mini-triage feed; decay pressure returns onto tired people."),
   beat("03:30", "Optional short Council if the group is coping well. Skip if they are not.", "Compare directly against the first sitting. Same people, same format, measurable difference."),
@@ -382,7 +382,7 @@ C.push(tbl([
   headRow(["ROUND TIME", "DO THIS", "WATCH FOR"], BW),
   beat("05:00", "No button — still Round 4. Fire into whichever two sectors are weakest.", "Triage under fatigue. Who is still asking questions and who has stopped."),
   beat("06:00", "Last two minutes. Announce the time remaining once, plainly.", "What a table chooses to spend its last minutes on."),
-  beat("08:00", "NEXT ROUND → Round 5, then START. The city broadcast SYSTEM LOAD INCREASING plays on START — say nothing yourself. Nothing is reset; whatever is open stays open.", "Whether anyone reads the broadcast aloud, and whether a table that is behind notices the clock is new."),
+  beat("08:00", "NEXT ROUND → Round 5, then START. Nothing plays by itself: FIRE the city broadcast SYSTEM LOAD INCREASING from the EVENTS timeline if you want it — say nothing yourself. Nothing is reset; whatever is open stays open.", "Whether anyone reads the broadcast aloud, and whether a table that is behind notices the clock is new."),
 ], BW));
 
 C.push(H3("Round 5 (00:00 – 10:00)"));
@@ -393,7 +393,7 @@ C.push(tbl([
   beat("02:00", "Walk the floor. Say nothing.", "A table that waits silently for a value it has not asked for. A liaison who asks for two things in one trip."),
   beat("05:00", "One TIME-CRITICAL P-10 into a sector already carrying a fault. Let the pending AGR trade-off and the upkeep line do their work.", "Whether the table drops the old fault for the loud new one, and who decides that."),
   beat("08:00", "Last two minutes. Announce the time once.", "Whether anyone starts a transfer they cannot finish."),
-  beat("10:00", "NEXT ROUND → Round 6, then START. CASCADE CONDITIONS DETECTED plays on START.", "Upkeep lands now: watch the NEXT ROUND UPKEEP lines on the consoles turn into real shortages."),
+  beat("10:00", "NEXT ROUND → Round 6, then START. FIRE CASCADE CONDITIONS DETECTED from the EVENTS timeline if you want it; nothing plays by itself.", "Upkeep lands now: watch the NEXT ROUND UPKEEP lines on the consoles turn into real shortages."),
 ], BW));
 
 C.push(H3("Round 6 (00:00 – 10:00)"));
@@ -403,7 +403,7 @@ C.push(tbl([
   beat("00:00", "Fire one fault into the sector whose Integrity is lowest and one into the sector it depends on. A TIME-CRITICAL P-10 where a movement is already waiting.", "Whether the room recognises the chain — the fault, the missing resource, the sector that holds it — or treats each as separate."),
   beat("03:00", "Walk the floor. If a table is drowning rather than struggling, fire nothing more at it.", "A plan from Round 5 that no longer works, and how long before someone says so out loud."),
   beat("06:00", "A second P-10 if the room is coping; nothing if it is not. The pressure is high, not maximal.", "Who protects their own sector and who gives up a value or a unit to another."),
-  beat("10:00", "NEXT ROUND → Round 7, then START. FINAL OPERATING WINDOW plays on START.", "Silence or noise at the transition: both are data."),
+  beat("10:00", "NEXT ROUND → Round 7, then START. FIRE FINAL OPERATING WINDOW from the EVENTS timeline if you want it; nothing plays by itself.", "Silence or noise at the transition: both are data."),
 ], BW));
 
 C.push(H3("Round 7 (00:00 – 10:00)"));

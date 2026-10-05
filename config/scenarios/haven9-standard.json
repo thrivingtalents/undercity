@@ -299,17 +299,17 @@
       { "offset_s": 120,  "kind": "announce", "text": "Core output at 60 percent. Continuity Order will be required.", "mode": "AUTO" }
     ],
     "R4": [
-      { "offset_s": 0,    "kind": "alert", "text": "TRAINING PROTOCOLS CONCLUDED", "subtitle": "All system events are now considered live. Multiple failures may occur concurrently. Operational consequences may carry forward. No further procedural sequencing will be provided.", "major": true, "mode": "AUTO", "note": "The city broadcast that opens the mixed phase — it plays when START is pressed. A situation, never a round name." },
+      { "offset_s": 0,    "kind": "alert", "text": "TRAINING PROTOCOLS CONCLUDED", "subtitle": "All system events are now considered live. Multiple failures may occur concurrently. Operational consequences may carry forward. No further procedural sequencing will be provided.", "major": true, "mode": "MANUAL", "note": "The city broadcast that opens the mixed phase. Nothing plays on START: FIRE it from here if the runbook wants it. A situation, never a round name." },
       { "offset_s": 150,  "kind": "core",  "value": 70, "mode": "AUTO" }
     ],
     "R5": [
-      { "offset_s": 0,    "kind": "alert", "text": "SYSTEM LOAD INCREASING", "subtitle": "Multiple sectors are reporting simultaneous operational demand.", "mode": "AUTO" }
+      { "offset_s": 0,    "kind": "alert", "text": "SYSTEM LOAD INCREASING", "subtitle": "Multiple sectors are reporting simultaneous operational demand.", "mode": "MANUAL", "note": "Yours to FIRE; nothing plays on START." }
     ],
     "R6": [
-      { "offset_s": 0,    "kind": "alert", "text": "CASCADE CONDITIONS DETECTED", "subtitle": "Earlier decisions and unresolved dependencies are affecting connected systems.", "mode": "AUTO" }
+      { "offset_s": 0,    "kind": "alert", "text": "CASCADE CONDITIONS DETECTED", "subtitle": "Earlier decisions and unresolved dependencies are affecting connected systems.", "mode": "MANUAL", "note": "Yours to FIRE; nothing plays on START." }
     ],
     "R7": [
-      { "offset_s": 0,    "kind": "alert", "text": "FINAL OPERATING WINDOW", "subtitle": "HAVEN-9 has entered the final operating window. Prioritise essential systems. Protect city continuity.", "major": true, "mode": "AUTO" }
+      { "offset_s": 0,    "kind": "alert", "text": "FINAL OPERATING WINDOW", "subtitle": "HAVEN-9 has entered the final operating window. Prioritise essential systems. Protect city continuity.", "major": true, "mode": "MANUAL", "note": "Yours to FIRE; nothing plays on START." }
     ]
   }
 }

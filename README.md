@@ -425,7 +425,10 @@ Migrations are additive and run at boot (`lib/db.js` → `migrate`).
   `core` (`value`), `announce` (`text`), `alert` (`text`) or `cycle` (an economy pass), and mode
   is `AUTO` (fires itself) or `MANUAL` (turns into READY TO FIRE — the
   facilitator hands the card and presses it). Skip or delay anything; the
-  script never forces the room.
+  script never forces the room. An `alert` or `announce` at `offset_s: 0`
+  is the round's own broadcast and is always MANUAL, READY the moment the
+  round is armed: NEXT ROUND and START play nothing (2026-10-06), and the
+  facilitator presses it as a separate action if the runbook wants it.
 - **COM intelligence**: `intel[]` → `{ key, label, value, hidden_in_brownout }`;
   editable live from Admin → CORE.
 

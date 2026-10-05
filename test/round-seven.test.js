@@ -244,19 +244,24 @@ test('R7-012: late-shift, chain and workbook faults are all fired by hand in Rou
   }
 });
 
-test('R7-013: no fault scheduler — a round change deals nothing, the new timelines carry only the broadcast, and it plays on START', () => {
+test('R7-013: no fault scheduler — a round change deals nothing, and the round broadcast waits for the facilitator instead of playing on START', () => {
   for (const r of ['R5', 'R6', 'R7']) {
     assert.deepEqual(newGame().faultsForRound(r), [], `${r} groups faults`);
     const beats = STANDARD.timelines[r];
-    assert.ok(Array.isArray(beats) && beats.length === 1 && beats[0].kind === 'alert' && beats[0].offset_s === 0, `${r}: ${JSON.stringify(beats)}`);
+    assert.ok(Array.isArray(beats) && beats.length === 1 && beats[0].kind === 'alert' && beats[0].offset_s === 0 && beats[0].mode === 'MANUAL', `${r}: ${JSON.stringify(beats)}`);
   }
   for (const [r, title, major] of [['R4', 'TRAINING PROTOCOLS CONCLUDED', true], ['R5', 'SYSTEM LOAD INCREASING', false], ['R6', 'CASCADE CONDITIONS DETECTED', false], ['R7', 'FINAL OPERATING WINDOW', true]]) {
     const g = newGame();
     for (const x of ALL.slice(1, ALL.indexOf(r))) { g.activateRound(x); g.clock('start'); g.tick(1000); }
     g.activateRound(r);
-    // The previous round's broadcast may still be up; this round's is not, until START.
-    assert.notEqual(g.state.alert && g.state.alert.title, title, `${r}: the broadcast played before START`);
-    g.clock('start'); g.tick(1000);
+    // QUIET TRANSITION (2026-10-06): neither NEXT ROUND nor START plays the broadcast.
+    assert.equal(g.state.alert, null, `${r}: a broadcast played on NEXT ROUND`);
+    g.clock('start'); g.tick(1000); g.tick(1000);
+    assert.equal(g.state.alert, null, `${r}: the broadcast played on START`);
+    const beat = g.state.timeline.find((t) => t.kind === 'alert' && t.offset_s === 0);
+    assert.ok(beat && beat.mode === 'MANUAL' && beat.status === 'READY' && beat.transition === true, `${r}: ${JSON.stringify(beat)}`);
+    // The facilitator's press plays it, with its weight.
+    assert.equal(g.fireTimelineItem(beat.id).ok, true);
     assert.ok(g.state.alert && g.state.alert.title === title, `${r}: ${JSON.stringify(g.state.alert)}`);
     assert.ok(g.state.alert.subtitle.length > 20, 'the body is missing');
     const view = forSector(g, 'POW').alert;

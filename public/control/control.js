@@ -1072,7 +1072,7 @@
       if (it.status === 'READY') ready += 1;
       return `<div class="tl ${it.status}">
         <span class="off">${U.mmss(it.offset_s)}</span>
-        <span class="what"><b>${esc(describe(it))}</b>${it.note ? `<span class="nt">${esc(it.note)}</span>` : ''}<span class="md">${it.mode} · ${it.status === 'READY' ? 'READY TO FIRE' : it.status}${it.result ? ' · ' + esc(it.result) : ''}</span></span>
+        <span class="what"><b>${esc(describe(it))}</b>${it.note ? `<span class="nt">${esc(it.note)}</span>` : ''}<span class="md">${it.mode} · ${it.status === 'READY' ? 'READY TO FIRE' : it.status}${it.result ? ' · ' + esc(it.result) : ''}${it.transition && it.status !== 'FIRED' && it.status !== 'SKIPPED' ? ' · NOTHING PLAYS ON START — YOURS TO FIRE' : ''}</span></span>
         <span class="acts">${it.status === 'PENDING' || it.status === 'READY'
           ? `<button class="fire" data-fire="${it.id}">${it.status === 'READY' ? 'FIRE NOW' : 'FIRE'}</button><button data-delay="${it.id}">+2:00</button><button data-skip="${it.id}">SKIP</button>` : ''}</span>
       </div>`;

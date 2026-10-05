@@ -581,7 +581,8 @@ exists, else a synthesised placeholder.
 `event_fired`, `effect_started/ended`, `scheduled`, `preset_fired`,
 `city_event_activated { activation round event_id event_name event_type by effects_requested effects_applied affected_sectors health duration expiry repeat_policy }`,
 `city_event_effect_expired`, `city_event_upkeep_effect_consumed` (2026-10-06),
-`timeline_fired/skipped/delayed`, `alert`, `config_patched`, `set_stability`,
+`false_alert_fired/opened/repair_attempt/com_notified/correction_prepared/corrected/force_cleared/cancelled` (2026-10-06, each with `false_alert_id`),
+`timeline_fired/skipped/delayed`, `transition_broadcast_held { id round kind text scenario_mode by }` (2026-10-06: an `alert` or `announce` beat at 00:00 is the round's own broadcast and is held MANUAL and READY the moment the round is armed — NEXT ROUND and START play nothing; a `timeline[]` item carries `transition: true`), `alert`, `config_patched`, `set_stability`,
 `intel`, `sound`. Every line also carries `round` and `phase`.
 
 ### 8.7 One clock: the round's (2026-09-18)
