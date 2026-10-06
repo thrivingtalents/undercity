@@ -298,7 +298,7 @@ test('ZB-009: the shared pages read identically in all six binders', (t) => {
   for (const code of Object.keys(SECTORS).slice(1)) {
     for (const i of [3, 4]) assert.equal(raw(code, i), raw('POW', i), `${code} page ${i + 1} differs from POW`);
     // page 2 differs in one refresh line and the brownout sentence; page 6 in the own-panel line
-    const strip2 = (s) => s.split('\n').filter((l) => !/\*\*4 Refresh\*\*|\*\*2 Production|^Imposed by the Authority/.test(l)).join('\n');
+    const strip2 = (s) => s.split('\n').filter((l) => !/\*\*Refresh\*\*|\*\*Production|^Imposed by the Authority/.test(l)).join('\n');
     assert.equal(strip2(raw(code, 1)), strip2(raw('POW', 1)), `${code} page 2 differs from POW beyond its own lines`);
     const strip6 = (s) => s.split('\n').filter((l) => !/^CHECK NEXT UPKEEP, open requests/.test(l)).join('\n');
     assert.equal(strip6(raw(code, 5)), strip6(raw('POW', 5)), `${code} page 6 differs from POW beyond its own line`);

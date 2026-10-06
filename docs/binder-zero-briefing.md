@@ -92,6 +92,29 @@ verified every document: zero coloured pixels on any page, the same page
 count and the same words as the colour original. The colour kit's document XML
 rebuilds byte-identical after the palette refactor.
 
+**Field manual edition (2026-10-06).** The nine pages were re-set as a clean
+operations manual, on the owner's brief, without changing a word that
+operates the simulation: wider margins (2.8 cm at the sides), one body size
+with a little more leading, bold black headings in sentence case with a short
+rule in the sector colour, and a box kept only where the brief allows one —
+the one important action on page 3 (GENERATE / HEALING / APPROVAL /
+INTERVENTIONS / PUBLISH), the warning on the trading page, the thin tables.
+The coloured page tab, the tinted callouts, the filled flow strips, the framed
+fault cards and the legend chips are gone; the sector colour is an accent on
+the page number, the heading rules, the step numbers, the arrows and the fault
+codes. Every page opens with a one-line purpose. The upkeep panel became a
+light strip and four short lines; the new-round checklist a plain numbered
+list; trading seven numbered steps that open with the action in bold; the
+Workers paragraph four bullets; the Council block a heading and bullets; a
+fault card reads down from its code to what to enter, with a thin rule between
+cards. The banners line moved from page 2 to the quick-actions page so page 2
+stays one page without squeezing; AGR's deck table is set one size smaller
+for the same reason. The footer reads "Each round p.2 · Sector control p.3 ·
+Faults p.4 / p.7–8 · Trades p.5 · Quick actions p.6 · Values p.9". Both kits
+rebuilt at nine pages a binder; the page check and the monochrome check pass;
+ZB-001…011 and every test that pins a binder number pass unchanged except
+ZB-009's filter, which named the old numbering of the new-round list.
+
 **Issues for the designer (nine-page edition).**
 
 1. *Brownout output wording.* Config: `brownout_effects.production_multiplier`

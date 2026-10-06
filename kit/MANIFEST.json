@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-06T01:50:13.711Z",
+  "generated_at": "2026-10-06T02:15:26.523Z",
   "sources": {
     "matrix": {
       "file": "undercity-crossref-matrix.xlsx",
@@ -28,43 +28,43 @@
       "file": "UNDERCITY_Binder_AGR.docx",
       "title": "Sector binder — AGR (nine pages; the station's quick reference)",
       "audience": "participant",
-      "bytes": 26264,
-      "sha256": "c0eeb4e9068200cc3f9015746f79cbf505d376969c7757923b7a0d0ec4020d04"
+      "bytes": 27025,
+      "sha256": "a00f16dddab1352d05e7c2205b361d5059a6c85ceea82c4ccb383d563bcc05ba"
     },
     {
       "file": "UNDERCITY_Binder_COM.docx",
       "title": "Sector binder — COM (nine pages; the station's quick reference)",
       "audience": "participant",
-      "bytes": 25210,
-      "sha256": "f94fc93beaa12a51d851918e4358165bf7a41916680f71769666847045baa1bc"
+      "bytes": 25949,
+      "sha256": "1a60e6e7c62cc63949f4d0c6ab0591cee0e2424f1c123312d70c36620a09f31a"
     },
     {
       "file": "UNDERCITY_Binder_MED.docx",
       "title": "Sector binder — MED (nine pages; the station's quick reference)",
       "audience": "participant",
-      "bytes": 25046,
-      "sha256": "0e358de51653f02511a3b8df34a57c1d37f411a976ac9e23190441d9dfec7de1"
+      "bytes": 25742,
+      "sha256": "cf0cd12376dad2fcffc89208826e742b0fa2b99af13e4ad1b55d90349ee58d48"
     },
     {
       "file": "UNDERCITY_Binder_POW.docx",
       "title": "Sector binder — POW (nine pages; the station's quick reference)",
       "audience": "participant",
-      "bytes": 25384,
-      "sha256": "c4d145ffeb68fa75d224ef98a4145ae0e4113d424b955ffabe3d9b9398159e5c"
+      "bytes": 26130,
+      "sha256": "f059fc7ce069dd7a580af3d64ffee174efaefd303342debc373622cc083ef059"
     },
     {
       "file": "UNDERCITY_Binder_TRN.docx",
       "title": "Sector binder — TRN (nine pages; the station's quick reference)",
       "audience": "participant",
-      "bytes": 25302,
-      "sha256": "c7ed41e8c0065f328e418145c24622322ad80d9617f986ab228056b54d47f184"
+      "bytes": 26027,
+      "sha256": "6ff36242dcb4c35dac2cbcebcb4dd29e1d0debbf3786a849f6bf269298250eea"
     },
     {
       "file": "UNDERCITY_Binder_WTR.docx",
       "title": "Sector binder — WTR (nine pages; the station's quick reference)",
       "audience": "participant",
-      "bytes": 25352,
-      "sha256": "5897fc3e72820791dc4c9c4ded2f35a4aaed5fa935159a7d7ac81c6e21a6a5ff"
+      "bytes": 26093,
+      "sha256": "6175792af0f35e4f39ce0ef9870b6ce1ff0f394533ef7e6c4a7e3dbe91e45718"
     },
     {
       "file": "UNDERCITY_CityCharter.docx",
@@ -105,8 +105,8 @@
       "file": "UNDERCITY_StationLog.docx",
       "title": "Station Operations Log — loose sheets, one per sector",
       "audience": "participant",
-      "bytes": 14613,
-      "sha256": "81f9607313ab90493ee41387f5bcfc6786c9443979cc54c53ea185ed9e457545"
+      "bytes": 15196,
+      "sha256": "bcaa7f99dc7aea3463a9baf34bab3748b209b044832b945dd2e0b152e9cf4f5e"
     },
     {
       "file": "UNDERCITY_TransferChits.docx",
