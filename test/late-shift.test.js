@@ -227,7 +227,8 @@ test('FX10-011 / H: P-10 faults carry decay 3.0 a minute and the existing decay 
 test('I: TIME-CRITICAL is printed on P-10 cards as a word, never a countdown', () => {
   assert.ok(/f\.time_critical/.test(CARDS_SRC) && /text: "TIME-CRITICAL"/.test(CARDS_SRC), 'the card builder does not print the word');
   assert.ok(!/facilitator_target_s/.test(CARDS_SRC), 'the card builder reads the facilitator target');
-  assert.ok(/lateFaults/.test(CARDS_SRC) && /section \|\| ROUND_LABEL/.test(CARDS_SRC), 'no LATE SHIFT section');
+  // The late-shift cards print like every other card: in numerical order, with no section or round on the card (2026-10-06).
+  assert.ok(/lateFaults/.test(CARDS_SRC) && !/tabLabel|ROUND_LABEL/.test(CARDS_SRC), 'a card names a section or a round');
   // The console says the word too, and only the word.
   assert.ok(/fr-tc">TIME-CRITICAL/.test(SECTOR_SRC));
   assert.ok(!/facilitator_target_s/.test(SECTOR_SRC));

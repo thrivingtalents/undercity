@@ -282,9 +282,9 @@ test('the twelve are unscheduled, printed in their own section, and facilitator-
     g.setPhase('ROUND_2');
     assert.equal(g.fireFault(f.code, f.sector).ok, true, `${f.code} cannot be issued`);
   }
-  // The printed deck carries them under an unnumbered section.
+  // The printed deck carries them in numerical order, with no section or round on the card (2026-10-06).
   const cards = fs.readFileSync(path.join(ROOT, 'tools/kit/build_cards.js'), 'utf8');
-  assert.ok(/REFERENCE CHAIN/.test(cards), 'the deck has no REFERENCE CHAIN section');
+  assert.ok(!/tabLabel|ROUND_LABEL/.test(cards), 'a card names a section or a round');
   assert.ok(/deck\.push\(\.\.\.chainFaults/.test(cards), 'the deck does not print them');
 });
 

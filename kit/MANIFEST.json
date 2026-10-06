@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-06T03:18:17.380Z",
+  "generated_at": "2026-10-06T03:27:07.792Z",
   "sources": {
     "matrix": {
       "file": "undercity-crossref-matrix.xlsx",
@@ -22,7 +22,7 @@
       "title": "Answer key — every resolution code",
       "audience": "facilitator",
       "bytes": 15553,
-      "sha256": "cca073613a9f1ba27483720ffcf8e294a778ed05836a1587885b1257b15ef395"
+      "sha256": "7d2159aa6fb74e4da4dd8a8a0bc5db124611b22fd79d11c9f11b4603065a1328"
     },
     {
       "file": "UNDERCITY_Binder_AGR.docx",
@@ -85,14 +85,14 @@
       "title": "Facilitator & Administrator Guidebook",
       "audience": "facilitator",
       "bytes": 38885,
-      "sha256": "d46562e8ed1f63adf5921a72311362e40790906d9f4b4b0cfe8bd3b244fe0d72"
+      "sha256": "f8272fa5f1ca6d5281be99812e3d4ebfb01854436cf14dee60414672a1b8dff1"
     },
     {
       "file": "UNDERCITY_FaultCards.docx",
       "title": "Fault card deck — optional props, 60 cards 15-up on four landscape A4 sheets, cut on the grey lines; the console is the alert",
       "audience": "participant",
-      "bytes": 15370,
-      "sha256": "6fc0d629b8441e23c277815fd1fc3b185cd132b6c499f4c1f8677f34d9711a03"
+      "bytes": 15307,
+      "sha256": "ac982b73e28b6649813ac26a94fc790c397f5d62b73b5b6dfb14025eb0e34de5"
     },
     {
       "file": "UNDERCITY_RoleCards.docx",

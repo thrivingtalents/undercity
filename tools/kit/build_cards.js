@@ -14,8 +14,9 @@
 // columns by five rows, fifteen cards a page, in numerical order: 8 mm page
 // margins, 4 mm between columns, 3 mm between rows, every row an exact height
 // so no card ever crosses a page. A card is a plain white rectangle with a thin
-// light-grey cut border: the sector code and round on one small line under a
-// hairline in the sector colour, the fault code as the clearest thing on it,
+// light-grey cut border: the sector code and name on one small line under a
+// hairline in the sector colour (no round and no section — the card says
+// nothing about when it is dealt), the fault code as the clearest thing on it,
 // the name with its severity triangles, a red TIME-CRITICAL word where the
 // fault carries one, the symptom, and the lookup reminder as a small footer.
 
@@ -65,15 +66,9 @@ const SECTOR = {
   AGR: { name: "AGRICULTURE",         colour: "5AB86A" },
   COM: { name: "COMMS & SENSORS",     colour: "B07AD8" },
 };
-// A round is its number, on the card as everywhere (2026-10-05): the tab is
-// the library's grouping, never a title the table can read a plan from.
-const ROUND_LABEL = {
-  R0: "ROUND 0", R1: "ROUND 1", R2: "ROUND 2", R3: "ROUND 3", R4: "ROUND 4", R5: "ROUND 5", R6: "ROUND 6", R7: "ROUND 7",
-  // Unscheduled by design: the facilitator fires these by hand.
-  null: "REFERENCE CHAIN",
-};
-// The tab line: a generated deck names its own section; everything else is its round.
-const tabLabel = (f) => f.section || ROUND_LABEL[f.round] || ROUND_LABEL[null];
+// No round and no section on a card (2026-10-06): the deck is in numerical
+// order, the facilitator's library knows the grouping, and a table reads
+// nothing about when a fault is dealt from the paper in its hand.
 
 const { INK, MUTED } = P;
 
@@ -113,13 +108,13 @@ function cardCell(f, width) {
   const s = SECTOR[f.sector];
   const kids = [];
 
-  // sector · name · round, on one small line, over a hairline in the sector colour
+  // sector · name, on one small line, over a hairline in the sector colour
   kids.push(new Paragraph({
     spacing: { after: 50, line: 220, lineRule: "auto" },
     border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: P.sector(s.colour), space: 2 } },
     children: [
       new TextRun({ text: f.sector, font: "Arial", size: 15, bold: true, color: P.sector(s.colour) }),
-      new TextRun({ text: ` · ${s.name} · ${tabLabel(f)}`, font: "Arial", size: 15, color: P.mono ? INK : MUTED }),
+      new TextRun({ text: ` · ${s.name}`, font: "Arial", size: 15, color: P.mono ? INK : MUTED }),
     ],
   }));
 

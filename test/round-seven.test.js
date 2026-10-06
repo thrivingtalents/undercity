@@ -364,8 +364,8 @@ test('NAME-006: no screen source carries a round-name label', () => {
     const text = read(file).toUpperCase();
     for (const w of NAMES) assert.ok(!text.includes(w), `${file} contains "${w}"`);
   }
-  // The content the room sees is numbered only: cards, the deck's tabs.
+  // The content the room sees is numbered only; a card names its sector and nothing about when it is dealt (2026-10-06).
   const cards = read('tools/kit/build_cards.js');
-  assert.ok(/R7: "ROUND 7"/.test(cards) && !/AFTERSHOCK|ORIENTATION|SHIFT 1/.test(cards));
+  assert.ok(!/ROUND_LABEL|tabLabel/.test(cards) && !/AFTERSHOCK|ORIENTATION|SHIFT 1/.test(cards));
   for (const r of ROUNDS.rounds) assert.ok(!NAMES.some((w) => JSON.stringify(r).toUpperCase().includes(w)), `${r.id} carries a name`);
 });
