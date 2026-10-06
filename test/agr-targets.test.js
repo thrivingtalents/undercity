@@ -195,6 +195,37 @@ test('BIOFILTER FLUSH: every active sector gains health and lends a worker; AGR 
   assert.deepEqual(obligations(g), []);
 });
 
+test('a CITY DECISION is said once (2026-10-06): the notice lives for its round, the round change takes it down, and the consequence still lands', () => {
+  const g = game();
+  deal(g, 'AGR_CITY_RECOVERY');
+  g.announce('Keep the pumps on', { sector: 'WTR' });   // a facilitator notice from earlier, for contrast
+  assert.equal(g.agrActivate('AGR_CITY_RECOVERY', { by: 'AGR' }).ok, true);
+  // during the round: the affected table is told once, and that is the notice its console shows
+  assert.equal(notices(g, 'WTR').length, 2);
+  assert.match(forSector(g, 'WTR').announcements[0].text, /^CITY DECISION — AGR/);
+  assert.deepEqual(obligations(g), [['WTR', { water: 1 }]]);
+  // the next round: no AGR banner on any console, the water still charged, the decision still in the log
+  const water = g.state.sectors.WTR.inventory.water;
+  const due = economy.upkeepFor(g, g.state.sectors.WTR).water;
+  g.activateRound('R3');
+  for (const s of SECTORS) assert.ok(!forSector(g, s).announcements.some((a) => /CITY DECISION/.test(a.text)), `${s} saw last round's decision again`);
+  assert.deepEqual(notices(g, 'WTR'), ['Keep the pumps on'], 'the facilitator\'s own notice went with it');
+  assert.equal(g.state.sectors.WTR.inventory.water, water - due, 'the trade-off was not charged');
+  assert.equal(logEvents(g, 'agr_card_activated').length, 1);
+  assert.equal(logEvents(g, 'agr_decision_notice').length, 5);
+  const expired = logEvents(g, 'agr_decision_notices_expired');
+  assert.equal(expired.length, 1);
+  assert.deepEqual(expired[0].sectors.sort(), ['COM', 'MED', 'POW', 'TRN', 'WTR']);
+
+  // a restart of the same round is not a round change: the notice stays up
+  const g2 = game();
+  deal(g2, 'AGR_CITY_RECOVERY');
+  assert.equal(g2.agrActivate('AGR_CITY_RECOVERY', { by: 'AGR' }).ok, true);
+  g2.activateRound('R2', { restart: true });
+  assert.ok(notices(g2, 'WTR').some((t) => /CITY DECISION/.test(t)), 'a restart of the round took the notice down');
+  assert.equal(logEvents(g2, 'agr_decision_notices_expired').length, 0);
+});
+
 // -- the cards that stayed home ----------------------------------------------------------------
 
 test('the six local cards still pay at home, and nobody else is told', () => {
@@ -289,12 +320,13 @@ test('a round change ends the loans and the city-wide hits land once, through th
   g.activateRound('R3');
   for (const s of SECTORS) assert.equal(g.availableWorkers(g.state.sectors[s]), 5, `${s} did not get its worker back`);
   assert.equal(logEvents(g, 'agr_decision_notice').length, 5);
-  // A restore keeps the notices; the result itself belongs to the round it was made in, and R3 has dealt.
+  // The notices went with the round (2026-10-06); the result itself belongs to the round it was made in, and R3 has dealt.
+  for (const s of SECTORS) assert.equal(notices(g, s).length, 0, `${s} was told about last round's decision again`);
   const snap = JSON.parse(JSON.stringify(g.serialise()));
   const back = newGame({ runId: 'targets-restore' });
   back.restore(snap);
   assert.equal(back.state.agr.last_result, null, 'a new round kept the old result');
-  assert.ok(back.state.announcements.some((a) => a.sector === 'POW' && /CITY DECISION/.test(a.text)));
+  assert.ok(!back.state.announcements.some((a) => a.sector === 'POW' && /CITY DECISION/.test(a.text)), 'a restore brought the old notice back');
   // Within the round, a restore keeps the result for AGR's screen.
   const g2 = game();
   deal(g2, 'AGR_POWER_SURGE');
