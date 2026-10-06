@@ -18,13 +18,6 @@
  *   8  FAULTS & REPAIRS — PART 2           sector: P-06 to P-10 as cards, ESCALATE TO
  *   9  SPECIFICATIONS, REFERENCES & AUTHORISATIONS   sector, values unchanged
  *
- * FIELD MANUAL EDITION (2026-10-06): the same words, laid out to be scanned.
- * Every page opens with a one-line purpose; long paragraphs are short lines
- * or bullets; a box is kept only for the one important action on a page and
- * for the warning on the trading page; everything else is a heading, a list,
- * a thin table or plain text. No number, procedure, value, crew, material or
- * instruction changed.
- *
  * Every number is read from the scenario and the engine through
  * binder_rules.js (RULES); every fault card, value and reference comes from
  * binder_content.json, which the assembler derives from the matrix and the
@@ -38,8 +31,6 @@ const { RULES, SECTOR_JOB, GLYPH, RES_NAME, fill } = rules;
 const P = (text, o = {}) => ({ t: 'p', text, ...o });
 const H = (text) => ({ t: 'h', text });
 const STEPS = (items, o = {}) => ({ t: 'steps', items, ...o });
-const LIST = (items, o = {}) => ({ t: 'list', items, ...o });
-const STRIP = (text) => ({ t: 'strip', text });
 const TABLE = (head, rows, widths, o = {}) => ({ t: 'table', head, rows, widths, ...o });
 const KV = (rows, o = {}) => ({ t: 'kv', rows, ...o });
 const BOX = (kind, title, lines) => ({ t: 'box', kind, title, lines });
@@ -104,22 +95,22 @@ function brownoutRule(b) {
 function pageStart(b) {
   const j = SECTOR_JOB[b.code];
   return {
-    num: 1, title: TITLES[1], lead: 'Read this page once. From then on, operate from pages 2 and 3.', blocks: [
-      P('The surface has been uninhabitable for forty years. HAVEN-9 survives three hundred metres underground on six interdependent sector systems and a geothermal Core that began to degrade this morning.', { lore: true }),
-      P('**Your objective:** keep **{NAME} ({CODE})** running until the shift ends — Health never at {DARK}, and the city supplied with what only you provide. Nobody will brief you. This binder and your sector console are the briefing.'),
+    num: 1, title: TITLES[1], blocks: [
+      P('The surface has been uninhabitable for forty years. HAVEN-9 survives three hundred metres underground on six interdependent sector systems and a geothermal Core that began to degrade this morning.'),
+      BOX('ACTION', 'YOUR OBJECTIVE', [
+        'Keep **{NAME} ({CODE})** running until the shift ends: Health never at {DARK}, and the city supplied with what only you provide. Nobody will brief you. This binder and your sector console are the briefing.',
+      ]),
       P(j.lore, { lore: true }),
-      H('Your sector'),
       KV([
-        ['What {CODE} does', j.operates],
-        ['What {CODE} controls', j.supplies],
-        ['Who depends on {CODE}', j.relied.replace(' (§14)', ' (p.9)')],
-        ['What {CODE} needs', j.depends],
-        ['If {CODE} goes DARK', j.fails],
-        ['Your authority', j.authority.replace('§9A is yours.', 'Page 3 is yours.')],
-      ], { keyWidth: 2300 }),
-      H('Starting position'),
-      P('**Stock**   {START_STOCK}'),
-      P('**Workforce**   {START_WORKERS} 👤 workers   ·   **Health** {START_HEALTH}   ·   **Upkeep** {UPKEEP} every round (p.2)'),
+        ['{CODE} OPERATES', j.operates],
+        ['{CODE} SUPPLIES OR CONTROLS', j.supplies],
+        ['WHO DEPENDS ON {CODE}', j.relied.replace(' (§14)', ' (p.9)')],
+        ['{CODE} DEPENDS ON', j.depends],
+        ['IF {CODE} GOES DARK', j.fails],
+        ['SPECIAL AUTHORITY', j.authority.replace('§9A is yours.', 'Page 3 is yours.')],
+        ['OPENING STOCK', '{START_STOCK}'],
+        ['STARTING WORKFORCE', '{START_WORKERS} 👤 workers · Health {START_HEALTH} · upkeep {UPKEEP} every round (p.2)'],
+      ], { keyWidth: 2500 }),
       H('Start-up checklist'),
       STEPS([
         'TAKE the Role Cards and assign them: SECTOR CHIEF, LIAISON, SYSTEMS LEAD, ENGINEERS. The cards carry the duties.',
@@ -145,34 +136,29 @@ function pageRound(b) {
     COM: 'Your board rows now carry last round\'s stamp: refresh what the city should see (p.3).',
   }[b.code];
   return {
-    num: 2, title: TITLES[2], lead: 'Five things every round comes down to, in this order.', blocks: [
-      FLOW(['Check upkeep', 'Sector action (p.3)', 'Repair faults (p.4)', 'Trade if needed (p.5)', 'Prepare next round']),
+    num: 2, title: TITLES[2], blocks: [
+      FLOW(['New round starts', 'Read the NEXT UPKEEP result', 'Run your sector action (p.3)', 'Repair ACTIVE FAULTS (p.4)', 'Trade for shortages (p.5)', 'Prepare the next upkeep']),
       P('{ROUND_FIRST} is set-up; play runs to {ROUND_LAST}. Each round has its own clock (**Round time**). At 00:00 the clock stops and nothing else happens: faults keep bleeding until the control desk starts the next round, and **Current round** changing is the only signal that it has.'),
-      STRIP('UPKEEP: {UPKEEP} · every round'),
-      LIST([
-        'Taken automatically from INVENTORY the moment the next round starts.',
-        '**The whole bill or none of it:** short by one unit, nothing is taken and you lose **{PENALTY} Health** once.',
-        'NEXT UPKEEP shows the bill, its Status (READY, or SHORTFALL and what is short) and the last result: UPKEEP PAID or UPKEEP SHORTFALL. There is no upkeep clock; Round time is the warning.',
-        'Brownout halves the bill to {UPKEEP_HALF}; DARK pays nothing.',
-      ], { tight: true }),
-      H('New round — check these now'),
-      STEPS([
-        '**Upkeep** was taken: read the NEXT UPKEEP result line and move the chits.',
-        gen ? `**Production** is open again: press GENERATE ${res} and add the chits (p.3). A pending generator upgrade has completed.`
-          : '**Production**: {CODE} has none. POW and WTR are generating now: trade for Power and Water (p.5).',
-        '**Workers**: crew held for an upgrade or a restart is released. An injured worker may have been returned by MED\'s automatic recovery. A worker you lent out stays where it is.',
-        `**Refresh**: ${refresh}`,
-        '**Open requests and transfers carry over.**',
-      ], { tight: true }),
+      BOX('ACTION', 'UPKEEP: {UPKEEP}, EVERY ROUND', [
+        'Taken automatically from INVENTORY the moment the next round starts. **The whole bill or none of it:** short by one unit, nothing is taken and you lose **{PENALTY} Health** once. No upkeep clock exists; Round time is the warning. NEXT UPKEEP shows the bill, its Status (READY, or SHORTFALL and what is short) and the last result: UPKEEP PAID or UPKEEP SHORTFALL. Brownout halves the bill to {UPKEEP_HALF}; DARK pays nothing.',
+      ]),
+      BOX('NEWROUND', 'NEW ROUND — CHECK THESE NOW', [
+        '**1 Upkeep** was taken: read the NEXT UPKEEP result line and move the chits.',
+        gen ? `**2 Production** is open again: press GENERATE ${res} and add the chits (p.3). A pending generator upgrade has completed.`
+          : '**2 Production**: {CODE} has none. POW and WTR are generating now: trade for Power and Water (p.5).',
+        '**3 Workers**: crew held for an upgrade or a restart is released. An injured worker may have been returned by MED\'s automatic recovery. A worker you lent out stays where it is.',
+        `**4 Refresh**: ${refresh}`,
+        '**5 Open requests and transfers carry over.**',
+      ]),
       TABLE(['STATUS', 'MEANS', 'DO'], [
         ['STABLE', 'Health {DEGR} or above.', 'Operate normally.'],
         ['DEGRADED', 'Health below {DEGR}.', 'Repair before the next fault lands.'],
         ['CRITICAL', 'Health below {CRIT}. Red wash on the console; the big screen shows you red. Every control still works.', 'Repair the fastest-bleeding fault first. Ask for a value, a part, a worker, an AGR intervention.'],
         ['BROWNOUT', 'Imposed by the Authority. ' + brownoutRule(b), 'Keep operating and pay the smaller bill.'],
         ['DARK', 'Health {DARK}. SECTOR OFFLINE: repairs lock, no output, no upkeep, no healing or approvals from you.', 'EMERGENCY RESTART (OVERVIEW page) with {RESTART_COST} and {RESTART_WORKERS} free workers: back at {RESTART_HEALTH} Health, CRITICAL, that crew held until the round ends.'],
-      ], [1250, 4150, 3626], { small: true, boldFirst: true }),
-      P('**Before the next round:** make sure NEXT UPKEEP reads READY. Separately, keep enough resources for any open repairs.', { small: true }),
-      LIST(['NEEDS MY ACTION empty and WAITING chased.', 'Chits match INVENTORY and WORKERS.', 'The log sheet current.'], { tight: true, small: true }),
+      ], [1300, 4300, 3426], { small: true, boldFirst: true }),
+      P('**Before the next round:** make sure NEXT UPKEEP reads READY. Separately, keep enough resources for any open repairs. NEEDS MY ACTION empty and WAITING chased · chits match INVENTORY and WORKERS · the log sheet current.', { small: true }),
+      P('**Banners under the header:** CITY ALERT (the whole city) · NOTICE TO {CODE} (this station) · CITY ANNOUNCEMENT UPDATED (read the big screen) · CITY DECISION — AGR (an intervention changed your stock, workers or Health) · COUNCIL IN SESSION (p.6) · SIMULATION PAUSED (every clock frozen; wait).', { small: true }),
     ],
   };
 }
@@ -183,7 +169,6 @@ function pageSector(b) {
   const code = b.code;
   const title = SECTOR_PAGE_TITLE[code];
   let blocks;
-  let lead;
   if (g.enabled && g.sectors.includes(code)) {
     const key = Object.keys(RULES.production[code] || {})[0];
     const res = RES_NAME[key].toUpperCase();
@@ -198,11 +183,9 @@ function pageSector(b) {
           : cost ? `${cost.parts} 🔧 Parts · ${cost.workers} 👤 workers${cost.support_from && cost.support_from[code] ? ` · ${cost.support_from[code]}'s ${myLabel}` : ''}` : '—';
       return [`L${l.level} ${l.name}`, `${l.output} ${GLYPH[key]} ${res}`, `${brownoutOutput(code, l.output)} ${GLYPH[key]} ${res}`, how];
     });
-    lead = `The one thing only ${code} can do, what it yields and what it costs to grow.`;
     blocks = [
-      BOX('ACTION', `GENERATE ${res}: once every round`, [
-        `ROUND OUTPUT panel, right column. Press **GENERATE ${res}** once each round: your level's output lands in INVENTORY at once. Add the chits.`,
-        'Output not generated before the round changes is lost. After use the panel reads OUTPUT ALREADY GENERATED THIS ROUND.',
+      BOX('ACTION', `GENERATE ${res}: ONCE EVERY ROUND`, [
+        `ROUND OUTPUT panel, right column. Press **GENERATE ${res}** once each round: your level's output lands in INVENTORY at once. Add the chits. Output not generated before the round changes is lost; after use the panel reads OUTPUT ALREADY GENERATED THIS ROUND.`,
       ]),
       H('Generator levels (output per round)'),
       TABLE(['LEVEL', 'OUTPUT', 'BROWNOUT', 'TO REACH IT'], rows, [1900, 1700, 1700, 3726], { small: true, boldFirst: true }),
@@ -215,13 +198,13 @@ function pageSector(b) {
       ].filter(Boolean)),
       H('Brownout and DARK'),
       P(`${brownoutRule(b)} DARK generates nothing.${code === 'POW' && RULES.core_scales_power ? ' Power output also rises and falls with the Core\'s output.' : ''}`),
-      H('Allocation is yours'),
-      P(`You decide who gets ${RES_NAME[key]}, how much, and when. The console never forces a transfer; every sector needs ${RULES.upkeep[key]} ${GLYPH[key]} a round for upkeep and most repairs burn it. Your Specification Tables (p.9) are what other Liaisons come to you for. Give, delay or bargain: your call.`),
+      BOX('REMEMBER', 'ALLOCATION IS YOURS', [
+        `You decide who gets ${RES_NAME[key]}, how much, and when. The console never forces a transfer; every sector needs ${RULES.upkeep[key]} ${GLYPH[key]} a round for upkeep and most repairs burn it. Your Specification Tables (p.9) are what other Liaisons come to you for. Give, delay or bargain: your call.`,
+      ]),
     ];
   } else if (code === 'MED') {
-    lead = 'Only Medical heals. Whom, and in what order, is decided here.';
     blocks = [
-      BOX('ACTION', 'HEALING THIS ROUND: {MED_HEALS} heals a round, city-wide', [
+      BOX('ACTION', 'HEALING THIS ROUND: {MED_HEALS} HEALS A ROUND, CITY-WIDE', [
         'Right column. The panel shows n / {MED_HEALS} USED · n LEFT and the HEALING QUEUE: one row per injured worker any sector has asked you to heal, in the order the requests arrived.',
       ]),
       STEPS([
@@ -236,13 +219,13 @@ function pageSector(b) {
       P('Nobody in HAVEN-9 produces ⚕. Your opening stock, REPAIR REWARDS and Agriculture\'s interventions are the only sources; some repairs across the city need ⚕ as materials, and the automatic recovery spends them. Every ⚕ you trade away is one fewer recovery.'),
       H('Brownout and DARK'),
       P(`${brownoutRule(b)} DARK heals nobody.`),
-      H('Priority is yours'),
-      P('Only MED heals. Whom you heal first, whom you make wait and whom you decline is your decision, and every sector will say its worker is the one that matters. Transport is not involved in healing; no chit is needed.'),
+      BOX('REMEMBER', 'PRIORITY IS YOURS', [
+        'Only MED heals. Whom you heal first, whom you make wait and whom you decline is your decision, and every sector will say its worker is the one that matters. Transport is not involved in healing; no chit is needed.',
+      ]),
     ];
   } else if (code === 'TRN') {
-    lead = 'Nothing moves between two sectors until you have confirmed the chit and pressed APPROVE.';
     blocks = [
-      BOX('ACTION', 'NOTHING MOVES WITHOUT YOUR APPROVAL: {TRN_APPROVALS} a round, city-wide', [
+      BOX('ACTION', 'NOTHING MOVES WITHOUT YOUR APPROVAL: {TRN_APPROVALS} A ROUND, CITY-WIDE', [
         'Your RESOURCE EXCHANGE page is titled TRANSFER CONTROL and opens on WAITING APPROVAL. TRANSFER APPROVALS shows the allowance as dots and n / {TRN_APPROVALS} USED, then PENDING APPROVALS: one card per transfer a supplier has fulfilled, with CHIT: CHECK REQUIRED.',
       ]),
       STEPS([
@@ -262,15 +245,12 @@ function pageSector(b) {
       ], [3400, 5626], { small: true, boldFirst: true }),
       H('Brownout and DARK'),
       P(`${brownoutRule(b)} DARK approves nothing: nobody in the city can trade until you restart.`),
-      H('Your own trades use the same queue'),
-      P('Transport approves transfers it is a party to like any other: your Liaison signs the chit, you confirm and approve it, and it uses one of the {TRN_APPROVALS}.'),
+      BOX('REMEMBER', 'YOUR OWN TRADES USE THE SAME QUEUE', ['Transport approves transfers it is a party to like any other: your Liaison signs the chit, you confirm and approve it, and it uses one of the {TRN_APPROVALS}.']),
     ];
   } else if (code === 'AGR') {
-    lead = 'One decision a round, with a gain and, later, a trade-off; both apply when you confirm.';
     blocks = [
-      BOX('ACTION', 'INTERVENTIONS THIS ROUND: {AGR_CARDS} random cards, confirm 1', [
-        'Right column. Each round the panel deals {AGR_CARDS} cards: a situation in the bays, then **GAIN** and, from {AGR_FROM}, **TRADE-OFF**, each naming the sectors it affects.',
-        'One decision a round; confirmed, the panel reads LOCKED UNTIL NEXT ROUND and DECISION RESULT shows what happened.',
+      BOX('ACTION', 'INTERVENTIONS THIS ROUND: {AGR_CARDS} RANDOM CARDS, CONFIRM 1', [
+        'Right column. Each round the panel deals {AGR_CARDS} cards: a situation in the bays, then **GAIN** and, from {AGR_FROM}, **TRADE-OFF**, each naming the sectors it affects. One decision a round; confirmed, the panel reads LOCKED UNTIL NEXT ROUND and DECISION RESULT shows what happened.',
       ]),
       STEPS([
         'SELECT a card. If it asks for a target, choose the sector or the resource first; the summary rewrites itself for your choice.',
@@ -286,7 +266,6 @@ function pageSector(b) {
       P('Your three are random each round; the console prints each card\'s exact figures when dealt. * needs TRN. ' + brownoutRule(b) + ' DARK plays no cards.', { small: true }),
     ];
   } else if (code === 'COM') {
-    lead = 'You see every sector live. The city sees only what you publish.';
     blocks = [
       BOX('ACTION', 'YOU SEE THE CITY. THE CITY SEES WHAT YOU PUBLISH.', [
         'Every other sector sees only its own console and the big screen. You see every sector live, and you write what the big screen reports.',
@@ -302,18 +281,19 @@ function pageSector(b) {
       ], { keyWidth: 2500 }),
       H('Brownout and DARK'),
       P(`${brownoutRule(b)} DARK: the city runs blind.`),
-      H('Nothing you publish changes a sector\'s real state'),
-      P('The board and the broadcast are what the city is told, never what is happening. A sector\'s Health, stock, faults and brownout are the engine\'s, and the big screen insists on showing a DARK or CRITICAL sector whatever your board says. What you pass on in person, to whom, and how fast, is your decision.'),
+      BOX('REMEMBER', 'NOTHING YOU PUBLISH CHANGES A SECTOR\'S REAL STATE', [
+        'The board and the broadcast are what the city is told, never what is happening. A sector\'s Health, stock, faults and brownout are the engine\'s, and the big screen insists on showing a DARK or CRITICAL sector whatever your board says. What you pass on in person, to whom, and how fast, is your decision.',
+      ]),
     ];
   }
-  return { num: 3, title: `${TITLES[3]}: ${title}`, lead, blocks };
+  return { num: 3, title: `${TITLES[3]}: ${title}`, blocks };
 }
 
 // ---------------------------------------------------------------- page 4
 function pageFault(b) {
   const tokenRows = Object.values(RULES.tokens).map((t) => [t.label, t.effect, `${t.use}, ${t.timing}.`]);
   return {
-    num: 4, title: TITLES[4], lead: 'Every repair is the same three moves. The card on p.7–8 is the whole procedure.', blocks: [
+    num: 4, title: TITLES[4], blocks: [
       FLOW(['GET VALUE', 'BUILD CODE', 'SUBMIT'], { big: true }),
       STEPS([
         'OPEN the fault in ACTIVE FAULTS: code, name, severity, DECAY rate. Fastest bleed first; **TIME-CRITICAL** before anything.',
@@ -323,7 +303,7 @@ function pageFault(b) {
         '**BUILD CODE.** Exactly as the card\'s ENTER line shows: procedure, then each three-digit value, joined by hyphens.',
         '**SUBMIT.** Systems Lead types the code, sets **Workers assigned** to at least the crew, presses **SUBMIT REPAIR**.',
         'ACCEPTED: green banner, the fault moves to RECENTLY RESOLVED, materials leave INVENTORY, the REPAIR REWARD is paid, the crew is free at once. Move the chits; log it.',
-      ], { tight: true }),
+      ]),
       TABLE(['CONSOLE SAYS', 'DO THIS'], [
         ['RESOLUTION REJECTED', 'The code is wrong. Verify the value, the source row and the code. ATTEMPTS counts these.'],
         ['INSUFFICIENT CREW', 'Assign more workers, borrow one (p.5) or arm RESERVE CREW. Not a wrong code.'],
@@ -333,8 +313,7 @@ function pageFault(b) {
         ['SECTOR IS DARK', 'Emergency Restart first (p.2).'],
       ], [3400, 5626], { small: true, boldFirst: true }),
       P('A crew or materials refusal costs nothing and does not count toward the lock. Codes that belong to other sectors: the ESCALATE TO list on p.8.', { small: true }),
-      H('Tactical tokens'),
-      P('TACTICAL OPPORTUNITIES panel: open the fault card first, then press the token. Used once.', { small: true }),
+      H('Tactical tokens (TACTICAL OPPORTUNITIES panel): open the fault card first, then press the token. Used once.'),
       TABLE(['TOKEN', 'EFFECT', 'USE'], tokenRows, [2200, 3400, 3426], { small: true, boldFirst: true }),
     ],
   };
@@ -343,35 +322,29 @@ function pageFault(b) {
 // ---------------------------------------------------------------- page 5
 function pageTrade(b) {
   return {
-    num: 5, title: TITLES[5], lead: 'Nothing moves between sectors without a request, a signed chit and TRN\'s stamp.', blocks: [
+    num: 5, title: TITLES[5], blocks: [
+      FLOW(['Liaisons negotiate in person', 'REQUEST on the console', 'Supplier FULFILLS', 'Both Liaisons sign the chit', 'Chit to TRN', 'TRN confirms, stamps, APPROVES', 'DELIVERED: move the stock']),
       STEPS([
-        '**Liaisons agree** the deal face to face. Only the Liaison leaves the station.',
-        '**The receiver sends the request:** RESOURCE EXCHANGE → **+ NEW REQUEST** → REQUEST FROM (sector), RESOURCE (⚡ 💧 🔧 ⚕ or 👤 WORKERS), QUANTITY → **SEND REQUEST**. The card reads WAITING FOR SUPPLIER.',
-        '**The supplier fulfils:** banner VIEW or NEEDS MY ACTION → **FULFILL** (possible only while it holds the stock) or DECLINE. The card reads WAITING FOR TRN.',
-        '**Both sign the chit:** both Liaisons fill in one paper Transfer Chit and sign it. The chit\'s fields are the record; nothing on it is optional.',
-        '**Bring the chit to TRN:** a Liaison carries it to Transport.',
-        '**TRN approves and stamps:** TRN checks it, presses CONFIRM CHIT, stamps the paper, presses APPROVE. TRN has {TRN_APPROVALS} approvals a round and may DECLINE.',
-        '**Move the stock or workers:** both consoles read **DELIVERED**. Now, and only now, the chits and tokens change hands. White copy to the receiver, duplicate to the sender.',
-      ], { tight: true }),
-      BOX('WARNING', 'Nothing has moved without all three', [
-        'A console request fulfilled by the supplier + a Transfer Chit signed by both Liaisons + TRN\'s approval and stamp. An unstamped chit is void.',
-        'A swap is two transfers, one each way, and costs TRN two approvals.',
-        'WITHDRAW your own request while it reads WAITING FOR SUPPLIER; once fulfilled, only the supplier can withdraw it or TRN decline it. Open requests carry over a round change.',
+        'Liaisons agree the deal face to face. Only the Liaison leaves the station.',
+        'The receiving sector: RESOURCE EXCHANGE → **+ NEW REQUEST** → REQUEST FROM (sector), RESOURCE (⚡ 💧 🔧 ⚕ or 👤 WORKERS), QUANTITY → **SEND REQUEST**. The card reads WAITING FOR SUPPLIER.',
+        'The supplier: banner VIEW or NEEDS MY ACTION → **FULFILL** (possible only while it holds the stock) or DECLINE. The card reads WAITING FOR TRN.',
+        'Both Liaisons fill in one paper Transfer Chit and sign it. The chit\'s fields are the record; nothing on it is optional.',
+        'A Liaison carries the chit to Transport.',
+        'TRN checks it, presses CONFIRM CHIT, stamps the paper, presses APPROVE. TRN has {TRN_APPROVALS} approvals a round and may DECLINE.',
+        'Both consoles read **DELIVERED**. Now, and only now, the chits and tokens change hands. White copy to the receiver, duplicate to the sender.',
+      ]),
+      BOX('WARNING', 'NOTHING HAS MOVED WITHOUT ALL THREE', [
+        'A console request fulfilled by the supplier + a Transfer Chit signed by both Liaisons + TRN\'s approval and stamp. An unstamped chit is void. A swap is two transfers, one each way, and costs TRN two approvals. WITHDRAW your own request while it reads WAITING FOR SUPPLIER; once fulfilled, only the supplier can withdraw it or TRN decline it. Open requests carry over a round change.',
       ]),
       H('Workers'),
-      LIST([
-        '**Workers assigned** on a repair is a count: the crew is free again the moment the code is accepted.',
-        'Workers are held, and shown unavailable, by a generator upgrade or an emergency restart (until the round ends), a brownout ({BROWN_WORKERS}), an AGR trade-off that takes one for the round, and a loan.',
-        'A worker is lent exactly like a resource: RESOURCE 👤 WORKERS, the same chit, the same TRN approval. The token changes hands at DELIVERED and the console shows LOANED OUT or BORROWED.',
-        '**A borrowed worker never returns by itself:** send one back the same way.',
-      ], { tight: true }),
+      P('**Workers assigned** on a repair is a count: the crew is free again the moment the code is accepted. Workers are held, and shown unavailable, by a generator upgrade or an emergency restart (until the round ends), a brownout ({BROWN_WORKERS}), an AGR trade-off that takes one for the round, and a loan. A worker is lent exactly like a resource: RESOURCE 👤 WORKERS, the same chit, the same TRN approval; the token changes hands at DELIVERED and the console shows LOANED OUT or BORROWED. **A borrowed worker never returns by itself**: send one back the same way.'),
       H('Injuries and healing'),
       STEPS([
         'Some faults injure workers the moment they appear: WORKERS available drops and the INJURED WORKERS panel appears. The token stays at your station, face down.',
         'Press **REQUEST MED HEALING** for each injured worker. The request joins MED\'s HEALING THIS ROUND queue. No chit, no Transport.',
         'MED presses HEAL: the worker returns to AVAILABLE at once. MED heals at most {MED_HEALS} workers a round across the city and may DECLINE.',
         'At each round change MED\'s automatic recovery returns {RECOVER_N} injured worker in the city if MED holds a ⚕.',
-      ], { tight: true }),
+      ]),
     ],
   };
 }
@@ -393,18 +366,16 @@ function pageQuick(b) {
     ['UPKEEP SHORTFALL SHOWN', 'You lost {PENALTY} Health; stock untouched. Trade for Power and Water now.'],
     ['A WORKER IS INJURED', 'Turn the token face down. REQUEST MED HEALING.'],
     ['RESOLUTION REJECTED', 'Verify value, source and code before trying again. {LOCK_N} wrong in a row locks the console {LOCK_S} s.'],
-    ['⚠ HEALTH BELOW {CRIT}', 'CRITICAL. Controls still work. Prioritise the fastest-decaying fault.'],
-    ['⚠ SECTOR IS DARK', 'EMERGENCY RESTART when you can pay {RESTART_COST} and {RESTART_WORKERS} workers (p.2).'],
+    ['HEALTH BELOW {CRIT}', 'CRITICAL. Controls still work. Prioritise the fastest-decaying fault.'],
+    ['SECTOR IS DARK', 'EMERGENCY RESTART when you can pay {RESTART_COST} and {RESTART_WORKERS} workers (p.2).'],
     ['COUNCIL IS CALLED', 'Chief and Liaison go immediately. Everyone else keeps operating.'],
     ['NO ACTIVE FAULT', `CHECK NEXT UPKEEP, open requests, chits against INVENTORY, injured workers, and your panel: ${own}`],
     ['CONSOLE SAYS RECONNECTING', 'Keep working on paper. If it stays down for minutes, that is a technical failure: tell the control desk.'],
   ];
   return {
-    num: 6, title: TITLES[6], lead: 'A reference page: find the situation on the left, do the line beside it. ⚠ marks an emergency.', blocks: [
+    num: 6, title: TITLES[6], blocks: [
       TABLE(['WHEN THIS HAPPENS', 'DO THIS'], rows, [3000, 6026], { small: true, boldFirst: true }),
-      P('**Banners under the header:** CITY ALERT (the whole city) · NOTICE TO {CODE} (this station) · CITY ANNOUNCEMENT UPDATED (read the big screen) · CITY DECISION — AGR (an intervention changed your stock, workers or Health) · COUNCIL IN SESSION (below) · SIMULATION PAUSED (every clock frozen; wait).', { small: true }),
-      H('COUNCIL IN SESSION — Chief and Liaison report to Central Council'),
-      LIST([
+      BOX('ACTION', 'COUNCIL IN SESSION — CHIEF + LIAISON REPORT TO CENTRAL COUNCIL', [
         'When that banner shows, the **Sector Chief and the Liaison go to the central Council table immediately**. Everyone else stays and keeps operating; faults keep bleeding and the round clock keeps running.',
         'The Chief holds the sector\'s seat and voice; a sector whose Chief is absent has no voice for that sitting. The Liaison may speak and holds no seat.',
         'The sitting is timed by the Continuity Authority. **Watch the Council clock** on the banner. **At 00:00, unresolved matters remain unresolved** (COUNCIL TIME EXPIRED).',
@@ -459,7 +430,7 @@ function pageFaults(b, part) {
   if (part === 2) {
     blocks.push(P('**ESCALATE TO — codes that belong to another sector:**   ' + escalate.map(([code, owner]) => `**${code} → ${owner}**`).join('   ·   ') + '.   A fault on your own console is always yours; told or shown one of these, tell that sector\'s station and enter nothing.', { small: true, escalate }));
   }
-  return { num: part === 1 ? 7 : 8, title: TITLES[part === 1 ? 7 : 8], lead: part === 1 ? 'Find the code, read down: crew, materials, where each value comes from, what to enter.' : 'The same cards, for the later procedures.', blocks };
+  return { num: part === 1 ? 7 : 8, title: TITLES[part === 1 ? 7 : 8], blocks };
 }
 
 function pageSpecs(b) {
@@ -478,7 +449,7 @@ function pageSpecs(b) {
     blocks.push({ t: 'spectable', kind: 'reference', id: 'REFERENCES', name: 'Cross-System Reference Directory', rows: b.references.map((r) => [r.name, r.display]) });
   }
   blocks.push({ t: 'spectable', kind: 'authorisation', id: 'APPENDIX C', name: 'Non-Routine Authorisation — issued under emergency powers, not revoked, valid for the current operating period', rows: [[b.appendix.row_label, String(b.appendix.value)]] });
-  return { num: 9, title: TITLES[9], lead: 'Your own values. Other Liaisons will ask for these rows by name.', blocks };
+  return { num: 9, title: TITLES[9], blocks };
 }
 
 function compactFor(b) {

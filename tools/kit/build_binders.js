@@ -11,22 +11,13 @@
 // written beside binder_content.json for tools/kit/check_binder_pages.py,
 // which exports the DOCX to PDF with Word and verifies that every page starts
 // where the binder says it does.
-//
-// FIELD MANUAL EDITION (2026-10-06). The same nine pages as a clean
-// operations manual: wider margins, one body size, headings that are bold
-// words rather than coloured capitals, thin rules where there used to be
-// filled panels, and a box only where the brief allows one — an important
-// action, a critical warning, a table, a time-critical card. The sector
-// colour is an accent: the page number, a heading's thin rule, a step
-// number, an arrow, a fault code. Nothing a participant reads is set in a
-// coloured block, and nothing here changes a word the pages say.
 
 const fs = require("fs");
 const path = require("path");
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   WidthType, ShadingType, AlignmentType, BorderStyle,
-  Header, Footer, PageNumber, VerticalAlign, TabStopType,
+  Header, Footer, PageNumber, VerticalAlign,
 } = require("docx");
 const compact = require("./binder_compact");
 const { fill } = require("./binder_rules");
@@ -40,38 +31,30 @@ const OUTDIR = positional[1] || "binders";
 const ONLY = (flag("--only") || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
 const data = JSON.parse(fs.readFileSync(SRC, "utf8"));
 
-// ---------------------------------------------------------------- the system
-
-/** Page geometry: 2.8 cm at the sides, 2.6 cm above, 2.3 cm below (A4). */
-const MARGIN = { top: 1380, bottom: 1200, left: 1560, right: 1560 };
-const W = 11906 - MARGIN.left - MARGIN.right;   // the content width in DXA
+const W = 9026;                     // A4 content width in DXA (11906 - 2*1440)
 const { INK, MUTED, RULE, WARN: WARN_RED, AMBER } = P;
-const tint = P.tint;
-
-/** One body size, one small size, one label size, and the page title the page check reads at 15 pt. */
-const SIZE = { body: 20, small: 18, label: 14, h2: 22, title: 30, num: 36, code: 26 };
-/** Line spacing for running text: a little air, never a stretch. */
-const LINE = 252;
 
 const noBorders = {
   top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE },
   left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE },
   insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE },
 };
-const hairline = { style: BorderStyle.SINGLE, size: 4, color: RULE };
-/** A table drawn with thin horizontal dividers only: no outer frame, no vertical lines. */
-const dividers = {
-  top: { style: BorderStyle.NONE }, bottom: hairline, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE },
-  insideHorizontal: hairline, insideVertical: { style: BorderStyle.NONE },
-};
 const thinBorders = {
-  top: hairline, bottom: hairline, left: hairline, right: hairline, insideHorizontal: hairline, insideVertical: hairline,
+  top: { style: BorderStyle.SINGLE, size: 4, color: RULE },
+  bottom: { style: BorderStyle.SINGLE, size: 4, color: RULE },
+  left: { style: BorderStyle.SINGLE, size: 4, color: RULE },
+  right: { style: BorderStyle.SINGLE, size: 4, color: RULE },
+  insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: RULE },
+  insideVertical: { style: BorderStyle.SINGLE, size: 4, color: RULE },
 };
 
+/** A light tint of a sector colour, for box fills: 85 % white (a grey of that lightness in B&W). */
+const tint = P.tint;
+
 const mono = (text, opts = {}) =>
-  new TextRun({ text, font: "Courier New", size: SIZE.body, color: INK, ...opts });
+  new TextRun({ text, font: "Courier New", size: 20, color: INK, ...opts });
 const body = (text, opts = {}) =>
-  new TextRun({ text, font: "Arial", size: SIZE.body, color: INK, ...opts });
+  new TextRun({ text, font: "Arial", size: 20, color: INK, ...opts });
 
 /**
  * Inline markup for the pages: **bold** and `mono`. Nothing else — the
@@ -84,26 +67,14 @@ function runs(text, opts = {}) {
   const parts = String(text).split(/(\*\*[^*]+\*\*|`[^`]+`)/g).filter((s) => s.length);
   for (const part of parts) {
     if (part.startsWith("**") && part.endsWith("**")) out.push(...plain(part.slice(2, -2), { ...opts, bold: true }));
-    else if (part.startsWith("`") && part.endsWith("`")) out.push(mono(part.slice(1, -1), { ...opts, size: opts.size || SIZE.body }));
+    else if (part.startsWith("`") && part.endsWith("`")) out.push(mono(part.slice(1, -1), { ...opts, size: opts.size || 20 }));
     else out.push(...plain(part, opts));
   }
   return out;
 }
 
-/**
- * A step that opens with its verb in capitals (TAKE the Role Cards …) gets
- * that verb in bold, so the eye finds the action first. A step that already
- * opens with bold text is left to its own emphasis.
- */
-function stepRuns(text, opts = {}) {
-  const s = String(text);
-  const m = /^([A-Z][A-Z]{2,}(?: [A-Z][A-Z]{2,})?)(?=[ ,.:;])/.exec(s);
-  if (!m || s.startsWith("**")) return runs(s, opts);
-  return [...runs(`**${m[1]}**`, opts), ...runs(s.slice(m[1].length), opts)];
-}
-
-const para = (children, { after = 120, before = 0, line = LINE, keepNext = false, keepLines = false, indent, alignment, border, tabStops } = {}) =>
-  new Paragraph({ children: Array.isArray(children) ? children : [children], spacing: { before, after, line, lineRule: "auto" }, keepNext, keepLines, indent, alignment, border, tabStops });
+const p = (children, opts = {}) =>
+  new Paragraph({ children: Array.isArray(children) ? children : [children], spacing: { after: 120 }, ...opts });
 
 /**
  * A page starts here. Not a PageBreak run: a paragraph that cannot fit on a
@@ -114,309 +85,316 @@ const para = (children, { after = 120, before = 0, line = LINE, keepNext = false
 const pageStart = () => new Paragraph({ pageBreakBefore: true, spacing: { before: 0, after: 0, line: 20 }, children: [new TextRun({ text: "", size: 2 })] });
 /** Spacing after a block. It knows it is a gap, so a page never ends on one. */
 const gap = (after = 120) => Object.assign(new Paragraph({ text: "", spacing: { after } }), { __gap: true });
-/** A thin rule across the page, as a paragraph border: it separates, it frames nothing. */
-const rule = (color = RULE, { before = 40, after = 120, size = 4 } = {}) =>
-  Object.assign(new Paragraph({ spacing: { before, after, line: 20 }, border: { bottom: { style: BorderStyle.SINGLE, size, color } }, children: [new TextRun({ text: "", size: 2 })] }), { __gap: true });
 
-function cell(children, { width, shade, bold, align, mono: isMono, size, color, margins, borders, span } = {}) {
+function cell(children, { width, shade, bold, align, mono: isMono, size, color, margins } = {}) {
   const list = (Array.isArray(children) ? children : [children]).flatMap((t) =>
     typeof t === "string" ? (isMono || t === "" ? [(isMono ? mono : body)(t, { bold, size, color })] : runs(t, { bold, size, color })) : [t]);
   return new TableCell({
     width: { size: width, type: WidthType.DXA },
     verticalAlign: VerticalAlign.TOP,
-    columnSpan: span,
     shading: shade ? { type: ShadingType.CLEAR, fill: shade, color: "auto" } : undefined,
-    margins: margins || { top: 70, bottom: 70, left: 90, right: 90 },
-    borders,
-    children: [new Paragraph({ spacing: { after: 0, line: LINE, lineRule: "auto" }, alignment: align, children: list })],
+    margins: margins || { top: 60, bottom: 60, left: 100, right: 100 },
+    children: [new Paragraph({ spacing: { after: 0 }, alignment: align, children: list })],
   });
 }
 
-/** Column widths the pages declare are proportions: fitted to the content width, the last column takes the rounding. */
-function fit(widths) {
-  const total = widths.reduce((a, b) => a + b, 0);
-  const out = widths.map((w) => Math.floor((w * W) / total));
-  out[out.length - 1] += W - out.reduce((a, b) => a + b, 0);
-  return out;
-}
-
-function table(rows, widths, borders = dividers) {
+function table(rows, widths, borders = thinBorders) {
   return new Table({ columnWidths: widths, width: { size: W, type: WidthType.DXA }, borders, rows });
 }
 
 // ---------------------------------------------------------------- page furniture
 
-/** The page head: the number in the sector colour, the title in black, a small grey tab at the right, one thin rule under both. */
+/** The page head: a large number in the sector colour, the title, a chip at the right. */
 function pageHead(num, title, colour, tab) {
-  const under = { bottom: { style: BorderStyle.SINGLE, size: 8, color: P.sector(colour) } };
   const left = new TableCell({
     width: { size: W - 1500, type: WidthType.DXA }, verticalAlign: VerticalAlign.BOTTOM,
-    borders: under, margins: { top: 0, bottom: 90, left: 0, right: 100 },
+    borders: { bottom: { style: BorderStyle.SINGLE, size: 12, color: P.sector(colour) } },
+    margins: { top: 0, bottom: 80, left: 0, right: 100 },
     children: [new Paragraph({
       spacing: { after: 0 },
       children: [
-        ...(num === "" ? [] : [new TextRun({ text: `${num}   `, font: "Arial", size: SIZE.num, bold: true, color: P.sector(colour) })]),
-        new TextRun({ text: title, font: "Arial", size: SIZE.title, bold: true, color: INK }),
+        ...(num === "" ? [] : [new TextRun({ text: `${num}  `, font: "Arial", size: 56, bold: true, color: P.sector(colour) })]),
+        new TextRun({ text: title, font: "Arial", size: 30, bold: true, color: INK, characterSpacing: 10 }),
       ],
     })],
   });
   const right = new TableCell({
     width: { size: 1500, type: WidthType.DXA }, verticalAlign: VerticalAlign.BOTTOM,
-    borders: under, margins: { top: 0, bottom: 100, left: 100, right: 0 },
+    borders: { bottom: { style: BorderStyle.SINGLE, size: 12, color: P.sector(colour) } },
+    shading: { type: ShadingType.CLEAR, fill: P.sector(colour), color: "auto" },
+    margins: { top: 60, bottom: 60, left: 100, right: 100 },
     children: [new Paragraph({
-      alignment: AlignmentType.RIGHT, spacing: { after: 0 },
-      children: [new TextRun({ text: tab, font: "Arial", size: 15, color: MUTED, characterSpacing: 20 })],
+      alignment: AlignmentType.CENTER, spacing: { after: 0 },
+      children: [new TextRun({ text: tab, font: "Arial", size: 18, bold: true, color: "FFFFFF", characterSpacing: 60 })],
     })],
   });
   return [
     new Table({ columnWidths: [W - 1500, 1500], width: { size: W, type: WidthType.DXA }, borders: noBorders, rows: [new TableRow({ children: [left, right] })] }),
-    gap(100),
+    gap(140),
   ];
 }
 
-/** The one-line purpose under a page title. */
-function leadBlock(text) {
-  return para(runs(text, { size: 19, italics: true, color: MUTED }), { after: 160 });
-}
-
-/** A section heading: bold words in black, a short thin rule in the sector colour at its left. */
-function headingBlock(text, colour) {
-  return para(runs(text, { size: SIZE.h2, bold: true }), {
-    before: 200, after: 70, keepNext: true, indent: { left: 140 },
-    border: { left: { style: BorderStyle.SINGLE, size: 14, color: P.sector(colour), space: 6 } },
-  });
-}
-
-/** Numbered steps: the number in the sector colour, the verb in bold, air between them. */
-function stepsBlock(items, colour, { start = 1, tight = false } = {}) {
-  return items.map((text, i) => para(
-    [new TextRun({ text: `${i + start}`, font: "Arial", size: SIZE.body, bold: true, color: P.sector(colour) }), new TextRun({ text: "\t", font: "Arial", size: SIZE.body }), ...stepRuns(text)],
-    { after: tight ? 60 : 100, indent: { left: 440, hanging: 440 }, tabStops: [{ type: TabStopType.LEFT, position: 440 }], keepLines: true },
-  ));
-}
-
-/** Bulleted lines: a small grey dash, hanging indent. */
-function listBlock(items, { tight = false, small = false } = {}) {
-  return items.map((text) => para(
-    [new TextRun({ text: "–", font: "Arial", size: small ? SIZE.small : SIZE.body, color: MUTED }), new TextRun({ text: "\t", font: "Arial", size: SIZE.body }), ...runs(text, small ? { size: SIZE.small } : {})],
-    { after: tight ? 40 : 70, indent: { left: 300, hanging: 300 }, tabStops: [{ type: TabStopType.LEFT, position: 300 }], keepLines: true },
-  ));
-}
-
-/** A table with bold headers over a black rule, thin dividers between rows, no fills and no frame. */
-function tableBlock(head, rows, declared, { small = false, boldFirst = false } = {}) {
-  const widths = fit(declared);
-  const size = small ? SIZE.small : SIZE.body;
-  const headRule = { bottom: { style: BorderStyle.SINGLE, size: 8, color: INK } };
-  const out = [new TableRow({ tableHeader: true, children: head.map((h, i) => cell(h, { width: widths[i], bold: true, size: 17, borders: headRule, margins: { top: 40, bottom: 60, left: 80, right: 80 } })) })];
-  for (const r of rows) {
-    out.push(new TableRow({ cantSplit: true, children: r.map((c, i) => new TableCell({
-      width: { size: widths[i], type: WidthType.DXA },
-      verticalAlign: VerticalAlign.TOP,
-      margins: { top: 60, bottom: 60, left: 80, right: 80 },
-      children: [new Paragraph({ spacing: { after: 0, line: LINE, lineRule: "auto" }, children: runs(c, { size, bold: boldFirst && i === 0 }) })],
-    })) }));
-  }
-  return table(out, widths);
-}
-
-/** Label and text, two columns, thin dividers, nothing filled. */
-function kvBlock(rows, { keyWidth = 2600 } = {}) {
-  return table(rows.map(([k, v]) => new TableRow({ cantSplit: true, children: [
-    cell(k, { width: keyWidth, bold: true, size: SIZE.small, margins: { top: 60, bottom: 60, left: 0, right: 100 } }),
-    new TableCell({
-      width: { size: W - keyWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP,
-      margins: { top: 60, bottom: 60, left: 100, right: 60 },
-      children: [new Paragraph({ spacing: { after: 0, line: LINE, lineRule: "auto" }, children: runs(v, { size: 19 }) })],
-    }),
-  ] })), [keyWidth, W - keyWidth]);
-}
-
-/**
- * The one kind of box left: a thin rule at the left in the kind's colour, a
- * small label, a bold title, plain lines. An important action is ruled in
- * the sector colour; a critical warning in red, on the faintest tint. No
- * frame, no fill otherwise, and no box inside it.
- */
-const BOX_STYLE = {
-  ACTION: (colour) => ({ bar: P.sector(colour), label: "ACTION", fill: null }),
-  WARNING: () => ({ bar: WARN_RED, label: "WARNING", fill: P.fill.warning }),
-  REMEMBER: () => ({ bar: MUTED, label: "REMEMBER", fill: null }),
-  NEWROUND: () => ({ bar: AMBER, label: "NEW ROUND", fill: null }),
+// In colour the kind is a colour. In B&W it is a treatment: ACTION and NEW
+// ROUND carry a black heading strip (NEW ROUND inside a dashed frame), WARNING
+// a double frame on grey, REMEMBER a thin grey frame — so the hierarchy reads
+// on a monochrome laser printer and a photocopy of it.
+const BOX_STYLE = P.mono ? {
+  ACTION: () => ({ fill: "FFFFFF", bar: "000000", title: "FFFFFF", strip: "000000", label: "ACTION", frame: { style: BorderStyle.SINGLE, size: 8, color: "000000" } }),
+  WARNING: () => ({ fill: "E6E6E6", bar: "000000", title: "000000", strip: null, label: "WARNING", frame: { style: BorderStyle.DOUBLE, size: 4, color: "000000" } }),
+  REMEMBER: () => ({ fill: "F7F7F7", bar: "808080", title: "000000", strip: null, label: "REMEMBER", frame: { style: BorderStyle.SINGLE, size: 4, color: "808080" } }),
+  NEWROUND: () => ({ fill: "F2F2F2", bar: "000000", title: "FFFFFF", strip: "000000", label: "NEW ROUND", frame: { style: BorderStyle.DASHED, size: 8, color: "000000" } }),
+} : {
+  ACTION: (colour) => ({ fill: tint(colour), bar: colour, title: colour, label: "ACTION" }),
+  WARNING: () => ({ fill: P.fill.warning, bar: WARN_RED, title: WARN_RED, label: "WARNING" }),
+  REMEMBER: () => ({ fill: P.fill.light, bar: MUTED, title: INK, label: "REMEMBER" }),
+  NEWROUND: () => ({ fill: P.fill.newround, bar: AMBER, title: AMBER, label: "NEW ROUND" }),
 };
 
 function boxBlock(kind, title, lines, colour) {
   const st = (BOX_STYLE[kind] || BOX_STYLE.REMEMBER)(colour);
   const paras = [
-    para([
-      new TextRun({ text: `${st.label}  `, font: "Arial", size: SIZE.label, bold: true, color: st.bar, characterSpacing: 40 }),
-      ...runs(title, { size: SIZE.h2, bold: true }),
-    ], { after: 70, keepNext: true }),
-    ...lines.map((line, i) => para(runs(line), { after: i === lines.length - 1 ? 0 : 70 })),
+    new Paragraph({
+      spacing: { after: 60 },
+      shading: st.strip ? { type: ShadingType.CLEAR, fill: st.strip, color: "auto" } : undefined,
+      children: [
+        new TextRun({ text: `${st.label}  `, font: "Arial", size: 14, bold: true, color: st.strip ? "FFFFFF" : st.bar, characterSpacing: 80 }),
+        ...runs(title, { size: kind === "NEWROUND" ? 26 : 22, bold: true, color: st.title }),
+      ],
+    }),
+    ...lines.map((line) => new Paragraph({ spacing: { after: 60 }, children: runs(line) })),
   ];
+  const frame = st.frame ? { top: st.frame, bottom: st.frame, right: st.frame } : {};
   return new Table({
     columnWidths: [W], width: { size: W, type: WidthType.DXA },
-    borders: { ...noBorders, left: { style: BorderStyle.SINGLE, size: 18, color: st.bar } },
-    rows: [new TableRow({ cantSplit: true, children: [new TableCell({
+    borders: { ...noBorders, ...frame, left: { style: BorderStyle.SINGLE, size: 36, color: st.bar } },
+    rows: [new TableRow({ children: [new TableCell({
       width: { size: W, type: WidthType.DXA },
-      shading: st.fill ? { type: ShadingType.CLEAR, fill: st.fill, color: "auto" } : undefined,
-      margins: { top: 70, bottom: 70, left: 200, right: 140 },
+      shading: { type: ShadingType.CLEAR, fill: st.fill, color: "auto" },
+      margins: { top: 120, bottom: 100, left: 200, right: 160 },
       children: paras,
     })] })],
   });
 }
 
-/** One highlighted strip, one line: the lightest tint of the sector colour behind bold text. */
-function stripBlock(text, colour) {
-  return new Table({
-    columnWidths: [W], width: { size: W, type: WidthType.DXA }, borders: noBorders,
-    rows: [new TableRow({ cantSplit: true, children: [new TableCell({
-      width: { size: W, type: WidthType.DXA },
-      shading: { type: ShadingType.CLEAR, fill: P.mono ? "F2F2F2" : tint(colour, 0.9), color: "auto" },
-      margins: { top: 60, bottom: 60, left: 160, right: 160 },
-      children: [new Paragraph({ spacing: { after: 0 }, children: runs(text, { bold: true }) })],
-    })] })],
+function headingBlock(text, colour) {
+  return new Paragraph({
+    spacing: { before: 200, after: 80 },
+    children: [new TextRun({ text: text.toUpperCase(), font: "Arial", size: 20, bold: true, color: P.sector(colour), characterSpacing: 40 })],
   });
 }
 
-/**
- * A sequence read left to right: numbers in the sector colour, labels in
- * black, thin arrows between — nothing filled. `big` is the three actions a
- * repair comes down to, set large, each on a short rule.
- */
+function stepsBlock(items, { start = 1 } = {}) {
+  return items.map((text, i) => new Paragraph({
+    spacing: { after: 70 }, indent: { left: 420, hanging: 420 },
+    children: [mono(`${String(i + start).padStart(2, " ")}  `, { bold: true }), ...runs(text)],
+  }));
+}
+
+function tableBlock(head, rows, widths, { small = false, boldFirst = false } = {}) {
+  const size = small ? 18 : 20;
+  const out = [new TableRow({ tableHeader: true, children: head.map((h, i) => cell(h, { width: widths[i], shade: "F2F2F2", bold: true, size: 16 })) })];
+  for (const r of rows) {
+    out.push(new TableRow({ cantSplit: true, children: r.map((c, i) => new TableCell({
+      width: { size: widths[i], type: WidthType.DXA },
+      verticalAlign: VerticalAlign.TOP,
+      margins: { top: 50, bottom: 50, left: 90, right: 90 },
+      children: [new Paragraph({ spacing: { after: 0 }, children: runs(c, { size, bold: boldFirst && i === 0 }) })],
+    })) }));
+  }
+  return table(out, widths);
+}
+
+function kvBlock(rows, { keyWidth = 2600 } = {}) {
+  return table(rows.map(([k, v]) => new TableRow({ cantSplit: true, children: [
+    cell(k, { width: keyWidth, shade: "F2F2F2", bold: true, size: 18 }),
+    new TableCell({
+      width: { size: W - keyWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP,
+      margins: { top: 60, bottom: 60, left: 100, right: 100 },
+      children: [new Paragraph({ spacing: { after: 0 }, children: runs(v) })],
+    }),
+  ] })), [keyWidth, W - keyWidth]);
+}
+
+/** A strip of steps joined by arrows. `big` is the three actions a repair comes down to. */
 function flowBlock(steps, colour, { big = false } = {}) {
   const n = steps.length;
-  const arrow = big ? 560 : 360;
+  const arrow = big ? 600 : 360;
   const stepW = Math.floor((W - arrow * (n - 1)) / n);
   const widths = [];
   const cells = [];
   steps.forEach((s, i) => {
     widths.push(stepW);
     cells.push(new TableCell({
-      width: { size: stepW, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP,
-      margins: { top: 40, bottom: big ? 80 : 40, left: 20, right: 40 },
-      borders: big ? { bottom: { style: BorderStyle.SINGLE, size: 8, color: P.sector(colour) } } : undefined,
-      children: [new Paragraph({ alignment: big ? AlignmentType.CENTER : AlignmentType.LEFT, spacing: { after: 0, line: LINE, lineRule: "auto" }, children: [
-        new TextRun({ text: `${i + 1}  `, font: "Arial", size: big ? 34 : 24, bold: true, color: P.sector(colour) }),
-        ...runs(s, { size: big ? 28 : 17, bold: true }),
-      ] })],
+      width: { size: stepW, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
+      shading: { type: ShadingType.CLEAR, fill: big ? P.sector(colour) : i === 0 ? P.sector(colour) : tint(colour, 0.8), color: "auto" },
+      margins: { top: big ? 120 : 90, bottom: big ? 120 : 90, left: 70, right: 70 },
+      borders: thinBorders,
+      children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: runs(big ? `${i + 1}  ${s}` : s, { size: big ? 30 : 16, bold: true, color: big || i === 0 ? "FFFFFF" : INK, characterSpacing: big ? 40 : 0 }) })],
     }));
     if (i < n - 1) {
       widths.push(arrow);
       cells.push(new TableCell({
-        width: { size: arrow, type: WidthType.DXA }, verticalAlign: big ? VerticalAlign.CENTER : VerticalAlign.TOP, borders: noBorders,
-        margins: { top: big ? 0 : 50, bottom: 0, left: 0, right: 0 },
-        children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [body("→", { size: big ? 36 : 22, color: P.sector(colour) })] })],
+        width: { size: arrow, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, borders: noBorders,
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+        children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [body("→", { size: big ? 44 : 28, bold: true, color: P.sector(colour) })] })],
       }));
     }
   });
   const used = widths.reduce((a, b) => a + b, 0);
   widths[widths.length - 1] += W - used;
-  return new Table({ columnWidths: widths, width: { size: W, type: WidthType.DXA }, borders: noBorders, rows: [new TableRow({ cantSplit: true, children: cells })] });
+  return new Table({ columnWidths: widths, width: { size: W, type: WidthType.DXA }, borders: noBorders, rows: [new TableRow({ children: cells })] });
 }
 
 /**
- * FAULTS & REPAIRS (pages 7 and 8): one card per procedure, without a frame.
- * The code is the biggest thing on the page because finding it is the job;
- * under it, on one line, the three things a team must stage, then each value
- * with where it comes from, then what to enter. A thin rule separates one
- * card from the next. A TIME-CRITICAL card carries one warning sign and a
- * small red word, and in black and white the word alone.
+ * FAULTS & REPAIRS (pages 7 and 8): one card per procedure. The code is the
+ * biggest thing on the page because finding it is the job; the three things a
+ * team must stage, fetch and type sit on fixed cells underneath.
  */
-const CARD_W = [2300, 2000, W - 4300];
+const CARD_W = [3000, 3000, 3026];
 function faultCardBlock(c, colour) {
-  const label = (text) => new TextRun({ text, font: "Arial", size: 13, bold: true, color: MUTED, characterSpacing: 40 });
-  const fact = (lab, value, { monoValue = false, width } = {}) => new TableCell({
-    width: { size: width, type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP, borders: noBorders,
-    margins: { top: 20, bottom: 20, left: 0, right: 80 },
+  const hot = P.mono && c.time_critical;            // B&W: the urgency is a black header, not a red word
+  const headFill = hot ? "000000" : tint(colour, 0.78);
+  const headInk = hot ? "FFFFFF" : INK;
+  const codeInk = hot ? "FFFFFF" : P.sector(colour);
+  const frame = P.sector(colour);
+  const frameSize = hot ? 24 : 12;
+  const labelled = (label, value, { monoValue = false, size = 20, extra = [] } = {}) => new TableCell({
+    width: { size: CARD_W[0], type: WidthType.DXA }, verticalAlign: VerticalAlign.TOP,
+    // Tightened 2026-10-06 so that page 8 still holds five cards once two of them carry a third value and an ENTER line.
+    margins: { top: 25, bottom: 30, left: 110, right: 90 },
     children: [
-      new Paragraph({ spacing: { after: 0 }, children: [label(lab)] }),
-      new Paragraph({ spacing: { after: 0 }, children: monoValue ? [mono(value, { bold: true, size: 21 })] : runs(value, { bold: true, size: 19 }) }),
+      new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: label, font: "Arial", size: 13, bold: true, color: MUTED, characterSpacing: 60 })] }),
+      new Paragraph({ spacing: { after: 0 }, children: monoValue ? [mono(value, { bold: true, size })] : runs(value, { bold: true, size }) }),
+      ...extra,
     ],
   });
-  const valueLine = (lab, text) => {
-    const [first, ...rest] = String(text || "—").split("\n");
-    return [
-      para([label(lab), new TextRun({ text: "\t", size: SIZE.body }), ...runs(first, { size: 19 })], { after: rest.length ? 0 : 30, indent: { left: 1000, hanging: 1000 }, tabStops: [{ type: TabStopType.LEFT, position: 1000 }], keepNext: true, keepLines: true }),
-      ...rest.map((l) => para(runs(l, { size: 15, italics: true, color: AMBER }), { after: 30, indent: { left: 1000 }, keepNext: true })),
-    ];
+  const valueCell = (label, text) => {
+    if (!text) return labelled(label, "—", { size: 18 });
+    const [first, ...rest] = String(text).split("\n");
+    return labelled(label, first, { size: 19, extra: rest.map((l) => new Paragraph({ spacing: { before: 20, after: 0 }, children: runs(l, { size: 15, italics: true, color: AMBER }) })) });
   };
-  const head = para([
-    mono(c.code, { bold: true, size: SIZE.code, color: P.sector(colour) }),
-    body("   "),
-    body(c.name, { bold: true, size: 21 }),
-    ...(c.time_critical ? [body("   "), ...runs("⚠ TIME-CRITICAL", { bold: true, size: 16, color: WARN_RED })] : []),
-  ], { after: 40, keepNext: true, keepLines: true });
-  const facts = new Table({
-    columnWidths: CARD_W, width: { size: W, type: WidthType.DXA }, borders: noBorders,
-    rows: [new TableRow({ cantSplit: true, children: [
-      fact("PROCEDURE", c.proc, { monoValue: true, width: CARD_W[0] }),
-      fact("CREW", c.crew, { width: CARD_W[1] }),
-      fact("MATERIALS", c.materials, { width: CARD_W[2] }),
+  const head = new TableRow({ cantSplit: true, children: [
+    new TableCell({
+      width: { size: CARD_W[0], type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
+      shading: { type: ShadingType.CLEAR, fill: headFill, color: "auto" },
+      margins: { top: 20, bottom: 20, left: 110, right: 90 },
+      children: [new Paragraph({ spacing: { after: 0 }, children: [mono(c.code, { bold: true, size: 36, color: codeInk })] })],
+    }),
+    new TableCell({
+      width: { size: CARD_W[1] + CARD_W[2], type: WidthType.DXA }, columnSpan: 2, verticalAlign: VerticalAlign.CENTER,
+      shading: { type: ShadingType.CLEAR, fill: headFill, color: "auto" },
+      margins: { top: 20, bottom: 20, left: 110, right: 90 },
+      children: [new Paragraph({ spacing: { after: 0 }, children: [
+        body(c.name, { bold: true, size: 22, color: headInk }),
+        ...(c.time_critical ? runs("   ⚠ TIME-CRITICAL", { bold: true, size: 20, color: hot ? "FFFFFF" : WARN_RED }) : []),
+      ] })],
+    }),
+  ] });
+  const facts = new TableRow({ cantSplit: true, children: [
+    labelled("PROCEDURE", c.proc, { monoValue: true, size: 22 }),
+    labelled("CREW", c.crew),
+    labelled("MATERIALS", c.materials),
+  ] });
+  // Two values share their row with ENTER. Three (every sector's P-08 and
+  // P-09, 2026-10-06) fill the row, and ENTER takes one line of its own under
+  // them — label and format side by side, so the card grows by a line and not
+  // a cell — and reads VALUE 1 → 2 → 3 → the code, the order it is built in.
+  const enterLine = (format) => new TableCell({
+    width: { size: W, type: WidthType.DXA }, columnSpan: 3, verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 20, bottom: 25, left: 110, right: 90 },
+    children: [new Paragraph({ spacing: { after: 0 }, children: [
+      new TextRun({ text: "ENTER    ", font: "Arial", size: 13, bold: true, color: MUTED, characterSpacing: 60 }),
+      mono(format, { bold: true, size: 22 }),
     ] })],
   });
-  const values = [
-    ...valueLine("VALUE 1", c.v1),
-    ...(c.v2 ? valueLine("VALUE 2", c.v2) : []),
-    ...(c.v3 ? valueLine("VALUE 3", c.v3) : []),
-  ];
-  const enter = para([label("ENTER"), new TextRun({ text: "\t", size: SIZE.body }), mono(c.format, { bold: true, size: 21 })], { after: 0, indent: { left: 1000, hanging: 1000 }, tabStops: [{ type: TabStopType.LEFT, position: 1000 }], keepLines: true });
-  return [head, facts, gap(20), ...values, enter, rule(RULE, { before: 70, after: 110 })];
+  const values = c.v3
+    ? [
+      new TableRow({ cantSplit: true, children: [valueCell("VALUE 1", c.v1), valueCell("VALUE 2", c.v2), valueCell("VALUE 3", c.v3)] }),
+      new TableRow({ cantSplit: true, children: [enterLine(c.format)] }),
+    ]
+    : [new TableRow({ cantSplit: true, children: [
+      valueCell("VALUE 1", c.v1),
+      valueCell("VALUE 2", c.v2),
+      labelled("ENTER", c.format, { monoValue: true, size: 22 }),
+    ] })];
+  return new Table({
+    columnWidths: CARD_W, width: { size: W, type: WidthType.DXA },
+    borders: {
+      top: { style: BorderStyle.SINGLE, size: frameSize, color: frame }, bottom: { style: BorderStyle.SINGLE, size: frameSize, color: frame },
+      left: { style: BorderStyle.SINGLE, size: frameSize, color: frame }, right: { style: BorderStyle.SINGLE, size: frameSize, color: frame },
+      insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: RULE }, insideVertical: { style: BorderStyle.SINGLE, size: 4, color: RULE },
+    },
+    rows: [head, facts, ...values],
+  });
 }
 
 const KIND_STYLE = P.mono ? {
-  value: { bar: "000000", text: "000000", border: BorderStyle.SINGLE, left: "ASSEMBLY", right: "RATED VALUE", tag: "VALUE" },
-  reference: { bar: "000000", text: "000000", border: BorderStyle.DASHED, left: "REFERENCE NAME", right: "REFERENCE — NOT A VALUE", tag: "REFERENCE" },
-  authorisation: { bar: "000000", text: "000000", border: BorderStyle.DOUBLE, left: "AUTHORISATION", right: "VALUE", tag: "AUTHORISATION" },
+  value: { fill: "F2F2F2", cell: null, bar: "000000", head: "000000", text: "000000", border: BorderStyle.SINGLE, left: "ASSEMBLY", right: "RATED VALUE", tag: "VALUE" },
+  reference: { fill: "D9D9D9", cell: "D9D9D9", bar: "000000", head: "000000", text: "000000", border: BorderStyle.DASHED, left: "REFERENCE NAME", right: "REFERENCE — NOT A VALUE", tag: "REFERENCE" },
+  authorisation: { fill: "000000", cell: "E6E6E6", bar: "000000", head: "FFFFFF", text: "000000", border: BorderStyle.DOUBLE, left: "AUTHORISATION", right: "VALUE", tag: "AUTHORISATION" },
 } : {
-  value: { bar: INK, text: INK, border: BorderStyle.SINGLE, left: "ASSEMBLY", right: "RATED VALUE", tag: "VALUE" },
-  reference: { bar: AMBER, text: AMBER, border: BorderStyle.SINGLE, left: "REFERENCE NAME", right: "REFERENCE — NOT A VALUE", tag: "REFERENCE" },
-  authorisation: { bar: WARN_RED, text: WARN_RED, border: BorderStyle.SINGLE, left: "AUTHORISATION", right: "VALUE", tag: "AUTHORISATION" },
+  value: { fill: P.fill.light, cell: null, bar: INK, head: INK, text: INK, border: BorderStyle.SINGLE, left: "ASSEMBLY", right: "RATED VALUE", tag: "VALUE" },
+  reference: { fill: P.fill.reference, cell: P.fill.reference, bar: AMBER, head: AMBER, text: AMBER, border: BorderStyle.SINGLE, left: "REFERENCE NAME", right: "REFERENCE — NOT A VALUE", tag: "REFERENCE" },
+  authorisation: { fill: P.fill.warning, cell: P.fill.warning, bar: WARN_RED, head: WARN_RED, text: WARN_RED, border: BorderStyle.SINGLE, left: "AUTHORISATION", right: "VALUE", tag: "AUTHORISATION" },
 };
-// B&W: the frame of a page-9 table says what kind it is (solid, dashed, double). Colour keeps its thin dividers.
+// B&W: the frame of a page-9 table says what kind it is (solid, dashed, double). Colour keeps its thin rules.
 const kindBorders = (st) => (P.mono ? {
   top: { style: st.border, size: 6, color: st.bar }, bottom: { style: st.border, size: 6, color: st.bar },
   left: { style: st.border, size: 6, color: st.bar }, right: { style: st.border, size: 6, color: st.bar },
-  insideHorizontal: hairline, insideVertical: { style: BorderStyle.NONE },
-} : dividers);
+  insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: RULE }, insideVertical: { style: BorderStyle.SINGLE, size: 4, color: RULE },
+} : thinBorders);
 
-/** What a VALUE, a REFERENCE and an AUTHORISATION are (page 9): three lines, the word in its colour. */
+/** Three chips: what a VALUE, a REFERENCE and an AUTHORISATION are (page 9). */
 function legendBlock(items) {
-  return items.map(([tag, text, kind]) => {
-    const st = KIND_STYLE[kind];
-    return para([
-      new TextRun({ text: tag, font: "Arial", size: 19, bold: true, color: st.bar }),
-      new TextRun({ text: "\t", size: SIZE.body }),
-      ...runs(text, { size: SIZE.small }),
-    ], { after: 50, indent: { left: 1900, hanging: 1900 }, tabStops: [{ type: TabStopType.LEFT, position: 1900 }] });
+  const w = Math.floor(W / items.length);
+  const widths = items.map((_, i) => (i === items.length - 1 ? W - w * (items.length - 1) : w));
+  return new Table({
+    columnWidths: widths, width: { size: W, type: WidthType.DXA }, borders: noBorders,
+    rows: [new TableRow({ children: items.map(([tag, text, kind], i) => {
+      const st = KIND_STYLE[kind];
+      return new TableCell({
+        width: { size: widths[i], type: WidthType.DXA },
+        shading: { type: ShadingType.CLEAR, fill: st.fill, color: "auto" },
+        borders: { top: { style: BorderStyle.SINGLE, size: 24, color: st.bar }, bottom: { style: st.border, size: 4, color: P.mono ? st.bar : RULE }, left: { style: st.border, size: 4, color: P.mono ? st.bar : RULE }, right: { style: st.border, size: 4, color: P.mono ? st.bar : RULE } },
+        margins: { top: 80, bottom: 80, left: 110, right: 90 },
+        children: [
+          new Paragraph({ spacing: { after: 30 }, children: [new TextRun({ text: tag, font: "Arial", size: 20, bold: true, color: st.head, characterSpacing: 40 })] }),
+          new Paragraph({ spacing: { after: 0 }, children: [body(text, { size: 17, color: P.mono ? st.head : INK })] }),
+        ],
+      });
+    }) })],
   });
 }
 
 /** A specification table, the reference directory or the appendix row (page 9), styled by kind. */
 function specTableBlock(blk, colour) {
   const st = KIND_STYLE[blk.kind || "value"];
-  const LEFT = 5200;
-  const headRule = { bottom: { style: BorderStyle.SINGLE, size: 8, color: INK } };
+  const LEFT = 5400;
   const rows = [new TableRow({ tableHeader: true, children: [
-    cell(st.left, { width: LEFT, bold: true, size: 15, borders: headRule, margins: { top: 30, bottom: 50, left: 80, right: 80 } }),
-    cell(st.right, { width: W - LEFT, bold: true, size: 15, align: AlignmentType.CENTER, color: st.bar, borders: headRule, margins: { top: 30, bottom: 50, left: 80, right: 80 } }),
+    cell(st.left, { width: LEFT, shade: st.fill, bold: true, size: 15, color: P.mono ? st.head : undefined }),
+    cell(st.right, { width: W - LEFT, shade: st.fill, bold: true, size: 15, align: AlignmentType.CENTER, color: st.head }),
   ] })];
   for (const [label, value] of blk.rows) {
     rows.push(new TableRow({ cantSplit: true, children: [
-      cell(label, { width: LEFT, size: 19, margins: { top: 70, bottom: 70, left: 80, right: 80 } }),
+      cell(label, { width: LEFT, size: 19, margins: { top: 80, bottom: 80, left: 100, right: 100 } }),
       new TableCell({
         width: { size: W - LEFT, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
-        margins: { top: 70, bottom: 70, left: 80, right: 80 },
+        shading: st.cell ? { type: ShadingType.CLEAR, fill: st.cell, color: "auto" } : undefined,
+        margins: { top: 80, bottom: 80, left: 100, right: 100 },
         children: [new Paragraph({ spacing: { after: 0 }, alignment: AlignmentType.CENTER, children: [mono(value, { bold: true, size: blk.kind === "value" ? 24 : 20, color: st.text })] })],
       }),
     ] }));
   }
   return [
-    para([
-      new TextRun({ text: `${st.tag}  `, font: "Arial", size: SIZE.label, bold: true, color: st.bar, characterSpacing: 40 }),
-      new TextRun({ text: blk.id === "REFERENCES" || blk.id === "APPENDIX C" ? blk.id : `TABLE ${blk.id}`, font: "Courier New", size: 20, bold: true, color: P.sector(colour) }),
-      new TextRun({ text: `   ${blk.name}`, font: "Arial", size: SIZE.small, bold: true, color: INK }),
-    ], { before: 200, after: 60, keepNext: true, indent: { left: 140 }, border: { left: { style: BorderStyle.SINGLE, size: 14, color: st.bar, space: 6 } } }),
+    new Paragraph({
+      spacing: { before: 160, after: 60 },
+      border: { left: { style: BorderStyle.SINGLE, size: 24, color: st.bar } }, indent: { left: 120 },
+      children: [
+        new TextRun({ text: `${st.tag}  `, font: "Arial", size: 13, bold: true, color: st.bar, characterSpacing: 80 }),
+        new TextRun({ text: blk.id === "REFERENCES" || blk.id === "APPENDIX C" ? blk.id : `TABLE ${blk.id}`, font: "Courier New", size: 20, bold: true, color: P.sector(colour) }),
+        new TextRun({ text: `   ${blk.name}`, font: "Arial", size: 18, bold: true, color: INK }),
+      ],
+    }),
     table(rows, [LEFT, W - LEFT], kindBorders(st)),
   ];
 }
@@ -425,22 +403,19 @@ function specTableBlock(blk, colour) {
 function renderBlock(blk, b) {
   const f = (t) => fill(t, b);
   switch (blk.t) {
-    case "p": return [para(
-      runs(f(blk.text), blk.muted ? { size: 16, italics: true, color: MUTED } : blk.lore ? { size: 19, italics: true, color: P.LORE } : blk.lead ? { size: 19, italics: true, color: MUTED } : blk.small ? { size: SIZE.small } : {}),
-      { after: blk.small ? 80 : blk.lead ? 160 : 110 },
-    )];
+    case "p": return [new Paragraph({
+      spacing: { after: blk.small ? 90 : 120 },
+      children: runs(f(blk.text), blk.muted ? { size: 16, italics: true, color: MUTED } : blk.lore ? { italics: true, color: P.LORE } : blk.small ? { size: 18 } : {}),
+    })];
     case "h": return [headingBlock(f(blk.text), b.colour)];
-    case "steps": return stepsBlock(blk.items.map(f), b.colour, blk);
-    case "list": return listBlock(blk.items.map(f), blk);
-    case "strip": return [stripBlock(f(blk.text), b.colour), gap(80)];
-    case "table": return [tableBlock(blk.head.map(f), blk.rows.map((r) => r.map(f)), blk.widths, blk), gap(120)];
-    case "kv": return [kvBlock(blk.rows.map(([k, v]) => [f(k), f(v)]), blk), gap(120)];
-    case "box": return [boxBlock(blk.kind, f(blk.title), blk.lines.map(f), b.colour), gap(140)];
-    case "flow": return [flowBlock(blk.steps.map(f), b.colour, blk), gap(blk.big ? 160 : 120)];
-    case "faultcards": return blk.cards.flatMap((c) => faultCardBlock(c, b.colour));
-    case "legend": return [...legendBlock(blk.items), gap(80)];
+    case "steps": return stepsBlock(blk.items.map(f), blk);
+    case "table": return [tableBlock(blk.head.map(f), blk.rows.map((r) => r.map(f)), blk.widths, blk), gap(100)];
+    case "kv": return [kvBlock(blk.rows.map(([k, v]) => [f(k), f(v)]), blk), gap(100)];
+    case "box": return [boxBlock(blk.kind, f(blk.title), blk.lines.map(f), b.colour), gap(120)];
+    case "flow": return [flowBlock(blk.steps.map(f), b.colour, blk), gap(120)];
+    case "faultcards": return blk.cards.flatMap((c) => [faultCardBlock(c, b.colour), gap(24)]);
+    case "legend": return [legendBlock(blk.items), gap(80)];
     case "spectable": return specTableBlock(blk, b.colour);
-    case "rule": return [rule(RULE, { before: 60, after: 140 })];
     case "gap": return [gap(blk.n)];
     default: throw new Error(`build_binders: unknown block ${blk.t}`);
   }
@@ -454,8 +429,7 @@ function buildBinder(b) {
   const children = [];
   pages.forEach((pg, i) => {
     if (i > 0) children.push(pageStart());
-    children.push(...pageHead(pg.num, fill(pg.title, b), b.colour, `${b.code}  ${pg.num} / ${pages.length}`));
-    if (pg.lead) children.push(leadBlock(fill(pg.lead, b)));
+    children.push(...pageHead(pg.num, fill(pg.title, b), b.colour, `${b.code} ${pg.num}/${pages.length}`));
     for (const blk of pg.blocks) children.push(...renderBlock(blk, b));
     // the spacing after a page's last table would be a paragraph that can spill onto a blank leaf
     while (children.length && children[children.length - 1].__gap) children.pop();
@@ -464,22 +438,22 @@ function buildBinder(b) {
   return {
     children, plan,
     header: `HAVEN-9 · ${b.code} ${b.name.toUpperCase()} · TECHNICAL OPERATIONS BINDER · KEEP AT STATION`,
-    footer: ["Page ", PageNumber.CURRENT, ` of ${pages.length}     Each round p.2 · Sector control p.3 · Faults p.4 / p.7–8 · Trades p.5 · Quick actions p.6 · Values p.9`],
+    footer: ["Page ", PageNumber.CURRENT, ` of ${pages.length}  ·  Each round p.2  ·  Your panel p.3  ·  Faults p.4 then p.7–8  ·  Trades p.5  ·  Quick actions p.6  ·  Values p.9`],
   };
 }
 
 const docOf = ({ children, header, footer }) => new Document({
-  styles: { default: { document: { run: { font: "Arial", size: SIZE.body, color: INK } } } },
+  styles: { default: { document: { run: { font: "Arial", size: 20, color: INK } } } },
   sections: [{
-    properties: { page: { margin: { top: MARGIN.top, bottom: MARGIN.bottom, left: MARGIN.left, right: MARGIN.right, header: 600, footer: 600 } } },
+    properties: { page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } },
     headers: { default: new Header({ children: [new Paragraph({
       alignment: AlignmentType.RIGHT,
       border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: RULE } },
-      children: [new TextRun({ text: header, font: "Arial", size: 13, color: MUTED })],
+      children: [new TextRun({ text: header, font: "Arial", size: 14, color: MUTED })],
     })]}) },
     footers: footer ? { default: new Footer({ children: [new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [new TextRun({ children: footer, font: "Arial", size: 13, color: MUTED })],
+      children: [new TextRun({ children: footer, font: "Arial", size: 14, color: MUTED })],
     })]}) } : undefined,
     children,
   }],
@@ -491,14 +465,17 @@ function stationLog(binders) {
   binders.forEach((b, i) => {
     if (i > 0) children.push(pageStart());
     children.push(...pageHead("", "STATION OPERATIONS LOG", b.colour, b.code));
-    children.push(para(runs("Loose sheet. Keep it current: it is the sector's record of what was decided and who agreed to it, and the Council may call for it at any time. Ask for a fresh sheet when it is full."), { after: 160 }));
-    const widths = [1200, 2500, 3100, W - 6800];
-    const headRule = { bottom: { style: BorderStyle.SINGLE, size: 8, color: INK } };
-    const rows = [new TableRow({ children: ["TIME", "EVENT / FAULT", "DECISION TAKEN", "WHO AGREED"].map((h, j) => cell(h, { width: widths[j], bold: true, size: 17, borders: headRule })) })];
+    children.push(p(body("Loose sheet. Keep it current: it is the sector's record of what was decided and who agreed to it, and the Council may call for it at any time. Ask for a fresh sheet when it is full.")));
+    const rows = [new TableRow({ children: [
+      cell("TIME", { width: 1200, shade: "F2F2F2", bold: true }),
+      cell("EVENT / FAULT", { width: 2600, shade: "F2F2F2", bold: true }),
+      cell("DECISION TAKEN", { width: 3200, shade: "F2F2F2", bold: true }),
+      cell("WHO AGREED", { width: W - 7000, shade: "F2F2F2", bold: true }),
+    ] })];
     for (let n = 0; n < 18; n += 1) {
-      rows.push(new TableRow({ children: widths.map((w) => cell("", { width: w, margins: { top: 150, bottom: 150, left: 90, right: 90 } })) }));
+      rows.push(new TableRow({ children: [cell("", { width: 1200 }), cell("", { width: 2600 }), cell("", { width: 3200 }), cell("", { width: W - 7000 })] }));
     }
-    children.push(table(rows, widths));
+    children.push(table(rows, [1200, 2600, 3200, W - 7000]));
   });
   return { children, header: "HAVEN-9 · STATION OPERATIONS LOG · LOOSE SHEET", footer: null };
 }
