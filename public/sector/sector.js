@@ -957,8 +957,9 @@
   }
   function ourStock(key) {
     if (!mine) return 0;
+    const wf = mine.workforce || {};
     return key === 'workers'
-      ? Number((mine.workforce || {}).active) || 0
+      ? Number(wf.transferable ?? wf.active) || 0
       : Number((mine.inventory || {})[key]) || 0;
   }
 

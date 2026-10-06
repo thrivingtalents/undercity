@@ -245,15 +245,15 @@ driven the way their binders say.
 | 1 | Assign roles | §1 step 1, §3, name boxes | Paper only; nothing on the console is needed |
 | 2 | Know the objective | §1 "Your objective" | — |
 | 3 | Know what the sector does | §2 | — |
-| 4 | Understand inventory and workforce | §1 steps 2–5, §8 | INVENTORY 3 ⚡ 3 💧 3 🔧 1 ⚕, WORKERS 8 / 8 AVAILABLE, exactly as §1 lists |
+| 4 | Understand inventory and workforce | §1 steps 2–5, §8 | INVENTORY 3 ⚡ 3 💧 3 🔧 1 ⚕, WORKERS 5 / 5 AVAILABLE, exactly as §1 lists |
 | 5 | Understand the round clock | §4, §6 | Current round "Round 0", Round time counting down |
 | 6 | Understand upkeep | §5 | NEXT UPKEEP ⚡ 2 POWER + 💧 1 WATER, Status READY |
-| 7 | Know what happens next round | §5 NEW ROUND box | Round 1 activated: "ROUND 0 · UPKEEP PAID — Sector stable.", 2 Power + 1 Water taken, Status SHORTFALL — 2 POWER SHORT until GENERATE, restart crew released (8 / 8) |
+| 7 | Know what happens next round | §5 NEW ROUND box | Round 1 activated: "ROUND 0 · UPKEEP PAID — Sector stable.", 2 Power + 1 Water taken, Status SHORTFALL — 2 POWER SHORT until GENERATE, restart crew released (5 / 5) |
 | 8 | Resolve a fault | §7 → §12 → §13 P-01 → §14 Table P-1 | F-001 fired; wrong code gave RESOLUTION REJECTED / ATTEMPTS 1; P-01-577 with 1 worker accepted; fault moved to RECENTLY RESOLVED, REWARD CLAIMED +1 PARTS, parts 3 → 3 |
 | 9 | Obtain information from another sector | §7 step 8; procedures name "WTR Binder, Table W-4" and the row | Paper and voice; no console step |
 | 10 | Perform a trade | §9 worked example | POW: RESOURCE EXCHANGE → + NEW REQUEST → WTR, 💧 WATER, 1 → SEND REQUEST (OUTGOING 1); WTR: banner VIEW / NEEDS ACTION → FULFILL (WAITING TRN 1) |
 | 11 | TRN approves correctly | §9A | TRANSFER CONTROL → CONFIRM CHIT ("CHIT ✓ IN HAND") → APPROVE → CONFIRM APPROVAL; POW water 3 → 4, HISTORY 1 |
-| 12 | Handle an injured worker | §8 | F-207 injured two TRN workers (6 / 8, INJURED 2); REQUEST MED HEALING → "TRN WORKER 1 → MEDICAL BAY WAITING FOR MEDICAL"; MED: HEALING THIS ROUND → HEAL → "1 / 3 USED · 2 LEFT", TRN 7 / 8 |
+| 12 | Handle an injured worker | §8 | F-207 injured two TRN workers (3 / 5, INJURED 2); REQUEST MED HEALING → "TRN WORKER 1 → MEDICAL BAY WAITING FOR MEDICAL"; MED: HEALING THIS ROUND → HEAL → "1 / 3 USED · 2 LEFT", TRN 4 / 5 |
 | 13 | Know what to do when Council is called | §10 | Banner "COUNCIL IN SESSION — CHIEF + LIAISON REPORT TO CENTRAL COUNCIL" with the Council clock (00:19 at reading) |
 | 14 | Know what to do with no active fault | §11 | Console: "NO ACTIVE FAULTS — systems nominal" |
 | 15 | Understand CRITICAL and DARK | §4 status table | Health 25: CRITICAL, red wash, every control live. Health 0: DARK, SECTOR OFFLINE. EMERGENCY RESTART: back at 20 %, CRITICAL, 2 workers held, 2 Parts + 1 Power + 1 Water taken |

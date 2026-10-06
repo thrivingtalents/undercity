@@ -258,13 +258,13 @@ test('EVT-UI-008: deactivating MONSTER ATTACK restores no Health and heals nobod
   assert.equal(fire(g, 'MONSTER_ATTACK').ok, true);
   for (const s of SECTORS) {
     assert.equal(health(g, s), 90, s);
-    assert.deepEqual([g.state.sectors[s].workforce.active, g.state.sectors[s].workforce.injured], [7, 1], s);
+    assert.deepEqual([g.state.sectors[s].workforce.active, g.state.sectors[s].workforce.injured], [4, 1], s);
   }
   const off = stop(g, 'MONSTER_ATTACK');
   assert.equal(off.ok, true);
   for (const s of SECTORS) {
     assert.equal(health(g, s), 90, `${s} got its Health back`);
-    assert.deepEqual([g.state.sectors[s].workforce.active, g.state.sectors[s].workforce.injured], [7, 1], `${s} was healed by the deactivation`);
+    assert.deepEqual([g.state.sectors[s].workforce.active, g.state.sectors[s].workforce.injured], [4, 1], `${s} was healed by the deactivation`);
   }
   assert.deepEqual(off.effects_not_reversed.map((i) => i.kind), ['health', 'injure_workers']);
   assert.equal(logEvents(g, 'worker_healed').length, 0);
@@ -536,12 +536,12 @@ test('the double press: two ACTIVATE presses apply once, two DEACTIVATE presses 
   const b = fire(g, 'EMERGENCY_MAINTENANCE_CREW');
   assert.deepEqual([a.ok, b.ok, b.reason], [true, false, 'event_already_active']);
   assert.equal(live(g, 'EMERGENCY_MAINTENANCE_CREW').length, 6);
-  for (const s of SECTORS) assert.equal(g.availableWorkers(g.state.sectors[s]), 9, s);
+  for (const s of SECTORS) assert.equal(g.availableWorkers(g.state.sectors[s]), 6, s);
   const c = stop(g, 'EMERGENCY_MAINTENANCE_CREW');
   const d = stop(g, 'EMERGENCY_MAINTENANCE_CREW');
   assert.deepEqual([c.ok, d.ok, d.reason], [true, false, 'event_not_active']);
   assert.equal(live(g).length, 0);
-  for (const s of SECTORS) assert.equal(g.availableWorkers(g.state.sectors[s]), 8, s);
+  for (const s of SECTORS) assert.equal(g.availableWorkers(g.state.sectors[s]), 5, s);
   assert.equal(logEvents(g, 'city_event_deactivated').length, 1);
   const control = read('public/control/control.js');
   assert.ok(/const press = \(b\) => \{\s*if \(b\.disabled\) return;\s*b\.disabled = true;/.test(control));

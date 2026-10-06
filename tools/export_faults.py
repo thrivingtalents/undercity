@@ -54,7 +54,7 @@ SECTOR_DEFS = {
 }
 START_INVENTORY = {"power": 3, "water": 3, "parts": 3, "med": 1}
 UPKEEP = {"power": 2, "water": 1}
-START_WORKFORCE = 8
+START_WORKFORCE = 5
 
 RESOURCE_WORDS = {"parts": "parts", "power": "power", "water": "water", "med": "med"}
 

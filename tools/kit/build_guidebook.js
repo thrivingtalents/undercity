@@ -477,7 +477,7 @@ C.push(tbl([
   row(["1", "Collect all six binders and the used log sheets. Confirm each binder still has all nine pages."], RW),
   row(["2", "If the optional fault deck was used, collect every card from tables and floor, re-sort by section tab and count to 60."], RW),
   row(["3", "Refill resource trays to opening stock: 3 power, 3 water, 3 parts, 1 med per sector."], RW),
-  row(["4", "Return workforce tokens to 8 per sector, including any left at the MED table."], RW),
+  row(["4", "Return workforce tokens to 5 per sector, including any left at the MED table."], RW),
   row(["5", "Collect used and unused chits. Refill each pad. Retrieve the TRN stamp — it goes missing more than anything else in the kit."], RW),
   row(["6", "Retrieve the City Charter and any Continuity Order. Insert a fresh Continuity Order form."], RW),
   row(["7", "Collect role cards, re-sort by sector."], RW),

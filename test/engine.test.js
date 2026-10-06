@@ -145,7 +145,7 @@ test('brownout holds workers back and adds its own bleed to an open fault', () =
   game.fireFault('F-201', 'POW');
   const f = game.findFault('POW', 'F-201');
   assert.equal('deadline_s' in f, false);
-  assert.equal(game.availableWorkers(game.state.sectors.POW), 8 - game.cfg.brownout_effects.worker_penalty);
+  assert.equal(game.availableWorkers(game.state.sectors.POW), 5 - game.cfg.brownout_effects.worker_penalty);
   const before = game.state.sectors.POW.integrity;
   game.tick(60000);
   assert.ok(before - game.state.sectors.POW.integrity >= 1.5 - 0.05, 'the fault stopped bleeding in brownout');
@@ -282,7 +282,7 @@ test('refusals name the problem and never the answer', () => {
   // the debrief still gets the numbers, in the log only
   const logged = logEvents(game, 'submit').find((e) => e.reason === 'insufficient_crew');
   assert.equal(logged.crew_required, 2);
-  assert.equal(logged.workforce_active, 8);
+  assert.equal(logged.workforce_active, 5);
   // and the screen's words for them
   for (const word of ['RESOLUTION REJECTED', 'INSUFFICIENT CREW', 'MATERIALS NOT READY', 'WORKER ASSIGNMENT INVALID']) {
     assert.ok(SECTOR_JS.includes(word), `the screen lacks "${word}"`);
@@ -795,10 +795,44 @@ test('a worker loan moves people and is tracked as loaned/borrowed', () => {
   const game = running();
   const t = readyTransfer(game, { from: 'AGR', to: 'MED', resource: 'workers', amount: 2 });
   game.approveTransfer(t.id, { by: 'TRN' });
-  assert.equal(game.state.sectors.AGR.workforce.active, 6);
+  assert.equal(game.state.sectors.AGR.workforce.active, 3);
   assert.equal(game.state.sectors.AGR.workforce.loaned, 2);
-  assert.equal(game.state.sectors.MED.workforce.active, 10);
-  assert.equal(forSector(game, 'AGR').sectors.AGR.workforce.total, 8);
+  assert.equal(game.state.sectors.MED.workforce.active, 7);
+  assert.equal(forSector(game, 'AGR').sectors.AGR.workforce.total, 5);
+});
+
+test('a worker loan draws only on free workers: committed, brownout-held and temporary crew stay home', () => {
+  const game = running();
+  const pow = game.state.sectors.POW;
+  assert.equal(game.transferableWorkers(pow), 5);
+
+  // three of five committed to an upgrade: two can leave, not three
+  assert.equal(game.commitWorkers('POW', 'GENERATOR_UPGRADE', 3).ok, true);
+  assert.equal(game.transferableWorkers(pow), 2);
+  assert.equal(forSector(game, 'POW').sectors.POW.workforce.transferable, 2);
+  const r = game.requestTransfer({ from: 'POW', to: 'MED', resource: 'workers', amount: 3, by: 'MED' });
+  assert.equal(r.ok, true);
+  const f = game.fulfillRequest(r.request.id, { by: 'POW' });
+  assert.deepEqual([f.ok, f.reason, f.have, f.need], [false, 'insufficient_stock_accept', 2, 3]);
+
+  // a temporary crew counts for a repair, never for a transfer
+  deal(game, 'AGR_RELIEF_CREW');
+  assert.equal(game.agrActivate('AGR_RELIEF_CREW', { by: 'AGR', target: { sector: 'POW' } }).ok, true);
+  assert.equal(game.availableWorkers(pow), 3);
+  assert.equal(game.transferableWorkers(pow), 2, 'a temporary worker was offered for transfer');
+
+  // the two free workers can go, and the claim never outgrows the workers left behind
+  const t = readyTransfer(game, { from: 'POW', to: 'MED', resource: 'workers', amount: 2 });
+  assert.equal(game.approveTransfer(t.id, { by: 'TRN' }).ok, true);
+  assert.equal(pow.workforce.active, 3);
+  assert.equal(game.committedWorkers(pow), 3);
+  assert.equal(game.transferableWorkers(pow), 0);
+  assert.ok(game.committedWorkers(pow) <= pow.workforce.active, 'more workers are committed than are left');
+
+  // a brownout holds its two back as well
+  game.releaseWorkers('POW', 'GENERATOR_UPGRADE');
+  game.setStatus('POW', 'BROWNOUT');
+  assert.equal(game.transferableWorkers(pow), 3 - game.cfg.brownout_effects.worker_penalty);
 });
 
 test('a sector sees only its own paperwork', () => {
@@ -1463,7 +1497,7 @@ test('RELIEF CREW: one temporary worker for a chosen sector until the round turn
   deal(game, 'AGR_RELIEF_CREW');
   assert.equal(game.agrActivate('AGR_RELIEF_CREW', { by: 'AGR', target: { sector: 'POW' } }).ok, true);
   assert.equal(game.availableWorkers(pow), base + 1);
-  assert.equal(pow.workforce.active, 8, 'the base count is untouched');
+  assert.equal(pow.workforce.active, 5, 'the base count is untouched');
   assert.equal(forSector(game, 'POW').sectors.POW.workforce.available, base + 1);
   nextRound(game);
   assert.equal(game.availableWorkers(pow), base, 'the round change did not end it');
@@ -3642,13 +3676,13 @@ test('a commitment takes workers out of the available pool without making them i
   const game = newGame();
   const pow = game.state.sectors.POW;
   const before = game.availableWorkers(pow);
-  assert.equal(before, 8, 'the standard scenario no longer starts POW with eight');
+  assert.equal(before, 5, 'the standard scenario no longer starts POW with five');
 
   const c = game.commitWorkers('POW', 'GENERATOR_UPGRADE', 3);
   assert.equal(c.ok, true);
   assert.equal(game.availableWorkers(pow), before - 3, 'the pool did not shrink');
   assert.equal(game.committedWorkers(pow), 3);
-  assert.equal(pow.workforce.active, 8, 'a committed worker was counted as gone');
+  assert.equal(pow.workforce.active, 5, 'a committed worker was counted as gone');
   assert.equal(pow.workforce.injured, 0, 'a committed worker was counted as injured');
 
   assert.equal(game.releaseWorkers('POW', 'GENERATOR_UPGRADE'), 3);
@@ -3662,8 +3696,8 @@ test('a commitment cannot overdraw the pool, and two purposes stack', () => {
   assert.equal(game.commitWorkers('POW', 'GENERATOR_UPGRADE', 99).ok, false);
   assert.equal(game.committedWorkers(pow), 0, 'a refused commitment took workers anyway');
 
-  assert.equal(game.commitWorkers('POW', 'GENERATOR_UPGRADE', 5).ok, true);
-  assert.equal(game.commitWorkers('POW', 'EMERGENCY_RESTART', 3).ok, true);
+  assert.equal(game.commitWorkers('POW', 'GENERATOR_UPGRADE', 3).ok, true);
+  assert.equal(game.commitWorkers('POW', 'EMERGENCY_RESTART', 2).ok, true);
   assert.equal(game.availableWorkers(pow), 0);
   const over = game.commitWorkers('POW', 'OTHER', 1);
   assert.equal(over.ok, false);
@@ -3671,7 +3705,7 @@ test('a commitment cannot overdraw the pool, and two purposes stack', () => {
   assert.equal(over.available, 0);
   // releasing one purpose does not release the other
   game.releaseWorkers('POW', 'GENERATOR_UPGRADE');
-  assert.equal(game.committedWorkers(pow), 3);
+  assert.equal(game.committedWorkers(pow), 2);
 });
 
 // WRK-01
@@ -3706,14 +3740,14 @@ test('WRK-01 a repair sees only the workers a commitment has left, and says why'
 test('injuries eat into a commitment rather than leaving a claim on workers who are gone', () => {
   const game = newGame();
   const pow = game.state.sectors.POW;
-  assert.equal(game.commitWorkers('POW', 'GENERATOR_UPGRADE', 6).ok, true);
+  assert.equal(game.commitWorkers('POW', 'GENERATOR_UPGRADE', 3).ok, true);
   assert.equal(game.availableWorkers(pow), 2);
 
   // four injured: two come out of the free pair, two must come off the claim
   game.injure('POW', 4);
-  assert.equal(pow.workforce.active, 4);
+  assert.equal(pow.workforce.active, 1);
   assert.equal(pow.workforce.injured, 4);
-  assert.equal(game.committedWorkers(pow), 4, 'the claim outlived the workers holding it');
+  assert.equal(game.committedWorkers(pow), 1, 'the claim outlived the workers holding it');
   assert.equal(game.availableWorkers(pow), 0);
   assert.ok(game.committedWorkers(pow) <= pow.workforce.active, 'more workers are committed than exist');
 });
@@ -3726,14 +3760,41 @@ test('a commitment survives a snapshot, and an older snapshot restores without o
   const back = newGame();
   back.restore(snap);
   assert.equal(back.committedWorkers(back.state.sectors.POW), 2, 'the commitment did not survive');
-  assert.equal(back.availableWorkers(back.state.sectors.POW), 6);
+  assert.equal(back.availableWorkers(back.state.sectors.POW), 3);
 
   // a snapshot from before this feature has no committed map at all
   for (const s of Object.values(snap.state.sectors)) delete s.workforce.committed;
   const old = newGame();
   old.restore(snap);
   assert.deepEqual(old.state.sectors.POW.workforce.committed, {}, 'an old snapshot did not get a committed map');
-  assert.equal(old.availableWorkers(old.state.sectors.POW), 8);
+  assert.equal(old.availableWorkers(old.state.sectors.POW), 5);
+});
+
+test('RESET on the same scenario reads it from the library again: a snapshot pinned to an older start keeps only the facilitator\'s own edits', () => {
+  const game = newGame();
+  // an old run: its snapshot carries the scenario as it was resolved then — eight workers a sector
+  for (const s of Object.values(game.scenario.sectors)) s.start_workforce = 8;
+  game.patchSectorConfig('WTR', { start_workforce: 6 });     // a live SETTINGS edit, meant to apply on the next reset
+  game.reset('old-run');
+  assert.deepEqual([game.state.sectors.POW.workforce.active, game.state.sectors.WTR.workforce.active], [8, 6]);
+  const snap = JSON.parse(JSON.stringify(game.serialise()));
+
+  // a new build restores it, and the facilitator presses RESET SESSION keeping the scenario
+  const back = newGame();
+  back.restore(snap);
+  assert.equal(back.scenario.sectors.POW.start_workforce, 8, 'the snapshot pins the old start');
+  const library = new ScenarioLibrary({ rounds, content: loadContent() });
+  back.reset('new-run', { scenario: back.refreshedScenario(library.resolve('haven9-standard')), keepSectorPatches: true });
+  for (const s of ['POW', 'MED', 'TRN', 'AGR', 'COM']) assert.equal(back.state.sectors[s].workforce.active, 5, `${s} kept the pinned start`);
+  assert.equal(back.state.sectors.WTR.workforce.active, 6, 'the facilitator\'s own edit was lost');
+  assert.equal(back.cfg.council_clock_s, game.cfg.council_clock_s, 'the live settings were replaced');
+
+  // a second reset on the same scenario keeps that edit too; switching scenario drops it
+  back.reset('third', { scenario: back.refreshedScenario(library.resolve('haven9-standard')), keepSectorPatches: true });
+  assert.equal(back.state.sectors.WTR.workforce.active, 6);
+  back.reset('fourth', { scenario: library.resolve('haven9-standard') });
+  assert.equal(back.state.sectors.WTR.workforce.active, 5, 'a switch of scenario carried an edit across');
+  assert.deepEqual(back.state.sector_config_patches, {});
 });
 
 test('the facilitator and the sector both see what is committed', () => {
@@ -3742,10 +3803,10 @@ test('the facilitator and the sector both see what is committed', () => {
   const ctl = forControl(game).sectors.POW.workforce;
   assert.equal(ctl.committed_total, 3);
   assert.deepEqual(ctl.committed, { GENERATOR_UPGRADE: 3 });
-  assert.equal(ctl.available, 5);
+  assert.equal(ctl.available, 2);
   const own = forSector(game, 'POW').sectors.POW.workforce;
   assert.equal(own.committed_total, 3);
-  assert.equal(own.available, 5);
+  assert.equal(own.available, 2);
 });
 
 
@@ -4182,18 +4243,18 @@ test('each preserved function undoes exactly the penalty it names, and nothing e
   const pow = game.state.sectors.POW;
   const plain = { prod: economy.productionFor(game, pow), crew: game.availableWorkers(pow) };
   assert.deepEqual(plain.prod, { power: 3 });
-  assert.equal(plain.crew, 8);
+  assert.equal(plain.crew, 5);
 
   game.setStatus('POW', 'BROWNOUT', { by: 'test' });
   assert.deepEqual(economy.productionFor(game, pow), {}, 'brownout no longer cuts POW output');
-  assert.equal(game.availableWorkers(pow), 6, 'brownout no longer holds workers back');
+  assert.equal(game.availableWorkers(pow), 3, 'brownout no longer holds workers back');
 
   game.chooseBrownoutFunction('POW', 'PRESERVE_PRODUCTION');
   assert.deepEqual(economy.productionFor(game, pow), { power: 3 }, 'output was not preserved');
-  assert.equal(game.availableWorkers(pow), 6, 'preserving output also gave the crew back');
+  assert.equal(game.availableWorkers(pow), 3, 'preserving output also gave the crew back');
 
   game.chooseBrownoutFunction('POW', 'PRESERVE_CREW');
-  assert.equal(game.availableWorkers(pow), 7, 'the worker was not released');
+  assert.equal(game.availableWorkers(pow), 4, 'the worker was not released');
   assert.deepEqual(economy.productionFor(game, pow), {}, 'preserving crew also kept the output');
 });
 

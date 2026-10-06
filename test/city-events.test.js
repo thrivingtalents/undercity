@@ -143,7 +143,7 @@ test('EVT-006: EMERGENCY MAINTENANCE CREW gives every operating sector one tempo
   const res = fire(g, 'EMERGENCY_MAINTENANCE_CREW');
   assert.equal(res.ok, true);
   for (const s of SECTORS) assert.equal(avail(g, s), before[s] + (s === 'COM' ? 0 : 1), s);
-  for (const s of SECTORS) assert.equal(g.state.sectors[s].workforce.active, 8, `${s}: the starting workforce was changed`);
+  for (const s of SECTORS) assert.equal(g.state.sectors[s].workforce.active, 5, `${s}: the starting workforce was changed`);
   // the table reads its chip in the event's words
   const chip = forSector(g, 'POW').effects.find((e) => e.kind === 'extra_workers');
   assert.ok(chip && chip.player_label === '+1 WORKER · THIS ROUND', JSON.stringify(chip));
@@ -196,14 +196,14 @@ test('EVT-008: CITY RECOVERY PROTOCOL gives +5 Health to non-DARK sectors and li
 
 test('EVT-009 / EVT-010: MONSTER ATTACK takes 10 Health and injures one Worker everywhere through the injury pipeline, which MED then heals', () => {
   const g = at('R3');
-  g.adjustWorkforce('AGR', -8, 0);   // nobody left to injure
+  g.adjustWorkforce('AGR', -5, 0);   // nobody left to injure
   assert.equal(g.state.sectors.AGR.workforce.active, 0);
   const injuriesBefore = logEvents(g, 'injury').length;
   const res = fire(g, 'MONSTER_ATTACK');
   assert.equal(res.ok, true);
   for (const s of SECTORS) assert.equal(health(g, s), 90, s);
   for (const s of SECTORS.filter((x) => x !== 'AGR')) {
-    assert.equal(g.state.sectors[s].workforce.active, 7, s);
+    assert.equal(g.state.sectors[s].workforce.active, 4, s);
     assert.equal(g.state.sectors[s].workforce.injured, 1, s);
   }
   assert.deepEqual(g.state.sectors.AGR.workforce, { ...g.state.sectors.AGR.workforce, active: 0, injured: 0 }, 'a sector with no Worker went negative');
@@ -216,7 +216,7 @@ test('EVT-009 / EVT-010: MONSTER ATTACK takes 10 Health and injures one Worker e
   const healed = g.healWorker(h.healing.id, { by: 'MED' });
   assert.equal(healed.ok, true, JSON.stringify(healed));
   assert.equal(g.state.sectors.POW.workforce.injured, 0);
-  assert.equal(g.state.sectors.POW.workforce.active, 8);
+  assert.equal(g.state.sectors.POW.workforce.active, 5);
   assert.equal(g.medHealsUsed(), 1);
 });
 
@@ -257,7 +257,7 @@ test('EVT-012: CORE ENERGY INSTABILITY makes the next upkeep 3 Power + 1 Water, 
 
 test('EVT-013: CITYWIDE STRUCTURAL DAMAGE takes 5 Health and one Worker of capacity this round, and injures nobody', () => {
   const g = at('R3');
-  g.adjustWorkforce('AGR', -8, 0);
+  g.adjustWorkforce('AGR', -5, 0);
   dark(g, 'COM');
   const before = Object.fromEntries(SECTORS.map((s) => [s, avail(g, s)]));
   const injuries = logEvents(g, 'injury').length;
@@ -524,7 +524,7 @@ test('EVT-024: RESET RUN removes every City Event effect, pending modifier, mark
   assert.equal(g.trnCapacity(), 3);
   assert.equal(g.medCapacity(), 3);
   for (const s of SECTORS) {
-    assert.deepEqual([g.state.sectors[s].workforce.active, g.state.sectors[s].workforce.injured], [8, 0], s);
+    assert.deepEqual([g.state.sectors[s].workforce.active, g.state.sectors[s].workforce.injured], [5, 0], s);
     assert.deepEqual(economy.upkeepFor(g, g.state.sectors[s]), { power: 2, water: 1 }, s);
     assert.equal(health(g, s), 100, s);
   }

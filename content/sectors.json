@@ -19,7 +19,7 @@
       "colour": "#E8B33A",
       "produces": "power",
       "start_integrity": 100,
-      "start_workforce": 8,
+      "start_workforce": 5,
       "start_inventory": {
         "power": 3,
         "water": 3,
@@ -38,7 +38,7 @@
       "colour": "#3A8FE8",
       "produces": "water",
       "start_integrity": 100,
-      "start_workforce": 8,
+      "start_workforce": 5,
       "start_inventory": {
         "power": 3,
         "water": 3,
@@ -57,7 +57,7 @@
       "colour": "#E85A5A",
       "produces": null,
       "start_integrity": 100,
-      "start_workforce": 8,
+      "start_workforce": 5,
       "start_inventory": {
         "power": 3,
         "water": 3,
@@ -76,7 +76,7 @@
       "colour": "#9A9A9A",
       "produces": null,
       "start_integrity": 100,
-      "start_workforce": 8,
+      "start_workforce": 5,
       "start_inventory": {
         "power": 3,
         "water": 3,
@@ -95,7 +95,7 @@
       "colour": "#5AB86A",
       "produces": null,
       "start_integrity": 100,
-      "start_workforce": 8,
+      "start_workforce": 5,
       "start_inventory": {
         "power": 3,
         "water": 3,
@@ -114,7 +114,7 @@
       "colour": "#B07AD8",
       "produces": null,
       "start_integrity": 100,
-      "start_workforce": 8,
+      "start_workforce": 5,
       "start_inventory": {
         "power": 3,
         "water": 3,

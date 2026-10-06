@@ -74,7 +74,7 @@ Cohort sizing: 3–6 participants per sector. 18 = minimum viable cohort; 36 = m
 | Water Units 💧 | Blue chit | WTR | Second universal currency |
 | Spare Parts 🔧 | Grey chit | None — fixed scarce stock | Zero-sum: the scarcity driver. Total city stock is deliberately ~70% of total R2–R3 demand |
 | Med Supplies ⚕ | Red chit | MED (limited) | Needed to restore injured Workforce |
-| Workforce 👤 | Wooden meeple/token | — | 8 per sector at start. Faults injure workforce; injured tokens go to MED. Fewer workers = slower fault resolution (see 3.4) |
+| Workforce 👤 | Wooden meeple/token | — | 5 per sector at start. Faults injure workforce; injured tokens go to MED. Fewer workers = slower fault resolution (see 3.4) |
 
 ### 2.3 Interdependency rules (the whole game in four sentences)
 1. Every sector pays a per-round **upkeep** in Power Cells and Water Units (printed on their dashboard and binder).

@@ -285,9 +285,9 @@ test('a round change ends the loans and the city-wide hits land once, through th
   deal(g, 'AGR_CITY_RECOVERY');
   g.agrActivate('AGR_CITY_RECOVERY', { by: 'AGR' });
   const avail = Object.fromEntries(SECTORS.map((s) => [s, g.availableWorkers(g.state.sectors[s])]));
-  for (const s of SECTORS) assert.ok(avail[s] < 8, `${s} did not lend a worker`);
+  for (const s of SECTORS) assert.ok(avail[s] < 5, `${s} did not lend a worker`);
   g.activateRound('R3');
-  for (const s of SECTORS) assert.equal(g.availableWorkers(g.state.sectors[s]), 8, `${s} did not get its worker back`);
+  for (const s of SECTORS) assert.equal(g.availableWorkers(g.state.sectors[s]), 5, `${s} did not get its worker back`);
   assert.equal(logEvents(g, 'agr_decision_notice').length, 5);
   // A restore keeps the notices; the result itself belongs to the round it was made in, and R3 has dealt.
   const snap = JSON.parse(JSON.stringify(g.serialise()));
