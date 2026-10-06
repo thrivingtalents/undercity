@@ -1,6 +1,6 @@
 // UNDERCITY — fault card deck renderer.
 // Reads content/faults.json (from export_faults.py) -> two DOCX files:
-//   UNDERCITY_FaultCards.docx   36 cards, 4-up on A4, cut lines, round-tabbed
+//   UNDERCITY_FaultCards.docx   60 cards, 15-up on four landscape A4 sheets, cut lines
 //   UNDERCITY_AnswerKey.docx    facilitator-only: codes, spec sources, notes
 //
 // Run: node build_cards.js [content/faults.json] [outdir]
@@ -9,12 +9,21 @@
 // source, or the resource cost. It shows the code to look up and nothing else.
 // The binder is the only route from card to procedure. Breaking this collapses
 // the cross-sector conversation the whole simulation exists to produce.
+//
+// FOUR SHEETS (2026-10-06). The deck is exactly four landscape A4 pages, three
+// columns by five rows, fifteen cards a page, in numerical order: 8 mm page
+// margins, 4 mm between columns, 3 mm between rows, every row an exact height
+// so no card ever crosses a page. A card is a plain white rectangle with a thin
+// light-grey cut border: the sector code and round on one small line under a
+// hairline in the sector colour, the fault code as the clearest thing on it,
+// the name with its severity triangles, a red TIME-CRITICAL word where the
+// fault carries one, the symptom, and the lookup reminder as a small footer.
 
 const fs = require("fs");
 const path = require("path");
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  WidthType, ShadingType, AlignmentType, BorderStyle, VerticalAlign, PageBreak,
+  WidthType, ShadingType, AlignmentType, BorderStyle, VerticalAlign,
   PageOrientation,
 } = require("docx");
 
@@ -68,104 +77,115 @@ const tabLabel = (f) => f.section || ROUND_LABEL[f.round] || ROUND_LABEL[null];
 
 const { INK, MUTED } = P;
 
-// A4 landscape content area, 2 cols x 2 rows = A6-ish cards
-const PORTRAIT_W = 11906, PORTRAIT_H = 16838;   // A4 portrait DXA
-const LAND_W = 16838, MARGIN = 720;             // effective landscape width
-const GRID_W = LAND_W - MARGIN * 2;             // 15398
-const COL_W = Math.floor(GRID_W / 2);           // 7699
-const ROW_H = 4900;                          // DXA per card row
+// ---------------------------------------------------------------- the sheet
+// A4 landscape, in DXA (1 mm = 56.69). The grid fills the page inside 8 mm
+// margins: three 91 mm columns with 4 mm between them, five rows with 3 mm
+// between them. Every row is an exact height. Word draws an exact row about
+// 1.2 mm taller than its figure (measured on the exported PDF), so the card
+// is declared at 34.6 mm to print at 35.8: five of them and four gutters come
+// to 191 mm of the 194 available, and the sheet's own paragraph marks never
+// push a fifth page.
+const PORTRAIT_W = 11906, PORTRAIT_H = 16838;   // A4 portrait DXA; the section turns it landscape
+const MM = 56.69;
+const MARGIN = Math.round(8 * MM);              // 454
+const CARD_W = Math.round(91 * MM);             // 5159
+const CARD_H = Math.round(34.6 * MM);           // 1961
+const GUTTER_X = Math.round(4 * MM);            // 227
+const GUTTER_Y = Math.round(3 * MM);            // 170
+const COLS = 3, ROWS = 5, PER_PAGE = COLS * ROWS;
+const GRID_W = COLS * CARD_W + (COLS - 1) * GUTTER_X;   // 15931 — the usable width is 15930, the last column takes the difference
+const COL_WIDTHS = [CARD_W, GUTTER_X, CARD_W, GUTTER_X, CARD_W - (GRID_W - (PORTRAIT_H - 2 * MARGIN))];
 
-const cutBorder = () => ({
-  top:    { style: BorderStyle.DASHED, size: 4, color: P.DASH },
-  bottom: { style: BorderStyle.DASHED, size: 4, color: P.DASH },
-  left:   { style: BorderStyle.DASHED, size: 4, color: P.DASH },
-  right:  { style: BorderStyle.DASHED, size: 4, color: P.DASH },
-});
+/** The cut border: thin, light grey, a guide for the scissors and nothing more. */
+const cutBorder = () => {
+  const line = { style: BorderStyle.SINGLE, size: 4, color: P.mono ? P.DASH : "CCCCCC" };
+  return { top: line, bottom: line, left: line, right: line };
+};
+const noBorder = () => {
+  const none = { style: BorderStyle.NONE };
+  return { top: none, bottom: none, left: none, right: none };
+};
 
 const sevPips = (n) => "▲".repeat(n);
 
-function cardCell(f) {
+/** One card. Header line, code, name + severity, TIME-CRITICAL where it applies, symptom, footer. */
+function cardCell(f, width) {
   const s = SECTOR[f.sector];
   const kids = [];
 
-  // colour bar
+  // sector · name · round, on one small line, over a hairline in the sector colour
   kids.push(new Paragraph({
-    spacing: { after: 0 },
-    border: { bottom: { style: BorderStyle.SINGLE, size: 24, color: P.sector(s.colour) } },
-    children: [new TextRun({ text: "", size: 2 })],
-  }));
-
-  // sector + round tab
-  kids.push(new Paragraph({
-    spacing: { before: 120, after: 100 },
+    spacing: { after: 50, line: 220, lineRule: "auto" },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: P.sector(s.colour), space: 2 } },
     children: [
-      new TextRun({ text: `${f.sector}  `, font: "Arial", size: 20, bold: true, color: P.sector(s.colour), characterSpacing: 40 }),
-      new TextRun({ text: s.name, font: "Arial", size: 14, ...(P.mono ? { bold: true, color: INK } : { color: MUTED }), characterSpacing: 40 }),
-      new TextRun({ text: `     ${tabLabel(f)}`, font: "Arial", size: 12, color: P.mono ? MUTED : "AAAAAA", characterSpacing: 60 }),
+      new TextRun({ text: f.sector, font: "Arial", size: 15, bold: true, color: P.sector(s.colour) }),
+      new TextRun({ text: ` · ${s.name} · ${tabLabel(f)}`, font: "Arial", size: 15, color: P.mono ? INK : MUTED }),
     ],
   }));
 
-  // fault code — the only thing that matters operationally
+  // fault code — the clearest thing on the card
   kids.push(new Paragraph({
-    spacing: { after: 40 },
-    children: [new TextRun({ text: f.code, font: "Courier New", size: 56, bold: true, color: INK })],
+    spacing: { before: 40, after: 10, line: 240, lineRule: "auto" },
+    children: [new TextRun({ text: f.code, font: "Arial", size: 22, bold: true, color: INK })],
   }));
 
   // name + severity
   kids.push(new Paragraph({
-    spacing: { after: 120 },
+    spacing: { after: 20, line: 230, lineRule: "auto" },
     children: [
-      new TextRun({ text: f.name, font: "Arial", size: 24, bold: true, color: INK }),
-      new TextRun({ text: `   ${sevPips(f.severity)}`, font: "Arial", size: 18, color: f.severity >= 3 ? P.WARN : MUTED }),
+      new TextRun({ text: f.name, font: "Arial", size: 18, bold: true, color: INK }),
+      new TextRun({ text: `  ${sevPips(f.severity)}`, font: "Arial", size: 15, color: f.severity >= 3 ? P.WARN : MUTED }),
     ],
   }));
 
   // TIME-CRITICAL (late shift): the word, never a number — nothing counts down.
   if (f.time_critical) {
     kids.push(new Paragraph({
-      spacing: { after: 100 },
-      shading: P.mono ? { type: ShadingType.CLEAR, fill: "000000", color: "auto" } : undefined,
-      children: [new TextRun({ text: "TIME-CRITICAL", font: "Arial", size: 16, bold: true, color: P.mono ? "FFFFFF" : P.WARN, characterSpacing: 60 })],
+      spacing: { after: 20, line: 220, lineRule: "auto" },
+      children: [new TextRun({ text: "TIME-CRITICAL", font: "Arial", size: 14, bold: true, color: P.WARN })],
     }));
   }
 
-  // flavour
+  // symptom
   kids.push(new Paragraph({
-    spacing: { after: 160 },
-    children: [new TextRun({ text: cardFlavour(f), font: "Arial", size: 18, color: P.LORE })],
+    spacing: { after: 40, line: 230, lineRule: "auto" },
+    children: [new TextRun({ text: cardFlavour(f), font: "Arial", size: 16, color: P.LORE })],
   }));
-
 
   // instruction footer — identical on every card
   kids.push(new Paragraph({
-    spacing: { before: 60 },
-    border: { top: { style: BorderStyle.SINGLE, size: 4, color: P.mono ? P.RULE : "CCCCCC" } },
-    children: [new TextRun({ text: "LOOK UP THIS CODE IN YOUR FAULT INDEX", font: "Arial", size: 16, bold: true, color: MUTED, characterSpacing: 40 })],
+    spacing: { after: 0, line: 220, lineRule: "auto" },
+    children: [new TextRun({ text: "LOOK UP THIS CODE IN YOUR FAULT INDEX", font: "Arial", size: 14, color: MUTED })],
   }));
 
   return new TableCell({
-    width: { size: COL_W, type: WidthType.DXA },
+    width: { size: width, type: WidthType.DXA },
     verticalAlign: VerticalAlign.TOP,
-    margins: { top: 200, bottom: 200, left: 320, right: 320 },
+    margins: { top: 90, bottom: 70, left: 140, right: 140 },
     borders: cutBorder(),
     children: kids,
   });
 }
 
-const blankCell = () => new TableCell({
-  width: { size: COL_W, type: WidthType.DXA },
-  borders: {
-    top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE },
-    left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE },
-  },
-  children: [new Paragraph({ text: "" })],
+const gutterCell = (width) => new TableCell({
+  width: { size: width, type: WidthType.DXA },
+  borders: noBorder(),
+  margins: { top: 0, bottom: 0, left: 0, right: 0 },
+  children: [new Paragraph({ spacing: { before: 0, after: 0, line: 20 }, children: [new TextRun({ text: "", size: 2 })] })],
+});
+
+const blankCell = (width) => new TableCell({
+  width: { size: width, type: WidthType.DXA },
+  borders: noBorder(),
+  children: [new Paragraph({ spacing: { before: 0, after: 0, line: 20 }, children: [new TextRun({ text: "", size: 2 })] })],
 });
 
 // ---------------------------------------------------------------- deck
 
-// Print order: grouped by round so the deck can be tabbed and reset fast.
-// REFERENCE CHAIN is an unnumbered section at the back — the same card, the
-// same tab line, no round number, because these are not dealt by a round.
+// Print order: numerical, which is also by round, so the deck can be tabbed and
+// reset fast. REFERENCE CHAIN and LATE SHIFT follow the rounds — the same
+// card, the same tab line, no round number, because these are not dealt by a
+// round.
 const ORDER = ["R0", "R1", "R2", "R3", "R4", "R5", "R6", "R7"];
 const deck = [];
 for (const r of ORDER) {
@@ -174,33 +194,49 @@ for (const r of ORDER) {
 deck.push(...chainFaults.slice().sort((a, b) => a.code.localeCompare(b.code)));
 deck.push(...lateFaults.slice().sort((a, b) => a.code.localeCompare(b.code)));
 
-const cardChildren = [];
-for (let i = 0; i < deck.length; i += 4) {
-  const chunk = deck.slice(i, i + 4);
+/** One sheet: fifteen cards in a 3 x 5 grid with gutter rows and columns between them. */
+function sheet(cards) {
   const rows = [];
-  for (let r = 0; r < 2; r++) {
-    const a = chunk[r * 2], b = chunk[r * 2 + 1];
-    if (!a) break;
-    rows.push(new TableRow({
-      height: { value: ROW_H, rule: "atLeast" },
-      children: [cardCell(a), b ? cardCell(b) : blankCell()],
-    }));
+  for (let r = 0; r < ROWS; r += 1) {
+    const cells = [];
+    for (let c = 0; c < COLS; c += 1) {
+      const f = cards[r * COLS + c];
+      cells.push(f ? cardCell(f, COL_WIDTHS[c * 2]) : blankCell(COL_WIDTHS[c * 2]));
+      if (c < COLS - 1) cells.push(gutterCell(COL_WIDTHS[c * 2 + 1]));
+    }
+    rows.push(new TableRow({ height: { value: CARD_H, rule: "exact" }, cantSplit: true, children: cells }));
+    if (r < ROWS - 1) {
+      rows.push(new TableRow({
+        height: { value: GUTTER_Y, rule: "exact" }, cantSplit: true,
+        children: COL_WIDTHS.map((w) => gutterCell(w)),
+      }));
+    }
   }
-  cardChildren.push(new Table({
-    columnWidths: [COL_W, COL_W],
-    width: { size: GRID_W, type: WidthType.DXA },
+  return new Table({
+    columnWidths: COL_WIDTHS,
+    width: { size: COL_WIDTHS.reduce((a, b) => a + b, 0), type: WidthType.DXA },
+    borders: noBorder(),
     rows,
-  }));
-  if (i + 4 < deck.length) cardChildren.push(new Paragraph({ children: [new PageBreak()] }));
+  });
 }
 
+const cardChildren = [];
+const sheets = Math.ceil(deck.length / PER_PAGE);
+for (let i = 0; i < deck.length; i += PER_PAGE) {
+  // a page starts here: a 1 pt paragraph that breaks before itself can never print an empty leaf
+  if (i > 0) cardChildren.push(new Paragraph({ pageBreakBefore: true, spacing: { before: 0, after: 0, line: 20 }, children: [new TextRun({ text: "", size: 2 })] }));
+  cardChildren.push(sheet(deck.slice(i, i + PER_PAGE)));
+}
+// the body's closing paragraph mark, kept to a point so it never asks for a fifth page
+cardChildren.push(new Paragraph({ spacing: { before: 0, after: 0, line: 20 }, children: [new TextRun({ text: "", size: 2 })] }));
+
 const cardsDoc = new Document({
-  styles: { default: { document: { run: { font: "Arial", size: 20, color: INK } } } },
+  styles: { default: { document: { run: { font: "Arial", size: 15, color: INK } } } },
   sections: [{
     properties: {
       page: {
         size: { width: PORTRAIT_W, height: PORTRAIT_H, orientation: PageOrientation.LANDSCAPE },
-        margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
+        margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN, header: 0, footer: 0 },
       },
     },
     children: cardChildren,
@@ -295,7 +331,7 @@ const keyPath = path.join(OUTDIR, P.out("UNDERCITY_AnswerKey.docx"));
 
 Packer.toBuffer(cardsDoc).then((b) => {
   fs.writeFileSync(cardPath, b);
-  console.log(`✓ ${cardPath}  (${deck.length} cards, ${Math.ceil(deck.length / 4)} A4 sheets, 4-up)`);
+  console.log(`✓ ${cardPath}  (${deck.length} cards, ${sheets} landscape A4 sheets, ${PER_PAGE}-up)`);
 });
 Packer.toBuffer(keyDoc).then((b) => {
   fs.writeFileSync(keyPath, b);

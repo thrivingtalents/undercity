@@ -35,7 +35,7 @@ const FACILITATOR_ONLY = new Set([
 ]);
 
 const TITLES = {
-  'UNDERCITY_FaultCards.docx': 'Fault card deck — optional props, 4-up on A4; the console is the alert',
+  'UNDERCITY_FaultCards.docx': 'Fault card deck — optional props, 60 cards 15-up on four landscape A4 sheets, cut on the grey lines; the console is the alert',
   'UNDERCITY_CityCharter.docx': 'City Charter + Continuity Order ballot',
   'UNDERCITY_RoleCards.docx': 'Role cards — one per participant',
   'UNDERCITY_TransferChits.docx': 'Transfer chits',

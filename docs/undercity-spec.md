@@ -161,7 +161,7 @@ Discrepancy seed: WTR binder Table W-4 row 3 = **340** (vs big screen 290). Flag
 
 ### 4.2 Fault Cards — deck of 30 (+6 tutorial)
 
-A6 cards, sector-coloured border, printed 4-per-A4 and cut. Each card:
+Cards 91 × 36 mm with a thin grey cut border and the sector colour as a hairline, printed 15 to a landscape A4 sheet (four sheets, numerical order, 2026-10-06) and cut. Each card:
 - Front: fault code (large), fault name, flavour line (1 sentence), severity icon (▲ minor / ▲▲ major / ▲▲▲ critical), "LOOK UP IN YOUR FAULT INDEX."
 - Back: blank (no answers on cards — answers live in binders).
 - Deck composition (as built, see matrix; evened out 2026-09-27): 6 R0 tutorial cards (one per sector), 6 R1 (self-contained, minor, one per sector), 12 R2 (cross-sector ring, two per sector), 6 R3 (critical, two-spec, one per sector), 6 R4 (novel combinations raiding other binders' buried appendices — tests transfer, not memory; one per sector). Total 36, six per sector, no false alarm.
